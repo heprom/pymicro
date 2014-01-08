@@ -267,12 +267,12 @@ def lattice_grid(lattice):
   grid.SetPoints(Points)
   return grid
 
-def lattice_3d(grid):
+def lattice_3d(grid, tubeRadius=0.02, sphereRadius=0.1):
   Edges = vtk.vtkExtractEdges()
   Edges.SetInput(grid)
   Tubes = vtk.vtkTubeFilter()
   Tubes.SetInputConnection(Edges.GetOutputPort())
-  Tubes.SetRadius(.02)
+  Tubes.SetRadius(tubeRadius)
   Tubes.SetNumberOfSides(6)
   Tubes.UseDefaultNormalOn()
   Tubes.SetDefaultNormal(.577, .577, .577)
@@ -284,7 +284,7 @@ def lattice_3d(grid):
 
   # Create a sphere to use as a glyph source for vtkGlyph3D.
   Sphere = vtk.vtkSphereSource()
-  Sphere.SetRadius(0.1)
+  Sphere.SetRadius(sphereRadius)
   Sphere.SetPhiResolution(20)
   Sphere.SetThetaResolution(20)
   Vertices = vtk.vtkGlyph3D()

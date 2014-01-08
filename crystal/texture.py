@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 import numpy as np
-from microstructure import Grain
+from microstructure import Orientation
 from matplotlib import pyplot as plt, colors, cm
 
 class PoleFigure:
 
-  def __init__(self, structure='cubic', proj='stereo'):
+  def __init__(self, structure='cubic', proj='stereo', \
+               orientation = Orientation(0.0, 0.0, 0.0, type='euler')):
     self.structure = structure
     self.proj = proj
+    self.orientation = orientation
     self.x = np.array([1,0,0])
     self.y = np.array([0,1,0])
     self.z = np.array([0,0,1])
@@ -16,6 +18,7 @@ class PoleFigure:
       self.c001s = np.array([[0,0,1],[0,1,0],[1,0,0]], dtype=np.float)
       self.c011s = np.array([[0,1,1],[1,0,1],[1,1,0],[0,-1,1],[-1,0,1],[-1,1,0]], dtype=np.float) / np.sqrt(2)
       self.c111s = np.array([[1,1,1],[-1,-1,1],[1,-1,1],[-1,1,1]], dtype=np.float) / np.sqrt(3)
+      #self.c111s = np.array([[-1,-1,-1],[1,1,-1],[-1,1,-1],[1,-1,-1]], dtype=np.float) / np.sqrt(3)
     #elif self.structure == 'hexagonal':
     else:
       raise TypeError('unsupported crystal structure', structure)
@@ -27,7 +30,7 @@ class PoleFigure:
     elif self.proj == 'stereo':
       c = c_dir + self.z
       c /= c[2] # SP'/SP = r/z with r=1
-      cp = np.cross(c, self.z)
+      cp = c #cp = np.cross(c, self.z)
     else:
       raise TypeError('Error, unsupported projection type', proj)
     if c_dir[2] < 0: cp *= -1
@@ -49,14 +52,33 @@ class PoleFigure:
       path[j,1] = ci[1]
     ax.plot(path[:,0], path[:,1], 'g-', markersize=6)
 
-  def plot_ipf(self, ax=None):
-    # create the inverse pole figure
+  def plot_pf_background(self, ax):
     an = np.linspace(0,2*np.pi,100)
     plt.hold('on')
     ax.plot(np.cos(an), np.sin(an), 'k-')
     ax.plot([-1,1], [0,0], 'k-')
     ax.plot([0,0], [-1,1], 'k-')
-    # inverse pole figure for direction Z
+
+  def plot_pf(self, ax=None):
+    # create the direct pole figure
+    self.plot_pf_background(ax)
+    ax.annotate('x', (1.01, 0.0), xycoords='data',
+      fontsize=16, horizontalalignment='left', verticalalignment='center')
+    ax.annotate('y', (0.0, 1.01), xycoords='data',
+      fontsize=16, horizontalalignment='center', verticalalignment='bottom')
+    for c in self.c111s:
+      B = self.orientation.orientation_matrix()
+      Bt = B.transpose()
+      c_rot = Bt.dot(c)
+      print 'plotting ',c,' in sample CS:',c_rot
+      self.plot_crystal_dir(c_rot, mk='o', col='k', ax=ax, ann=False)
+    ax.axis([-1.1,1.1,-1.1,1.1])
+    ax.axis('off')
+    ax.set_title('direct %s projection' % self.proj)
+
+  def plot_ipf(self, ax=None):
+    # create the inverse pole figure for direction Z
+    self.plot_pf_background(ax)
     for c in self.c111s:
       for i in range(3):
         d = c.copy(); d[i] = 0
@@ -71,18 +93,32 @@ class PoleFigure:
       for c in dirs:
         if np.dot(c,self.z) == 0.0:
           self.plot_crystal_dir(-c, mk=markers[i], col='k', ax=ax, ann=False)
-
+    # plot the sample z-axis
+    B = self.orientation.orientation_matrix()
+    Bt = B.transpose()
+    z_rot = Bt.dot(self.z)
+    self.plot_crystal_dir(z_rot, mk='s', col='r', ax=ax, ann=True)
+    print 'plotting ',self.z,' in sample CS:',z_rot
     ax.axis([-1.1,1.1,-1.1,1.1])
     ax.axis('off')
-    ax.set_title(self.proj + ' projection')
+    ax.set_title('inverse %s projection' % self.proj)
 
 if __name__ == '__main__':
-  pf1 = PoleFigure(structure='cubic', proj='flat')
-  pf2 = PoleFigure(structure='cubic', proj='stereo')
-  fig = plt.figure(figsize=(10,5))
-  ax1 = fig.add_subplot(121, aspect='equal')
-  pf1.plot_ipf(ax=ax1)
-  ax2 = fig.add_subplot(122, aspect='equal')
-  pf2.plot_ipf(ax=ax2)
+  pf = PoleFigure(structure='cubic', proj='flat')
+  #pf.proj = 'stereo'
+  print pf.c111s
+  #pf.orientation = Orientation(10.0, 0.0, 0.0)
+  pf.orientation = Orientation(142.8,32.0,214.4)
+  fig = plt.figure(figsize=(12,5))
+  ax1 = fig.add_subplot(131, aspect='equal')
+  pf.plot_pf(ax = ax1)
+  ax2 = fig.add_subplot(132, aspect='equal')
+  pf.proj = 'flat'
+  pf.plot_ipf(ax = ax2)
+  #change projection mode to stereo
+  pf.proj = 'stereo'
+  ax3 = fig.add_subplot(133, aspect='equal')
+  pf.plot_ipf(ax = ax3)
+  plt.subplots_adjust(top=1, bottom=0, left=0, right=1)
   plt.savefig('ipf_full.pdf',format='pdf')
   plt.show()

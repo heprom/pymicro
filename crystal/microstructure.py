@@ -62,7 +62,19 @@ class Orientation:
     orientation = Orientation(phi1, Phi, phi2, type=t)
     return orientation
 
-  '''Compute the orientation matrix. '''
+  '''Compute the orientation matrix associated with the crystal orientation. 
+     this follows the passive rotation definition which means that it brings 
+     the sample coordinate system into coincidence with the crystal coordinate 
+     system. Then one may express a vector Vc in the crystal coordinate system 
+     from the vector in the sample coordinate system Vs by:
+     
+     Vc = B.Vs
+     
+     and inversely (because B^-1=B^T):
+     
+     Vs = B^T.Vc
+          
+  '''
   def orientation_matrix(self):
     c1 = np.cos(self.phi1*np.pi/180.)
     s1 = np.sin(self.phi1*np.pi/180.)
@@ -94,9 +106,9 @@ class Grain:
   The volume of the grain is expressed in pixel/voxel unit.
   '''
 
-  def __init__(self, grain_id, phi1, Phi, phi2):
-    print '*** INIT ***'
-    self.__init__(grain_id, Orientation(phi1, Phi, phi2, type='euler'))
+  #def __init__(self, grain_id, phi1, Phi, phi2):
+  #  print '*** INIT ***'
+  #  self.__init__(grain_id, Orientation(phi1, Phi, phi2, type='euler'))
 
   def __init__(self, grain_id, grain_orientation):
     self.id = grain_id

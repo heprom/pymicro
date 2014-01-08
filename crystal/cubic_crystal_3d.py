@@ -43,7 +43,7 @@ def create_lattice_3d_with_planes(lattice, hklplanes):
     
     # add an arrow to display the normal to the plane
     arrowActor = unit_arrow_3d(origin, hklplane.normal)
-    assembly.AddPart(arrowActor)  
+    assembly.AddPart(arrowActor)
   
   Edges, Vertices = lattice_3d(grid)
   # add the two actors to the renderer
@@ -56,9 +56,8 @@ def create_lattice_3d_with_planes(lattice, hklplanes):
 
 if __name__ == '__main__':
   '''
-  Create a 3d scene with all the crystal lattice types.
-  Each lattice is created separatly and added to the scene
-  with a small offset so it is displayed nicely.
+  Create a 3d scene with a cubic crystal lattice.
+  Hkl planes are added to the lattice and displayed.
   '''
   # Create the Renderer and RenderWindow
   ren = vtk.vtkRenderer()

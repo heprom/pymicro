@@ -309,6 +309,19 @@ def apply_orientation_to_actor(actor, euler):
   matrix = vtk.vtkMatrix4x4()
   matrix = transform.GetMatrix()
   actor.SetUserTransform(transform)
+
+def data_outline(data, corner=False, color=black):
+  if corner:
+    outlineFilter = vtk.vtkOutlineCornerFilter()
+  else:
+    outlineFilter = vtk.vtkOutlineFilter()
+  outlineFilter.SetInput(data)
+  outlineMapper = vtk.vtkPolyDataMapper()
+  outlineMapper.SetInputConnection(outlineFilter.GetOutputPort())
+  outline = vtk.vtkActor()
+  outline.SetMapper(outlineMapper)
+  outline.GetProperty().SetColor(color)
+  return outline
   
 def grid_vol_view(scan):
   s_size = scan[:-4].split('_')[-2].split('x')
@@ -321,7 +334,7 @@ def grid_vol_view(scan):
   uGrid.SetSpacing(1,1,1)
   uGrid.SetScalarType(to_vtk_type(s_type))
   # read the actual image data
-  print 'reading scan %s.raw with size %dx%dx%d using type %d' % \
+  print 'reading scan %s with size %dx%dx%d using type %d' % \
     (scan, size[0], size[1], size[2], to_vtk_type(s_type))
   reader = vtk.vtkImageReader2() # 2 is faster
   reader.SetDataScalarType(to_vtk_type(s_type))
@@ -369,22 +382,8 @@ def grid_vol_view(scan):
   cam.Dolly(0.6)
   cam.SetClippingRange(0,1000)
   # add axes actor
-  axes = vtk.vtkAxesActor()
   l = 0.5*numpy.mean(size)
-  axes.SetTotalLength(l, l, l)
-  axes.SetXAxisLabelText('x')
-  axes.SetYAxisLabelText('y')
-  axes.SetZAxisLabelText('z')
-  axes.SetShaftTypeToCylinder()
-  axes.SetCylinderRadius(0.02)
-  print axes.GetCylinderRadius()
-  axprop = vtk.vtkTextProperty()
-  axprop.SetColor(0, 0, 0)
-  axprop.SetFontSize(1)
-  axprop.SetFontFamilyToArial()
-  axes.GetXAxisCaptionActor2D().SetCaptionTextProperty(axprop)
-  axes.GetYAxisCaptionActor2D().SetCaptionTextProperty(axprop)
-  axes.GetZAxisCaptionActor2D().SetCaptionTextProperty(axprop)
+  axes = axes_actor(length = l, axisLabels = True)
   # Create renderer
   ren = vtk.vtkRenderer()
   ren.SetBackground(1.0, 1.0, 1.0)
@@ -410,7 +409,7 @@ def vol_view(scan):
   s_size = scan[:-4].split('_')[-2].split('x')
   s_type = scan[:-4].split('_')[-1]
   size = [int(s_size[0]), int(s_size[1]), int(s_size[2])]
-  print 'reading scan %s.raw with size %dx%dx%d using type %d' % \
+  print 'reading scan %s with size %dx%dx%d using type %d' % \
     (scan, size[0], size[1], size[2], to_vtk_type(s_type))
   reader = vtk.vtkImageReader2() # 2 is faster
   reader.SetDataScalarType(to_vtk_type(s_type))
@@ -451,21 +450,8 @@ def vol_view(scan):
   cam.SetFocalPoint(size[0], size[1], size[2])
   cam.SetClippingRange(20,1000)
   # add axes actor
-  axes = vtk.vtkAxesActor()
   l = min(size)
-  axes.SetTotalLength(l, l, l)
-  axes.SetXAxisLabelText('x')
-  axes.SetYAxisLabelText('y')
-  axes.SetZAxisLabelText('z')
-  axes.SetShaftTypeToCylinder()
-  axes.SetCylinderRadius(0.02)
-  axprop = vtk.vtkTextProperty()
-  axprop.SetColor(0, 0, 0)
-  axprop.SetFontSize(1)
-  axprop.SetFontFamilyToArial()
-  axes.GetXAxisCaptionActor2D().SetCaptionTextProperty(axprop)
-  axes.GetYAxisCaptionActor2D().SetCaptionTextProperty(axprop)
-  axes.GetZAxisCaptionActor2D().SetCaptionTextProperty(axprop)
+  axes = axes_actor(length = l, axisLabels = True)
   # Create renderer
   ren = vtk.vtkRenderer()
   ren.SetBackground(1.0, 1.0, 1.0)

@@ -60,7 +60,7 @@ def edf_write(data, fname, type=numpy.uint16, header_size=1024):
   
   This function write a (x,y,z) 3D dataset to the disk.
   The file is written as a Z-stack. It means that the first nx*ny bytes 
-  represent the first slices and so on...
+  represent the first slice and so on...
   '''
   # get current time
   from time import gmtime, strftime
@@ -160,7 +160,7 @@ def HST_write(data, fname):
   This function write a (x,y,z) 3D dataset to the disk.
   The file is written as a Z-stack. It means that the first nx*ny bytes 
   represent the first slices and so on...
-  This function is deprecated and its use should be replaced by edf_read.
+  This function is deprecated and its use should be replaced by the use of edf_write.
   '''
   (nz, ny, nx) = data.shape
   print 'opening',fname,'for writing'

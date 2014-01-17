@@ -310,7 +310,31 @@ def apply_orientation_to_actor(actor, euler):
   matrix = transform.GetMatrix()
   actor.SetUserTransform(transform)
 
+def read_image_data(file_name, size, data_type='uint8'):
+  '''
+  vtk helper function to read a 3d data file.
+  The size is needed in the form (x, y, z) as well a string describing
+  the data type in numpy format (uint8 is assumed by default).
+  Lower file left and little endian are assumed.
+  '''
+  reader = vtk.vtkImageReader2() # 2 is faster
+  reader.SetDataScalarType(to_vtk_type(data_type))
+  reader.SetFileDimensionality(3)
+  reader.SetHeaderSize(0)
+  reader.SetDataByteOrderToLittleEndian()
+  reader.FileLowerLeftOn()
+  reader.SetDataExtent (0, size[0]-1, 0, size[1]-1, 0, size[2]-1)
+  reader.SetNumberOfScalarComponents(1)
+  reader.SetDataOrigin(0, 0, 0)
+  reader.SetFileName(file_name)
+  reader.Update()
+  data = reader.GetOutput()
+  return data
+
 def data_outline(data, corner=False, color=black):
+  '''
+  vtk helper function to draw a bounding box around a volume.
+  '''
   if corner:
     outlineFilter = vtk.vtkOutlineCornerFilter()
   else:
@@ -322,7 +346,52 @@ def data_outline(data, corner=False, color=black):
   outline.SetMapper(outlineMapper)
   outline.GetProperty().SetColor(color)
   return outline
-  
+
+def contourByDiscreteMarchingCubes(data, value, color='grey', diffuseColor='grey', opacity=1.0):
+  contour = vtk.vtkDiscreteMarchingCubes()
+  contour.SetInput(data)
+  contour.SetValue(0, value)
+  contour.Update()
+  normals = vtk.vtkPolyDataNormals()
+  normals.SetInputConnection(contour.GetOutputPort())
+  normals.SetFeatureAngle(60.0)
+  mapper = vtk.vtkPolyDataMapper()
+  mapper.ScalarVisibilityOff()
+  mapper.SetInputConnection(normals.GetOutputPort())
+  mapper.Update()
+  actor = vtk.vtkActor()
+  actor.SetMapper(mapper)
+  print 'setting actor color to',color
+  actor.GetProperty().SetColor(color)
+  actor.GetProperty().SetDiffuseColor(diffuseColor)
+  actor.GetProperty().SetSpecular(.4)
+  actor.GetProperty().SetSpecularPower(10)
+  actor.GetProperty().SetOpacity(opacity)
+  return actor
+
+def render(ren, ren_size=(600, 600), display=True, name='render_3d.png'):
+  # Create a window for the renderer
+  renWin = vtk.vtkRenderWindow()
+  renWin.AddRenderer(ren)
+  renWin.SetSize(ren_size)
+  if display:
+    # Start the initialization and rendering
+    iren = vtk.vtkRenderWindowInteractor()
+    iren.SetRenderWindow(renWin)
+    renWin.Render()
+    iren.Initialize()
+    iren.Start()
+  else:
+    # capture the display and write a png image
+    w2i = vtk.vtkWindowToImageFilter()
+    writer = vtk.vtkPNGWriter()
+    w2i.SetInput(renWin)
+    w2i.Update()
+    writer.SetInputConnection(w2i.GetOutputPort())
+    writer.SetFileName(name)
+    renWin.Render()
+    writer.Write()
+
 def grid_vol_view(scan):
   s_size = scan[:-4].split('_')[-2].split('x')
   s_type = scan[:-4].split('_')[-1]

@@ -159,7 +159,7 @@ def HST_write(data, fname):
   
   This function write a (x,y,z) 3D dataset to the disk.
   The file is written as a Z-stack. It means that the first nx*ny bytes 
-  represent the first slices and so on...
+  represent the first slice and so on...
   This function is deprecated and its use should be replaced by the use of edf_write.
   '''
   (nz, ny, nx) = data.shape

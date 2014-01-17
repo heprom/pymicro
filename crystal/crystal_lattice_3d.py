@@ -86,7 +86,7 @@ if __name__ == '__main__':
   ren.AddViewProp(axes)
 
   # Set the background color.
-  ren.SetBackground(white)
+  ren.SetBackground(1.0, 1.0, 1.0)
   # set up camera
   cam = vtk.vtkCamera()
   cam.SetViewUp(0, 0, 1)

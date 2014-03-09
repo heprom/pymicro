@@ -220,7 +220,7 @@ def unit_arrow_3d(start, vector):
     m.SetElement(i, 0, X[i]);
     m.SetElement(i, 1, Y[i]);
     m.SetElement(i, 2, Z[i]);
-  print m
+  #print m
   t = vtk.vtkTransform()
   t.Identity()
   t.Concatenate(m)
@@ -234,9 +234,9 @@ def unit_arrow_3d(start, vector):
   arrowActor.GetProperty().SetColor(orange)
   return arrowActor
   
-def lattice_grid(lattice):
+def lattice_grid(lattice, origin=[0., 0., 0.]):
   [A, B, C] = lattice.matrix
-  O = [0., 0., 0.] # origin
+  O = origin
 
   # create the eight points based on the lattice matrix
   Points = vtk.vtkPoints()

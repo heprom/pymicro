@@ -11,30 +11,54 @@ from xml.dom.minidom import Document, parse
 class Orientation:
   '''
   Crystallographic orientation class.
+  this follows the passive rotation definition which means that it brings 
+  the sample coordinate system into coincidence with the crystal coordinate 
+  system. Then one may express a vector Vc in the crystal coordinate system 
+  from the vector in the sample coordinate system Vs by:
+  
+  Vc = B.Vs
+  
+  and inversely (because B^-1=B^T):
+  
+  Vs = B^T.Vc
   '''
 
-  '''Euler angles must be specified in degrees.'''
-  def __init__(self, phi1, Phi, phi2, type='euler'):
-    if (type != 'euler'):
-      raise TypeError('unsupported orientation type', type)
-    self.type = type
-    self.phi1 = phi1
-    self.Phi = Phi
-    self.phi2 = phi2
+  '''Initialization from the 9 components of the orientation matrix.'''
+  def __init__(self, matrix):
+    g = np.array(matrix, dtype=np.float64).reshape((3, 3))
+    self._matrix = g
+    print '__init__ Orientation'
+    self.euler = Orientation.OrientationMatrix2Euler(g)
+    self.rod = Orientation.OrientationMatrix2Rodrigues(g)
+
+  def orientation_matrix(self):
+    return self._matrix
 
   '''Provide a string representation of the class.'''
   def __repr__(self):
-    return "orientation = (%.3f, %.3f, %.3f)" % (self.phi1, self.Phi, self.phi2)
+    s = 'Crystal Orientation'
+    s += '\norientation matrix = %s' % self._matrix.view()
+    s += '\nEuler angles (degrees) = (%8.3f,%8.3f,%8.3f)' % (self.phi1(), self.Phi(), self.phi2())
+    s += '\nRodrigues vector = %s' % self.OrientationMatrix2Rodrigues(self._matrix)
+    return s
+
+  '''Convenience methode to expose the first Euler angle.'''
+  def phi1(self):
+    return self.euler[0]
+
+  '''Convenience methode to expose the second Euler angle.'''
+  def Phi(self):
+    return self.euler[1]
+
+  '''Convenience methode to expose the third Euler angle.'''
+  def phi2(self):
+    return self.euler[2]
 
   '''
   Returns an XML representation of the Orientation instance.
   '''
   def to_xml(self, doc):
     orientation = doc.createElement('Orientation')
-    orientation_type = doc.createElement('Type')
-    orientation_type_text = doc.createTextNode('%s' % self.type)
-    orientation_type.appendChild(orientation_type_text)
-    orientation.appendChild(orientation_type)
     orientation_phi1 = doc.createElement('phi1')
     orientation_phi1_text = doc.createTextNode('%f' % self.phi1)
     orientation_phi1.appendChild(orientation_phi1_text)
@@ -51,50 +75,149 @@ class Orientation:
 
   @staticmethod
   def from_xml(orientation_node):
-    orientation_type = orientation_node.childNodes[0]
     orientation_phi1 = orientation_node.childNodes[1]
     orientation_Phi = orientation_node.childNodes[2]
     orientation_phi2 = orientation_node.childNodes[3]
-    t = orientation_type.childNodes[0].nodeValue
     phi1 = float(orientation_phi1.childNodes[0].nodeValue)
     Phi = float(orientation_Phi.childNodes[0].nodeValue)
     phi2 = float(orientation_phi2.childNodes[0].nodeValue)
-    orientation = Orientation(phi1, Phi, phi2, type=t)
+    orientation = Orientation.from_euler(np.array([phi1, Phi, phi2]))
     return orientation
 
-  '''Compute the orientation matrix associated with the crystal orientation. 
-     this follows the passive rotation definition which means that it brings 
-     the sample coordinate system into coincidence with the crystal coordinate 
-     system. Then one may express a vector Vc in the crystal coordinate system 
-     from the vector in the sample coordinate system Vs by:
-     
-     Vc = B.Vs
-     
-     and inversely (because B^-1=B^T):
-     
-     Vs = B^T.Vc
-          
+  @staticmethod
+  def from_euler(euler):
+    g = Orientation.Euler2OrientationMatrix(euler)
+    o = Orientation(g)
+    return o
+
+  @staticmethod
+  def from_rodrigues(rod):
+    g = Orientation.Rodrigues2OrientationMatrix(rod)
+    o = Orientation(g)
+    return o
+
   '''
-  def orientation_matrix(self):
-    c1 = np.cos(self.phi1*np.pi/180.)
-    s1 = np.sin(self.phi1*np.pi/180.)
-    c = np.cos(self.Phi*np.pi/180.)
-    s = np.sin(self.Phi*np.pi/180.)
-    c2 = np.cos(self.phi2*np.pi/180.)
-    s2 = np.sin(self.phi2*np.pi/180.)
+  Compute the orientation matrix associated with the 3 Euler angles (given in degrees).
+  '''
+  @staticmethod
+  def Euler2OrientationMatrix(euler):
+    (rphi1, rPhi, rphi2) = np.radians(euler)
+    c1 = np.cos(rphi1)
+    s1 = np.sin(rphi1)
+    c = np.cos(rPhi)
+    s = np.sin(rPhi)
+    c2 = np.cos(rphi2)
+    s2 = np.sin(rphi2)
 
     # rotation matrix B
-    b11 = c1*c2-s1*s2*c
-    b12 = s1*c2+c1*s2*c
+    b11 = c1*c2 - s1*s2*c
+    b12 = s1*c2 + c1*s2*c
     b13 = s2*s
-    b21 = -c1*s2-s1*c2*c
-    b22 = -s1*s2+c1*c2*c
+    b21 = -c1*s2 - s1*c2*c
+    b22 = -s1*s2 + c1*c2*c
     b23 = c2*s
     b31 = s1*s
     b32 = -c1*s
     b33 = c
-    B = np.array([[b11,b12,b13],[b21,b22,b23],[b31,b32,b33]])
+    B = np.array([[b11, b12, b13], [b21, b22, b23], [b31, b32, b33]])
     return B
+
+  '''
+  Compute the Euler angles (in degrees) from the orientation matrix.
+  '''
+  @staticmethod
+  def OrientationMatrix2Euler(g, eps=0.000001):
+    if np.abs(g[2,2] - 1) < eps:
+      phi1 = np.arctan(g[0,1] / g[0,0])
+      Phi = 0.0
+      phi2 = phi1
+      return np.degrees(np.array([phi1, Phi, phi2]))
+    else:
+      phi1 = np.arctan(-g[2,0] / g[2,1])
+      Phi = np.arccos(g[2,2])
+      phi2 = np.arctan(g[0,2]/g[1,2])
+      return np.degrees(np.array([phi1, Phi, phi2]))
+
+  '''
+  Compute the rodrigues vector from the orientation matrix.
+  '''
+  @staticmethod
+  def OrientationMatrix2Rodrigues(g, eps=0.000001):
+    t = g.trace() + 1
+    if np.abs(t) < eps:
+      return np.zeros(3)
+    else:
+      r1 = (g[1,2] - g[2,1]) / t
+      r2 = (g[2,0] - g[0,2]) / t
+      r3 = (g[0,1] - g[1,0]) / t
+    return np.array([r1, r2, r3])
+
+  '''
+  Compute the orientation matrix from the rodrigues vector.
+  '''
+  @staticmethod
+  def Rodrigues2OrientationMatrix(rod, eps=0.000001):
+    r = np.linalg.norm(rod)
+    I = np.diagflat(np.ones(3))
+    if r < eps:
+      return I
+    else:
+      theta = 2*np.arctan(r)
+      n = rod / r
+      omega = np.array([[0.0, n[2], -n[1]], [-n[2], 0.0, n[0]], [n[1], -n[0], 0.0]])
+      return I + np.sin(theta) * omega + (1 - np.cos(theta)) * omega.dot(omega)
+
+  '''
+  Compute the quaternion from the 3 euler angles (in degrees)
+  '''
+  @staticmethod
+  def Euler2Quaternion(euler):
+    (phi1, Phi, phi2) = np.radians(euler)
+    q0 = np.cos(0.5 * (phi1 + phi2)) * np.cos(0.5*Phi)
+    q1 = np.cos(0.5 * (phi1 - phi2)) * np.sin(0.5*Phi)
+    q2 = np.sin(0.5 * (phi1 - phi2)) * np.sin(0.5*Phi)
+    q3 = np.sin(0.5 * (phi1 + phi2)) * np.cos(0.5*Phi)
+    return np.array([q0, q1, q2, q3])
+
+  '''
+  Compute the rodrigues vector from the 3 euler angles (in degrees)
+  '''
+  @staticmethod
+  def Euler2Rodrigues(euler):
+    (phi1, Phi, phi2) = np.radians(euler)
+    a = 0.5 * (phi1 - phi2)
+    b = 0.5 * (phi1 + phi2)
+    r1 = np.tan(0.5*Phi) * np.cos(a) / np.cos(b)
+    r2 = np.tan(0.5*Phi) * np.sin(a) / np.cos(b)
+    r3 = np.tan(b)
+    return np.array([r1, r2, r3])
+    
+  '''
+  Read a set of grain orientations from a z-set input file.
+  '''
+  @staticmethod
+  def read_euler_from_zset_inp(inp_path):
+    inp = open(inp_path)
+    lines = inp.readlines()
+    for i,line in enumerate(lines):  
+      if line.lstrip().startswith('***material'):
+        break
+    euler_lines = []
+    for j,line in enumerate(lines[i+1:]):  
+      if line.lstrip().startswith('***'):
+        break
+      if (not line.lstrip().startswith('%') and line.find('**elset')>0):
+        euler_lines.append(line)
+    euler = []
+    for l in euler_lines:
+      tokens = l.split()
+      elset = tokens[tokens.index('**elset')+1]
+      phi1 = tokens[tokens.index('*rotation')+1]
+      Phi = tokens[tokens.index('*rotation')+2]
+      phi2 = tokens[tokens.index('*rotation')+3]
+      angles = np.array([float(phi1), float(Phi), float(phi2)])
+      euler.append([elset, Orientation.from_euler(angles)])
+    return dict(euler)
 
 class Grain:
   '''
@@ -105,10 +228,6 @@ class Grain:
   The position field is the center of mass of the grain in world coordinates.
   The volume of the grain is expressed in pixel/voxel unit.
   '''
-
-  #def __init__(self, grain_id, phi1, Phi, phi2):
-  #  print '*** INIT ***'
-  #  self.__init__(grain_id, Orientation(phi1, Phi, phi2, type='euler'))
 
   def __init__(self, grain_id, grain_orientation):
     self.id = grain_id
@@ -232,6 +351,17 @@ class Microstructure:
     self.grains = []
     self.vtkmesh = None
 
+  '''create random color map.
+     The first color can be enforced to black and usually figure out the background.
+     The random seed is fixed to consistently produce the same colormap. '''
+  @staticmethod
+  def rand_cmap(N=4096, first_is_black = False):
+    np.random.seed(13)
+    rand_colors = np.random.rand(N, 3)
+    if first_is_black:
+      rand_colors[0] = [0., 0., 0.] # enforce black background (value 0)
+    return colors.ListedColormap(rand_colors)
+    
   @staticmethod
   def from_xml(xml_file_name):
     micro = Microstructure()
@@ -357,12 +487,8 @@ class EbsdMicrostructure:
       iq = self.records[:,5].reshape(self.shape)
       plt.imshow(iq, cmap=cm.gray, interpolation='nearest')
     elif type == 'GID':
-      np.random.seed(13)
-      rand_colors = np.random.rand(4096,3)
-      rand_colors[0] = [0., 0., 0.] # enforce black background (value 0)
-      rand_cmap = colors.ListedColormap(rand_colors)
       gid = self.records[:,8].reshape(self.shape)
-      plt.imshow(gid, cmap=rand_cmap, interpolation='nearest')
+      plt.imshow(gid, cmap=Microstructure.rand_cmap(), interpolation='nearest')
     else:
       raise TypeError('unsupported ebsd plot type', type)
     if save:

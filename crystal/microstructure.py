@@ -127,16 +127,45 @@ class Orientation:
   '''
   @staticmethod
   def OrientationMatrix2Euler(g, eps=0.000001):
+    # compute rodrigues vector
+    R = Orientation.OrientationMatrix2Rodrigues(g, eps=eps)
     if np.abs(g[2,2] - 1) < eps:
       phi1 = np.arctan(g[0,1] / g[0,0])
       Phi = 0.0
       phi2 = phi1
-      return np.degrees(np.array([phi1, Phi, phi2]))
     else:
       phi1 = np.arctan(-g[2,0] / g[2,1])
       Phi = np.arccos(g[2,2])
-      phi2 = np.arctan(g[0,2]/g[1,2])
-      return np.degrees(np.array([phi1, Phi, phi2]))
+      phi2 = np.arctan(g[0,2] / g[1,2])
+    # conditions determined by Jia Li, fev 2012
+    if phi1 < 0:
+      if phi2 > 0:
+        if R[0] > 0:
+          phi1 += 2*np.pi
+        else:
+          phi1 += np.pi
+          phi2 += np.pi
+      else: # phi2 < 0
+        if R[0] > 0:
+          phi1 += 2*np.pi
+          phi2 += 2*np.pi
+        else:
+          phi1 += np.pi
+          phi2 += np.pi
+    else: # phi1 > 0
+      if phi2 > 0:
+        if R[0] > 0:
+          pass # nothing special here
+        else:
+          phi1 += np.pi
+          phi2 += np.pi
+      else: # phi2 < 0
+        if R[0] > 0:
+          pass # nothing special here
+        else:
+          phi1 += np.pi
+          phi2 += np.pi        
+    return np.degrees(np.array([phi1, Phi, phi2]))
 
   '''
   Compute the rodrigues vector from the orientation matrix.

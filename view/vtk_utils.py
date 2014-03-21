@@ -202,7 +202,7 @@ def add_HklPlane_with_orientation_in_grain(grain):
   local_orientation.AddPart(hklplaneActor)
   return local_orientation
   
-def unit_arrow_3d(start, vector):
+def unit_arrow_3d(start, vector, color=orange):
   arrowSource = vtk.vtkArrowSource()
   # We build a local direct base with X being the unit arrow vector
   X = vector/numpy.linalg.norm(vector)
@@ -231,7 +231,7 @@ def unit_arrow_3d(start, vector):
   mapper.SetInputConnection(transArrow.GetOutputPort())
   arrowActor = vtk.vtkActor()
   arrowActor.SetMapper(mapper)
-  arrowActor.GetProperty().SetColor(orange)
+  arrowActor.GetProperty().SetColor(color)
   return arrowActor
   
 def lattice_grid(lattice, origin=[0., 0., 0.]):
@@ -299,13 +299,16 @@ def lattice_3d(grid, tubeRadius=0.02, sphereRadius=0.1):
   Vertices.GetProperty().SetDiffuseColor(blue)
   return Edges, Vertices
 
-def apply_orientation_to_actor(actor, euler):
-  # transform the actor assembly using the three euler angles
+def apply_orientation_to_actor(actor, orientation):
+  '''
+  Transform the actor assembly using the specified Orientation.
+  The three euler angles are used according to Bunge's convention.
+  '''
   transform = vtk.vtkTransform()
   transform.Identity()
-  transform.RotateZ(euler.phi1)
-  transform.RotateX(euler.Phi)
-  transform.RotateZ(euler.phi2)
+  transform.RotateZ(orientation.phi1())
+  transform.RotateX(orientation.Phi())
+  transform.RotateZ(orientation.phi2())
   matrix = vtk.vtkMatrix4x4()
   matrix = transform.GetMatrix()
   actor.SetUserTransform(transform)

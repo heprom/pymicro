@@ -5,6 +5,16 @@ from matplotlib import pyplot as plt, colors, cm
 
 class PoleFigure:
 
+  '''
+  Create an empty PoleFigure object associated with an empty Microstructure.
+  
+  structure: crystal structure (only 'cubic' for now)
+  proj: projection type, can be either 'stereo' (default) or 'flat'
+  mksize: marker size as displayed on the plots
+  verbose: verbose mode
+  color_by_grain_id: color the spot on the pole figure with grain color
+  pflegend: show the legend (only if color_by_grain_id is active)
+  '''
   def __init__(self, structure='cubic', proj='stereo', \
                microstructure = Microstructure()):
     self.structure = structure
@@ -13,6 +23,7 @@ class PoleFigure:
     self.mksize = 12
     self.verbose = False
     self.color_by_grain_id = False
+    self.pflegend = False
     self.x = np.array([1,0,0])
     self.y = np.array([0,1,0])
     self.z = np.array([0,0,1])
@@ -38,7 +49,7 @@ class PoleFigure:
     plt.savefig(self.microstructure.name + '_pole_figure.pdf',format='pdf')
 
   '''Helper function to plot a crystal direction.'''
-  def plot_crystal_dir(self, c_dir, mk='o', col='k', ax=None, ann=False):
+  def plot_crystal_dir(self, c_dir, mk='o', col='k', ax=None, ann=False, lab=''):
     if c_dir[2] < 0: c_dir *= -1 # make unit vector have z>0
     if self.proj == 'flat':
       cp = c_dir
@@ -49,7 +60,8 @@ class PoleFigure:
       #cp = np.cross(c, self.z)
     else:
       raise TypeError('Error, unsupported projection type', proj)
-    ax.plot(cp[0], cp[1], markerfacecolor=col, marker=mk, markersize=self.mksize)
+    ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
+      markersize=self.mksize, label=lab)
     if ann:
       ax.annotate(c_dir.view(), (cp[0], cp[1]-0.1), xycoords='data',
         fontsize=8, horizontalalignment='center', verticalalignment='center')
@@ -86,12 +98,18 @@ class PoleFigure:
       B = grain.orientation_matrix()
       Bt = B.transpose()
       for c in self.c111s:
+        label = ''
         c_rot = Bt.dot(c)
         if self.verbose: print 'plotting ',c,' in sample CS:',c_rot
         if self.color_by_grain_id:
           col = Microstructure.rand_cmap().colors[grain.id]
-        self.plot_crystal_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann)
+          if self.pflegend and self.c111s.tolist().index(c.tolist()) == 0:
+            # only add grain legend for the first crystal direction
+            label = 'grain ' + str(grain.id)
+        self.plot_crystal_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
     ax.axis([-1.1,1.1,-1.1,1.1])
+    if self.pflegend and self.color_by_grain_id:
+      ax.legend(bbox_to_anchor=(0.1, 1), loc=1, borderaxespad=0.)
     ax.axis('off')
     ax.set_title('direct %s projection' % self.proj)
 

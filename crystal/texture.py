@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
-from microstructure import Orientation, Grain, Microstructure
+from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from matplotlib import pyplot as plt, colors, cm
 
 class PoleFigure:

@@ -4,8 +4,8 @@
 import os, wx, numpy
 from PyMicro.view.wxPlotPanel import PlotPanel
 from matplotlib import pyplot, colors, cm
-from PyMicro.io.file_utils import edf_read
-from PyMicro.view.vtk_utils import vol_view, grid_vol_view
+from pymicro.io.file_utils import edf_read
+from pymicro.view.vtk_utils import vol_view, grid_vol_view
 
 class ImPanel(PlotPanel):
   '''The ImPanel extends PlotPanel to draw the image in a matplotlib 

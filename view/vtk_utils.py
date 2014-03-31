@@ -4,8 +4,8 @@ import vtk
 from vtk.util.colors import *
 import numpy
 # see if some of the stuff needs to be moved to the Microstructure module
-from PyMicro.crystal.lattice import HklPlane
-#from PyMicro.crystal.microstructure import * 
+from pymicro.crystal.lattice import HklPlane
+#from pymicro.crystal.microstructure import * 
 
 def to_vtk_type(type):
   if type == 'uint8':

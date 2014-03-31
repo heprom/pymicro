@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# PyMicro documentation build configuration file, created by
+# pymicro documentation build configuration file, created by
 # sphinx-quickstart on Tue Oct 22 11:17:23 2013.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -21,9 +21,9 @@ sys.path.insert(0, os.path.abspath('..'))
 #sys.path.insert(0, os.path.abspath('./crystal'))
 #sys.path.insert(0, os.path.abspath('./file'))
 #sys.path.insert(0, os.path.abspath('./view'))
-#from PyMicro.crystal import *
-#from PyMicro.file import *
-#from PyMicro.view import *
+#from pymicro.crystal import *
+#from pymicro.file import *
+#from pymicro.view import *
 #print sys.path
 
 # -- General configuration -----------------------------------------------------
@@ -48,7 +48,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'PyMicro'
+project = u'pymicro'
 copyright = u'2013-2014, Henry Proudhon'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -172,7 +172,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'PyMicrodoc'
+htmlhelp_basename = 'pymicrodoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -186,7 +186,7 @@ htmlhelp_basename = 'PyMicrodoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'PyMicro.tex', u'PyMicro Documentation',
+  ('index', 'pymicro.tex', u'pymicro Documentation',
    u'Henry Proudhon', 'manual'),
 ]
 
@@ -219,6 +219,6 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'pymicro', u'PyMicro Documentation',
+    ('index', 'pymicro', u'pymicro Documentation',
      [u'Henry Proudhon'], 1)
 ]

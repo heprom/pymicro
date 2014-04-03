@@ -130,7 +130,7 @@ class Orientation:
     # compute rodrigues vector
     R = Orientation.OrientationMatrix2Rodrigues(g, eps=eps)
     if np.abs(g[2,2] - 1) < eps:
-      phi1 = np.arctan(g[0,1] / g[0,0])
+      phi1 = 0.5*np.arctan(g[0,1] / g[0,0])
       Phi = 0.0
       phi2 = phi1
     else:

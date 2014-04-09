@@ -350,6 +350,28 @@ def data_outline(data, corner=False, color=black):
   outline.GetProperty().SetColor(color)
   return outline
 
+def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0):
+  contour = vtk.vtkContourFilter()
+  contour.SetInput(data)
+  contour.SetValue(0, value)
+  contour.Update()
+  normals = vtk.vtkPolyDataNormals()
+  normals.SetInputConnection(contour.GetOutputPort())
+  normals.SetFeatureAngle(60.0)
+  mapper = vtk.vtkPolyDataMapper()
+  mapper.ScalarVisibilityOff()
+  mapper.SetInputConnection(normals.GetOutputPort())
+  mapper.Update()
+  actor = vtk.vtkActor()
+  actor.SetMapper(mapper)
+  print 'setting actor color to',color
+  actor.GetProperty().SetColor(color)
+  actor.GetProperty().SetDiffuseColor(diffuseColor)
+  actor.GetProperty().SetSpecular(.4)
+  actor.GetProperty().SetSpecularPower(10)
+  actor.GetProperty().SetOpacity(opacity)
+  return actor
+
 def contourByDiscreteMarchingCubes(data, value, color='grey', diffuseColor='grey', opacity=1.0):
   contour = vtk.vtkDiscreteMarchingCubes()
   contour.SetInput(data)

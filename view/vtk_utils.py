@@ -128,16 +128,16 @@ def hot_cmap(table_range=(0,255)):
   lut.SetRange(table_range)
   return lut
 
-def add_hklplane_to_grain(hklplane, grid, euler, origin=(0, 0, 0)):
+def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0)):
   rot_plane = vtk.vtkPlane()
   rot_plane.SetOrigin(origin)
   # rotate the plane by setting the normal
   rot_normal = numpy.array([0., 0., 0.])
   transform = vtk.vtkTransform()
   transform.Identity()
-  transform.RotateZ(euler.phi1)
-  transform.RotateX(euler.Phi)
-  transform.RotateZ(euler.phi2)
+  transform.RotateZ(orientation.phi1())
+  transform.RotateX(orientation.Phi())
+  transform.RotateZ(orientation.phi2())
   matrix = vtk.vtkMatrix4x4()
   matrix = transform.GetMatrix()
   for i in range(3):

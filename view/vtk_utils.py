@@ -12,6 +12,10 @@ def to_vtk_type(type):
     return vtk.VTK_UNSIGNED_CHAR
   elif type == 'uint16':
     return vtk.VTK_UNSIGNED_SHORT
+  elif type == 'float':
+    return vtk.VTK_FLOAT
+  elif type == 'float64':
+    return vtk.VTK_DOUBLE
   
 def rand_cmap(N=256, first_is_black = False, table_range=(0,255)):
   '''create a look up table with random color.

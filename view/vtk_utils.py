@@ -317,7 +317,7 @@ def apply_orientation_to_actor(actor, orientation):
   matrix = transform.GetMatrix()
   actor.SetUserTransform(transform)
 
-def read_image_data(file_name, size, data_type='uint8'):
+def read_image_data(file_name, size, header=0, data_type='uint8'):
   '''
   vtk helper function to read a 3d data file.
   The size is needed in the form (x, y, z) as well a string describing
@@ -327,7 +327,7 @@ def read_image_data(file_name, size, data_type='uint8'):
   reader = vtk.vtkImageReader2() # 2 is faster
   reader.SetDataScalarType(to_vtk_type(data_type))
   reader.SetFileDimensionality(3)
-  reader.SetHeaderSize(0)
+  reader.SetHeaderSize(header)
   reader.SetDataByteOrderToLittleEndian()
   reader.FileLowerLeftOn()
   reader.SetDataExtent (0, size[0]-1, 0, size[1]-1, 0, size[2]-1)

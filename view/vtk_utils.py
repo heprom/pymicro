@@ -12,6 +12,8 @@ def to_vtk_type(type):
     return vtk.VTK_UNSIGNED_CHAR
   elif type == 'uint16':
     return vtk.VTK_UNSIGNED_SHORT
+  elif type == 'uint32':
+    return vtk.VTK_UNSIGNED_INT
   elif type == 'float':
     return vtk.VTK_FLOAT
   elif type == 'float64':

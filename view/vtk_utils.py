@@ -381,6 +381,19 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   actor.GetProperty().SetOpacity(opacity)
   return actor
 
+'''
+  Setup the camera with usual viewing parameters.
+  The camera is looking at the center of the data with the Z-axis vertical.
+'''
+def setupCamera(size=(100,100,100)):
+  cam = vtk.vtkCamera()
+  print 'setting up camera'
+  cam.SetViewUp(0, 0, 1)
+  cam.SetPosition(2*size[0], -2*size[1], 2*size[2])
+  cam.SetFocalPoint(0.5*size[0], 0.5*size[1], 0.5*size[2])
+  cam.SetClippingRange(0, 2*max(size))
+  return cam
+
 def render(ren, ren_size=(600, 600), display=True, name='render_3d.png'):
   # Create a window for the renderer
   renWin = vtk.vtkRenderWindow()

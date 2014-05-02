@@ -1,5 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.colors import colorConverter
+import matplotlib as mpl
 
 '''
   Compute and plot the gray level histogram of the provided data array.
@@ -22,3 +24,17 @@ def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False)
   if save: plt.savefig(prefix + '_hist.png', format='png')
   if show: plt.show()
 
+'''
+  Creating a particular colormap with transparency.
+  Only values equal to 255 will have a non zero alpha channel.
+  This is typically used to overlay a binary result on initial data.
+'''
+def alpha_cmap(color='red'):
+  color1 = colorConverter.to_rgba('white')
+  color2 = colorConverter.to_rgba(color)
+  mycmap = mpl.colors.LinearSegmentedColormap.from_list('my_cmap', [color1, color2], 256)
+  mycmap._init()
+  alphas = np.zeros(mycmap.N+3)
+  alphas[255:] = 1.0 # show only values at 255
+  mycmap._lut[:,-1] = alphas
+  return mycmap

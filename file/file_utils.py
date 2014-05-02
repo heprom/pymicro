@@ -162,7 +162,7 @@ def HST_write(data, fname):
   represent the first slice and so on...
   This function is deprecated and its use should be replaced by the use of edf_write.
   '''
-  (nz, ny, nx) = data.shape
+  (nx, ny, nz) = data.shape
   print 'opening',fname,'for writing'
   print 'volume size is ', nx, 'x', ny, 'x', nz
   f = open(fname, 'wb')

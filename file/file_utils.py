@@ -55,6 +55,15 @@ def edf_read(file_name, header_size=1024, type=numpy.uint16, \
   else:
     return data_xyz
 
+def esrfdatatype(data_type):
+    return {
+        np.uint8:   ' UnsignedByte',
+        np.uint16:  'UnsignedShort',
+        np.uint32:  ' UnsignedLong',
+        np.float32: '   FloatValue',
+        np.float64: '  DoubleValue',
+        }.get(data_type, 'UnsignedShort')
+
 def edf_write(data, fname, type=numpy.uint16, header_size=1024):
   '''Write a binary edf file with the appropriate header.
   
@@ -80,13 +89,13 @@ def edf_write(data, fname, type=numpy.uint16, header_size=1024):
   head += 'HeaderID       = EH:000001:000000:000000 ;\n'
   head += 'Image          = 1 ;\n'
   head += 'ByteOrder      = LowByteFirst ;\n'
-  head += 'DataType       = UnsignedByte ;\n' #FIXME write according to actual type
+  head += 'DataType       = ' + esrfdatatype(type) + ' ;\n'
   head += 'Dim_1          = %4s;\n' % nx
   head += 'Dim_2          = %4s;\n' % ny
   head += 'Dim_3          = %4s;\n' % nz
   head += 'Size           = %9s;\n' % nbytes
   head += 'Date           = ' + today + ' ;\n'
-  for i in range(header_size-260):
+  for i in range(header_size - len(head) - 2):
     head += ' '
   head += '}\n'
   f.write(head)

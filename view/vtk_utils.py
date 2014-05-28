@@ -319,15 +319,19 @@ def apply_orientation_to_actor(actor, orientation):
   matrix = transform.GetMatrix()
   actor.SetUserTransform(transform)
 
-def read_image_data(file_name, size, header=0, data_type='uint8'):
+def read_image_data(file_name, size, header=0, data_type='uint8', verbose=False):
   '''
   vtk helper function to read a 3d data file.
   The size is needed in the form (x, y, z) as well a string describing
   the data type in numpy format (uint8 is assumed by default).
   Lower file left and little endian are assumed.
   '''
+  vtk_type = to_vtk_type(data_type)
+  if verbose:
+    print 'reading scan %s with size %dx%dx%d using vtk type %d' % \
+      (file_name, size[0], size[1], size[2], vtk_type)
   reader = vtk.vtkImageReader2() # 2 is faster
-  reader.SetDataScalarType(to_vtk_type(data_type))
+  reader.SetDataScalarType(vtk_type)
   reader.SetFileDimensionality(3)
   reader.SetHeaderSize(header)
   reader.SetDataByteOrderToLittleEndian()
@@ -385,9 +389,8 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   Setup the camera with usual viewing parameters.
   The camera is looking at the center of the data with the Z-axis vertical.
 '''
-def setupCamera(size=(100,100,100)):
+def setup_camera(size=(100,100,100)):
   cam = vtk.vtkCamera()
-  print 'setting up camera'
   cam.SetViewUp(0, 0, 1)
   cam.SetPosition(2*size[0], -2*size[1], 2*size[2])
   cam.SetFocalPoint(0.5*size[0], 0.5*size[1], 0.5*size[2])

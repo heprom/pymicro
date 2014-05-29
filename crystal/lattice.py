@@ -156,7 +156,10 @@ class HklPlane:
     '''Returns a copy of the unit vector normal to the plane.'''
     return np.copy(self._normal)
     
+  @staticmethod
   def get_family(hkl):
+    '''Helper static method to obtain a list of the different
+    slip plane in a particular family.'''
     family = []
     if hkl = '110':
       family.append(HklPlane(1, 1, 0))

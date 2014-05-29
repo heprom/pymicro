@@ -156,6 +156,24 @@ class HklPlane:
     '''Returns a copy of the unit vector normal to the plane.'''
     return np.copy(self._normal)
     
+  def get_family(hkl):
+    family = []
+    if hkl = '110':
+      family.append(HklPlane(1, 1, 0))
+      family.append(HklPlane(-1, 1, 0))
+      family.append(HklPlane(1, 0, 1))
+      family.append(HklPlane(-1, 0, 1))
+      family.append(HklPlane(0, 1, 1))
+      family.append(HklPlane(0, -1, 1))
+    elif hkl = '111':
+      family.append(HklPlane(1, 1, 1))
+      family.append(HklPlane(-1, 1, 1))
+      family.append(HklPlane(1, -1, 1))
+      family.append(HklPlane(1, 1, -1))
+    else:
+      print 'warning, family not supported:', hkl
+    return family
+      
 if __name__ == '__main__':
   a=0.5
   l = Lattice([[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]])

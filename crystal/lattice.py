@@ -161,14 +161,14 @@ class HklPlane:
     '''Helper static method to obtain a list of the different
     slip plane in a particular family.'''
     family = []
-    if hkl = '110':
+    if hkl == '110':
       family.append(HklPlane(1, 1, 0))
       family.append(HklPlane(-1, 1, 0))
       family.append(HklPlane(1, 0, 1))
       family.append(HklPlane(-1, 0, 1))
       family.append(HklPlane(0, 1, 1))
       family.append(HklPlane(0, -1, 1))
-    elif hkl = '111':
+    elif hkl == '111':
       family.append(HklPlane(1, 1, 1))
       family.append(HklPlane(-1, 1, 1))
       family.append(HklPlane(1, -1, 1))

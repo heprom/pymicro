@@ -141,7 +141,6 @@ class HklPlane:
     self._h = h
     self._k = k
     self._l = l
-    self._normal = np.array([h,k,l])/np.linalg.norm(np.array([h,k,l]))
 
   def __repr__(self):
     f = lambda x: "%0.3f" % x
@@ -150,13 +149,13 @@ class HklPlane:
            ' h : ' + str(self._h),
            ' k : ' + str(self._k),
            ' l : ' + str(self._l),
-           ' plane normal : ' + ' '.join(map(f, self._normal))]
+           ' plane normal : ' + ' '.join(map(f, self.normal()))]
     return '\n'.join(out)
 
   @property
   def normal(self):
     '''Returns a copy of the unit vector normal to the plane.'''
-    return np.copy(self._normal)
+    return np.array([h,k,l])/np.linalg.norm(np.array([h,k,l]))
     
   @staticmethod
   def get_family(hkl):

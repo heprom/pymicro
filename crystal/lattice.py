@@ -132,10 +132,12 @@ class Lattice:
 class HklPlane:
   '''
   This class define crystallographic planes using Miller indices.
+  A cubic crystal lattice is assumed for the moment.
   FIXME right now the we do not make use of the repiprocal lattice to 
   compute the plane... this should be corrected in the future.
   '''
-  def __init__(self, h, k, l):
+  def __init__(self, h, k, l, lattice=cubic(1.0)):
+    self._lattice = lattice
     self._h = h
     self._k = k
     self._l = l

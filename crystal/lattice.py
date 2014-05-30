@@ -136,12 +136,18 @@ class HklPlane:
   FIXME right now the we do not make use of the repiprocal lattice to 
   compute the plane... this should be corrected in the future.
   '''
-  def __init__(self, h, k, l, lattice=cubic(1.0)):
+  def __init__(self, h, k, l, lattice=Lattice.cubic(1.0)):
     self._lattice = lattice
     self._h = h
     self._k = k
     self._l = l
 
+  def normal(self):
+    '''Returns the unit vector normal to the plane.'''
+    (h, k, l) = self.miller_indices()
+    n = np.array([h, k, l])
+    return n/np.linalg.norm(n)
+  
   def __repr__(self):
     f = lambda x: "%0.3f" % x
     out = ['HKL Plane',
@@ -149,14 +155,31 @@ class HklPlane:
            ' h : ' + str(self._h),
            ' k : ' + str(self._k),
            ' l : ' + str(self._l),
-           ' plane normal : ' + ' '.join(map(f, self.normal()))]
+           ' plane normal : ' + str(self.normal()),
+           ' crystal lattice : ' + str(self._lattice)]
     return '\n'.join(out)
 
-  @property
-  def normal(self):
-    '''Returns a copy of the unit vector normal to the plane.'''
-    return np.array([h,k,l])/np.linalg.norm(np.array([h,k,l]))
-    
+  def miller_indices(self):
+    '''Returns an immutable tuple of the plane Miller indices.'''
+    return (self._h, self._k, self._l)
+
+  def interplanar_spacing(self):
+    '''
+    Compute the interplanar spacing.
+    The formula comes from 'Introduction to Crystallography' p. 68
+    by Donald E. Sands.
+    '''
+    (a, b, c) = self._lattice._lengths
+    (h, k, l) = self.miller_indices()
+    (alpha, beta, gamma) = radians(self._lattice._angles)
+    #d = a / np.sqrt(h**2 + k**2 + l**2) # for cubic structure
+    d = self._lattice.volume() / np.sqrt(h**2*b**2*c**2*np.sin(alpha)**2 + \
+      k**2*a**2*c**2*np.sin(beta)**2 + l**2*a**2*b**2*np.sin(gamma)**2 + \
+      2*h*l*a*b**2*c*(np.cos(alpha)*np.cos(gamma) - np.cos(beta)) + \
+      2*h*k*a*b*c**2*(np.cos(alpha)*np.cos(beta) - np.cos(gamma)) + \
+      2*k*l*a**2*b*c*(np.cos(beta)*np.cos(gamma) - np.cos(alpha)))
+    return d
+
   @staticmethod
   def get_family(hkl):
     '''Helper static method to obtain a list of the different
@@ -179,6 +202,8 @@ class HklPlane:
     return family
       
 if __name__ == '__main__':
-  a=0.5
+  a = 0.405 # Al FCC
   l = Lattice([[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]])
-  print l.__repr__
+  p = HklPlane(1, 1, 1, lattice=l)
+  print p.__repr__
+  print p.interplanar_spacing()

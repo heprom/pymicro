@@ -6,6 +6,8 @@
 import itertools
 import numpy as np
 from numpy import pi, dot, transpose, radians
+#from pymicro.crystal.microstructure import Orientation
+from matplotlib import pyplot as plt
 
 class Lattice:
   '''
@@ -200,7 +202,91 @@ class HklPlane:
     else:
       print 'warning, family not supported:', hkl
     return family
-      
+  
+  @staticmethod
+  def plot_slip_traces(orientation, hkl='111', n_int=np.array([0, 0, 1]), \
+    view_up=np.array([0, 1, 0]), verbose=False, title=True, legend=True, \
+    trans=False, str_plane=None):
+    '''
+    A method to plot the slip planes intersection with a particular plane 
+    (known as slip traces if the plane correspond to the surface).
+    * orientation: The crystal orientation.
+    * hkl: the slip plane family (eg. 111 or 110)
+    * n_int: normal to the plane of intersection.
+    * view_up: vector to place upwards on the plot
+    * verbose: activate verbose mode.
+    
+    A few additional parameters can be used to control the plot looking.
+    * title: display a title above the plot
+    * legend: display the legend
+    * trans: use a transparent background for the figure (useful to 
+             overlay the figure on top of another image).
+    * str_plane: particuler string to use to represent the plane in the image name.
+    '''
+    n_int /= np.linalg.norm(n_int)
+    view_up /= np.linalg.norm(view_up)
+    Bt = orientation.orientation_matrix().transpose()
+    hklplanes = HklPlane.get_family(hkl)
+    plt.figure(figsize=(7, 5))
+    colors = 'rgykcmbw'
+    for i, p in enumerate(hklplanes):
+      n_rot = Bt.dot(p.normal())
+      trace_xyz = np.cross(n_rot, n_int)
+      trace_xyz /= np.linalg.norm(trace_xyz)
+      # now we have the trace vector expressed in the XYZ coordinate system
+      # we need to change the coordinate system to the intersection plane
+      # (then only the first two component will be non zero)
+      P = np.zeros((3,3), dtype=np.float)
+      Zp = n_int
+      Yp = view_up / np.linalg.norm(view_up)
+      Xp = np.cross(Yp, Zp)
+      for k in range(3):
+        P[k, 0] = Xp[k]
+        P[k, 1] = Yp[k]
+        P[k, 2] = Zp[k]
+      trace = P.transpose().dot(trace_xyz) # X'=P^-1.X
+      if verbose:
+        print 'trace in XYZ',trace_xyz
+        print P
+        print 'trace in (XpYpZp):',trace
+      x = [-trace[0]/2, trace[0]/2]
+      y = [-trace[1]/2, trace[1]/2]
+      plt.plot(x, y, colors[i % len(hklplanes)], label='%d%d%d' % (p._h, p._k, p._l), linewidth=2)
+    plt.axis('equal')
+    t = np.linspace(0., 2*np.pi, 100)
+    plt.plot(0.5*np.cos(t), 0.5*np.sin(t), 'k')
+    plt.axis([-0.51,0.51,-0.51,0.51])
+    plt.axis('off')
+    if not str_plane: str_plane = '(%.1f, %.1f, %.1f)' % (n_int[0], n_int[1], n_int[2])
+    if title:
+      plt.title('{%s} family traces on plane %s' % (hkl, str_plane))
+    if legend: plt.legend(bbox_to_anchor=(0.9, 1), loc=2, borderaxespad=0.)
+    plt.savefig('slip_traces_%s_%s.png' % (hkl, str_plane), transparent=trans, format='png')
+
+  @staticmethod
+  def plot_XY_slip_traces(orientation, hkl='111', title=True, \
+    legend=True, trans=False, verbose=False):
+    ''' Helper method to plot the slip traces on the XY plane.'''
+    HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int = np.array([0, 0, 1]), \
+      view_up = np.array([0, 1, 0]), title=title, legend=legend, \
+      trans=trans, verbose=verbose, str_plane='XY')
+
+  @staticmethod
+  def plot_YZ_slip_traces(orientation, hkl='111', title=True, \
+    legend=True, trans=False, verbose=False):
+    ''' Helper method to plot the slip traces on the YZ plane.'''
+    HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int = np.array([1, 0, 0]), \
+      view_up = np.array([0, 0, 1]), title=title, legend=legend, \
+      trans=trans, verbose=verbose, str_plane='YZ')
+
+  @staticmethod
+  def plot_XZ_slip_traces(orientation, hkl='111', title=True, \
+    legend=True, trans=False, verbose=False):
+    ''' Helper method to plot the slip traces on the XZ plane.'''
+    HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int = np.array([0, -1, 0]), \
+      view_up = np.array([0, 0, 1]), title=title, legend=legend, \
+      trans=trans, verbose=verbose, str_plane='XZ')
+
 if __name__ == '__main__':
   a = 0.405 # Al FCC
   l = Lattice([[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]])

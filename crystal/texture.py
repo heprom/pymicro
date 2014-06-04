@@ -109,7 +109,8 @@ class PoleFigure:
         self.plot_crystal_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
     ax.axis([-1.1,1.1,-1.1,1.1])
     if self.pflegend and self.color_by_grain_id:
-      ax.legend(bbox_to_anchor=(0.1, 1), loc=1, numpoints=1)#borderaxespad=0.)
+      ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, \
+        prop={'size':10})
     ax.axis('off')
     ax.set_title('direct %s projection' % self.proj)
 

@@ -210,6 +210,8 @@ class HklPlane:
     '''
     A method to plot the slip planes intersection with a particular plane 
     (known as slip traces if the plane correspond to the surface).
+    Thank to Jia Li for starting this code.
+    
     * orientation: The crystal orientation.
     * hkl: the slip plane family (eg. 111 or 110)
     * n_int: normal to the plane of intersection.

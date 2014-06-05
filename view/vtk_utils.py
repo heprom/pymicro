@@ -208,10 +208,11 @@ def add_HklPlane_with_orientation_in_grain(grain):
   local_orientation.AddPart(hklplaneActor)
   return local_orientation
   
-def unit_arrow_3d(start, vector, color=orange):
+def unit_arrow_3d(start, vector, color=orange, make_unit=True):
+  n = numpy.linalg.norm(vector)
   arrowSource = vtk.vtkArrowSource()
   # We build a local direct base with X being the unit arrow vector
-  X = vector/numpy.linalg.norm(vector)
+  X = vector/n
   arb = numpy.array([1,0,0]) # used numpy here, could used the vtkMath module as well...
   Z = numpy.cross(X, arb)
   Y = numpy.cross(Z, X)
@@ -222,11 +223,11 @@ def unit_arrow_3d(start, vector, color=orange):
               0, 0, 1, start[2],
               0, 0, 0, 1))
   # Create the direction cosine matrix
+  if make_unit: n = 1
   for i in range(3):
-    m.SetElement(i, 0, X[i]);
-    m.SetElement(i, 1, Y[i]);
-    m.SetElement(i, 2, Z[i]);
-  #print m
+    m.SetElement(i, 0, n*X[i]);
+    m.SetElement(i, 1, n*Y[i]);
+    m.SetElement(i, 2, n*Z[i]);
   t = vtk.vtkTransform()
   t.Identity()
   t.Concatenate(m)

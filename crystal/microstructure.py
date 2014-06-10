@@ -277,14 +277,14 @@ class Grain:
   def SetVtkMesh(self, mesh):
     self.vtkmesh = mesh
     
-  def add_vtk_mesh(self, array, contour=True):
+  def add_vtk_mesh(self, array, contour=True, verbose=False):
     label = self.id # we use the grain id here... 
     # create vtk structure
     from scipy import ndimage
     from vtk.util import numpy_support
     grain_size = np.shape(array)
     array_bin = (array == label).astype(np.uint8)
-    print np.unique(array_bin)
+    if verbose: print np.unique(array_bin)
     local_com = ndimage.measurements.center_of_mass(array_bin, array)
     vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array_bin, order='F'), deep=1)
     grid = vtk.vtkUniformGrid()
@@ -299,19 +299,19 @@ class Grain:
       contour.SetInput(grid)
       contour.SetValue(0, 0.5)
       contour.Update()
-      print contour.GetOutput()
+      if verbose: print contour.GetOutput()
       self.SetVtkMesh(contour.GetOutput())
     else:
       grid.SetExtent(0, grain_size[0], 0, grain_size[1], 0, grain_size[2])
       grid.GetCellData().SetScalars(vtk_data_array)
       # threshold selected grain
-      print 'thresholding label', label
+      if verbose: print 'thresholding label', label
       thresh = vtk.vtkThreshold()
       thresh.ThresholdBetween(0.5, 1.5)
       #thresh.ThresholdBetween(label-0.5, label+0.5)
       thresh.SetInput(grid)
       thresh.Update()
-      print thresh.GetOutput()
+      if verbose: print thresh.GetOutput()
       self.SetVtkMesh(thresh.GetOutput())
 
   '''

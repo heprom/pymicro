@@ -143,9 +143,9 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0)):
   matrix = vtk.vtkMatrix4x4()
   matrix = transform.GetMatrix()
   for i in range(3):
-    rot_normal[0] += hklplane.normal[0] * matrix.GetElement(0, i);
-    rot_normal[1] += hklplane.normal[1] * matrix.GetElement(1, i);
-    rot_normal[2] += hklplane.normal[2] * matrix.GetElement(2, i);
+    rot_normal[0] += hklplane.normal()[0] * matrix.GetElement(0, i);
+    rot_normal[1] += hklplane.normal()[1] * matrix.GetElement(1, i);
+    rot_normal[2] += hklplane.normal()[2] * matrix.GetElement(2, i);
   rot_plane.SetNormal(rot_normal)
   return add_plane_to_grid(rot_plane, grid, origin)
     
@@ -196,9 +196,9 @@ def add_HklPlane_with_orientation_in_grain(grain):
   grain_axes = axes_actor(length = 30, axisLabels = False)
   transform = vtk.vtkTransform()
   transform.Identity()
-  transform.RotateZ(grain.orientation.phi1)
-  transform.RotateX(grain.orientation.Phi)
-  transform.RotateZ(grain.orientation.phi2)
+  transform.RotateZ(grain.orientation.phi1())
+  transform.RotateX(grain.orientation.Phi())
+  transform.RotateZ(grain.orientation.phi2())
   grain_axes.SetUserTransform(transform)
   local_orientation.AddPart(grain_axes)
   # add hkl plane

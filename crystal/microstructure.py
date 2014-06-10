@@ -60,24 +60,24 @@ class Orientation:
   def to_xml(self, doc):
     orientation = doc.createElement('Orientation')
     orientation_phi1 = doc.createElement('phi1')
-    orientation_phi1_text = doc.createTextNode('%f' % self.phi1)
+    orientation_phi1_text = doc.createTextNode('%f' % self.phi1())
     orientation_phi1.appendChild(orientation_phi1_text)
     orientation.appendChild(orientation_phi1)
     orientation_Phi = doc.createElement('Phi')
-    orientation_Phi_text = doc.createTextNode('%f' % self.Phi)
+    orientation_Phi_text = doc.createTextNode('%f' % self.Phi())
     orientation_Phi.appendChild(orientation_Phi_text)
     orientation.appendChild(orientation_Phi)
     orientation_phi2 = doc.createElement('phi2')
-    orientation_phi2_text = doc.createTextNode('%f' % self.phi2)
+    orientation_phi2_text = doc.createTextNode('%f' % self.phi2())
     orientation_phi2.appendChild(orientation_phi2_text)
     orientation.appendChild(orientation_phi2)
     return orientation
 
   @staticmethod
   def from_xml(orientation_node):
-    orientation_phi1 = orientation_node.childNodes[1]
-    orientation_Phi = orientation_node.childNodes[2]
-    orientation_phi2 = orientation_node.childNodes[3]
+    orientation_phi1 = orientation_node.childNodes[0]
+    orientation_Phi = orientation_node.childNodes[1]
+    orientation_phi2 = orientation_node.childNodes[2]
     phi1 = float(orientation_phi1.childNodes[0].nodeValue)
     Phi = float(orientation_Phi.childNodes[0].nodeValue)
     phi2 = float(orientation_phi2.childNodes[0].nodeValue)
@@ -277,27 +277,42 @@ class Grain:
   def SetVtkMesh(self, mesh):
     self.vtkmesh = mesh
     
-  def add_vtk_mesh(self, array):
+  def add_vtk_mesh(self, array, contour=True):
     label = self.id # we use the grain id here... 
     # create vtk structure
     from scipy import ndimage
     from vtk.util import numpy_support
     grain_size = np.shape(array)
-    local_com = ndimage.measurements.center_of_mass(array == label, array)
-    vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array, order='F'), deep=1)
+    array_bin = (array == label).astype(np.uint8)
+    print np.unique(array_bin)
+    local_com = ndimage.measurements.center_of_mass(array_bin, array)
+    vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array_bin, order='F'), deep=1)
     grid = vtk.vtkUniformGrid()
-    grid.SetExtent(0, grain_size[0], 0, grain_size[1], 0, grain_size[2])
     grid.SetOrigin(-local_com[0], -local_com[1], -local_com[2])
     grid.SetSpacing(1, 1, 1)
     grid.SetScalarType(vtk.VTK_UNSIGNED_CHAR)
-    grid.GetCellData().SetScalars(vtk_data_array)
-    # threshold selected grain
-    print 'thresholding label', label
-    thresh = vtk.vtkThreshold()
-    thresh.ThresholdBetween(label-0.5, label+0.5)
-    thresh.SetInput(grid)
-    thresh.Update()
-    self.SetVtkMesh(thresh.GetOutput())
+    if contour:
+      grid.SetExtent(0, grain_size[0]-1, 0, grain_size[1]-1, 0, grain_size[2]-1)
+      grid.GetPointData().SetScalars(vtk_data_array)
+      # contouring selected grain
+      contour = vtk.vtkContourFilter()
+      contour.SetInput(grid)
+      contour.SetValue(0, 0.5)
+      contour.Update()
+      print contour.GetOutput()
+      self.SetVtkMesh(contour.GetOutput())
+    else:
+      grid.SetExtent(0, grain_size[0], 0, grain_size[1], 0, grain_size[2])
+      grid.GetCellData().SetScalars(vtk_data_array)
+      # threshold selected grain
+      print 'thresholding label', label
+      thresh = vtk.vtkThreshold()
+      thresh.ThresholdBetween(0.5, 1.5)
+      #thresh.ThresholdBetween(label-0.5, label+0.5)
+      thresh.SetInput(grid)
+      thresh.Update()
+      print thresh.GetOutput()
+      self.SetVtkMesh(thresh.GetOutput())
 
   '''
   Returns an XML representation of the Grain instance.
@@ -439,15 +454,15 @@ class Microstructure:
     # save the microstructure instance as xml
     doc = Document()
     self.to_xml(doc)
-    xml_file_name = '%s.xml' % self.name[:-4]
+    xml_file_name = '%s.xml' % self.name
     print 'writting ' + xml_file_name
-    f= open(xml_file_name, 'wb')
+    f = open(xml_file_name, 'wb')
     doc.writexml(f, encoding= 'utf-8')
     f.close()
     # now save the vtk representation
     if self.vtkmesh != None:
       import vtk
-      vtk_file_name = '%s.vtm' % self.name[:-4]
+      vtk_file_name = '%s.vtm' % self.name
       print 'writting ' + vtk_file_name
       writer = vtk.vtkXMLMultiBlockDataWriter()
       writer.SetFileName(vtk_file_name)

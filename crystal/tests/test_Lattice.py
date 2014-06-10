@@ -22,7 +22,7 @@ class LatticeTests(unittest.TestCase):
   
   def test_HklPlane(self):
     p = HklPlane(1,1,1)
-    n = p.normal
+    n = p.normal()
     self.assertEqual(np.linalg.norm(n), 1)
     
 if __name__ == '__main__':

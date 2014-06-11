@@ -4,7 +4,7 @@ crystallographic granular microstructure such as mostly present in
 metallic materials.
 '''
 import numpy as np
-import vtk
+import os, vtk
 from matplotlib import pyplot as plt, colors, cm
 from xml.dom.minidom import Document, parse
 
@@ -317,7 +317,7 @@ class Grain:
   '''
   Returns an XML representation of the Grain instance.
   '''
-  def to_xml(self, doc):
+  def to_xml(self, doc, file_name=None):
     grain = doc.createElement('Grain')
     grain_id = doc.createElement('Id')
     grain_id_text = doc.createTextNode('%s' % self.id)
@@ -339,7 +339,9 @@ class Grain:
     grain_position_z.appendChild(grain_position_z_text)
     grain.appendChild(grain_position)
     grain_mesh = doc.createElement('Mesh')
-    grain_mesh_text = doc.createTextNode('%s' % self.vtk_file_name())
+    if not file_name:
+      file_name = self.vtk_file_name()
+    grain_mesh_text = doc.createTextNode('%s' % file_name)
     grain_mesh.appendChild(grain_mesh_text)
     grain.appendChild(grain_mesh)
     return grain
@@ -365,11 +367,13 @@ class Grain:
   def vtk_file_name(self):
     return 'grain_%d.vtu' % self.id
     
-  def save_vtk_repr(self):
+  def save_vtk_repr(self, file_name=None):
     import vtk
-    print 'writting ' + self.vtk_file_name()
+    if not file_name:
+      file_name = self.vtk_file_name()
+    print 'writting ' + file_name
     writer = vtk.vtkXMLUnstructuredGridWriter()
-    writer.SetFileName(self.vtk_file_name())
+    writer.SetFileName(file_name)
     writer.SetInput(self.vtkmesh)
     writer.Write()
 
@@ -443,9 +447,10 @@ class Microstructure:
     name.appendChild(name_text)
     grains = doc.createElement('Grains')
     root.appendChild(grains)
-    for grain in self.grains:
-      grains.appendChild(grain.to_xml(doc))
-              
+    for i, grain in enumerate(self.grains):
+      file_name = os.path.join(self.name, '%s_%d.vtu' % (self.name, i))
+      grains.appendChild(grain.to_xml(doc, file_name))
+
   '''
   Saving the microstructure, only save the vtk representation 
   of the grain for now.

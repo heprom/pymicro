@@ -4,7 +4,7 @@ import vtk
 from vtk.util.colors import *
 import numpy
 # see if some of the stuff needs to be moved to the Microstructure module
-from pymicro.crystal.lattice import HklPlane
+from pymicro.crystal.lattice import Lattice, HklPlane
 #from pymicro.crystal.microstructure import * 
 
 def to_vtk_type(type):
@@ -361,6 +361,21 @@ def data_outline(data, corner=False, color=black):
   outline.GetProperty().SetColor(color)
   return outline
 
+def box_3d(size=(100, 100, 100), line_color=black):
+  '''
+  vtk helper function to draw a box of a given size.
+  '''
+  l = Lattice.orthorombic(size[0], size[1], size[2])
+  grid = lattice_grid(l, origin=[0., 0., 0.])
+  edges = vtk.vtkExtractEdges()
+  edges.SetInput(grid)
+  mapper = vtk.vtkPolyDataMapper()
+  mapper.SetInputConnection(edges.GetOutputPort())
+  box = vtk.vtkActor()
+  box.SetMapper(mapper)
+  box.GetProperty().SetColor(line_color)
+  return box
+  
 def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discrete=False):
   if discrete:
     contour = vtk.vtkDiscreteMarchingCubes()

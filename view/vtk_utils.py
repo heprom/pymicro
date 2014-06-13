@@ -190,7 +190,7 @@ def axes_actor(length = 1.0, axisLabels = True):
     axes.SetAxisLabels(0)
   return axes
     
-def add_HklPlane_with_orientation_in_grain(grain):
+def add_HklPlanes_with_orientation_in_grain(grain, hklplanes=[HklPlane(1, 1, 1)]):
   # use a vtkAxesActor to display the crystal orientation
   local_orientation = vtk.vtkAssembly()
   grain_axes = axes_actor(length = 30, axisLabels = False)
@@ -201,11 +201,11 @@ def add_HklPlane_with_orientation_in_grain(grain):
   transform.RotateZ(grain.orientation.phi2())
   grain_axes.SetUserTransform(transform)
   local_orientation.AddPart(grain_axes)
-  # add hkl plane
-  hklplane = HklPlane(1, 1, 1)
-  hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh, \
-    grain.orientation)
-  local_orientation.AddPart(hklplaneActor)
+  # add all hkl planes to the grain
+  for hklplane in hklplanes:
+    hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh, \
+      grain.orientation)
+    local_orientation.AddPart(hklplaneActor)
   return local_orientation
   
 def unit_arrow_3d(start, vector, color=orange, make_unit=True):

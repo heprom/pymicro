@@ -134,6 +134,7 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0)):
   rot_plane = vtk.vtkPlane()
   rot_plane.SetOrigin(origin)
   # rotate the plane by setting the normal
+  '''
   rot_normal = numpy.array([0., 0., 0.])
   transform = vtk.vtkTransform()
   transform.Identity()
@@ -142,11 +143,20 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0)):
   transform.RotateZ(orientation.phi2())
   matrix = vtk.vtkMatrix4x4()
   matrix = transform.GetMatrix()
+  print matrix
   for i in range(3):
-    rot_normal[0] += hklplane.normal()[0] * matrix.GetElement(0, i);
-    rot_normal[1] += hklplane.normal()[1] * matrix.GetElement(1, i);
-    rot_normal[2] += hklplane.normal()[2] * matrix.GetElement(2, i);
+    rot_normal[0] += hklplane.normal()[i] * matrix.GetElement(0, i);
+    rot_normal[1] += hklplane.normal()[i] * matrix.GetElement(1, i);
+    rot_normal[2] += hklplane.normal()[i] * matrix.GetElement(2, i);
   rot_plane.SetNormal(rot_normal)
+  print '[hkl] normal direction expressed in sample coordinate system is: ', rot_normal
+  '''
+  B = orientation.orientation_matrix()
+  Bt = B.transpose()
+  print Bt
+  n_rot = Bt.dot(hklplane.normal()/numpy.linalg.norm(hklplane.normal()))
+  rot_plane.SetNormal(n_rot)
+  print '[hkl] normal direction expressed in sample coordinate system is: ', n_rot
   return add_plane_to_grid(rot_plane, grid, origin)
     
 def add_plane_to_grid(plane, grid, origin):
@@ -154,7 +164,7 @@ def add_plane_to_grid(plane, grid, origin):
   vtk helper function to add a plane inside another object
   described by a mesh (vtkunstructuredgrid).
   The method is to use a vtkCutter with the mesh as input and the plane 
-  as the cut function. An actor in returned.
+  as the cut function. An actor is returned.
   This may be used directly to add hkl planes inside a lattice cell.
   '''
   # cut the crystal with the plane

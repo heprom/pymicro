@@ -165,7 +165,7 @@ def add_plane_to_grid(plane, grid, origin):
   described by a mesh (vtkunstructuredgrid).
   The method is to use a vtkCutter with the mesh as input and the plane 
   as the cut function. An actor is returned.
-  This may be used directly to add hkl planes inside a lattice cell.
+  This may be used directly to add hkl planes inside a lattice cell or a grain.
   '''
   # cut the crystal with the plane
   planeCut = vtk.vtkCutter()
@@ -252,6 +252,11 @@ def unit_arrow_3d(start, vector, color=orange, make_unit=True):
   return arrowActor
   
 def lattice_grid(lattice, origin=[0., 0., 0.]):
+  '''
+  Create a mesh representation of a crystal lattice.
+  A vtkUnstructuredGrid class is used with one hexaedron element
+  corresponding to the lattice.
+  '''
   [A, B, C] = lattice.matrix
   O = origin
 
@@ -285,6 +290,11 @@ def lattice_grid(lattice, origin=[0., 0., 0.]):
   return grid
 
 def lattice_3d(grid, tubeRadius=0.02, sphereRadius=0.1):
+  '''
+  Create the 3D representation of a crystal lattice.
+  the lattice edges are shown using a vtkTubeFilter and the atoms are 
+  displayed using spheres. Both tube and sphere radius can be controlled.
+  '''
   Edges = vtk.vtkExtractEdges()
   Edges.SetInput(grid)
   Tubes = vtk.vtkTubeFilter()
@@ -316,6 +326,46 @@ def lattice_3d(grid, tubeRadius=0.02, sphereRadius=0.1):
   Vertices.GetProperty().SetDiffuseColor(blue)
   return Edges, Vertices
 
+def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
+  show_normal=True, plane_opacity=1.0):
+  '''
+  Create the 3D representation of a crystal lattice.
+  HklPlanes can be displayed within the lattice cell with their normals.
+  Crystal orientation can also be provided which rotates the whole assembly appropriately.
+  '''
+  # get grid corresponding to the crystal lattice
+  grid = lattice_grid(lattice)
+  (a, b, c) = lattice._lengths
+  
+  # an assembly is used to gather all the actors together
+  assembly = vtk.vtkAssembly()
+
+  # display all the hkl planes (with normal)
+  for hklplane in hklplanes:
+    origin = (a/2, b/2, c/2)
+    plane = vtk.vtkPlane()
+    plane.SetOrigin(origin)
+    plane.SetNormal(hklplane.normal())
+    hklplaneActor = add_plane_to_grid(plane, grid, origin)
+    hklplaneActor.GetProperty().SetOpacity(plane_opacity)
+    assembly.AddPart(hklplaneActor)
+    if show_normal:
+      # add an arrow to display the normal to the plane
+      arrowActor = unit_arrow_3d(origin, a*hklplane.normal(), make_unit=False)
+      assembly.AddPart(arrowActor)
+  
+  Edges, Vertices = lattice_3d(grid, tubeRadius=0.02*a, sphereRadius=0.1*a)
+  # add the two actors to the renderer
+  assembly.AddPart(Edges)
+  assembly.AddPart(Vertices)
+
+  # finally, apply crystal orientation to the lattice
+  assembly.SetOrigin(a/2, b/2, c/2)
+  assembly.AddPosition(-a/2, -b/2, -c/2)
+  if crystal_orientation != None:
+    apply_orientation_to_actor(assembly, crystal_orientation)
+  return assembly
+
 def apply_orientation_to_actor(actor, orientation):
   '''
   Transform the actor assembly using the specified Orientation.
@@ -326,8 +376,6 @@ def apply_orientation_to_actor(actor, orientation):
   transform.RotateZ(orientation.phi1())
   transform.RotateX(orientation.Phi())
   transform.RotateZ(orientation.phi2())
-  matrix = vtk.vtkMatrix4x4()
-  matrix = transform.GetMatrix()
   actor.SetUserTransform(transform)
 
 def read_image_data(file_name, size, header=0, data_type='uint8', verbose=False):

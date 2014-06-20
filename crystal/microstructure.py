@@ -410,8 +410,14 @@ class Microstructure:
       rand_colors[0] = [0., 0., 0.] # enforce black background (value 0)
     return colors.ListedColormap(rand_colors)
     
+  '''
+  Load a Microstructure object from an xml file.
+  It is possible to restrict the grains which are loaded by providing 
+  the list of ids of the grains of interest.
+  '''
   @staticmethod
-  def from_xml(xml_file_name):
+  def from_xml(xml_file_name, grain_ids=None):
+    print grain_ids
     micro = Microstructure()
     dom = parse(xml_file_name)
     root = dom.childNodes[0]
@@ -419,6 +425,7 @@ class Microstructure:
     micro.name = name.childNodes[0].nodeValue
     grains = root.childNodes[1]
     for node in grains.childNodes:
+      if grain_ids and not (int(node.childNodes[0].childNodes[0].nodeValue) in grain_ids): continue
       print node
       micro.grains.append(Grain.from_xml(node))
     return micro

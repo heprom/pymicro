@@ -200,6 +200,27 @@ def axes_actor(length = 1.0, axisLabels = True):
     axes.SetAxisLabels(0)
   return axes
     
+def add_grain_to_3d_scene(grain, hklplanes, show_orientation=False):
+  orientation = grain.orientation
+  assembly = vtk.vtkAssembly()
+  # create mapper
+  print 'creating grain actor'
+  mapper = vtk.vtkDataSetMapper()
+  mapper.SetInput(grain.vtkmesh)
+  mapper.ScalarVisibilityOff() # we use the grain id for chosing the color
+  lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
+  grain_actor = vtk.vtkActor()
+  grain_actor.GetProperty().SetColor(lut.GetTableValue(grain.id)[0:3])
+  grain_actor.SetMapper(mapper)
+  assembly.AddPart(grain_actor)
+  # add all hkl planes and local grain orientation actor
+  if show_orientation:
+    grain_actor.GetProperty().SetOpacity(0.3)
+    local_orientation = add_HklPlanes_with_orientation_in_grain(grain, hklplanes)
+    # add local orientation to the grain actor
+    assembly.AddPart(local_orientation)
+  return assembly
+
 def add_HklPlanes_with_orientation_in_grain(grain, hklplanes=[HklPlane(1, 1, 1)]):
   # use a vtkAxesActor to display the crystal orientation
   local_orientation = vtk.vtkAssembly()

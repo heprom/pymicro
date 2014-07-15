@@ -21,7 +21,5 @@ package providing tools to analyze experimental WAXD patterns, including radial 
 """
 
 # import relevant external symbols into package namespace:
-from waxd import *
-from fit import *
-from wxRadialProfile import wxRadialProfile
-from wxFitProfile import wxFitProfile
+from pymicro.diffraction.waxd import *
+from pymicro.diffraction.fit import *

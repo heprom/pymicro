@@ -38,3 +38,17 @@ def alpha_cmap(color='red'):
   alphas[255:] = 1.0 # show only values at 255
   mycmap._lut[:,-1] = alphas
   return mycmap
+
+'''
+Modify the coordinate formatter of pyplot to display the image
+value of the nearest pixel given x and y.
+'''
+def format_coord(x, y):
+  n_rows, n_cols = array.shape
+  col = int(x + 0.5)
+  row = int(y + 0.5)
+  if col >= 0 and col < numcols and row >= 0 and row < numrows:
+    z = 10#array[row, col]
+    return 'x=%1.1f, y=%1.1f, z=%1.1f' % (x, y, z)
+  else:
+    return 'x=%1.1f, y=%1.1f' % (x, y)

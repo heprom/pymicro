@@ -1,4 +1,5 @@
-from numpy import array, empty, uint8, uint16, uint32, float32, fromstring, reshape, zeros, linspace, sqrt, pi, cos, sin, exp
+import numpy as np
+#from numpy import array, empty, uint8, uint16, uint32, float32, fromstring, reshape, zeros, linspace, sqrt, pi, cos, sin, exp
 from scipy import ndimage
 
 def edf_readf(image_name, size):
@@ -14,8 +15,8 @@ def edf_readf(image_name, size):
     data = empty((ny, nx), dtype=type)
     print 'reading EDF image...'
     f.seek(1024)
-    data = reshape(fromstring(f.read(ny * nx * 4), \
-        uint32).astype(float32), (ny, nx))
+    data = reshape(np.fromstring(f.read(ny * nx * 4), \
+        np.uint32).astype(float32), (ny, nx))
     f.close()
     return data
 
@@ -32,8 +33,8 @@ def edf_read(image_name, size):
     data = empty((ny, nx), dtype=type)
     print 'reading EDF image...'
     f.seek(1024)
-    data = reshape(fromstring(f.read(ny * nx * 4), \
-        uint32).astype(uint32), (ny, nx))
+    data = reshape(np.fromstring(f.read(ny * nx * 4), \
+        np.uint32).astype(np.uint32), (ny, nx))
     f.close()
     return data
 
@@ -49,8 +50,8 @@ def rawmar_read(image_name, size):
     data = empty((ny, nx), dtype=type)
     print 'reading image...'
     f.seek(4600)
-    data = reshape(fromstring(f.read(ny * nx * 2), \
-        uint16).astype(uint16), (ny, nx))
+    data = reshape(np.fromstring(f.read(ny * nx * 2), \
+        np.uint16).astype(np.uint16), (ny, nx))
     f.close()
     return data
 
@@ -58,17 +59,17 @@ def interp_im_along_line(im, jvals, ivals):
   ''' perform image data interpolation along a line
       using numpy ndimage module.
   '''
-  coords = array([jvals, ivals])
+  coords = np.array([jvals, ivals])
   vals = ndimage.map_coordinates(im, coords)
   return vals
 
 def gaussian(x, mean, stddev):
-  y = (1/sqrt(2*pi*stddev))*exp(-((x-mean)**2)/(2*stddev))
+  y = (1/np.sqrt(2*np.pi*stddev))*np.exp(-((x-mean)**2)/(2*stddev))
   return y
 
 def gauss_pic(x, I0, mean, stddev):
-  y = zeros_like(x)
-  alpha = I0*sqrt(2*pi*stddev)
+  y = np.zeros_like(x)
+  alpha = I0*np.sqrt(2*np.pi*stddev)
   for i in range(len(x)):
     y[i] = alpha*gaussian(x[i], mean, stddev)
   return y
@@ -92,7 +93,7 @@ def pearson7asym(x, I0, x0, delta2tetag, mg, delta2tetad, md):
       delta2tetad largeur a mi hauteur droite
       md facteur de forme droite
   '''
-  I = zeros_like(x)
+  I = np.zeros_like(x)
   for i in range(len(x)):
     if x[i]<=x0:
       I[i]=pearson7(x[i],I0,x0,delta2tetag,mg)
@@ -161,21 +162,21 @@ def open_radial_profile_params(path):
 def phi_profile(_rmin, _rmax, _xc, _yc, _phi_min, _phi_max, _steps, _im, callback = None):
   ''' Angular integration of the WAXD pattern.
   '''  
-  _int_vals = zeros(_steps)
-  for i, phi_i in enumerate(linspace(_phi_min, _phi_max, _steps)):
+  _int_vals = np.zeros(_steps)
+  for i, phi_i in enumerate(np.linspace(_phi_min, _phi_max, _steps)):
     if callback:
       progress = abs((phi_i - _phi_min)/(_phi_max - _phi_min))
       callback(progress)
-    _rphi = (180. + phi_i) * pi / 180.
-    xs = _xc + _rmin * cos(_rphi)
-    ys = _yc - _rmin * sin(_rphi)
-    xe = _xc + _rmax * cos(_rphi)
-    ye = _yc - _rmax * sin(_rphi)
-    ivals = linspace(xs, xe, 2*(_rmax-_rmin))
-    jvals = linspace(ys, ye, 2*(_rmax-_rmin))
+    _rphi = (180. + phi_i) * np.pi / 180.
+    xs = _xc + _rmin * np.cos(_rphi)
+    ys = _yc - _rmin * np.sin(_rphi)
+    xe = _xc + _rmax * np.cos(_rphi)
+    ye = _yc - _rmax * np.sin(_rphi)
+    ivals = np.linspace(xs, xe, 2*(_rmax-_rmin))
+    jvals = np.linspace(ys, ye, 2*(_rmax-_rmin))
     vals = interp_im_along_line(_im, jvals, ivals)
     _int_vals[i] = sum(vals)/2.
-  return [linspace(_phi_min, _phi_max, _steps), _int_vals]
+  return [np.linspace(_phi_min, _phi_max, _steps), _int_vals]
   
 def radial_profile(_rmin, _rmax, _xc, _yc, _phi_min, _phi_max, _steps, _im, callback = None):
   ''' Radial integration of the WAXD pattern.
@@ -186,23 +187,23 @@ def radial_profile(_rmin, _rmax, _xc, _yc, _phi_min, _phi_max, _steps, _im, call
       A callback flag is used to notify GUI functions 
       (like to update a progress bar).
   '''
-  _int_vals = zeros(2*(_rmax-_rmin))
-  for phi_i in linspace(_phi_min, _phi_max, _steps):
+  _int_vals = np.zeros(2*(_rmax-_rmin))
+  for phi_i in np.linspace(_phi_min, _phi_max, _steps):
     if callback:
       progress = abs((phi_i - _phi_min)/(_phi_max - _phi_min))
       callback(progress)
-    #_rtheta = theta_i * pi / 180.
-    #_rtheta = (90 + theta_i) * pi / 180.
-    _rphi = (180 + phi_i) * pi / 180.
-    xs = _xc + _rmin * cos(_rphi)
-    ys = _yc - _rmin * sin(_rphi)
-    xe = _xc + _rmax * cos(_rphi)
-    ye = _yc - _rmax * sin(_rphi)
-    ivals = linspace(xs, xe, 2*(_rmax-_rmin))
-    jvals = linspace(ys, ye, 2*(_rmax-_rmin))
+    #_rtheta = theta_i * np.pi / 180.
+    #_rtheta = (90 + theta_i) * np.pi / 180.
+    _rphi = (180 + phi_i) * np.pi / 180.
+    xs = _xc + _rmin * np.cos(_rphi)
+    ys = _yc - _rmin * np.sin(_rphi)
+    xe = _xc + _rmax * np.cos(_rphi)
+    ye = _yc - _rmax * np.sin(_rphi)
+    ivals = np.linspace(xs, xe, 2*(_rmax-_rmin))
+    jvals = np.linspace(ys, ye, 2*(_rmax-_rmin))
     vals = interp_im_along_line(_im, jvals, ivals)
     _int_vals += vals * float(_phi_max - _phi_min) / _steps
-  return [linspace(_rmin, _rmax, 2*(_rmax-_rmin)), _int_vals]
+  return [np.linspace(_rmin, _rmax, 2*(_rmax-_rmin)), _int_vals]
 
 def element_max(tt):
     i=0

@@ -3,10 +3,10 @@
 
 import os, wx, pickle
 import thread
-from view.wxPlotPanel import PlotPanel
+from pymicro.view.wxPlotPanel import PlotPanel
 from numpy import shape, linspace, zeros_like, pi, cos, sin, tan
 from matplotlib import cm
-from waxd import *
+from pymicro.diffraction.waxd import *
 from math import atan
 
 class ImPanel(PlotPanel):
@@ -137,6 +137,7 @@ class wxRadialProfileFrame(wx.Frame):
     wx.Frame.__init__(self, None, wx.ID_ANY, title = u"wx Radial Profile")
     self.SetSize((800, 600))
     self.statusbar = self.CreateStatusBar()
+    self.im = None
     if im_file != None:
       self.OnLoadImage(im_file)
     sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -271,13 +272,15 @@ class wxRadialProfileFrame(wx.Frame):
     self.path = im_file
     print 'self.path=',self.path
     # read diffraction image
-    if self.path.endswith('edf'):
+    if self.path.endswith('.edf'):
       #self.im = edf_readf(im_file, 2300)
       from scipy.signal import medfilt2d
       self.im = medfilt2d(edf_readf(im_file, 2300), 5)
       for i in range(2300):
         for j in range(2300):
           if self.im[i,j] > 12000.: self.im[i,j] = 12000.
+    elif self.path.endswith('.dat'):
+      self.im = np.genfromtxt(im_file)
     else:
       self.im = rawmar_read(im_file, 2300)
     self.statusbar.SetStatusText('Image loaded from %s ' % self.path)

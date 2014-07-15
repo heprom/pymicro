@@ -39,8 +39,8 @@ def edf_read(file_name, header_size=1024, type=numpy.uint16, \
     if verbose: print 'autoparsing filename: data type is set to',type
   elif dims == None:
     # try to get the image size from the ascii header
-    (dim_1, dim_2, dim_3) = (int(header_values['Dim_1']), \
-      int(header_values['Dim_2']), int(header_values['Dim_3']))
+    (dim_1, dim_2, dim_3) = (int(header_values['Dim_1'].split('.')[0]), \
+      int(header_values['Dim_2'].split('.')[0]), int(header_values['Dim_3'].split('.')[0]))
   else:
     (dim_1, dim_2, dim_3) = dims
   if verbose: print 'reading data...', file_name, 'from byte', f.tell()
@@ -48,8 +48,8 @@ def edf_read(file_name, header_size=1024, type=numpy.uint16, \
     dim_1 * dim_2 * dim_3), type).astype(type), (dim_3, dim_2, dim_1))
   f.close()
   # HP 10/2013 start using proper [x,y,z] data ordering
-  #data_xyz = data.transpose(2,1,0)
-  data_xyz = data.transpose(1,2,0) # HP ma1921
+  data_xyz = data.transpose(2,1,0)
+  #data_xyz = data.transpose(1,2,0) # HP ma1921
   if return_header:
     return header_values, data_xyz
   else:

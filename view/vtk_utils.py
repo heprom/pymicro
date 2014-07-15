@@ -271,7 +271,7 @@ def unit_arrow_3d(start, vector, color=orange, make_unit=True):
   arrowActor.SetMapper(mapper)
   arrowActor.GetProperty().SetColor(color)
   return arrowActor
-  
+
 def lattice_grid(lattice, origin=[0., 0., 0.]):
   '''
   Create a mesh representation of a crystal lattice.
@@ -310,6 +310,44 @@ def lattice_grid(lattice, origin=[0., 0., 0.]):
   grid.SetPoints(Points)
   return grid
 
+def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
+  [A, B, C] = lattice.matrix
+  print A, B, C
+  O = origin
+  points = vtk.vtkPoints()
+  points.InsertNextPoint(O)
+  points.InsertNextPoint(O+A)
+  points.InsertNextPoint(O+A-B)
+  points.InsertNextPoint(O-2*B)
+  points.InsertNextPoint(O-2*B-A)
+  points.InsertNextPoint(O-B-A)
+  points.InsertNextPoint(O+C)
+  points.InsertNextPoint(O+A+C)
+  points.InsertNextPoint(O+A-B+C)
+  points.InsertNextPoint(O-2*B+C)
+  points.InsertNextPoint(O-2*B-A+C)
+  points.InsertNextPoint(O-B-A+C)
+
+  ids = vtk.vtkIdList()
+  ids.InsertNextId(0)
+  ids.InsertNextId(1)
+  ids.InsertNextId(2)
+  ids.InsertNextId(3)
+  ids.InsertNextId(4)
+  ids.InsertNextId(5)
+  ids.InsertNextId(6)
+  ids.InsertNextId(7)
+  ids.InsertNextId(8)
+  ids.InsertNextId(9)
+  ids.InsertNextId(10)
+  ids.InsertNextId(11)
+  # build the unstructured grid with one cell
+  grid = vtk.vtkUnstructuredGrid()
+  grid.Allocate(1, 1)
+  grid.InsertNextCell(16, ids) # 16 is hexagonal prism cell type
+  grid.SetPoints(points)
+  return grid
+  
 def lattice_3d(grid, tubeRadius=0.02, sphereRadius=0.1):
   '''
   Create the 3D representation of a crystal lattice.

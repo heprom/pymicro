@@ -312,7 +312,6 @@ def lattice_grid(lattice, origin=[0., 0., 0.]):
 
 def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
   [A, B, C] = lattice.matrix
-  print A, B, C
   O = origin
   points = vtk.vtkPoints()
   points.InsertNextPoint(O)

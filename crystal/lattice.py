@@ -145,9 +145,15 @@ class HklPlane:
     self._l = l
 
   def normal(self):
-    '''Returns the unit vector normal to the plane.'''
-    (h, k, l) = self.miller_indices()
-    n = np.array([h, k, l])
+    '''Returns the unit vector normal to the plane.
+    FIXME do not handle non straight lattices like hexagonal
+    '''
+    #(a, b, c) = self._lattice._lengths
+    #(h, k, l) = self.miller_indices()
+    n = np.zeros(3)
+    for i in range(3):
+      if self.miller_indices()[i] != 0:
+        n[i] = self._lattice._lengths[i]/float(self.miller_indices()[i])
     return n/np.linalg.norm(n)
   
   def __repr__(self):

@@ -154,7 +154,7 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0)):
   B = orientation.orientation_matrix()
   Bt = B.transpose()
   print Bt
-  n_rot = Bt.dot(hklplane.normal()/numpy.linalg.norm(hklplane.normal()))
+  n_rot = numpy.dot(Bt, hklplane.normal()/numpy.linalg.norm(hklplane.normal()))
   rot_plane.SetNormal(n_rot)
   print '[hkl] normal direction expressed in sample coordinate system is: ', n_rot
   return add_plane_to_grid(rot_plane, grid, origin)

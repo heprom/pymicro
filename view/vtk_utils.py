@@ -159,7 +159,7 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0)):
   print '[hkl] normal direction expressed in sample coordinate system is: ', n_rot
   return add_plane_to_grid(rot_plane, grid, origin)
     
-def add_plane_to_grid(plane, grid, origin):
+def add_plane_to_grid(plane, grid, origin, opacity=0.3):
   '''
   vtk helper function to add a plane inside another object
   described by a mesh (vtkunstructuredgrid).
@@ -177,7 +177,7 @@ def add_plane_to_grid(plane, grid, origin):
   cutMapper.SetInputConnection(planeCut.GetOutputPort())
   cutActor = vtk.vtkActor()
   cutActor.SetMapper(cutMapper)
-  cutActor.GetProperty().SetOpacity(0.3)
+  cutActor.GetProperty().SetOpacity(opacity)
   return cutActor
   
 def axes_actor(length = 1.0, axisLabels = True):

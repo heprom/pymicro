@@ -146,14 +146,24 @@ class HklPlane:
 
   def normal(self):
     '''Returns the unit vector normal to the plane.
-    FIXME do not handle non straight lattices like hexagonal
+    FIXME proof hkl plane hexagonal calculations
     '''
-    #(a, b, c) = self._lattice._lengths
-    #(h, k, l) = self.miller_indices()
+    (alpha, beta, gamma) = self._lattice._angles
+    (h, k, l) = self.miller_indices()
+    print 'computing hkl plane normal with indices',h,k,l
+    print 'lattice angles:', (alpha, beta, gamma)
+    isHexagonal = np.linalg.norm(np.array([alpha, beta, gamma]) - np.array([90.0, 90.0, 120.0])) < 0.001
+    (h, k, l) = self.miller_indices()
     n = np.zeros(3)
-    for i in range(3):
-      if self.miller_indices()[i] != 0:
-        n[i] = self._lattice._lengths[i]/float(self.miller_indices()[i])
+    a = self._lattice._matrix[0]
+    b = self._lattice._matrix[1]
+    c = self._lattice._matrix[2]
+    print 'lattice vectors:', a, b, c
+    n = h*a + k*b + l*c
+    if isHexagonal:
+      n_hex = np.array([2*n[0] + n[1], n[0] + 2*n[1], n[2]])
+      print 'HCP plane', self.miller_indices(), 'is normal to', n_hex
+      n = n_hex
     return n/np.linalg.norm(n)
   
   def __repr__(self):
@@ -188,6 +198,16 @@ class HklPlane:
       2*k*l*a**2*b*c*(np.cos(beta)*np.cos(gamma) - np.cos(alpha)))
     return d
 
+  @staticmethod
+  def four_to_three_index(h, k, i, l):
+    '''Convert four to three index direction (used for hexagonal crystal lattice.'''
+    return (6*h/5. - 3*k/5., 3*h/5. + 6*k/5., l)
+
+  @staticmethod
+  def three_to_four_index(u, v, w):
+    '''Convert three to four index direction (used for hexagonal crystal lattice.'''
+    return ((2*u - v)/3., (2*v - u)/3., -(u + v)/3., w)
+    
   @staticmethod
   def get_family(hkl):
     '''Helper static method to obtain a list of the different

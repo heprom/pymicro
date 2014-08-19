@@ -27,7 +27,6 @@ class Orientation:
   def __init__(self, matrix):
     g = np.array(matrix, dtype=np.float64).reshape((3, 3))
     self._matrix = g
-    print '__init__ Orientation'
     self.euler = Orientation.OrientationMatrix2Euler(g)
     self.rod = Orientation.OrientationMatrix2Rodrigues(g)
 

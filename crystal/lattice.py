@@ -1,4 +1,4 @@
-'''The microstructure module define the class to handle 
+'''The lattice module define the class to handle 
    3D crystal lattices (the 7 Bravais lattices).
    This particular class has been largely inspired from the pymatgen 
    project at https://github.com/materialsproject/pymatgen
@@ -6,7 +6,6 @@
 import itertools
 import numpy as np
 from numpy import pi, dot, transpose, radians
-#from pymicro.crystal.microstructure import Orientation
 from matplotlib import pyplot as plt
 
 class Lattice:
@@ -144,21 +143,22 @@ class HklPlane:
     self._k = k
     self._l = l
 
-  def normal(self):
+  def normal(self, verbose=False):
     '''Returns the unit vector normal to the plane.
     FIXME proof hkl plane hexagonal calculations
     '''
     (alpha, beta, gamma) = self._lattice._angles
     (h, k, l) = self.miller_indices()
-    print 'computing hkl plane normal with indices',h,k,l
-    print 'lattice angles:', (alpha, beta, gamma)
     isHexagonal = np.linalg.norm(np.array([alpha, beta, gamma]) - np.array([90.0, 90.0, 120.0])) < 0.001
     (h, k, l) = self.miller_indices()
     n = np.zeros(3)
     a = self._lattice._matrix[0]
     b = self._lattice._matrix[1]
     c = self._lattice._matrix[2]
-    print 'lattice vectors:', a, b, c
+    if verbose:
+      print 'computing hkl plane normal with indices',h,k,l
+      print 'lattice angles:', (alpha, beta, gamma)
+      print 'lattice vectors:', a, b, c
     n = h*a + k*b + l*c
     if isHexagonal:
       n_hex = np.array([2*n[0] + n[1], n[0] + 2*n[1], n[2]])
@@ -178,14 +178,22 @@ class HklPlane:
     return '\n'.join(out)
 
   def miller_indices(self):
-    '''Returns an immutable tuple of the plane Miller indices.'''
+    '''
+    Returns an immutable tuple of the plane Miller indices.
+    '''
     return (self._h, self._k, self._l)
 
   def interplanar_spacing(self):
     '''
     Compute the interplanar spacing.
-    The formula comes from 'Introduction to Crystallography' p. 68
-    by Donald E. Sands.
+    For cubic lattice, it is:
+    
+    .. math::
+    
+       d = a / \sqrt{h^2 + k^2 + l^2}
+       
+    The general formula comes from 'Introduction to Crystallography' 
+    p. 68 by Donald E. Sands.
     '''
     (a, b, c) = self._lattice._lengths
     (h, k, l) = self.miller_indices()

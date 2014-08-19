@@ -1,10 +1,8 @@
 import sys
-import numpy
-from numpy import empty, fromstring, reshape, ravel
+import numpy as np
 import struct
-from pylab import * #TODO get rid of this
 
-def edf_read(file_name, header_size=1024, type=numpy.uint16, \
+def edf_read(file_name, header_size=1024, type=np.uint16, \
   verbose=True, dims=None, autoparse_filename=False, return_header=False):
   '''Read an edf file.
 
@@ -17,7 +15,7 @@ def edf_read(file_name, header_size=1024, type=numpy.uint16, \
   will read the 3d image as unsigned 16 bits with size 100 x 200 x 50.
   '''
   f = open(file_name, 'r')
-  h = fromstring(f.read(header_size))
+  h = np.fromstring(f.read(header_size))
   if verbose: print 'reading header'
   s = struct.unpack(str(header_size) + 'c', h)
   header = ''
@@ -31,9 +29,9 @@ def edf_read(file_name, header_size=1024, type=numpy.uint16, \
   if autoparse_filename == True:
     s_type = file_name[:-4].split('_')[-1]
     if s_type == 'uint8':
-      type = numpy.uint8
+      type = np.uint8
     elif s_type == 'uint16':
-      type = numpy.uint16
+      type = np.uint16
     s_size = file_name[:-4].split('_')[-2].split('x')
     (dim_1, dim_2, dim_3) = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
     if verbose: print 'autoparsing filename: data type is set to',type
@@ -44,7 +42,7 @@ def edf_read(file_name, header_size=1024, type=numpy.uint16, \
   else:
     (dim_1, dim_2, dim_3) = dims
   if verbose: print 'reading data...', file_name, 'from byte', f.tell()
-  data = reshape(fromstring(f.read(dtype(type).itemsize * \
+  data = np.reshape(np.fromstring(f.read(np.dtype(type).itemsize * \
     dim_1 * dim_2 * dim_3), type).astype(type), (dim_3, dim_2, dim_1))
   f.close()
   # HP 10/2013 start using proper [x,y,z] data ordering
@@ -64,7 +62,7 @@ def esrfdatatype(data_type):
         np.float64: '  DoubleValue',
         }.get(data_type, 'UnsignedShort')
 
-def edf_write(data, fname, type=numpy.uint16, header_size=1024):
+def edf_write(data, fname, type=np.uint16, header_size=1024):
   '''Write a binary edf file with the appropriate header.
   
   This function write a (x,y,z) 3D dataset to the disk.
@@ -74,14 +72,14 @@ def edf_write(data, fname, type=numpy.uint16, header_size=1024):
   # get current time
   from time import gmtime, strftime
   today = strftime('%d-%b-%Y', gmtime())
-  size = numpy.shape(data)
+  size = np.shape(data)
   if len(size) < 3:
     (ny,nx) = size
     nz = 1
   else:
     (nz, ny, nx) = size
   print 'data size in pixels is ', nx, 'x', ny, 'x', nz
-  nbytes = nx * ny * nz * dtype(type).itemsize + header_size
+  nbytes = nx * ny * nz * np.dtype(type).itemsize + header_size
   print 'opening',fname,'for writing'
   # craft an ascii header of the appropriate size
   f = open(fname, 'wb')
@@ -99,7 +97,7 @@ def edf_write(data, fname, type=numpy.uint16, header_size=1024):
     head += ' '
   head += '}\n'
   f.write(head)
-  s = ravel(data.transpose(2,1,0)).astype(type).tostring()
+  s = np.ravel(data.transpose(2,1,0)).astype(type).tostring()
   f.write(s)
   f.close()
 
@@ -124,7 +122,7 @@ def HST_info(info_file):
     z_dim = int(f.readline().split()[2])
     return [x_dim, y_dim, z_dim]
 
-def HST_read(scan_name, zrange=None, type=numpy.uint8, verbose=False, header=0, dims=None):
+def HST_read(scan_name, zrange=None, type=np.uint8, verbose=False, header=0, dims=None):
   '''Read a volume file stored as a concatenated stack of binary images.
   
   The volume size must be specified by dims=(nx,ny,nz) unless an associated 
@@ -133,7 +131,7 @@ def HST_read(scan_name, zrange=None, type=numpy.uint8, verbose=False, header=0, 
   to float (32 bits) for example.
   NB: if you read a .edf file written by matlab in +y+x+z convention (column
   major order), you may want to use:
-  numpy.swapaxes(HST_read('file.edf',...),0,1)
+  np.swapaxes(HST_read('file.edf',...),0,1)
   '''
   if verbose: print 'data type is',type
   if dims == None:
@@ -144,11 +142,11 @@ def HST_read(scan_name, zrange=None, type=numpy.uint8, verbose=False, header=0, 
       zrange = range(0, nz)
   print 'volume size is ', nx, 'x', ny, 'x', len(zrange)
   f = open(scan_name, 'rb')
-  data = empty((ny, nx, len(zrange)), dtype=type)
+  data = np.empty((ny, nx, len(zrange)), dtype=type)
   if verbose: print 'reading volume... from byte ',f.tell()
-  f.seek(header + dtype(type).itemsize * nx * ny * zrange[0])
-  data = reshape(fromstring( \
-      f.read(dtype(type).itemsize * len(zrange) * ny * nx), \
+  f.seek(header + np.dtype(type).itemsize * nx * ny * zrange[0])
+  data = np.reshape(np.fromstring( \
+      f.read(np.dtype(type).itemsize * len(zrange) * ny * nx), \
       type).astype(type), (len(zrange), ny, nx), order='C')
   f.close()
   # HP 10/2013 start using proper [x,y,z] data ordering
@@ -160,7 +158,7 @@ def rawmar_read(image_name, size, verbose=False):
   
   These images are typically obtained from the marcvt utility.
   That this method assume Big endian byte order.'''
-  data = HST_read(image_name, dims = (1,size,size), header=4600, type=numpy.uint16, verbose=verbose)[0,:,:]
+  data = HST_read(image_name, dims = (1,size,size), header=4600, type=np.uint16, verbose=verbose)[0,:,:]
   return data
 
 def HST_write(data, fname):
@@ -176,7 +174,7 @@ def HST_write(data, fname):
   print 'volume size is ', nx, 'x', ny, 'x', nz
   f = open(fname, 'wb')
   # HP 11/2013 swap axes according to read function
-  s = ravel(data.transpose(2,1,0)).tostring()
+  s = np.ravel(data.transpose(2,1,0)).tostring()
   f.write(s)
   f.close()
   print 'writing .info file'
@@ -207,7 +205,7 @@ def Vtk_write(data, fname):
   f.close()
   # append binary data
   f = open(fname, 'ab')
-  s = ravel(data).tostring()
+  s = np.ravel(data).tostring()
   f.write(s)
   f.close()
   print 'done with writing'
@@ -220,7 +218,7 @@ def read_dif(Nx, Ny, file, shift=False):
   '''
   import csv                                             
   reader = csv.reader(open(file, "r"))
-  im = numpy.zeros((Ny, Nx), dtype=numpy.float)
+  im = np.zeros((Ny, Nx), dtype=np.float)
   max = 0
   xmax = -1
   ymax = -1
@@ -232,7 +230,7 @@ def read_dif(Nx, Ny, file, shift=False):
       xx -= Nx
     if yy >= Ny:
       yy -= Ny
-    im[yy, xx] = numpy.sqrt(float(a)*float(a) + float(b)*float(b))
+    im[yy, xx] = np.sqrt(float(a)*float(a) + float(b)*float(b))
     if im[yy, xx] > max:
       max = im[yy, xx]
       xmax = xx
@@ -245,7 +243,7 @@ def read_dif(Nx, Ny, file, shift=False):
     ish -= Nx/2
     jsh -= Ny/2
     print 'image shift is:',ish,jsh
-    shift_im = numpy.zeros_like(im)
+    shift_im = np.zeros_like(im)
     for i in range(Nx):
       ishift = i + ish
       if ishift >= Nx:

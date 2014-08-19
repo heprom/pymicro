@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-import os, wx, numpy
-from PyMicro.view.wxPlotPanel import PlotPanel
+import os, wx, numpy as np
+from pymicro.view.wxPlotPanel import PlotPanel
 from matplotlib import pyplot, colors, cm
-from pymicro.io.file_utils import edf_read
+from pymicro.file.file_utils import edf_read
 from pymicro.view.vtk_utils import vol_view, grid_vol_view
 
 class ImPanel(PlotPanel):
@@ -19,8 +19,8 @@ class ImPanel(PlotPanel):
     '''Initialize a new ImPanel. This Set some references on the parent, 
     the image to draw and call PlotPanel __init__ method.'''
     # consistently create the same random colors
-    numpy.random.seed(13)
-    rand_colors = numpy.random.rand(2048,3)
+    np.random.seed(13)
+    rand_colors = np.random.rand(2048,3)
     rand_colors[0] = [0., 0., 0.] # enforce black background
     self.rand_cmap = colors.ListedColormap(rand_colors)
     # initialize Panel
@@ -99,9 +99,9 @@ class wxVolumeViewerFrame(wx.Frame):
     # read 3d image
     h, self.vol = edf_read(im_file, header_size=0, verbose=True, \
       autoparse_filename=True, return_header=True)
-    print 'min in image= %d, max in image=%d' % (numpy.min(self.vol), numpy.max(self.vol))
-    self.maxim_sc.SetRange(0, numpy.shape(self.vol)[2]-1)
-    print numpy.shape(self.vol)
+    print 'min in image= %d, max in image=%d' % (np.min(self.vol), np.max(self.vol))
+    self.maxim_sc.SetRange(0, np.shape(self.vol)[2]-1)
+    print np.shape(self.vol)
     self.imPanel.SetImage(self.vol[:,:,0])
 
   def OnCmapSelected(self, event):
@@ -131,8 +131,8 @@ class wxVolumeViewer(wx.App):
 
 if __name__ == '__main__':
   data_dir = '/home/proudhon/anr/AFGRAP/AGREGATS/RAW/'
-  name = 'dct_test1_304x304x10_uint8.raw'
-  #name = 'F30_crop0_2-2-2_80x80x58_uint8.raw'
+  #name = 'dct_test1_304x304x10_uint8.raw'
+  name = 'F30_crop0_2-2-2_80x80x58_uint8.raw'
   im_file = os.path.join(data_dir, name)
   # create application instance
   app = wxVolumeViewer(im_file)

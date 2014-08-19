@@ -3,7 +3,7 @@
 
 import os, wx, pickle
 from view.wxPlotPanel import PlotPanel
-from wxRadialProfile import ProfilePanel
+from pymicro.apps.wxRadialProfile import ProfilePanel
 from fit import *
 from wx.lib.masked import NumCtrl
 from wx.lib.masked.numctrl import EVT_NUM

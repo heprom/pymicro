@@ -3,6 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. image:: _static/pymicro_logo_600.png
+   :width: 300 px
+   :alt: pymicro
+   :align: center
+
 Introduction
 ============
 

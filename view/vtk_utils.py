@@ -130,36 +130,19 @@ def hot_cmap(table_range=(0,255)):
   lut.SetRange(table_range)
   return lut
 
-def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0)):
+def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0), 
+  opacity=1.0, show_normal=False, normal_length=1.0):
   rot_plane = vtk.vtkPlane()
   rot_plane.SetOrigin(origin)
   # rotate the plane by setting the normal
-  '''
-  rot_normal = numpy.array([0., 0., 0.])
-  transform = vtk.vtkTransform()
-  transform.Identity()
-  transform.RotateZ(orientation.phi1())
-  transform.RotateX(orientation.Phi())
-  transform.RotateZ(orientation.phi2())
-  matrix = vtk.vtkMatrix4x4()
-  matrix = transform.GetMatrix()
-  print matrix
-  for i in range(3):
-    rot_normal[0] += hklplane.normal()[i] * matrix.GetElement(0, i);
-    rot_normal[1] += hklplane.normal()[i] * matrix.GetElement(1, i);
-    rot_normal[2] += hklplane.normal()[i] * matrix.GetElement(2, i);
-  rot_plane.SetNormal(rot_normal)
-  print '[hkl] normal direction expressed in sample coordinate system is: ', rot_normal
-  '''
-  B = orientation.orientation_matrix()
-  Bt = B.transpose()
-  print Bt
+  Bt = orientation.orientation_matrix().transpose()
   n_rot = numpy.dot(Bt, hklplane.normal()/numpy.linalg.norm(hklplane.normal()))
   rot_plane.SetNormal(n_rot)
-  print '[hkl] normal direction expressed in sample coordinate system is: ', n_rot
-  return add_plane_to_grid(rot_plane, grid, origin)
-    
-def add_plane_to_grid(plane, grid, origin, opacity=0.3):
+  #print '[hkl] normal direction expressed in sample coordinate system is: ', n_rot
+  return add_plane_to_grid(rot_plane, grid, origin, opacity=opacity, \
+    show_normal=show_normal, normal_length=normal_length)
+
+def add_plane_to_grid(plane, grid, origin, opacity=0.3, show_normal=False, normal_length=1.0):
   '''
   vtk helper function to add a plane inside another object
   described by a mesh (vtkunstructuredgrid).
@@ -171,14 +154,19 @@ def add_plane_to_grid(plane, grid, origin, opacity=0.3):
   planeCut = vtk.vtkCutter()
   planeCut.SetInput(grid)
   planeCut.SetCutFunction(plane)
-  #print planeCut.GetOutput()
 
   cutMapper = vtk.vtkPolyDataMapper()
   cutMapper.SetInputConnection(planeCut.GetOutputPort())
   cutActor = vtk.vtkActor()
   cutActor.SetMapper(cutMapper)
   cutActor.GetProperty().SetOpacity(opacity)
-  return cutActor
+  assembly = vtk.vtkAssembly()
+  assembly.AddPart(cutActor)
+  if show_normal:
+    # add an arrow to display the normal to the plane
+    arrowActor = unit_arrow_3d(origin, normal_length*numpy.array(plane.GetNormal()), make_unit=False)
+    assembly.AddPart(arrowActor)
+  return assembly
   
 def axes_actor(length = 1.0, axisLabels = True):
   axes = vtk.vtkAxesActor()
@@ -199,7 +187,36 @@ def axes_actor(length = 1.0, axisLabels = True):
   else:
     axes.SetAxisLabels(0)
   return axes
-    
+
+def grain_3d(grain, hklplanes=None, show_normal=False, \
+  plane_opacity=1.0, show_orientation=False):
+  assembly = vtk.vtkAssembly()
+  # create mapper
+  mapper = vtk.vtkDataSetMapper()
+  mapper.SetInput(grain.vtkmesh)
+  mapper.ScalarVisibilityOff() # we use the grain id for chosing the color
+  lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
+  grain_actor = vtk.vtkActor()
+  grain_actor.GetProperty().SetColor(lut.GetTableValue(grain.id)[0:3])
+  grain_actor.SetMapper(mapper)
+  assembly.AddPart(grain_actor)
+  # add all hkl planes
+  if hklplanes != None:
+    for hklplane in hklplanes:
+      # the grain has its center of mass at the origin
+      origin = (0., 0., 0.)
+      hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh, \
+        grain.orientation, origin, opacity=plane_opacity, \
+        show_normal=show_normal, normal_length=50.)
+      assembly.AddPart(hklplaneActor)
+  if show_orientation:
+    grain_actor.GetProperty().SetOpacity(0.3)
+    local_orientation = add_local_orientation_axes(grain.orientation, axes_length=30)
+    # add local orientation to the grain actor
+    assembly.AddPart(local_orientation)
+  return assembly
+
+# deprecated, will be removed soon
 def add_grain_to_3d_scene(grain, hklplanes, show_orientation=False):
   orientation = grain.orientation
   assembly = vtk.vtkAssembly()
@@ -220,6 +237,19 @@ def add_grain_to_3d_scene(grain, hklplanes, show_orientation=False):
     # add local orientation to the grain actor
     assembly.AddPart(local_orientation)
   return assembly
+
+def add_local_orientation_axes(orientation, axes_length=30):
+  # use a vtkAxesActor to display the crystal orientation
+  local_orientation = vtk.vtkAssembly()
+  axes = axes_actor(length = axes_length, axisLabels = False)
+  transform = vtk.vtkTransform()
+  transform.Identity()
+  transform.RotateZ(orientation.phi1())
+  transform.RotateX(orientation.Phi())
+  transform.RotateZ(orientation.phi2())
+  axes.SetUserTransform(transform)
+  local_orientation.AddPart(axes)
+  return local_orientation
 
 def add_HklPlanes_with_orientation_in_grain(grain, hklplanes=[HklPlane(1, 1, 1)]):
   # use a vtkAxesActor to display the crystal orientation

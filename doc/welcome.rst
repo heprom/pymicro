@@ -22,6 +22,13 @@ Dependencies
 2. numpy - For array, matrix and other numerical manipulations. Used extensively
    by all modules.
 3. scipy 0.10+, mainly used for ndimage filters.
-4. matplotlib 1.1+ for plotting (e.g. pole figures).
+4. matplotlib 1.1+ for plotting (e.g. pole figures or 3D image slices).
 5. VTK with Python bindings 5.8+ (http://www.vtk.org/) for visualization of
    3D data using the :mod:`pymicro.view` package.
+
+API documentation
+=================
+
+For detailed documentation of all modules and classes, please refer to the
+:doc:`API docs </modules>`.
+

@@ -9,3 +9,11 @@ file Package
     :undoc-members:
     :show-inheritance:
 
+:mod:`tifffile` Module
+----------------------
+
+.. automodule:: pymicro.file.tifffile
+    :members:
+    :undoc-members:
+    :show-inheritance:
+

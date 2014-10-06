@@ -377,11 +377,44 @@ def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
   grid.SetPoints(points)
   return grid
   
-def lattice_3d(grid, tubeRadius=0.02, sphereRadius=0.1):
+def lattice_3d(grid, sphereRadius=0.1, tubeRadius=0.02):
   '''
   Create the 3D representation of a crystal lattice.
   the lattice edges are shown using a vtkTubeFilter and the atoms are 
   displayed using spheres. Both tube and sphere radius can be controlled.
+
+  .. code-block:: python
+
+    l = Lattice.cubic(1.0)
+    grid = lattice_grid(l)
+    Edges, Vertices = lattice_3d(grid)
+    ren = vtk.vtkRenderer()
+    ren.AddActor(Edges)
+    ren.AddActor(Vertices)
+    render(ren, display=True)
+
+  .. figure:: _static/lattice_3d.png
+      :width: 300 px
+      :height: 300 px
+      :alt: lattice_3d
+      :align: center
+
+      A 3D view of a cubic lattice.
+
+  *Parameters*
+  
+  **grid**: vtkUnstructuredGrid
+  The vtk grid representing the lattice.
+
+  **sphereRadius**: float
+  Size of the spheres representing the atoms (default: 0.1).
+
+  **tubeRadius**: float
+  Radius of the tubes representing the atomic bonds (default: 0.02).
+
+  *Returns*
+
+  The method return two actors, representing the lattice edges and vertices.
   '''
   Edges = vtk.vtkExtractEdges()
   Edges.SetInput(grid)
@@ -419,7 +452,47 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
   '''
   Create the 3D representation of a crystal lattice.
   HklPlanes can be displayed within the lattice cell with their normals.
+  A single vtk actor in form of an assembly is returned.
   Crystal orientation can also be provided which rotates the whole assembly appropriately.
+
+  .. code-block:: python
+
+    l = Lattice.cubic(1.0)
+    o = Orientation.from_euler((344.0, 125.0, 217.0))
+
+    grid = lattice_grid(l)
+    hklplanes = Hklplane.get_family('111')
+    cubic = lattice_3d_with_planes(grid, hklplanes, crystal_orientation=o, \\
+      show_normal=True, plane_opacity=0.5)
+    ren = vtk.vtkRenderer()
+    ren.AddActor(cubic)
+    render(ren, display=True)
+
+  .. figure:: _static/cubic_crystal_3d.png
+     :width: 300 px
+     :alt: lattice_3d_with_planes
+     :align: center
+
+     A 3D view of a cubic lattice with all four 111 planes displayed.
+
+  *Parameters*
+
+  **hklplanes**: list of `pymicro.crystal.lattice.HklPlane`
+  A list of the hkl planes to add to the lattice.
+
+  **crystal_orientation**: Orientation
+  The crystal orientation with respect to the sample coordinate system
+  (default: None).
+  
+  **show_normal** bool
+  A boolean controling if the slip plane normals are shown (default: True)
+  
+  **plane_opacity** float in [0., 1.0]
+  A float number controlling the slip plane opacity.
+
+  *Returns*
+
+  The method return a vtkAssembly that can be directly added to a renderer.
   '''
   # get grid corresponding to the crystal lattice
   grid = lattice_grid(lattice)
@@ -435,7 +508,7 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
     plane.SetOrigin(origin)
     plane.SetNormal(hklplane.normal())
     hklplaneActor = add_plane_to_grid(plane, grid, origin)
-    hklplaneActor.GetProperty().SetOpacity(plane_opacity)
+    #hklplaneActor.GetProperty().SetOpacity(plane_opacity)
     assembly.AddPart(hklplaneActor)
     if show_normal:
       # add an arrow to display the normal to the plane

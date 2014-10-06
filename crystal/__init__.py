@@ -1,4 +1,4 @@
-"""A module to specifically handle crystal structures
+"""A package to specifically handle crystal structures
 
 .. moduleauthor:: Henry Proudhon <henry.proudhon@gmail.com>
 
@@ -11,4 +11,4 @@ import texture
 
 
 def start():
-    "This starts the crystal module ..."
+    'This starts the crystal package...'

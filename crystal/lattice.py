@@ -1,7 +1,5 @@
 '''The lattice module define the class to handle 
    3D crystal lattices (the 7 Bravais lattices).
-   This particular class has been largely inspired from the pymatgen 
-   project at https://github.com/materialsproject/pymatgen
 '''
 import itertools
 import numpy as np
@@ -11,7 +9,16 @@ from matplotlib import pyplot as plt
 class Lattice:
   '''
   Crystal lattice class.
-  It supports only cubic and hexagonal at the moment.
+
+  This particular class has been partly inspired from the pymatgen 
+  project at https://github.com/materialsproject/pymatgen
+
+  Any of the 7 Bravais lattice can be easily created and manipulated.
+  ::
+
+    a = 0.352 # FCC Nickel
+    l = Lattice.cubic(a)
+    print(l.volume())
   '''
   
   def __init__(self, matrix):
@@ -133,11 +140,32 @@ class Lattice:
 class HklPlane:
   '''
   This class define crystallographic planes using Miller indices.
-  A cubic crystal lattice is assumed for the moment.
-  FIXME right now the we do not make use of the repiprocal lattice to 
-  compute the plane... this should be corrected in the future.
+  
+  A plane can be create by speficying its Miller indices and the 
+  crystal lattice (default is cubic with lattice parameter of 1.0)
+  ::
+
+    a = 0.405 # FCC Aluminium
+    l = Lattice.cubic(a)
+    p = HklPlane(1, 1, 1, lattice=l)
+    print p
+    print p.interplanar_spacing()
+
+  .. note::
+
+     The calculations have not been thourouhly tested appart 
+     from cubic crystal lattice.
+
+  .. warning::
+
+     Right now the we do not make use of the repiprocal lattice to 
+     compute the plane... this should be corrected in the future.
   '''
+
   def __init__(self, h, k, l, lattice=Lattice.cubic(1.0)):
+    '''Create a new hkl plane with the given Miller indices and 
+       crystal lattice.
+    '''
     self._lattice = lattice
     self._h = h
     self._k = k
@@ -145,7 +173,10 @@ class HklPlane:
 
   def normal(self, verbose=False):
     '''Returns the unit vector normal to the plane.
-    FIXME proof hkl plane hexagonal calculations
+
+    .. warning::
+
+       Proof hkl plane hexagonal calculations
     '''
     (alpha, beta, gamma) = self._lattice._angles
     (h, k, l) = self.miller_indices()
@@ -208,12 +239,12 @@ class HklPlane:
 
   @staticmethod
   def four_to_three_index(h, k, i, l):
-    '''Convert four to three index direction (used for hexagonal crystal lattice.'''
+    '''Convert four to three index direction (used for hexagonal crystal lattice).'''
     return (6*h/5. - 3*k/5., 3*h/5. + 6*k/5., l)
 
   @staticmethod
   def three_to_four_index(u, v, w):
-    '''Convert three to four index direction (used for hexagonal crystal lattice.'''
+    '''Convert three to four index direction (used for hexagonal crystal lattice).'''
     return ((2*u - v)/3., (2*v - u)/3., -(u + v)/3., w)
     
   @staticmethod
@@ -253,10 +284,11 @@ class HklPlane:
     * verbose: activate verbose mode.
     
     A few additional parameters can be used to control the plot looking.
+
     * title: display a title above the plot
     * legend: display the legend
     * trans: use a transparent background for the figure (useful to 
-             overlay the figure on top of another image).
+      overlay the figure on top of another image).
     * str_plane: particuler string to use to represent the plane in the image name.
     '''
     n_int /= np.linalg.norm(n_int)
@@ -323,9 +355,3 @@ class HklPlane:
       view_up = np.array([0, 0, 1]), title=title, legend=legend, \
       trans=trans, verbose=verbose, str_plane='XZ')
 
-if __name__ == '__main__':
-  a = 0.405 # Al FCC
-  l = Lattice([[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]])
-  p = HklPlane(1, 1, 1, lattice=l)
-  print p.__repr__
-  print p.interplanar_spacing()

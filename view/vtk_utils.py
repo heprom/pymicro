@@ -641,6 +641,45 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   return actor
 
 '''
+  This method construct an actor to map a 3d dataset.
+  1/8 of the data is clipped out to have a better view of the interior.
+  
+  *Parameters*
+
+  **data**: the dataset to map, in VTK format.
+
+  *Returns*
+
+  The method return a vtkActor that can be directly added to a renderer.
+'''  
+def map_data_with_clip(data):
+  size = 1 + numpy.array(data.GetExtent()[1::2])
+  # implicit function
+  bbox = vtk.vtkBox()
+  bbox.SetXMin(size[0]/2., -1, size[2]/2.)
+  bbox.SetXMax(size[0], size[1]/2., size[2])
+
+  # use extract geometry filter to access the data
+  extract = vtk.vtkExtractGeometry()
+  extract.SetInput(data)
+  extract.ExtractInsideOff()
+  extract.ExtractBoundaryCellsOn()
+  extract.SetImplicitFunction(bbox)
+
+  mapper = vtk.vtkDataSetMapper()
+  mapper.ScalarVisibilityOn()
+  lut = gray_cmap(table_range=(0,255))
+  mapper.SetLookupTable(lut)
+  mapper.UseLookupTableScalarRangeOn()
+  mapper.SetScalarModeToUsePointData();
+  mapper.SetColorModeToMapScalars();
+  mapper.SetInput(extract.GetOutput())
+  mapper.Update()
+  actor = vtk.vtkActor()
+  actor.SetMapper(mapper)
+  return actor
+  
+'''
   Setup the camera with usual viewing parameters.
   The camera is looking at the center of the data with the Z-axis vertical.
 '''

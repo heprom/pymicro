@@ -47,7 +47,17 @@ def pv_rand_cmap(N=256, first_is_black = False):
   print '</ColorMap>'
 
 def gray_cmap(table_range=(0,255)):
-  '''create a black and white colormap.'''
+  '''create a black and white colormap.
+
+  *Parameters*
+  
+  **table_range**: 2 values tuple (default: (0,255))
+  start and end values for the table range.
+
+  *Returns*
+
+  A vtkLookupTable from black to white.
+  '''
   lut = vtk.vtkLookupTable()
   lut.SetSaturationRange(0,0)
   lut.SetHueRange(0,0)
@@ -58,7 +68,17 @@ def gray_cmap(table_range=(0,255)):
   return lut
 
 def hot_cmap(table_range=(0,255)):
-  '''create a look up table similar to matlab's hot.'''
+  '''Create a VTK look up table similar to matlab's hot.
+
+  *Parameters*
+  
+  **table_range**: 2 values tuple (default: (0,255))
+  start and end values for the table range.
+
+  *Returns*
+
+  A vtkLookupTable from white to red.
+  '''
   lut = vtk.vtkLookupTable()
   lutNum = 64
   lut.SetNumberOfTableValues(lutNum)

@@ -8,6 +8,16 @@ from pymicro.crystal.lattice import Lattice, HklPlane
 #from pymicro.crystal.microstructure import * 
 
 def to_vtk_type(type):
+  '''Function to get the VTK data type given a numpy data type.
+
+  *Parameters*
+  
+  **type**: the numpy data type like 'uint8', 'uint16'...
+
+  *Returns*
+
+  A VTK data type.
+  '''
   if type == 'uint8':
     return vtk.VTK_UNSIGNED_CHAR
   elif type == 'uint16':
@@ -163,14 +173,31 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0),
     show_normal=show_normal, normal_length=normal_length)
 
 def add_plane_to_grid(plane, grid, origin, opacity=0.3, show_normal=False, normal_length=1.0):
+  '''Add a 3d plane inside another object.
+  
+  This function adds a plane inside another object described by a mesh 
+  (vtkunstructuredgrid). The method is to use a vtkCutter with the mesh 
+  as input and the plane as the cut function. An actor is returned.
+  This may be used directly to add hkl planes inside a lattice cell or 
+  a grain.
+
+  *Parameters*
+  
+  **plane**: A VTK implicit function describing the plane to add.
+
+  **grid**: A VTK unstructured grid in which the plane is to be added.
+  
+  **opacity**: Opacity value of the plane actor.
+  
+  **show_normal**: A boolean value to add the plane normal as a 3d arrow.
+  
+  **normal_length**: The length of the plane normal vector.
+  
+  *Returns*
+  
+  A VTK assembly with the plane and the normal (if needed).
   '''
-  vtk helper function to add a plane inside another object
-  described by a mesh (vtkunstructuredgrid).
-  The method is to use a vtkCutter with the mesh as input and the plane 
-  as the cut function. An actor is returned.
-  This may be used directly to add hkl planes inside a lattice cell or a grain.
-  '''
-  # cut the crystal with the plane
+  # cut the unstructured grid with the plane
   planeCut = vtk.vtkCutter()
   planeCut.SetInput(grid)
   planeCut.SetCutFunction(plane)
@@ -271,7 +298,12 @@ def add_local_orientation_axes(orientation, axes_length=30):
   local_orientation.AddPart(axes)
   return local_orientation
 
-def add_HklPlanes_with_orientation_in_grain(grain, hklplanes=[HklPlane(1, 1, 1)]):
+def add_HklPlanes_with_orientation_in_grain(grain, \
+  hklplanes=[]):
+  '''
+  Add some plane actors corresponding to a list of (hkl) planes to 
+  a grain actor.
+  '''
   # use a vtkAxesActor to display the crystal orientation
   local_orientation = vtk.vtkAssembly()
   grain_axes = axes_actor(length = 30, axisLabels = False)
@@ -640,19 +672,38 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   actor.GetProperty().SetOpacity(opacity)
   return actor
 
-'''
+def map_data_with_clip(data, lut = gray_cmap()):
+  '''
   This method construct an actor to map a 3d dataset.
   1/8 of the data is clipped out to have a better view of the interior.
+  It requires a fair amount of memory so downsample your data if you can
+  (it may not be visible at all on the resulting image).
+  
+  .. code-block:: python
+
+    data = read_image_data(im_file, size)
+    ren = vtk.vtkRenderer()
+    actor = map_data_with_clip(data)
+    ren.AddActor(actor)
+    render(ren, display=True)
+
+  .. figure:: _static/pa66gf30_clip_3d.png
+     :width: 300 px
+     :alt: pa66gf30_clip_3d
+     :align: center
+
+     A 3D view of a polyamid sample with reinforcing glass fibers.
   
   *Parameters*
 
   **data**: the dataset to map, in VTK format.
+  
+  **lut**: VTK look up table (default: `gray_cmap`).
 
   *Returns*
 
   The method return a vtkActor that can be directly added to a renderer.
-'''  
-def map_data_with_clip(data):
+  '''  
   size = 1 + numpy.array(data.GetExtent()[1::2])
   # implicit function
   bbox = vtk.vtkBox()
@@ -668,7 +719,6 @@ def map_data_with_clip(data):
 
   mapper = vtk.vtkDataSetMapper()
   mapper.ScalarVisibilityOn()
-  lut = gray_cmap(table_range=(0,255))
   mapper.SetLookupTable(lut)
   mapper.UseLookupTableScalarRangeOn()
   mapper.SetScalarModeToUsePointData();

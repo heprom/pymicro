@@ -23,8 +23,8 @@ class Orientation:
   Vs = B^T.Vc
   '''
 
-  '''Initialization from the 9 components of the orientation matrix.'''
   def __init__(self, matrix):
+    '''Initialization from the 9 components of the orientation matrix.'''
     g = np.array(matrix, dtype=np.float64).reshape((3, 3))
     self._matrix = g
     self.euler = Orientation.OrientationMatrix2Euler(g)
@@ -33,30 +33,30 @@ class Orientation:
   def orientation_matrix(self):
     return self._matrix
 
-  '''Provide a string representation of the class.'''
   def __repr__(self):
+    '''Provide a string representation of the class.'''
     s = 'Crystal Orientation'
     s += '\norientation matrix = %s' % self._matrix.view()
     s += '\nEuler angles (degrees) = (%8.3f,%8.3f,%8.3f)' % (self.phi1(), self.Phi(), self.phi2())
     s += '\nRodrigues vector = %s' % self.OrientationMatrix2Rodrigues(self._matrix)
     return s
 
-  '''Convenience methode to expose the first Euler angle.'''
   def phi1(self):
+    '''Convenience methode to expose the first Euler angle.'''
     return self.euler[0]
 
-  '''Convenience methode to expose the second Euler angle.'''
   def Phi(self):
+    '''Convenience methode to expose the second Euler angle.'''
     return self.euler[1]
 
-  '''Convenience methode to expose the third Euler angle.'''
   def phi2(self):
+    '''Convenience methode to expose the third Euler angle.'''
     return self.euler[2]
 
-  '''
-  Returns an XML representation of the Orientation instance.
-  '''
   def to_xml(self, doc):
+    '''
+    Returns an XML representation of the Orientation instance.
+    '''
     orientation = doc.createElement('Orientation')
     orientation_phi1 = doc.createElement('phi1')
     orientation_phi1_text = doc.createTextNode('%f' % self.phi1())
@@ -95,11 +95,12 @@ class Orientation:
     o = Orientation(g)
     return o
 
-  '''
-  Compute the orientation matrix associated with the 3 Euler angles (given in degrees).
-  '''
   @staticmethod
   def Euler2OrientationMatrix(euler):
+    '''
+    Compute the orientation matrix associated with the 3 Euler angles 
+    (given in degrees).
+    '''
     (rphi1, rPhi, rphi2) = np.radians(euler)
     c1 = np.cos(rphi1)
     s1 = np.sin(rphi1)
@@ -121,11 +122,11 @@ class Orientation:
     B = np.array([[b11, b12, b13], [b21, b22, b23], [b31, b32, b33]])
     return B
 
-  '''
-  Compute the Euler angles (in degrees) from the orientation matrix.
-  '''
   @staticmethod
   def OrientationMatrix2Euler(g, eps=0.000001):
+    '''
+    Compute the Euler angles (in degrees) from the orientation matrix.
+    '''
     # compute rodrigues vector
     R = Orientation.OrientationMatrix2Rodrigues(g, eps=eps)
     if np.abs(g[2,2] - 1) < eps:
@@ -166,11 +167,11 @@ class Orientation:
           phi2 += np.pi        
     return np.degrees(np.array([phi1, Phi, phi2]))
 
-  '''
-  Compute the rodrigues vector from the orientation matrix.
-  '''
   @staticmethod
   def OrientationMatrix2Rodrigues(g, eps=0.000001):
+    '''
+    Compute the rodrigues vector from the orientation matrix.
+    '''
     t = g.trace() + 1
     if np.abs(t) < eps:
       return np.zeros(3)
@@ -180,11 +181,11 @@ class Orientation:
       r3 = (g[0,1] - g[1,0]) / t
     return np.array([r1, r2, r3])
 
-  '''
-  Compute the orientation matrix from the rodrigues vector.
-  '''
   @staticmethod
   def Rodrigues2OrientationMatrix(rod, eps=0.000001):
+    '''
+    Compute the orientation matrix from the rodrigues vector.
+    '''
     r = np.linalg.norm(rod)
     I = np.diagflat(np.ones(3))
     if r < eps:
@@ -195,11 +196,11 @@ class Orientation:
       omega = np.array([[0.0, n[2], -n[1]], [-n[2], 0.0, n[0]], [n[1], -n[0], 0.0]])
       return I + np.sin(theta) * omega + (1 - np.cos(theta)) * omega.dot(omega)
 
-  '''
-  Compute the quaternion from the 3 euler angles (in degrees)
-  '''
   @staticmethod
   def Euler2Quaternion(euler):
+    '''
+    Compute the quaternion from the 3 euler angles (in degrees)
+    '''
     (phi1, Phi, phi2) = np.radians(euler)
     q0 = np.cos(0.5 * (phi1 + phi2)) * np.cos(0.5*Phi)
     q1 = np.cos(0.5 * (phi1 - phi2)) * np.sin(0.5*Phi)
@@ -207,11 +208,11 @@ class Orientation:
     q3 = np.sin(0.5 * (phi1 + phi2)) * np.cos(0.5*Phi)
     return np.array([q0, q1, q2, q3])
 
-  '''
-  Compute the rodrigues vector from the 3 euler angles (in degrees)
-  '''
   @staticmethod
   def Euler2Rodrigues(euler):
+    '''
+    Compute the rodrigues vector from the 3 euler angles (in degrees)
+    '''
     (phi1, Phi, phi2) = np.radians(euler)
     a = 0.5 * (phi1 - phi2)
     b = 0.5 * (phi1 + phi2)
@@ -220,11 +221,11 @@ class Orientation:
     r3 = np.tan(b)
     return np.array([r1, r2, r3])
     
-  '''
-  Read a set of grain orientations from a z-set input file.
-  '''
   @staticmethod
   def read_euler_from_zset_inp(inp_path):
+    '''
+    Read a set of grain orientations from a z-set input file.
+    '''
     inp = open(inp_path)
     lines = inp.readlines()
     for i,line in enumerate(lines):  
@@ -265,8 +266,8 @@ class Grain:
     self.vtkmesh = None
     #self.records = []
 
-  '''Provide a string representation of the class.'''
   def __repr__(self):
+    '''Provide a string representation of the class.'''
     s = '%s\n * id = %d\n' % (self.__class__.__name__, self.id)
     s += ' * %s\n' % (self.orientation)
     s += ' * position (%f, %f, %f)\n' % (self.position)
@@ -313,10 +314,10 @@ class Grain:
       if verbose: print thresh.GetOutput()
       self.SetVtkMesh(thresh.GetOutput())
 
-  '''
-  Returns an XML representation of the Grain instance.
-  '''
   def to_xml(self, doc, file_name=None):
+    '''
+    Returns an XML representation of the Grain instance.
+    '''
     grain = doc.createElement('Grain')
     grain_id = doc.createElement('Id')
     grain_id_text = doc.createTextNode('%s' % self.id)
@@ -385,33 +386,35 @@ class Grain:
     self.vtkmesh = reader.GetOutput()
 
   def orientation_matrix(self):
+    '''Returns the grain orientation matrix.'''
     return self.orientation.orientation_matrix()
 
   def dct_omega_angles(self, hkl, lambda_keV, verbose=True):
     '''Compute the two omega angles which satisfy the Bragg condition.
     
     According to the Bragg's law, a crystallographic grain will be in 
-    diffracting condition if: \[\sin\theta=-[\Omega g^{-1}h]_1\]
+    diffracting condition if:
+    
+    .. math::
+    
+       \sin\\theta=-[\Omega g^{-1}h]_1
+       
     This method solves the associated second order equation to return 
     the two corresponding omega angles.
     
-    .. Warning
+    .. warning::
     
        Cubic lattice is assumed which turn the matrix S into the identity.
+       
     '''
-    d = hkl.interplanar_spacing()
     (h, k, l) = hkl.miller_indices()
     (a, b, c) = hkl._lattice._lengths
-    lambda_nm = 12.4 / lambda_keV / 10.
-    theta = np.arcsin(lambda_nm / (2 * d))
-    if verbose:
-      theta_deg = 180 * theta / np.pi
-      print '\nBragg angle for %d%d%d at %d keV is %.1f\n' % (h, k, l, lambda_keV, theta_deg)
+    theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
 
     Bt = self.orientation_matrix().transpose()
     A = h*Bt[0,0] + k*Bt[1,0] + l*Bt[2,0]
     B = -h*Bt[0,1] - k*Bt[1,1] - l*Bt[2,1]
-    C = 4*np.pi*np.sin(theta)**2/(lambda_keV*a)
+    C = 4*np.pi*np.sin(theta)**2/(lambda_keV*a) # FIXME check lambda_keV here
     Delta = 4*(A**2 + B**2 - C**2)
     if verbose:
       print 'A=',A
@@ -444,24 +447,26 @@ class Microstructure:
     self.grains = []
     self.vtkmesh = None
 
-  '''create random color map.
-     The first color can be enforced to black and usually figure out the background.
-     The random seed is fixed to consistently produce the same colormap. '''
   @staticmethod
   def rand_cmap(N=4096, first_is_black = False):
+    '''Creates a random color map.
+    
+       The first color can be enforced to black and usually figure out the background.
+       The random seed is fixed to consistently produce the same colormap.
+    '''
     np.random.seed(13)
     rand_colors = np.random.rand(N, 3)
     if first_is_black:
       rand_colors[0] = [0., 0., 0.] # enforce black background (value 0)
     return colors.ListedColormap(rand_colors)
     
-  '''
-  Load a Microstructure object from an xml file.
-  It is possible to restrict the grains which are loaded by providing 
-  the list of ids of the grains of interest.
-  '''
   @staticmethod
   def from_xml(xml_file_name, grain_ids=None):
+    '''Load a Microstructure object from an xml file.
+    
+    It is possible to restrict the grains which are loaded by providing 
+    the list of ids of the grains of interest.
+    '''
     print grain_ids
     micro = Microstructure()
     dom = parse(xml_file_name)
@@ -495,8 +500,8 @@ class Microstructure:
         return grain
     raise ValueError('grain %d not found in the microstructure' % gid)
 
-  '''Provide a string representation of the class.'''
   def __repr__(self):
+    '''Provide a string representation of the class.'''
     s = '%s\n' % self.__class__.__name__
     s += '* name: %s\n' % self.name
     for g in self.grains:
@@ -506,10 +511,10 @@ class Microstructure:
   def SetVtkMesh(self, mesh):
     self.vtkmesh = mesh
 
-  '''
-  Returns an XML representation of the Microstructure instance.
-  '''
   def to_xml(self, doc):
+    '''
+    Returns an XML representation of the Microstructure instance.
+    '''
     root = doc.createElement('Microstructure')
     doc.appendChild(root)
     name = doc.createElement('Name')
@@ -522,11 +527,12 @@ class Microstructure:
       file_name = os.path.join(self.name, '%s_%d.vtu' % (self.name, i))
       grains.appendChild(grain.to_xml(doc, file_name))
 
-  '''
-  Saving the microstructure, only save the vtk representation 
-  of the grain for now.
-  '''
   def save(self):
+    '''Saving the microstructure to the disk.
+    
+    Save the metadata as a XML file and when available, also save the 
+    vtk representation of the grains.
+    '''
     # save the microstructure instance as xml
     doc = Document()
     self.to_xml(doc)
@@ -550,6 +556,7 @@ class EbsdMicrostructure:
   Class used to manipulate a full microstructure read from an EBSD 
   measurement for instance.
   '''
+
   def __init__(self, name='empty'):
     self.name = name
     self.type = None

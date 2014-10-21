@@ -38,7 +38,10 @@ def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False)
   '''Histogram of a data array.
   
   Compute and plot the gray level histogram of the provided data array.
-  Works only with 8 bit data (ie np.uint8).
+
+  .. warning::
+
+     Works only with 8 bit data (ie numpy uint8 data type).
 
   *Parameters*
   

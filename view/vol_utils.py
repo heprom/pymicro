@@ -80,12 +80,12 @@ def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False)
   if save: plt.savefig(prefix + '_hist.png', format='png')
   if show: plt.show()
 
-'''
-  Creating a particular colormap with transparency.
+def alpha_cmap(color='red'):
+  '''Creating a particular colormap with transparency.
+  
   Only values equal to 255 will have a non zero alpha channel.
   This is typically used to overlay a binary result on initial data.
-'''
-def alpha_cmap(color='red'):
+  '''
   color1 = colorConverter.to_rgba('white')
   color2 = colorConverter.to_rgba(color)
   mycmap = mpl.colors.LinearSegmentedColormap.from_list('my_cmap', [color1, color2], 256)
@@ -95,11 +95,11 @@ def alpha_cmap(color='red'):
   mycmap._lut[:,-1] = alphas
   return mycmap
 
-'''
-Modify the coordinate formatter of pyplot to display the image
-value of the nearest pixel given x and y.
-'''
 def format_coord(x, y):
+  '''
+  Modify the coordinate formatter of pyplot to display the image
+  value of the nearest pixel given x and y.
+  '''
   n_rows, n_cols = array.shape
   col = int(x + 0.5)
   row = int(y + 0.5)

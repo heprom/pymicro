@@ -387,6 +387,52 @@ class Grain:
   def orientation_matrix(self):
     return self.orientation.orientation_matrix()
 
+  def dct_omega_angles(self, hkl, lambda_keV, verbose=True):
+    '''Compute the two omega angles which satisfy the Bragg condition.
+    
+    According to the Bragg's law, a crystallographic grain will be in 
+    diffracting condition if: \[\sin\theta=-[\Omega g^{-1}h]_1\]
+    This method solves the associated second order equation to return 
+    the two corresponding omega angles.
+    
+    .. Warning
+    
+       Cubic lattice is assumed which turn the matrix S into the identity.
+    '''
+    d = hkl.interplanar_spacing()
+    (h, k, l) = hkl.miller_indices()
+    (a, b, c) = hkl._lattice._lengths
+    lambda_nm = 12.4 / lambda_keV / 10.
+    theta = np.arcsin(lambda_nm / (2 * d))
+    if verbose:
+      theta_deg = 180 * theta / np.pi
+      print '\nBragg angle for %d%d%d at %d keV is %.1f\n' % (h, k, l, lambda_keV, theta_deg)
+
+    Bt = self.orientation_matrix().transpose()
+    A = h*Bt[0,0] + k*Bt[1,0] + l*Bt[2,0]
+    B = -h*Bt[0,1] - k*Bt[1,1] - l*Bt[2,1]
+    C = 4*np.pi*np.sin(theta)**2/(lambda_keV*a)
+    Delta = 4*(A**2 + B**2 - C**2)
+    if verbose:
+      print 'A=',A
+      print 'B=',B
+      print 'C=',C
+      print 'Delta=',Delta
+    t1 = (B - 0.5 * np.sqrt(Delta)) / (A+C)
+    t2 = (B + 0.5 * np.sqrt(Delta)) / (A+C)
+    w1 = 2 * np.arctan(t1) * 180. / np.pi
+    w2 = 2 * np.arctan(t2) * 180. / np.pi
+    if verbose:
+      print 't1=%.3f and t2=%.3f' % (t1, t2)
+      print 'w1=%.3f and w2=%.3f' % (w1, w2)
+      print 'verifying Acos(w)+Bsin(w)=C:'
+      for t in (t1,t2):
+        print A*(1-t**2)/(1+t**2)+B*2*t/(1+t**2)
+      print 'verifying (A+C)*t**2-2*B*t+(C-A)=0'
+      for t in (t1,t2):
+        print (A+C)*t**2-2*B*t+(C-A)
+    return (w1, w2)
+    
 class Microstructure:
   '''
   Class used to manipulate a full microstructure.
@@ -429,6 +475,25 @@ class Microstructure:
       micro.grains.append(Grain.from_xml(node))
     return micro
     
+  def get_grain(self, gid):
+    '''Get a particular grain given its id.
+    
+    This method browses the microstructure and return the grain 
+    corresponding to the given id. If the grain is not found, the 
+    method raises a `ValueError`.
+
+    *Parameters*
+
+    **gid**: the grain id.
+    
+    *Returns*
+
+    The method return a `Grain` with the corresponding id.
+    '''
+    for grain in self.grains:
+      if grain.id == gid:
+        return grain
+    raise ValueError('grain %d not found in the microstructure' % gid)
 
   '''Provide a string representation of the class.'''
   def __repr__(self):

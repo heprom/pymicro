@@ -25,6 +25,7 @@ Contents:
    :maxdepth: 2
 
    welcome
+   examples
    modules
 
 Indices and tables

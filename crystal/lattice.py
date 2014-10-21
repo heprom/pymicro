@@ -22,7 +22,8 @@ class Lattice:
   '''
   
   def __init__(self, matrix):
-    '''
+    '''Create a crystal lattice (unit cel).
+    
      Create a lattice from any sequence of 9 numbers.
      Note that the sequence is assumed to be read one row at a time. 
      Each row represents one lattice vector.
@@ -131,8 +132,7 @@ class Lattice:
     return Lattice([vector_a, vector_b, vector_c])    
 
   def volume(self):
-    '''
-    Volume of the unit cell.
+    '''Compute the volume of the unit cell.
     '''
     m = self._matrix
     return abs(np.dot(np.cross(m[0], m[1]), m[2]))

@@ -741,19 +741,34 @@ def setup_camera(size=(100,100,100)):
   cam.SetClippingRange(1, 10*max(size))
   return cam
 
-def render(ren, ren_size=(600, 600), display=True, name='render_3d.png'):
+def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.png'):
+  '''Render the VTK scene in 3D.
+  
+  Given a `vtkRenderer`, this function does the actual 3D rendering. It 
+  can be used to display the scene interactlively and/or save a still 
+  image in png format.
+  
+  *Parameters*
+  
+  **ren**: the VTK renderer with containing all the actors.
+  
+  **ren_size**: a tuple with two value to set the size of the image in 
+  pixels (defalut 600x600).
+  
+  **display**: a boolean to control if the scene has to be displayed 
+  interactively to the user (default True).
+  
+  **save**: a boolean to to control if the scene has to be saved as a 
+  png image (default False).
+  
+  **name**: a string to used when saving the scene as an image (default 
+  is 'render_3d.png').
+  '''
   # Create a window for the renderer
   renWin = vtk.vtkRenderWindow()
   renWin.AddRenderer(ren)
   renWin.SetSize(ren_size)
-  if display:
-    # Start the initialization and rendering
-    iren = vtk.vtkRenderWindowInteractor()
-    iren.SetRenderWindow(renWin)
-    renWin.Render()
-    iren.Initialize()
-    iren.Start()
-  else:
+  if save:
     # capture the display and write a png image
     w2i = vtk.vtkWindowToImageFilter()
     writer = vtk.vtkPNGWriter()
@@ -763,6 +778,13 @@ def render(ren, ren_size=(600, 600), display=True, name='render_3d.png'):
     writer.SetFileName(name)
     renWin.Render()
     writer.Write()
+  if display:
+    # Start the initialization and rendering
+    iren = vtk.vtkRenderWindowInteractor()
+    iren.SetRenderWindow(renWin)
+    renWin.Render()
+    iren.Initialize()
+    iren.Start()
 
 def grid_vol_view(scan):
   s_size = scan[:-4].split('_')[-2].split('x')

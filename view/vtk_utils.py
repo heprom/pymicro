@@ -765,10 +765,10 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
   is 'render_3d.png').
   '''
   # Create a window for the renderer
-  renWin = vtk.vtkRenderWindow()
-  renWin.AddRenderer(ren)
-  renWin.SetSize(ren_size)
   if save:
+    renWin = vtk.vtkRenderWindow()
+    renWin.AddRenderer(ren)
+    renWin.SetSize(ren_size)
     # capture the display and write a png image
     w2i = vtk.vtkWindowToImageFilter()
     writer = vtk.vtkPNGWriter()
@@ -779,6 +779,9 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
     renWin.Render()
     writer.Write()
   if display:
+    renWin = vtk.vtkRenderWindow()
+    renWin.AddRenderer(ren)
+    renWin.SetSize(ren_size)
     # Start the initialization and rendering
     iren = vtk.vtkRenderWindowInteractor()
     iren.SetRenderWindow(renWin)

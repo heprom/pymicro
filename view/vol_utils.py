@@ -7,7 +7,8 @@ def show_and_save(image, name, dpi=100, colormap=cm.gray, verbose=False):
   '''Save a 2D image with pyplot.
   
   This function displays a 2D numpy array (or a slice of a 3D array)
-  using pyplot and save it to the disk as a png image.
+  using pyplot and save it to the disk as a png image. The interpolation 
+  is disabled and the vertical origin is set to the bottom of the image.
 
   *Parameters*
   
@@ -29,7 +30,7 @@ def show_and_save(image, name, dpi=100, colormap=cm.gray, verbose=False):
   plt.axis('off')
   plt.hold('off')
   plt.subplots_adjust(top=1, bottom=0, left=0, right=1)
-  plt.imshow(image, cmap=colormap, interpolation='nearest')
+  plt.imshow(image, cmap=colormap, interpolation='nearest', origin='lower')
   plt.savefig(name + '.png', format='png')
   plt.close()
 

@@ -11,7 +11,7 @@ def show_and_save(image, name, dpi=100, colormap=cm.gray, verbose=False):
 
   *Parameters*
   
-  **image**: the 2d data array to ssho and save.
+  **image**: the 2d data array to show and save.
   
   **name**: a string to use as the file name (without the extension)
   
@@ -33,11 +33,37 @@ def show_and_save(image, name, dpi=100, colormap=cm.gray, verbose=False):
   plt.savefig(name + '.png', format='png')
   plt.close()
 
-'''
+def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False):
+  '''Histogram of a data array.
+  
   Compute and plot the gray level histogram of the provided data array.
   Works only with 8 bit data (ie np.uint8).
-'''
-def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False):
+
+  *Parameters*
+  
+  **data**: the data array to analyse.
+  
+  **nb_bins**: the number of bins in the histogram.
+  
+  **show**: boolean to display the figure using pyplot (defalut True).
+
+  **save**: boolean to save the figure using pyplot (defalut False).
+  
+  **prefix**: a string to use in the file name when saving the histogram 
+  as an image (defaut 'data').
+  
+  **density**: a boolean to control wether the histogram is plotted 
+  using the probability density function, see numpy histogram function 
+  for more details (default False).
+  
+  .. figure:: _static/HDPE_0001-2_512x512x512_uint8_hist.png
+      :width: 600 px
+      :height: 400 px
+      :alt: HDPE_0001-2_512x512x512_uint8_hist.png
+      :align: center
+
+      Gray level histogram computed on a 512x512x512 8 bits image.
+  '''
   print 'computing gray level histogram'
   hist, bin_edges = np.histogram(data, bins=nb_bins, range=(0,255), density=density)
   bin_centers = 0.5*(bin_edges[:-1] + bin_edges[1:])

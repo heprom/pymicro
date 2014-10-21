@@ -237,6 +237,23 @@ class HklPlane:
       2*k*l*a**2*b*c*(np.cos(beta)*np.cos(gamma) - np.cos(alpha)))
     return d
 
+  def bragg_angle(self, lambda_keV, verbose=False):
+    '''Compute the Bragg angle for this `HklPlane`.
+    
+    .. warning::
+    
+      For this calculation to work properly, the lattice spacing needs 
+      to be in nm units.
+    '''
+    d = self.interplanar_spacing()
+    lambda_nm = 1.2398 / lambda_keV
+    theta = np.arcsin(lambda_nm / (2 * d))
+    if verbose:
+      theta_deg = 180 * theta / np.pi
+      (h, k, l) = self.miller_indices()
+      print '\nBragg angle for %d%d%d at %.1f keV is %.1f deg\n' % (h, k, l, lambda_keV, theta_deg)
+    return theta
+    
   @staticmethod
   def four_to_three_index(h, k, i, l):
     '''Convert four to three index direction (used for hexagonal crystal lattice).'''

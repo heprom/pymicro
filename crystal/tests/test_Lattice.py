@@ -27,7 +27,7 @@ class LatticeTests(unittest.TestCase):
   
   def test_bragg_angle(self):
     l = Lattice.cubic(0.287) # FCC iron
-    hkl = HklPlane(2, 0, 0, l) # 200 reflection is at 32.7 deg
+    hkl = HklPlane(2, 0, 0, l) # 200 reflection at 8 keV is at 32.7 deg
     self.assertAlmostEqual(hkl.bragg_angle(8), 0.5704164) 
     
 if __name__ == '__main__':

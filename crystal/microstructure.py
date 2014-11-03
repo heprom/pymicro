@@ -410,12 +410,15 @@ class Grain:
     (h, k, l) = hkl.miller_indices()
     (a, b, c) = hkl._lattice._lengths
     theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
+    lambda_nm = 1.2398 / lambda_keV
 
     Bt = self.orientation_matrix().transpose()
     A = h*Bt[0,0] + k*Bt[1,0] + l*Bt[2,0]
     B = -h*Bt[0,1] - k*Bt[1,1] - l*Bt[2,1]
-    C = 4*np.pi*np.sin(theta)**2/(lambda_keV*a) # FIXME check lambda_keV here
+    C = 2*a*np.sin(theta)**2 / lambda_nm
     Delta = 4*(A**2 + B**2 - C**2)
+    if Delta < 0:
+      raise ValueError('Delta < 0')
     if verbose:
       print 'A=',A
       print 'B=',B

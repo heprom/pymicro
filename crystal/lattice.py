@@ -238,7 +238,7 @@ class HklPlane:
     return d
 
   def bragg_angle(self, lambda_keV, verbose=False):
-    '''Compute the Bragg angle for this `HklPlane`.
+    '''Compute the Bragg angle for this `HklPlane` at the given energy.
     
     .. warning::
     

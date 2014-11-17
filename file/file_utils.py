@@ -34,11 +34,18 @@ def edf_read(file_name, header_size=1024, type=np.uint16, \
       type = np.uint16
     s_size = file_name[:-4].split('_')[-2].split('x')
     (dim_1, dim_2, dim_3) = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
-    if verbose: print 'autoparsing filename: data type is set to',type
+    if verbose: print 'autoparsing filename: data type is set to', type
   elif dims == None:
-    # try to get the image size from the ascii header
-    (dim_1, dim_2, dim_3) = (int(header_values['Dim_1'].split('.')[0]), \
-      int(header_values['Dim_2'].split('.')[0]), int(header_values['Dim_3'].split('.')[0]))
+    # get the image size from the ascii header
+    dim_1 = int(header_values['Dim_1'].split('.')[0])
+    try:
+      dim_2 = int(header_values['Dim_2'].split('.')[0])
+    except:
+      dim_2 = 1
+    try:
+      dim_3 = int(header_values['Dim_3'].split('.')[0])
+    except:
+      dim_3 = 1
   else:
     (dim_1, dim_2, dim_3) = dims
   if verbose: print 'reading data...', file_name, 'from byte', f.tell()

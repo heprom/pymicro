@@ -197,6 +197,12 @@ def HST_write(data, fname):
   print 'done with writing'
 
 def Vtk_write(data, fname):
+  '''Write a data array into old style (V3.0) VTK format.
+  
+  An ascii header is written to which the binary data is appended.
+  
+  ..note:: the header assumes uint8 data type.
+  '''
   (nz, ny, nx) = data.shape
   print 'opening',fname,'for writing'
   print 'volume size is ', nx, 'x', ny, 'x', nz
@@ -222,8 +228,10 @@ def Vtk_write(data, fname):
 
 def read_dif(Nx, Ny, file, shift=False):
   '''Read the result of an FFT computation in a csv format.
+  
      These fiels are basically produced by **process diffraction
-     within a ZeBuLoN post_processing.
+     within a z-set post_processing.
+     
      Returns an image array containing the data.
   '''
   import csv                                             

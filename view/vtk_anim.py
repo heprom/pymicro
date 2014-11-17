@@ -1,3 +1,6 @@
+'''The vtk_anim module define a set of classes to generate 3d 
+   animations with vtk in the form of a series of png images.
+'''
 import vtk
 import os, numpy as np
 
@@ -52,7 +55,7 @@ class vtkAnimation():
     w2i.SetInput(iren.GetRenderWindow())
     writer = vtk.vtkPNGWriter()
     writer.SetInputConnection(w2i.GetOutputPort())
-    file_name = os.path.join(self.prefix, '%s_%d.png' % (self.prefix, self.timer_count))
+    file_name = os.path.join(self.prefix, '%s_%03d.png' % (self.prefix, self.timer_count))
     writer.SetFileName(file_name)
     writer.Write()
 
@@ -79,8 +82,16 @@ class vtkAnimation():
     return '\n'.join(out)
 
 class vtkAnimCameraAroundZ(vtkAnimation):
+  '''
+  Animate the camera around the vertical axis.
+  
+  This class can be used to generate a series of images (default 36)
+  while the camera rotate around the vertical axis (defined by the 
+  camera SetViewUp method)?
+  '''
   
   def __init__(self, cam, t):
+    '''Initialize the animation.'''
     print 'init vtkAnimCameraAroundZ'
     vtkAnimation.__init__(self, t)
     self.time_anim_ends = t + 36
@@ -90,6 +101,7 @@ class vtkAnimCameraAroundZ(vtkAnimation):
     self.camera = cam
  
   def execute(self, iren, event):
+    '''Execute method called to rotate the camera.'''
     do = vtkAnimation.pre_execute(self)
     if not do: return
     t1 = self.time_anim_starts
@@ -106,7 +118,7 @@ class vtkRotateActorAroundZAxis(vtkAnimation):
     self.actor_position = (0., 0., 0.)
  
   def execute(self, iren, event):
-    do = vtkAnimation.pre_execute()
+    do = vtkAnimation.pre_execute(self)
     if not do: return
     t = self.timer_count * np.pi / 180.
     X = ([np.cos(t), np.sin(t), 0])

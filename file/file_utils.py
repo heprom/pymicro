@@ -163,9 +163,12 @@ def HST_read(scan_name, zrange=None, type=np.uint8, verbose=False, header=0, dim
 def rawmar_read(image_name, size, verbose=False):
   '''Read a square 2D image plate MAR image.
   
-  These images are typically obtained from the marcvt utility.
-  That this method assume Big endian byte order.'''
-  data = HST_read(image_name, dims = (1,size,size), header=4600, type=np.uint16, verbose=verbose)[0,:,:]
+  These binary images are typically obtained from the marcvt utility.
+
+  ..note:: This method assume Big endian byte order.
+  '''
+  data = HST_read(image_name, dims = (1, size, size), header=4600, \
+    type=np.uint16, verbose=verbose)[:,:,0]
   return data
 
 def HST_write(data, fname):

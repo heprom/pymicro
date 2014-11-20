@@ -170,6 +170,14 @@ def alpha_cmap(color='red'):
   
   Only values equal to 255 will have a non zero alpha channel.
   This is typically used to overlay a binary result on initial data.
+
+  *Parameters*
+  
+  **color**: the color to use for non transparents values (ie. 255).
+
+  *Returns*
+
+  **mycmap**: a fully transparent colormap except for 255 values.
   '''
   color1 = colorConverter.to_rgba('white')
   color2 = colorConverter.to_rgba(color)

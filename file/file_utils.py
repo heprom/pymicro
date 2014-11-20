@@ -135,10 +135,11 @@ def HST_read(scan_name, zrange=None, type=np.uint8, verbose=False, header=0, dim
   The volume size must be specified by dims=(nx,ny,nz) unless an associated 
   .info file is present in the same location to determine the volume 
   size. The data type is unsigned short (8 bits) by default but can be set 
-  to float (32 bits) for example.
-  NB: if you read a .edf file written by matlab in +y+x+z convention (column
-  major order), you may want to use:
-  np.swapaxes(HST_read('file.edf',...),0,1)
+  to any numpy typa (32 bits float for example).
+  
+  ..note:: if you use this function to read a .edf file written by 
+    matlab in +y+x+z convention (column major order), you may want to 
+    use: np.swapaxes(HST_read('file.edf', ...), 0, 1)
   '''
   if verbose: print 'data type is',type
   if dims == None:
@@ -147,7 +148,7 @@ def HST_read(scan_name, zrange=None, type=np.uint8, verbose=False, header=0, dim
     (nx, ny, nz) = dims
   if zrange == None:
       zrange = range(0, nz)
-  print 'volume size is ', nx, 'x', ny, 'x', len(zrange)
+  if verbose: print 'volume size is ', nx, 'x', ny, 'x', len(zrange)
   f = open(scan_name, 'rb')
   data = np.empty((ny, nx, len(zrange)), dtype=type)
   if verbose: print 'reading volume... from byte ',f.tell()
@@ -196,6 +197,55 @@ def HST_write(data, fname):
   f.close()
   print 'done with writing'
 
+def recad_vol(vol_filename, min, max, verbose=False):
+  '''Recad a 32 bit vol file into 8 bit raw file.
+  
+  This function reads a 3D volume file into a numpy float32 array and
+  applies the `recad` function with the [min, max] range. The result is 
+  saved into a .raw file with the same name as the input file.
+
+  In verbose mode, a piture to compare mid slices in the two volumes 
+  and another one to compare the histograms are saved.
+  
+  ..note:: To read the vol file, the presence of a .info file is 
+    assumed, see `HST_read`.
+
+  *Parameters*
+
+  **vol_filename**: the path to the binary vol file.
+  
+  **min**: value to use as the minimum (will be 0 in the casted array).
+
+  **max**: value to use as the maximum (will be 255 in the casted array).
+
+  **verbose**: activate verbose mode (False by default).
+  '''
+  prefix = vol_filename[:-4]
+  vol_size = HST_info(vol_filename + '.info')
+  data = HST_read(vol_filename, type=np.float32)  
+  data_uint8 = recad(data, min, max)
+  if verbose:
+    plt.figure(1, figsize=(10,5))
+    plt.subplot(121)
+    plt.imshow(data[:,:,vol_size[2]//2])
+    plt.title('float image')
+    plt.axis('off')
+    plt.subplot(122)
+    plt.imshow(data_uint8[:,:,vol_size[2]//2])
+    plt.title('uint8 image')
+    plt.axis('off')
+    plt.savefig('%sslices.pdf' % (prefix), format='pdf')
+    plt.figure(2)
+    plt.clf()
+    plt.subplot(211)
+    plt.title('Gray level histograms from float to uint8')
+    n, bins, patches = plt.hist(data.ravel(), bins=256, histtype='stepfilled', facecolor='green')
+    plt.figure(2)
+    plt.subplot(212)
+    plt.hist(data_uint8.ravel(), bins=256, histtype='stepfilled', facecolor='green')
+    plt.savefig('%shist.pdf' % (prefix), format='pdf')
+  HST_write(data_uint8, '%s.raw' % prefix)
+  
 def Vtk_write(data, fname):
   '''Write a data array into old style (V3.0) VTK format.
   

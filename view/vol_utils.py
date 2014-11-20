@@ -84,6 +84,69 @@ def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False)
   if save: plt.savefig(prefix + '_hist.png', format='png')
   if show: plt.show()
 
+def auto_min_max(data, cut=0.0002, nb_bins = 256, verbose=False):
+  '''Compute the min and max values in a numpy data array.
+  
+  The min and max values are calculated based on the histogram of the 
+  array which is limited at both end by the cut parameter (0.0002 by 
+  default). This means 99.98% of the values are within the [min, max] 
+  range.
+  
+  *Parameters*
+  
+  **data**: the data array to analyse.
+
+  **cut**: the cut off value to use on the histogram (0.0002 by default).
+
+  **nb_bins**: number of bins to use in the histogram (256 by default).
+
+  *Returns*
+
+  **(min, max)**: a tuple containing the min and max values.
+  '''
+  n, bins = np.histogram(data, bins=nb_bins, density=False)
+  min = 0.0; max = 0.0
+  total = np.sum(n)
+  p = np.cumsum(n)
+  for i in range(nb_bins):
+    if p[i] > total*0.00002:
+      min = bins[i]
+      if verbose: print 'min = %f (i=%d)' % (min, i)
+      break
+  for i in range(nb_bins):
+    if total-p[nb_bins-1-i] > total*0.00002:
+      max = bins[nb_bins-1-i]
+      if verbose: print 'max = %f' % max
+      break
+  return (min, max)
+
+def recad(data, min, max):
+  '''Cast a numpy array into 8 bit data type.
+  
+  This function change the data type of a numpy array into 8 bit. The 
+  data values are interpolated from [min, max] to [0, 255]. Both min 
+  and max values may be chosen manually or computed by the function 
+  `find_min_max`.
+
+  *Parameters*
+  
+  **data**: the data array to cast to uint8.
+
+  **min**: value to use as the minimum (will be 0 in the casted array).
+
+  **max**: value to use as the maximum (will be 255 in the casted array).
+
+  *Returns*
+
+  **data_uint8**: the data array casted to uint8.
+  '''
+  low_values_indices = data < min
+  data[low_values_indices] = min
+  large_values_indices = data > max
+  data[large_values_indices] = max
+  data_uint8 = (255 * (data - min) / (max - min)).astype(np.uint8)
+  return data_uint8
+
 def alpha_cmap(color='red'):
   '''Creating a particular colormap with transparency.
   

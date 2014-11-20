@@ -1,7 +1,37 @@
-import sys
+import os, sys
 import numpy as np
 import struct
 
+def unpack_header(h):
+  nbytes = len(h)
+  nbits = 8 * nbytes
+  s = struct.unpack(str(nbits) + 'c', h)
+  tmp_header = ''
+  for i in range(nbits):
+    tmp_header += s[i]
+  header_values = {}
+  for line in tmp_header.split('\n'):
+    tokens = line.split('=')
+    if len(tokens)>1:
+      header_values[tokens[0].strip()] = tokens[1].split(';')[0].strip()
+  return header_values
+  
+def edf_info(file_name, header_size=None):
+  if header_size == None:
+    # guess the header size by peeking at the first 128 bytes
+    f = open(file_name, 'r')
+    h = np.fromstring(f.read(128))
+    header_values = unpack_header(h)
+    total_file_size = os.path.getsize(file_name)
+    payload_size = int(header_values['Size'])
+    header_size = total_file_size - payload_size
+    print 'determined header size is:', header_size
+    f.seek(0)
+    h = np.fromstring(f.read(header_size))
+    f.close()
+    return unpack_header(h)
+  
+    
 def edf_read(file_name, header_size=1024, type=np.uint16, \
   verbose=True, dims=None, autoparse_filename=False, return_header=False):
   '''Read an edf file.
@@ -11,7 +41,10 @@ def edf_read(file_name, header_size=1024, type=np.uint16, \
   the image (eg. image size, motor positions).
   The autoparse_filename can be activated to retreive image type and 
   size:
-  edf_read(myvol_100x200x50_uint16.edf, autoparse_filename=True)
+  ::
+  
+    edf_read(myvol_100x200x50_uint16.edf, autoparse_filename=True)
+
   will read the 3d image as unsigned 16 bits with size 100 x 200 x 50.
   '''
   f = open(file_name, 'r')
@@ -60,13 +93,22 @@ def edf_read(file_name, header_size=1024, type=np.uint16, \
   else:
     return data_xyz
 
-def esrfdatatype(data_type):
+def esrf_to_numpy_datatype(data_type):
     return {
-        np.uint8:   ' UnsignedByte',
-        np.uint16:  'UnsignedShort',
-        np.uint32:  ' UnsignedLong',
-        np.float32: '   FloatValue',
-        np.float64: '  DoubleValue',
+        'UnsignedByte': np.uint8,
+        'UnsignedShort': np.uint16,
+        'UnsignedLong': np.uint32,
+        'FloatValue': np.float32,
+        'DoubleValue': np.float64,
+        }.get(data_type, np.uint16)
+
+def numpy_to_esrf_datatype(data_type):
+    return {
+        np.uint8: 'UnsignedByte',
+        np.uint16: 'UnsignedShort',
+        np.uint32: 'UnsignedLong',
+        np.float32: 'FloatValue',
+        np.float64: 'DoubleValue',
         }.get(data_type, 'UnsignedShort')
 
 def edf_write(data, fname, type=np.uint16, header_size=1024):
@@ -94,7 +136,7 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
   head += 'HeaderID       = EH:000001:000000:000000 ;\n'
   head += 'Image          = 1 ;\n'
   head += 'ByteOrder      = LowByteFirst ;\n'
-  head += 'DataType       = ' + esrfdatatype(type) + ' ;\n'
+  head += 'DataType       = %13s;\n' % numpy_to_esrf_datatype(type)
   head += 'Dim_1          = %4s;\n' % nx
   head += 'Dim_2          = %4s;\n' % ny
   head += 'Dim_3          = %4s;\n' % nz

@@ -93,14 +93,16 @@ class wxImageViewerFrame(wx.Frame):
   def OnLoadImage(self, im_file):
     self.path = im_file
     print 'self.path=',self.path
-    # read image depending on file extension (only .png and .edf supported)
+    # read image depending on file extension (only .png .tif and .edf supported)
     if self.path.endswith('.edf'):
       self.im = edf_read(im_file, header_size=2048, verbose=True, \
-        return_header=False)[:,:,0]
+        return_header=False)[:,:,0].transpose()
     elif self.path.endswith('.png'):
       self.im = mpimg.imread(im_file)
+    elif self.path.endswith('.tif'):
+      self.im = TiffFile(im_file).asarray()
     else:
-      print('Only png and edf images are supported for the moment')
+      print('Only png, tif and edf images are supported for the moment')
       exit()
     print 'min in image= %d, max in image=%d' % (np.min(self.im), np.max(self.im))
     print np.shape(self.im)

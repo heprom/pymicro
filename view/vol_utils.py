@@ -84,6 +84,24 @@ def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False)
   if save: plt.savefig(prefix + '_hist.png', format='png')
   if show: plt.show()
 
+def flat(img, ref, dark):
+  '''Apply flat field correction to an image.
+  
+  *Parameters*
+  
+  **img**: the image to correct.
+  
+  **ref**: the reference image (without sample).
+  
+  **dark**: the dark image (thermal noise of the camera).
+
+  *Returns*
+
+  **flat**: the flat field corrected image.
+  '''
+  flat = (img - dark).astype(np.float32) / (ref - dark).astype(np.float32)
+  return flat
+  
 def auto_min_max(data, cut=0.0002, nb_bins = 256, verbose=False):
   '''Compute the min and max values in a numpy data array.
   

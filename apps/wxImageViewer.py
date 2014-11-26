@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
 
-import wx, os, re, numpy as np
+import sys, wx, os, re, numpy as np
 from pymicro.view.wxPlotPanel import PlotPanel
 from matplotlib import pyplot, colors, cm
 import matplotlib.image as mpimg
@@ -81,8 +81,8 @@ class wxImageViewerFrame(wx.Frame):
     self.maxim_sc = wx.SpinCtrl(cmapPanel, wx.ID_ANY, min=0, max=len(self.image_list)-1)
     self.Bind(wx.EVT_SPINCTRL, self.OnSliceUpdate)
     cmapBox.Add(self.maxim_sc, 0, wx.ALIGN_CENTER)
-    self.cur_image_name = wx.TextCtrl(cmapPanel, wx.EXPAND | wx.ALL, '')
-    cmapBox.Add(self.cur_image_name, 0, wx.ALIGN_CENTER)
+    self.cur_image_name = wx.StaticText(cmapPanel, wx.EXPAND | wx.TE_READONLY, '')
+    cmapBox.Add(self.cur_image_name, 0, wx.EXPAND | wx.ALL, 5)
     leftBox.Add(cmapPanel, 0, wx.EXPAND | wx.ALL, 5)
     sizer.Add(leftPanel, 1, wx.EXPAND | wx.ALL, 5)
     # final settings
@@ -103,10 +103,10 @@ class wxImageViewerFrame(wx.Frame):
       self.im = TiffFile(im_file).asarray()
     else:
       print('Only png, tif and edf images are supported for the moment')
-      exit()
+      sys.exit(1)
     print 'min in image= %d, max in image=%d' % (np.min(self.im), np.max(self.im))
     print np.shape(self.im)
-    self.cur_image_name.SetValue(im_file)
+    self.cur_image_name.SetLabel(im_file)
     self.imPanel.SetImage(self.im)
 
   def OnCmapSelected(self, event):
@@ -126,7 +126,7 @@ class ImageViewer(wx.App):
     print self.images
     if not self.images:
       print('No image found, please verify your pattern or your working directory')
-      exit()
+      sys.exit(1)
     wx.App.__init__(self)
     # start main event loop
     self.MainLoop()

@@ -3,6 +3,11 @@ import numpy as np
 import struct
 
 def unpack_header(h):
+  '''Unpack an ascii header.
+  
+  Form a string with the read binary data and then split it into string 
+  tokens which are put in a dictionnary.
+  '''
   nbytes = len(h)
   nbits = 8 * nbytes
   s = struct.unpack(str(nbits) + 'c', h)
@@ -17,9 +22,25 @@ def unpack_header(h):
   return header_values
   
 def edf_info(file_name, header_size=None):
+  '''Read and return informations contained in the header of a .edf file.
+  
+  Edf files always start with a header (of variable length) containing 
+  informations about the file such as acquisition conditions, image 
+  dimensions... This function reads a certain amount of bytes of a given 
+  file as ascii data and unpack it.
+  If not specified, the header size is determined automatically by 
+  substracting the data size (read as ascii at the begining of the file) 
+  to the total file size.
+
+  *Parameters*
+
+  **header_size**: number of bytes to read (None by default).
+  
+  Returns a dictionnary containing the file informations.
+  '''
+  f = open(file_name, 'r')
   if header_size == None:
     # guess the header size by peeking at the first 128 bytes
-    f = open(file_name, 'r')
     h = np.fromstring(f.read(128))
     header_values = unpack_header(h)
     total_file_size = os.path.getsize(file_name)
@@ -27,9 +48,9 @@ def edf_info(file_name, header_size=None):
     header_size = total_file_size - payload_size
     print 'determined header size is:', header_size
     f.seek(0)
-    h = np.fromstring(f.read(header_size))
-    f.close()
-    return unpack_header(h)
+  h = np.fromstring(f.read(header_size))
+  f.close()
+  return unpack_header(h)
   
     
 def edf_read(file_name, header_size=1024, type=np.uint16, \

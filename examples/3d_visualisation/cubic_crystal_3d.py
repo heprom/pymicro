@@ -13,15 +13,12 @@ if __name__ == '__main__':
   ren = vtk.vtkRenderer()
   ren.SetBackground(1., 1., 1.)
 
-  # crystal orientation
-  o = None #Orientation.from_euler((344.0, 125.0, 217.0))
-
   # create the unit lattice cell
   l = Lattice.cubic(1.0)
   
   # create the slip planes and the cubic lattice actor
   hklplanes = HklPlane.get_family('111')
-  cubic  = lattice_3d_with_planes(l, hklplanes, crystal_orientation=o, \
+  cubic  = lattice_3d_with_planes(l, hklplanes, crystal_orientation=None, \
     show_normal=True, plane_opacity=0.5)
   ren.AddActor(cubic)
 
@@ -35,5 +32,5 @@ if __name__ == '__main__':
   cam.SetPosition(4, -1.5, 1.5) # change the position to something better
   cam.Dolly(1.1) # get a little closer
   ren.SetActiveCamera(cam)
-  render(ren, display=False, ren_size=(800,800), name='cubic_crystal_3d.png')
+  render(ren, save=True, display=False, ren_size=(800,800), name='cubic_crystal_3d.png')
   print 'done'

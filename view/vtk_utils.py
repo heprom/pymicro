@@ -559,8 +559,7 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
     plane = vtk.vtkPlane()
     plane.SetOrigin(origin)
     plane.SetNormal(hklplane.normal())
-    hklplaneActor = add_plane_to_grid(plane, grid, origin)
-    #hklplaneActor.GetProperty().SetOpacity(plane_opacity)
+    hklplaneActor = add_plane_to_grid(plane, grid, origin, opacity=plane_opacity)
     assembly.AddPart(hklplaneActor)
     if show_normal:
       # add an arrow to display the normal to the plane

@@ -158,11 +158,12 @@ class vtkAnimCameraToZ(vtkAnimation):
 
 class vtkSetVisibility(vtkAnimation):
   
-  def __init__(self, t, actor, visible = 1, gradually=False):
+  def __init__(self, t, actor, visible = 1, max_opacity = 1, gradually=False):
     vtkAnimation.__init__(self, t)
     self.actor = actor
     self.visible = visible
     self.gradually = gradually
+    self.max_opacity = max_opacity
  
   def execute(self, iren, event):
     do = vtkAnimation.pre_execute(self)
@@ -176,9 +177,9 @@ class vtkSetVisibility(vtkAnimation):
         if self.actor.GetVisibility() == 0:
           self.actor.SetVisibility(1) # make the actor visible
         if self.visible:
-          opacity = 1 - (t2 - self.timer_count)/float(t2 - t1)
+          opacity = self.max_opacity * (1 - (t2 - self.timer_count) / float(t2 - t1))
         else:
-          opacity = (t2 - self.timer_count)/float(t2 - t1)
+          opacity = self.max_opacity * (t2 - self.timer_count) / float(t2 - t1)
         if self.verbose: print 'opacity=',opacity
         # change the opacity for each actor in the assemby
         collection = vtk.vtkPropCollection()

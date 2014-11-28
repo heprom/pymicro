@@ -1,8 +1,10 @@
 import os
 import sys
 import vtk
-from vtk.util.colors import *
 import numpy
+from vtk.util.colors import *
+from vtk.util import numpy_support
+
 # see if some of the stuff needs to be moved to the Microstructure module
 from pymicro.crystal.lattice import Lattice, HklPlane
 #from pymicro.crystal.microstructure import * 
@@ -787,6 +789,58 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
     renWin.Render()
     iren.Initialize()
     iren.Start()
+
+def show_grains(data):
+  '''Create a 3d actor of all the grains in a labeled numpy array.
+  
+  Given a 3d numpy array, this function compute the skin of all the 
+  grains (labels > 1). the background is assumed to be zero and is 
+  removed. The actor produced is colored by the grain ids using the 
+  random color map, see `rand_cmap`.
+  
+  *Parameters*
+  
+  **data**: a labeled numpy array.
+  
+  Returns a vtk actor that can be added to a rendered to show all the 
+  grains colored by their id.
+  
+  '''
+  size = data.shape
+  vtk_data_array = numpy_support.numpy_to_vtk(numpy.ravel(data, order='F'), deep=1)
+  grid = vtk.vtkUniformGrid()
+  grid.SetSpacing(1, 1, 1)
+  grid.SetScalarType(vtk.VTK_UNSIGNED_SHORT)
+  grid.SetExtent(0, size[0], 0, size[1], 0, size[2]) # for cell data
+  grid.GetCellData().SetScalars(vtk_data_array)
+  visible = numpy_support.numpy_to_vtk(numpy.ravel(data > 1, order='F').astype(numpy.uint8), deep=1)
+  grid.SetCellVisibilityArray(visible)
+
+  # use extract geometry filter to access the data
+  extract = vtk.vtkExtractGeometry()
+  extract.SetInput(grid)
+  extract.ExtractInsideOn()
+  extract.ExtractBoundaryCellsOn()
+  bbox = vtk.vtkBox()
+  bbox.SetXMin(0, 0, 0)
+  bbox.SetXMax(size[0], size[1], size[2])
+  extract.SetImplicitFunction(bbox)
+
+  mapper = vtk.vtkDataSetMapper()
+  mapper.ScalarVisibilityOn()
+  lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
+  mapper.SetLookupTable(lut)
+  mapper.UseLookupTableScalarRangeOn()
+  mapper.SetScalarModeToUseCellData();
+  mapper.SetColorModeToMapScalars();
+  mapper.SetInput(extract.GetOutput())
+  mapper.Update()
+  actor = vtk.vtkActor()
+  actor.SetMapper(mapper)
+  actor.GetProperty().SetSpecular(.4)
+  actor.GetProperty().SetSpecularPower(10)
+  actor.GetProperty().SetOpacity(1.0)
+  return actor
 
 def grid_vol_view(scan):
   s_size = scan[:-4].split('_')[-2].split('x')

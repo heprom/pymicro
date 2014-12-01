@@ -32,5 +32,6 @@ if __name__ == '__main__':
   cam.SetPosition(4, -1.5, 1.5) # change the position to something better
   cam.Dolly(1.1) # get a little closer
   ren.SetActiveCamera(cam)
-  render(ren, save=True, display=False, ren_size=(800,800), name='cubic_crystal_3d.png')
-  print 'done'
+  image_name = os.path.splitext(__file__)[0] + '.png'
+  print 'writting %s' % image_name
+  render(ren, save=True, display=False, ren_size=(800,800), name=image_name)

@@ -7,10 +7,7 @@ import os, vtk
 from scipy import ndimage
 import numpy as np
 
-data_dir = os.path.join(os.environ['RAWDATA'], '2014_feb_topotomo/raw_stacks')
-#scan = 'grain.raw'
-#scan = 'grain1_450x450x487_uint8.raw'
-#scan = 'grain1_225x225x243_uint8.raw'
+data_dir = '../data'
 scan = 'grain1_112x112x121_uint8.raw'
 im_file = os.path.join(data_dir, scan)
 
@@ -22,7 +19,6 @@ grain.position = ndimage.measurements.center_of_mass(grain_data, grain_data)
 print 'grain position:',grain.position
 grain.volume = ndimage.measurements.sum(grain_data) # label is 1.0 here
 grain.add_vtk_mesh(grain_data, contour=False)
-#grain.save_vtk_repr() # save the grain mesh in vtk format
 
 print 'adding bounding box'
 grain_bbox = box_3d(size=np.shape(grain_data), line_color=white)
@@ -30,7 +26,6 @@ print 'adding grain with slip planes'
 p1 = HklPlane(-1, 1, 1)
 p2 = HklPlane(1, -1, 1)
 p3 = HklPlane(1, 1, 1)
-#hklplanes = [p1, p2]
 hklplanes = [p3]
 grain_with_planes = add_grain_to_3d_scene(grain, hklplanes, show_orientation=True)
 tr = vtk.vtkTransform()
@@ -52,7 +47,6 @@ axes.GetXAxisCaptionActor2D().GetCaptionTextProperty().SetColor(grey)
 
 print 'setting up camera'
 cam = setup_camera(size=np.shape(grain_data))
-#cam.SetPosition(2*np.shape(grain_data)[0], -2*np.shape(grain_data)[1], 1.5*np.shape(grain_data)[2])
 cam.Dolly(0.9)
 
 # Create renderer and add all the actors
@@ -64,4 +58,6 @@ ren.AddActor(cubic)
 ren.AddViewProp(axes);
 ren.SetActiveCamera(cam)
 
-render(ren, ren_size=(600, 700), display=True, name=scan[:-4] + '_3d.png')
+image_name = os.path.splitext(__file__)[0] + '.png'
+print 'writting %s' % image_name
+render(ren, ren_size=(600, 700), save=True, display=False, name=image_name)

@@ -25,7 +25,7 @@ Contents:
    :maxdepth: 2
 
    welcome
-   examples
+   auto_examples/index.rst
    modules
 
 Indices and tables

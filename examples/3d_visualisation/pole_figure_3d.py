@@ -44,6 +44,7 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
     plane = vtk.vtkPlane()
     plane.SetOrigin(origin)
     plane.SetNormal(hklplane.normal())
+    #FIXME here an assembly is retruned and we cannot access the mapper anymore
     hklplaneActor = vtk_utils.add_plane_to_grid(plane, grid, origin)
     cubic_lattice.AddPart(hklplaneActor)
     # get a reference to the vtkPolyData representing the hkl plane
@@ -83,18 +84,6 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
   cubic_lattice.RotateX(grain_orientation.Phi())
   cubic_lattice.RotateZ(grain_orientation.phi2())
 
-  '''
-  # add a vertical plane for visualisation purpose
-  source = vtk.vtkPlaneSource()
-  source.SetCenter(0,0,0)
-  source.SetNormal(0,1,0)
-  mapper = vtk.vtkPolyDataMapper()
-  mapper.SetInput(source.GetOutput())
-  actor = vtk.vtkActor()
-  actor.SetMapper(mapper)
-  ren.AddActor(actor)
-  '''
-
   # add an outbounding sphere
   sphereSource = vtk.vtkSphereSource()
   sphereSource.SetCenter(0.0, 0.0, 0.0)
@@ -124,15 +113,10 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
   cam.SetFocalPoint(0, 0, 0)
   ren.SetActiveCamera(cam)
   
-  vtk_utils.render(ren, ren_size=(800, 800), display=True, name='pole_figure_3d.png')
+  image_name = os.path.splitext(__file__)[0] + '.png'
+  print 'writting %s' % image_name
+  vtk_utils.render(ren, ren_size=(800, 800), save=True, display=False, name=image_name)
 
 if __name__ == '__main__':
-
-  # grain orientation
-  '''
-  Schimd factor analysis gives max = 0.46
-  for system (1-11)[-101]
-  '''
-  #orientation = Orientation.from_euler(numpy.array([0, 0, 0]))
   orientation = Orientation.from_euler(numpy.array([142.8, 32.0, 214.4]))
   create_pole_figure_3d(orientation, show_arrows=True, show_slip_traces=True, verbose=False)

@@ -1,6 +1,6 @@
 """A package to work with materials microstructures
 
-.. packageauthor:: Henry Proudhon <henry.proudhon@gmail.com>
+.. moduleauthor:: Henry Proudhon <henry.proudhon@gmail.com>
 
 """
 

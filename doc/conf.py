@@ -19,7 +19,13 @@ import sys, os
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('../pymicro'))
+sys.path.append(os.path.abspath('sphinxext'))
 #print sys.path
+
+try:
+    import gen_rst
+except:
+    pass
 
 # -- General configuration -----------------------------------------------------
 
@@ -28,7 +34,7 @@ needs_sphinx = '1.1'
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc']#, 'sphinx.ext.mathjax']
+extensions = ['sphinx.ext.autodoc', 'gen_rst']#, 'sphinx.ext.mathjax']
 #mathjax_path = 'MathJax/MathJax.js'
 #jsmath_path = 'jsMath/easy/load.js'
 
@@ -65,7 +71,7 @@ release = '0.1.0'
 # non-false value, then it is used:
 #today = ''
 # Else, today_fmt is used as the format for a strftime call.
-#today_fmt = '%B %d, %Y'
+today_fmt = '%B %d, %Y'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.

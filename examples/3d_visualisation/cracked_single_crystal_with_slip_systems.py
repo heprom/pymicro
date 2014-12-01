@@ -15,8 +15,7 @@ def create_mesh_outline_3d_with_planes(lattice, orientation, nld):
   top_crack_plane = vtk.vtkPlane()
   top_crack_plane.SetNormal(0,0.025,1)
   top_crack_plane.SetOrigin(0.5, 1.0, 0.5)
-  top_crack_planeActor = add_plane_to_grid(top_crack_plane, grid, None)
-  top_crack_planeActor.GetProperty().SetOpacity(1.0)
+  top_crack_planeActor = add_plane_to_grid(top_crack_plane, grid, None, opacity=1.0)
   transform = vtk.vtkTransform()
   transform.Scale(1.0, 0.5, 1.0)
   top_crack_planeActor.SetUserTransform(transform)
@@ -24,8 +23,7 @@ def create_mesh_outline_3d_with_planes(lattice, orientation, nld):
   bot_crack_plane = vtk.vtkPlane()
   bot_crack_plane.SetNormal(0,0.025,-1)
   bot_crack_plane.SetOrigin(0.5, 1.0, 0.5)
-  bot_crack_planeActor = add_plane_to_grid(bot_crack_plane, grid, None)
-  bot_crack_planeActor.GetProperty().SetOpacity(1.0)
+  bot_crack_planeActor = add_plane_to_grid(bot_crack_plane, grid, None, opacity=1.0)
   transform = vtk.vtkTransform()
   transform.Scale(1.0, 0.5, 1.0)
   bot_crack_planeActor.SetUserTransform(transform)
@@ -42,8 +40,7 @@ def create_mesh_outline_3d_with_planes(lattice, orientation, nld):
     plane = vtk.vtkPlane()
     plane.SetNormal(slip_normal_rot)
     plane.SetOrigin(0.5, 0.0, 0.5) # origin at the left side center of the cell
-    hklplaneActor = add_plane_to_grid(plane, grid, None)
-    hklplaneActor.GetProperty().SetOpacity(0.5)
+    hklplaneActor = add_plane_to_grid(plane, grid, None, opacity=0.5)
     # add an arrow to display the normal to the plane
     slip_direction = numpy.cross((-1,0,0), slip_normal)
     print 'slip direction', slip_direction
@@ -129,6 +126,6 @@ if __name__ == '__main__':
   #cam.Dolly(1.0)
   ren.SetActiveCamera(cam)
   
-  image_name = '%d_slip_systems.png' % len(nld)
+  image_name = os.path.splitext(__file__)[0] + '.png'
   print 'writting %s' % image_name
-  render(ren, display=False, ren_size=(800,800), name=image_name)
+  render(ren, save=True, display=False, ren_size=(800,800), name=image_name)

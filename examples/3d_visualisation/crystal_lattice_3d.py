@@ -95,4 +95,7 @@ if __name__ == '__main__':
   cam.SetClippingRange(-20,20)
   cam.Dolly(0.2)
   ren.SetActiveCamera(cam)
-  render(ren, ren_size=(800, 400), display=False, name='crystal_lattice_3d.png')
+  import os
+  image_name = os.path.splitext(__file__)[0] + '.png'
+  print 'writting %s' % image_name
+  render(ren, ren_size=(800, 400), save=True, display=False, name=image_name)

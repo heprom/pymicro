@@ -5,7 +5,7 @@ import numpy as np
 
 display = False
 
-data_dir = 'rawdata'
+data_dir = '../data'
 scan = 'mousse_250x250x250_uint8.raw'
 im_file = os.path.join(data_dir, scan)
 s_size = scan[:-4].split('_')[-2].split('x')
@@ -39,5 +39,7 @@ cam.SetClippingRange(1, 2000)
 ren.SetActiveCamera(cam)
 
 print '3d rendering'
-render(ren, ren_size=(600, 600), display=False, save=True, name='%s_3d.png' % scan[:-4])
+image_name = os.path.splitext(__file__)[0] + '.png'
+print 'writting %s' % image_name
+render(ren, ren_size=(600, 600), display=False, save=True, name=image_name)
 print 'done'

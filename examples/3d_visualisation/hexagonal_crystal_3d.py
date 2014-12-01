@@ -19,9 +19,8 @@ if __name__ == '__main__':
 
   # hexagonal lattice
   a = 1.0 #0.321 # nm
-  c = 1.5 #0.521 #nm
+  c = 1.5 #0.521 # nm
   l = Lattice.hexagonal(a, c)
-  #grid = lattice_grid(l)
   grid = hexagonal_lattice_grid(l)
   print np.array(HklPlane.four_to_three_index(1,0,-1,0))/0.6 # prismatic 1
   print np.array(HklPlane.four_to_three_index(0,1,-1,0))/0.6 # prismatic 2
@@ -33,8 +32,6 @@ if __name__ == '__main__':
   p3 = HklPlane(-3., 6., 5., lattice=l)
   p4 = HklPlane(3, 9, 10, lattice=l)
   p5 = HklPlane(0, 0, 1, lattice=l)
-  #hklplanes = [p1, p3]
-  #hklplanes = [p2, p4]
   hklplanes = [p3,p5]
   hexagon = vtk.vtkAssembly()
   Edges, Vertices = lattice_3d(grid, tubeRadius=0.025*a, sphereRadius=0.1*a)
@@ -50,8 +47,7 @@ if __name__ == '__main__':
     plane.SetOrigin(origin)
     plane.SetNormal(hklplane.normal())
     print 'normal is', plane.GetNormal()
-    hklplaneActor = add_plane_to_grid(plane, grid, origin)
-    hklplaneActor.GetProperty().SetOpacity(0.5)
+    hklplaneActor = add_plane_to_grid(plane, grid, origin, opacity=0.5)
     hexagon.AddPart(hklplaneActor)
     # add an arrow to display the normal to the plane
     arrowActor = unit_arrow_3d(origin, a*np.array(plane.GetNormal()), make_unit=False)
@@ -69,8 +65,9 @@ if __name__ == '__main__':
   cam = setup_camera(size=(1, 1, 1))
   cam.SetFocalPoint(0, 0, 0)
   cam.SetPosition(0., -2, 1.0) # change the position to something better
-  cam.ParallelProjectionOn()
-  cam.Dolly(1.1) # get a little closer
+  cam.Dolly(0.4)
   ren.SetActiveCamera(cam)
-  render(ren, display=True, ren_size=(800,800), name='hexagonal_crystal_3d.png')
+  image_name = os.path.splitext(__file__)[0] + '.png'
+  print 'writting %s' % image_name
+  render(ren, save=True, display=False, ren_size=(800,800), name=image_name)
   print 'done'

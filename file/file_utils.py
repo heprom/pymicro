@@ -41,7 +41,7 @@ def edf_info(file_name, header_size=None):
   f = open(file_name, 'r')
   if header_size == None:
     # guess the header size by peeking at the first 128 bytes
-    h = np.fromstring(f.read(128))
+    h = np.fromstring(f.read(512))
     header_values = unpack_header(h)
     total_file_size = os.path.getsize(file_name)
     payload_size = int(header_values['Size'])

@@ -274,6 +274,15 @@ class Grain:
     s += ' * has vtk mesh ? %s\n' % (self.vtkmesh != None)
     return s
     
+  def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
+    plane = slip_system.get_slip_plane()
+    Bt = self.orientation_matrix().transpose()
+    n_rot = np.dot(Bt, plane.normal()) # plane.normal() is a unit vector
+    slip = slip_system.get_slip_direction().direction()
+    slip_rot = np.dot(Bt, slip)
+    SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
+    return SF
+
   def SetVtkMesh(self, mesh):
     self.vtkmesh = mesh
     

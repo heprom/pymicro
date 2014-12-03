@@ -137,7 +137,84 @@ class Lattice:
     m = self._matrix
     return abs(np.dot(np.cross(m[0], m[1]), m[2]))
 
-class HklPlane:
+  @staticmethod
+  def get_slip_systems(plane_type='111'):
+    if plane_type != '111':
+      print 'warning only 111 slip supported for the moment!'
+    planes = HklPlane.get_family(plane_type)
+    slip_systems = []
+    for plane in planes:
+      (h, k, l) = plane.miller_indices()
+      for i in range(3): # 3 slip directions by plane
+        dir_type = np.array([h, k, l])
+        dir_type[i] = 0
+        direction = np.cross(np.array([h, k, l]), dir_type)
+        (u, v, w) = direction
+        slip_dir = HklDirection(u, v, w)
+        slip_systems.append(SlipSystem(plane, slip_dir))
+    return slip_systems
+      
+class SlipSystem:
+  '''A class to represent a crystallographic slip system.
+  
+  A slip system is composed of a slip plane (most widely spaced planes
+  in the crystal) and a slip direction (highest linear density of atoms
+  in the crystal).
+  '''
+  
+  def __init__(self, plane, direction):
+    '''Create a new slip system object with the given slip plane and 
+    slip direction.
+    '''
+    self._plane = plane
+    self._direction = direction
+
+  def __repr__(self):
+    out = '(%d%d%d)' % self._plane.miller_indices()
+    out += '[%d%d%d]' % self._direction.miller_indices()
+    return out
+  
+  def get_slip_plane(self):
+    return self._plane
+    
+  def get_slip_direction(self):
+    return self._direction
+
+class HklObject:
+
+  def __init__(self, h, k, l, lattice=Lattice.cubic(1.0)):
+    '''Create a new hkl object with the given Miller indices and 
+       crystal lattice.
+    '''
+    self._lattice = lattice
+    self._h = h
+    self._k = k
+    self._l = l
+
+  def miller_indices(self):
+    '''
+    Returns an immutable tuple of the plane Miller indices.
+    '''
+    return (self._h, self._k, self._l)
+
+class HklDirection(HklObject):
+
+  def __repr__(self):
+    f = lambda x: "%0.3f" % x
+    out = ['HKL Direction',
+           ' Miller indices:',
+           ' h : ' + str(self._h),
+           ' k : ' + str(self._k),
+           ' l : ' + str(self._l),
+           ' crystal lattice : ' + str(self._lattice)]
+    return '\n'.join(out)
+    
+  def direction(self):
+    (h, k, l) = self.miller_indices()
+    l_vect = np.array([h, k, l])
+    return l_vect/np.linalg.norm(l_vect)
+
+class HklPlane(HklObject):
   '''
   This class define crystallographic planes using Miller indices.
   
@@ -161,15 +238,6 @@ class HklPlane:
      Right now the we do not make use of the repiprocal lattice to 
      compute the plane... this should be corrected in the future.
   '''
-
-  def __init__(self, h, k, l, lattice=Lattice.cubic(1.0)):
-    '''Create a new hkl plane with the given Miller indices and 
-       crystal lattice.
-    '''
-    self._lattice = lattice
-    self._h = h
-    self._k = k
-    self._l = l
 
   def normal(self, verbose=False):
     '''Returns the unit vector normal to the plane.
@@ -207,12 +275,6 @@ class HklPlane:
            ' plane normal : ' + str(self.normal()),
            ' crystal lattice : ' + str(self._lattice)]
     return '\n'.join(out)
-
-  def miller_indices(self):
-    '''
-    Returns an immutable tuple of the plane Miller indices.
-    '''
-    return (self._h, self._k, self._l)
 
   def interplanar_spacing(self):
     '''
@@ -386,4 +448,4 @@ class HklPlane:
     HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int = np.array([0, -1, 0]), \
       view_up = np.array([0, 0, 1]), title=title, legend=legend, \
       trans=trans, verbose=verbose, str_plane='XZ')
-
+    

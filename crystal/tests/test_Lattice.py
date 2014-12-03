@@ -30,5 +30,9 @@ class LatticeTests(unittest.TestCase):
     hkl = HklPlane(2, 0, 0, l) # 200 reflection at 8 keV is at 32.7 deg
     self.assertAlmostEqual(hkl.bragg_angle(8), 0.5704164) 
     
+  def test_slip_systems(self):
+    print 'test_slip_systems'
+    print Lattice.get_slip_systems(plane_type='111')
+    
 if __name__ == '__main__':
   unittest.main()

@@ -213,24 +213,32 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
 
     image_dir = os.path.join(target_dir, 'images')
     thumb_dir = os.path.join(image_dir, 'thumb')
+    print 'image_dir: ',image_dir
+    print 'thumb_dir: ',thumb_dir
     if not os.path.exists(image_dir):
         os.makedirs(image_dir)
     if not os.path.exists(thumb_dir):
         os.makedirs(thumb_dir)
     image_path = os.path.join(image_dir, image_fname)
+    image_thumb_path = os.path.join(src_dir, 'thumb_' + image_fname)
+    print 'image_thumb_path: ',image_thumb_path
     # copy image to the images folder
     shutil.copy(os.path.join(src_dir, image_fname), image_path)
-    thumb_file = os.path.join(thumb_dir, fname[:-3] + '.png')
 
-    # generate thumb file
     this_template = plot_rst_template
-    from matplotlib import image
-    if os.path.exists(image_path):
-        image.thumbnail(image_path, thumb_file, 0.2)
+    # code moved to the actual examples not to depend on matplotlib
+    # generate thumb file
+    #thumb_file = os.path.join(thumb_dir, fname[:-3] + '.png')
+    #from matplotlib import image
+    #if os.path.exists(image_path):
+    #    image.thumbnail(image_path, thumb_file, 0.2)
 
-    if not os.path.exists(thumb_file):
-        # create something not to replace the thumbnail
+    thumb_file = os.path.join(thumb_dir, fname[:-3] + '.png')
+    if not os.path.exists(image_thumb_path):
+        # create something to replace the thumbnail
         shutil.copy('blank_image.png', thumb_file)
+    else:
+        shutil.copy(image_thumb_path, thumb_file)
 
     docstring, short_desc, end_row = extract_docstring(example_file)
 

@@ -44,7 +44,7 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
     plane = vtk.vtkPlane()
     plane.SetOrigin(origin)
     plane.SetNormal(hklplane.normal())
-    #FIXME here an assembly is retruned and we cannot access the mapper anymore
+    #FIXME here an assembly is returned and we cannot access the mapper anymore
     hklplaneActor = vtk_utils.add_plane_to_grid(plane, grid, origin)
     cubic_lattice.AddPart(hklplaneActor)
     # get a reference to the vtkPolyData representing the hkl plane
@@ -116,6 +116,9 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
   image_name = os.path.splitext(__file__)[0] + '.png'
   print 'writting %s' % image_name
   vtk_utils.render(ren, ren_size=(800, 800), save=True, display=False, name=image_name)
+
+  from matplotlib import image
+  image.thumbnail(image_name, 'thumb_' + image_name, 0.2)
 
 if __name__ == '__main__':
   orientation = Orientation.from_euler(numpy.array([142.8, 32.0, 214.4]))

@@ -129,3 +129,6 @@ if __name__ == '__main__':
   image_name = os.path.splitext(__file__)[0] + '.png'
   print 'writting %s' % image_name
   render(ren, save=True, display=False, ren_size=(800,800), name=image_name)
+
+  from matplotlib import image
+  image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

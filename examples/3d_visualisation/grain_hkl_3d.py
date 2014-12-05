@@ -61,3 +61,6 @@ ren.SetActiveCamera(cam)
 image_name = os.path.splitext(__file__)[0] + '.png'
 print 'writting %s' % image_name
 render(ren, ren_size=(600, 700), save=True, display=False, name=image_name)
+
+from matplotlib import image
+image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

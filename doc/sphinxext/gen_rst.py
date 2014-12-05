@@ -13,9 +13,6 @@ import shutil
 import traceback
 import glob
 
-import matplotlib
-matplotlib.use('Agg')
-
 import token, tokenize
 
 rst_template = """

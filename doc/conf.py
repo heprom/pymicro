@@ -16,12 +16,14 @@ import sys, os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('../../pymicro'))
 sys.path.insert(0, os.path.abspath('../crystal'))
+sys.path.insert(0, os.path.abspath('../file'))
+sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('.'))
 sys.path.append(os.path.abspath('sphinxext'))
 print sys.path
+print os.listdir('/home/git/generate/pymicro')
 
 try:
     import gen_rst

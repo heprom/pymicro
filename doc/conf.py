@@ -12,6 +12,11 @@
 # serve to show the default.
 
 import sys, os
+import mock
+ 
+MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'scipy.ndimage', 'wx', 'vtk']
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = mock.Mock()
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -22,8 +27,6 @@ sys.path.insert(0, os.path.abspath('../file'))
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.append(os.path.abspath('sphinxext'))
-print sys.path
-print os.listdir('/home/git/generate/pymicro')
 
 try:
     import gen_rst

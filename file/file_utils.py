@@ -149,7 +149,7 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
   else:
     (nz, ny, nx) = size
   print 'data size in pixels is ', nx, 'x', ny, 'x', nz
-  nbytes = nx * ny * nz * np.dtype(type).itemsize + header_size
+  nbytes = nx * ny * nz * np.dtype(type).itemsize
   print 'opening',fname,'for writing'
   # craft an ascii header of the appropriate size
   f = open(fname, 'wb')

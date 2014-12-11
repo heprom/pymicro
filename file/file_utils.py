@@ -40,7 +40,7 @@ def edf_info(file_name, header_size=None):
   '''
   f = open(file_name, 'r')
   if header_size == None:
-    # guess the header size by peeking at the first 128 bytes
+    # guess the header size by peeking at the first chunk of 512 bytes
     h = np.fromstring(f.read(512))
     header_values = unpack_header(h)
     total_file_size = os.path.getsize(file_name)
@@ -50,69 +50,56 @@ def edf_info(file_name, header_size=None):
     f.seek(0)
   h = np.fromstring(f.read(header_size))
   f.close()
-  return unpack_header(h)
-  
+  return unpack_header(h)  
     
-def edf_read(file_name, header_size=1024, type=np.uint16, \
-  verbose=True, dims=None, autoparse_filename=False, return_header=False):
+def edf_read(file_name):
   '''Read an edf file.
 
-  edf stands for ESRF data file. It may have a variable header size 
-  (1024 bytes by default) which contain ASCII information about 
-  the image (eg. image size, motor positions).
-  The autoparse_filename can be activated to retreive image type and 
-  size:
+  edf stands for ESRF data file. It has a variable header size which is 
+  a multiple of 512 bytes and contains the image meta in ASCII format 
+  (eg. image size, data type, motor positions).
+  
+  The ascii header is parsed automatically by `edf_info` to retreive the 
+  image size and data type. Depending on the information enclosed in the 
+  header, this function may return a 1d, 2d or 3d array.
   ::
   
-    edf_read(myvol_100x200x50_uint16.edf, autoparse_filename=True)
+    >>> im = edf_read('radio.edf')
+    >>> im.shape
+    (2048, 2048)
 
-  will read the 3d image as unsigned 16 bits with size 100 x 200 x 50.
+  *Parameters*
+
+  **file_name**: the name of the edf file to read.
+  
   '''
+  header_values = edf_info(file_name)
   f = open(file_name, 'r')
-  h = np.fromstring(f.read(header_size))
-  if verbose: print 'reading header'
-  s = struct.unpack(str(header_size) + 'c', h)
-  header = ''
-  for i in range(header_size):
-    header += s[i]
-  header_values = {}
-  for line in header.split('\n'):
-    tokens = line.split('=')
-    if len(tokens)>1:
-      header_values[tokens[0].strip()] = tokens[1].split(';')[0].strip()
-  if autoparse_filename == True:
-    s_type = file_name[:-4].split('_')[-1]
-    if s_type == 'uint8':
-      type = np.uint8
-    elif s_type == 'uint16':
-      type = np.uint16
-    s_size = file_name[:-4].split('_')[-2].split('x')
-    (dim_1, dim_2, dim_3) = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
-    if verbose: print 'autoparsing filename: data type is set to', type
-  elif dims == None:
-    # get the image size from the ascii header
-    dim_1 = int(header_values['Dim_1'].split('.')[0])
-    try:
-      dim_2 = int(header_values['Dim_2'].split('.')[0])
-    except:
-      dim_2 = 1
-    try:
-      dim_3 = int(header_values['Dim_3'].split('.')[0])
-    except:
-      dim_3 = 1
+  data_type = esrf_to_numpy_datatype(header_values['DataType'])
+  # get the payload size
+  payload_size = int(header_values['Size'])
+  # get the image size from the ascii header
+  dim_1 = int(header_values['Dim_1'].split('.')[0])
+  try:
+    dim_2 = int(header_values['Dim_2'].split('.')[0])
+    dim_3 = int(header_values['Dim_3'].split('.')[0])
+  except:
+    pass
+  # now read binary data
+  header_size = os.path.getsize(file_name) - payload_size
+  f.seek(header_size)
+  payload = np.fromstring(f.read(payload_size), data_type)
+  if dim_1 and dim_2 and dim_3:
+    data = np.reshape(payload, (dim_3, dim_2, dim_1)).transpose(2, 1, 0)
+  elif dim_1 and dim_2:
+    data = np.reshape(payload, (dim_2, dim_1)).transpose(1, 0)
   else:
-    (dim_1, dim_2, dim_3) = dims
-  if verbose: print 'reading data...', file_name, 'from byte', f.tell()
-  data = np.reshape(np.fromstring(f.read(np.dtype(type).itemsize * \
-    dim_1 * dim_2 * dim_3), type).astype(type), (dim_3, dim_2, dim_1))
+    data = np.reshape(payload, (dim_1))
   f.close()
-  # HP 10/2013 start using proper [x,y,z] data ordering
-  data_xyz = data.transpose(2,1,0)
-  #data_xyz = data.transpose(1,2,0) # HP ma1921
-  if return_header:
-    return header_values, data_xyz
-  else:
-    return data_xyz
+  # pay attention to byte order
+  if header_values['ByteOrder'] == 'HighByteFirst':
+    data = data.byteswap()
+  return data
 
 def esrf_to_numpy_datatype(data_type):
     return {
@@ -143,13 +130,8 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
   from time import gmtime, strftime
   today = strftime('%d-%b-%Y', gmtime())
   size = np.shape(data)
-  if len(size) < 3:
-    (ny,nx) = size
-    nz = 1
-  else:
-    (nz, ny, nx) = size
-  print 'data size in pixels is ', nx, 'x', ny, 'x', nz
-  nbytes = nx * ny * nz * np.dtype(type).itemsize
+  print 'data size in pixels is ', size
+  nbytes = np.prod(size) * np.dtype(type).itemsize
   print 'opening',fname,'for writing'
   # craft an ascii header of the appropriate size
   f = open(fname, 'wb')
@@ -158,9 +140,9 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
   head += 'Image          = 1 ;\n'
   head += 'ByteOrder      = LowByteFirst ;\n'
   head += 'DataType       = %13s;\n' % numpy_to_esrf_datatype(type)
-  head += 'Dim_1          = %4s;\n' % nx
-  head += 'Dim_2          = %4s;\n' % ny
-  head += 'Dim_3          = %4s;\n' % nz
+  head += 'Dim_1          = %4s;\n' % size[0]
+  if len(size) > 1: head += 'Dim_2          = %4s;\n' % size[1]
+  if len(size) > 2: head += 'Dim_3          = %4s;\n' % size[2]
   head += 'Size           = %9s;\n' % nbytes
   head += 'Date           = ' + today + ' ;\n'
   for i in range(header_size - len(head) - 2):
@@ -192,18 +174,37 @@ def HST_info(info_file):
     z_dim = int(f.readline().split()[2])
     return [x_dim, y_dim, z_dim]
 
-def HST_read(scan_name, zrange=None, type=np.uint8, verbose=False, header=0, dims=None):
+def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
+  header_size=0, dims=None):
   '''Read a volume file stored as a concatenated stack of binary images.
   
   The volume size must be specified by dims=(nx,ny,nz) unless an associated 
   .info file is present in the same location to determine the volume 
   size. The data type is unsigned short (8 bits) by default but can be set 
-  to any numpy typa (32 bits float for example).
+  to any numpy type (32 bits float for example).
   
+  The autoparse_filename can be activated to retreive image type and 
+  size:
+  ::
+  
+    HST_read(myvol_100x200x50_uint16.raw, autoparse_filename=True)
+
+  will read the 3d image as unsigned 16 bits with size 100 x 200 x 50.
+
   ..note:: if you use this function to read a .edf file written by 
     matlab in +y+x+z convention (column major order), you may want to 
     use: np.swapaxes(HST_read('file.edf', ...), 0, 1)
+
   '''
+  if autoparse_filename == True:
+    s_type = file_name[:-4].split('_')[-1]
+    if s_type == 'uint8':
+      data_type = np.uint8
+    elif s_type == 'uint16':
+      data_type = np.uint16
+    s_size = file_name[:-4].split('_')[-2].split('x')
+    (dim_1, dim_2, dim_3) = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
+    if verbose: print 'autoparsing filename: data type is set to', type
   if verbose: print 'data type is',type
   if dims == None:
     [nx, ny, nz] = HST_info(scan_name + '.info')
@@ -215,10 +216,10 @@ def HST_read(scan_name, zrange=None, type=np.uint8, verbose=False, header=0, dim
   f = open(scan_name, 'rb')
   data = np.empty((ny, nx, len(zrange)), dtype=type)
   if verbose: print 'reading volume... from byte ',f.tell()
-  f.seek(header + np.dtype(type).itemsize * nx * ny * zrange[0])
+  f.seek(header_size + np.dtype(data_type).itemsize * nx * ny * zrange[0])
   data = np.reshape(np.fromstring( \
-      f.read(np.dtype(type).itemsize * len(zrange) * ny * nx), \
-      type).astype(type), (len(zrange), ny, nx), order='C')
+      f.read(np.dtype(data_type).itemsize * len(zrange) * ny * nx), \
+      data_type).astype(data_type), (len(zrange), ny, nx), order='C')
   f.close()
   # HP 10/2013 start using proper [x,y,z] data ordering
   data_xyz = data.transpose(2,1,0)

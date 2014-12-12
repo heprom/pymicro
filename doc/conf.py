@@ -14,7 +14,7 @@
 import sys, os
 import mock
  
-MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'scipy.ndimage', 'wx', 'vtk']
+MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'scipy.ndimage', 'wx', 'vtk', '_tifffile']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 

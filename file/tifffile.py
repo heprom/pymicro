@@ -148,7 +148,7 @@ from fractions import Fraction
 from xml.etree import cElementTree as etree
 
 import numpy
-
+'''
 try:
     import _tifffile
 except ImportError:
@@ -156,7 +156,7 @@ except ImportError:
         "failed to import the optional _tifffile C extension module.\n"
         "Loading of some compressed images will be slow.\n"
         "Tifffile.c can be obtained at http://www.lfd.uci.edu/~gohlke/")
-
+'''
 __version__ = '2014.08.24'
 __docformat__ = 'restructuredtext en'
 __all__ = ('imsave', 'imread', 'imshow', 'TiffFile', 'TiffWriter',

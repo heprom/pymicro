@@ -175,7 +175,7 @@ def HST_info(info_file):
     return [x_dim, y_dim, z_dim]
 
 def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
-  header_size=0, dims=None):
+  header_size=0, autoparse_filename=False, dims=None):
   '''Read a volume file stored as a concatenated stack of binary images.
   
   The volume size must be specified by dims=(nx,ny,nz) unless an associated 
@@ -343,7 +343,7 @@ def Vtk_write(data, fname):
 def read_dif(Nx, Ny, file, shift=False):
   '''Read the result of an FFT computation in a csv format.
   
-     These fiels are basically produced by **process diffraction
+     These fiels are basically produced by \*\*process diffraction
      within a z-set post_processing.
      
      Returns an image array containing the data.

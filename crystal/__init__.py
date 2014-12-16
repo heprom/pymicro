@@ -1,14 +1,11 @@
 """A package to specifically handle crystal structures
 
-.. moduleauthor:: Henry Proudhon <henry.proudhon@gmail.com>
+   The crystal package has three main modules:
+
+   * lattice
+   * microstructure
+   * texture
+
+   .. moduleauthor:: Henry Proudhon <henry.proudhon@gmail.com>
 
 """
-
-__version__  = '0.1.0'
-import lattice
-import microstructure
-import texture
-
-
-def start():
-    'This starts the crystal package...'

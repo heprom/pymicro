@@ -164,7 +164,7 @@ class Orientation:
           pass # nothing special here
         else:
           phi1 += np.pi
-          phi2 += np.pi        
+          phi2 += np.pi
     return np.degrees(np.array([phi1, Phi, phi2]))
 
   @staticmethod

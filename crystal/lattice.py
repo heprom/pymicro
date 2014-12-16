@@ -24,9 +24,8 @@ class Lattice:
   def __init__(self, matrix):
     '''Create a crystal lattice (unit cel).
     
-     Create a lattice from any sequence of 9 numbers.
-     Note that the sequence is assumed to be read one row at a time. 
-     Each row represents one lattice vector.
+    Create a lattice from a 3x3 matrix.
+    Each row in the matrix represents one lattice vector.
     '''
     m = np.array(matrix, dtype=np.float64).reshape((3, 3))
     lengths = np.sqrt(np.sum(m ** 2, axis=1))
@@ -107,8 +106,11 @@ class Lattice:
     Create a triclinic Lattice unit cell with 3 different length 
     parameters a, b, c and three different cell angles alpha, beta 
     and gamma.
-    This method is here for the sake of completeness since one can 
-    create the triclinic cell directly using the from_parameters method.
+
+    ..note
+    
+      This method is here for the sake of completeness since one can 
+      create the triclinic cell directly using the from_parameters method.
     '''
     return Lattice.from_parameters(a, b, c, alpha, beta, gamma)
       
@@ -116,6 +118,7 @@ class Lattice:
   def from_parameters(a, b, c, alpha, beta, gamma):
     '''
     Create a Lattice using unit cell lengths and angles (in degrees).
+
     Returns: A Lattice with the specified lattice parameters.
     '''
     alpha_r = radians(alpha)
@@ -132,8 +135,7 @@ class Lattice:
     return Lattice([vector_a, vector_b, vector_c])    
 
   def volume(self):
-    '''Compute the volume of the unit cell.
-    '''
+    '''Compute the volume of the unit cell.'''
     m = self._matrix
     return abs(np.dot(np.cross(m[0], m[1]), m[2]))
 
@@ -182,10 +184,12 @@ class SlipSystem:
 
 class HklObject:
 
-  def __init__(self, h, k, l, lattice=Lattice.cubic(1.0)):
+  def __init__(self, h, k, l, lattice=None):
     '''Create a new hkl object with the given Miller indices and 
        crystal lattice.
     '''
+    if lattice == None:
+      lattice = Lattice.cubic(1.0)
     self._lattice = lattice
     self._h = h
     self._k = k

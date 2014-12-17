@@ -13,7 +13,7 @@
 
 import sys, os
 import mock
-MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.colors', 'scipy.ndimage', 'wx', 'vtk', 'vtk.utils.colors', '_tifffile']
+MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.image', 'matplotlib.cm', 'matplotlib.colors', 'scipy.ndimage', 'wx', 'vtk', 'vtk.utils.colors', '_tifffile']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 # If extensions (or modules to document with autodoc) are in another directory,

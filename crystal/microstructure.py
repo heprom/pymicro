@@ -123,7 +123,43 @@ class Orientation:
     return B
 
   @staticmethod
-  def OrientationMatrix2Euler(g, eps=0.000001):
+  def OrientationMatrix2EulerSF(g):
+    '''
+    Compute the Euler angles (in degrees) from the orientation matrix
+    in a similar way as done in MandelCrystal.c
+    '''
+    tol = 0.1
+    r = np.zeros(9, dtype=np.float64) # double precision here
+    # Z-set order for tensor is 11 22 33 12 23 13 21 32 31
+    r[0] = g[0, 0]
+    r[1] = g[1, 1]
+    r[2] = g[2, 2]
+    r[3] = g[0, 1]
+    r[4] = g[1, 2]
+    r[5] = g[0, 2]
+    r[6] = g[1, 0]
+    r[7] = g[2, 1]
+    r[8] = g[2, 0]
+    phi = np.arccos(r[2])
+    if (phi == 0.):
+      phi2 = 0.
+      phi1 = np.arcsin(r[6])
+      if (abs(np.cos(phi1) - r[0]) > tol): phi1 = np.pi - phi1
+    else:
+      x2 = r[5]/np.sin(phi)
+      x1 = r[8]/np.sin(phi);
+      if (x1 > 1.): x1=1.
+      if (x2 > 1.): x2=1.
+      if (x1 < -1.): x1=-1.
+      if (x2 < -1.): x2=-1.
+      phi2 = np.arcsin(x2)
+      phi1 = np.arcsin(x1)
+      if (abs(np.cos(phi2) * np.sin(phi) - r[7]) > tol): phi2 = np.pi - phi2
+      if (abs(np.cos(phi1) * np.sin(phi) + r[4]) > tol): phi1 = np.pi - phi1
+    return np.degrees(np.array([phi1, phi, phi2]))
+  
+  @staticmethod
+  def OrientationMatrix2Euler(g, eps=0.00000001):
     '''
     Compute the Euler angles (in degrees) from the orientation matrix.
     '''
@@ -168,7 +204,7 @@ class Orientation:
     return np.degrees(np.array([phi1, Phi, phi2]))
 
   @staticmethod
-  def OrientationMatrix2Rodrigues(g, eps=0.000001):
+  def OrientationMatrix2Rodrigues(g, eps=0.00000001):
     '''
     Compute the rodrigues vector from the orientation matrix.
     '''

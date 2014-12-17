@@ -76,15 +76,21 @@ def edf_read(file_name):
   header_values = edf_info(file_name)
   f = open(file_name, 'r')
   data_type = esrf_to_numpy_datatype(header_values['DataType'])
+  print header_values['DataType'], data_type
   # get the payload size
   payload_size = int(header_values['Size'])
   # get the image size from the ascii header
   dim_1 = int(header_values['Dim_1'].split('.')[0])
   try:
     dim_2 = int(header_values['Dim_2'].split('.')[0])
+  except:
+    print 'Dim_2 not defined in header'
+    dim_2 = None
+  try:
+    print 'Dim_3 not defined in header'
     dim_3 = int(header_values['Dim_3'].split('.')[0])
   except:
-    pass
+    dim_3 = None
   # now read binary data
   header_size = os.path.getsize(file_name) - payload_size
   f.seek(header_size)
@@ -106,6 +112,7 @@ def esrf_to_numpy_datatype(data_type):
         'UnsignedByte': np.uint8,
         'UnsignedShort': np.uint16,
         'UnsignedLong': np.uint32,
+        'SignedInteger': np.int32,
         'FloatValue': np.float32,
         'DoubleValue': np.float64,
         }.get(data_type, np.uint16)
@@ -115,6 +122,7 @@ def numpy_to_esrf_datatype(data_type):
         np.uint8: 'UnsignedByte',
         np.uint16: 'UnsignedShort',
         np.uint32: 'UnsignedLong',
+        np.int32: 'SignedInteger',
         np.float32: 'FloatValue',
         np.float64: 'DoubleValue',
         }.get(data_type, 'UnsignedShort')
@@ -149,7 +157,12 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
     head += ' '
   head += '}\n'
   f.write(head)
-  s = np.ravel(data.transpose(2,1,0)).astype(type).tostring()
+  if len(data.shape) == 3:
+    s = np.ravel(data.transpose(2,1,0)).astype(type).tostring()
+  elif len(data.shape) == 2:
+    s = np.ravel(data.transpose(1,0)).astype(type).tostring()
+  else:
+    s = np.ravel(data).astype(type).tostring()
   f.write(s)
   f.close()
 

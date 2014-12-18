@@ -246,33 +246,41 @@ def rawmar_read(image_name, size, verbose=False):
   ..note:: This method assume Big endian byte order.
   '''
   data = HST_read(image_name, dims = (1, size, size), header=4600, \
-    type=np.uint16, verbose=verbose)[:,:,0]
+    data_type=np.uint16, verbose=verbose)[:,:,0]
   return data
 
-def HST_write(data, fname):
+def HST_write(data, file_name, verbose=True):
   '''Write binary raw file.
   
   This function write a (x,y,z) 3D dataset to the disk.
   The file is written as a Z-stack. It means that the first nx*ny bytes 
   represent the first slice and so on...
-  This function is deprecated and its use should be replaced by the use of edf_write.
+  
+  A .info file containing the volume size is also written.
+
+  *Parameters*
+
+  **data**: the 3d array to write to the disk.
+  
+  **file_name**: the name of file to write.
   '''
   (nx, ny, nz) = data.shape
-  print 'opening',fname,'for writing'
-  print 'volume size is ', nx, 'x', ny, 'x', nz
-  f = open(fname, 'wb')
+  if verbose:
+    print('opening %s for writing' % file_name)
+    print('volume size is %dx%dx%d' % (nx, ny, nz))
+  f = open(file_name, 'wb')
   # HP 11/2013 swap axes according to read function
   s = np.ravel(data.transpose(2,1,0)).tostring()
   f.write(s)
   f.close()
-  print 'writing .info file'
-  f = open(fname + '.info', 'w')
+  if verbose: print('writing .info file')
+  f = open(file_name + '.info', 'w')
   f.write('! PyHST_SLAVE VOLUME INFO FILE\n')
-  f.write('NUM_X = ' + str(nx) + '\n')
-  f.write('NUM_Y = ' + str(ny) + '\n')
-  f.write('NUM_Z = ' + str(nz) + '\n')
+  f.write('NUM_X = %4d\n' % nx)
+  f.write('NUM_Y = %4d\n' % ny)
+  f.write('NUM_Z = %4d\n' % nz)
   f.close()
-  print 'done with writing'
+  if verbose: print('done with writing')
 
 def recad_vol(vol_filename, min, max, verbose=False):
   '''Recad a 32 bit vol file into 8 bit raw file.

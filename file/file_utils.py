@@ -169,8 +169,10 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
 def HST_info(info_file):
     '''Read the given info file and returns the volume size.
     
-    Note that the first line of the file must begin by ! PyHST
-    or directly by NUM_X.
+    .. note::
+    
+       The first line of the file must begin by ! PyHST or directly 
+       by NUM_X.
     '''
     f = open(info_file, 'r')
     # the first line must contain PyHST or NUM_X
@@ -204,7 +206,9 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
 
   will read the 3d image as unsigned 16 bits with size 100 x 200 x 50.
 
-  ..note:: if you use this function to read a .edf file written by 
+  .. note::
+
+    If you use this function to read a .edf file written by 
     matlab in +y+x+z convention (column major order), you may want to 
     use: np.swapaxes(HST_read('file.edf', ...), 0, 1)
 
@@ -243,7 +247,9 @@ def rawmar_read(image_name, size, verbose=False):
   
   These binary images are typically obtained from the marcvt utility.
 
-  ..note:: This method assume Big endian byte order.
+  .. note::
+  
+     This method assume Big endian byte order.
   '''
   data = HST_read(image_name, dims = (1, size, size), header=4600, \
     data_type=np.uint16, verbose=verbose)[:,:,0]
@@ -292,8 +298,10 @@ def recad_vol(vol_filename, min, max, verbose=False):
   In verbose mode, a piture to compare mid slices in the two volumes 
   and another one to compare the histograms are saved.
   
-  ..note:: To read the vol file, the presence of a .info file is 
-    assumed, see `HST_read`.
+  .. note::
+  
+     To read the vol file, the presence of a .info file is 
+     assumed, see `HST_read`.
 
   *Parameters*
 
@@ -336,7 +344,9 @@ def Vtk_write(data, fname):
   
   An ascii header is written to which the binary data is appended.
   
-  ..note:: the header assumes uint8 data type.
+  .. note::
+  
+     The header assumes uint8 data type.
   '''
   (nz, ny, nx) = data.shape
   print 'opening',fname,'for writing'

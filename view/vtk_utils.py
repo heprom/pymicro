@@ -2,12 +2,11 @@ import os
 import sys
 import vtk
 import numpy
-from vtk.util.colors import *
+from vtk.util.colors import black, white, grey, blue, orange
 from vtk.util import numpy_support
 
 # see if some of the stuff needs to be moved to the Microstructure module
 from pymicro.crystal.lattice import Lattice, HklPlane
-#from pymicro.crystal.microstructure import * 
 
 def to_vtk_type(type):
   '''Function to get the VTK data type given a numpy data type.
@@ -32,9 +31,11 @@ def to_vtk_type(type):
     return vtk.VTK_DOUBLE
   
 def rand_cmap(N=256, first_is_black = False, table_range=(0,255)):
-  '''create a look up table with random color.
-     The first color can be enforced to black and usually figure out the background.
-     The random seed is fixed to consistently produce the same colormap. '''
+  '''Create a VTK look up table with random colors.
+  
+     The first color can be enforced to black and usually figure out 
+     the image background. The random seed is fixed to 13 in order 
+     to consistently produce the same colormap. '''
   numpy.random.seed(13)
   rand_colors = numpy.random.rand(N,3)
   if first_is_black:
@@ -48,7 +49,7 @@ def rand_cmap(N=256, first_is_black = False, table_range=(0,255)):
   return lut
 
 def pv_rand_cmap(N=256, first_is_black = False):
-  '''write out the random color map in paraview xml format. '''
+  '''Write out the random color map in paraview xml format. '''
   numpy.random.seed(13)
   rand_colors = numpy.random.rand(N,3)
   if first_is_black:
@@ -174,7 +175,7 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0),
   return add_plane_to_grid(rot_plane, grid, origin, opacity=opacity, \
     show_normal=show_normal, normal_length=normal_length)
 
-def add_plane_to_grid(plane, grid, origin, opacity=0.3, show_normal=False, normal_length=1.0):
+def add_plane_to_grid(plane, grid, origin, opacity=0.3):
   '''Add a 3d plane inside another object.
   
   This function adds a plane inside another object described by a mesh 
@@ -191,13 +192,9 @@ def add_plane_to_grid(plane, grid, origin, opacity=0.3, show_normal=False, norma
   
   **opacity**: Opacity value of the plane actor.
   
-  **show_normal**: A boolean value to add the plane normal as a 3d arrow.
-  
-  **normal_length**: The length of the plane normal vector.
-  
   *Returns*
   
-  A VTK assembly with the plane and the normal (if needed).
+  A VTK actor.
   '''
   # cut the unstructured grid with the plane
   planeCut = vtk.vtkCutter()
@@ -209,12 +206,35 @@ def add_plane_to_grid(plane, grid, origin, opacity=0.3, show_normal=False, norma
   cutActor = vtk.vtkActor()
   cutActor.SetMapper(cutMapper)
   cutActor.GetProperty().SetOpacity(opacity)
+  return cutActor
+  
+def add_plane_to_grid_with_normal(plane, grid, origin, opacity=0.3, normal_length=1.0):
+  '''Add a 3d plane and display its normal inside another object.
+  
+  This function adds a plane inside another object described by a mesh 
+  (vtkunstructuredgrid). It basicall call `add_plane_to_grid` and also 
+  add a 3d arrow to display the plane normal.
+
+  *Parameters*
+  
+  **plane**: A VTK implicit function describing the plane to add.
+
+  **grid**: A VTK unstructured grid in which the plane is to be added.
+  
+  **opacity**: Opacity value of the plane actor.
+  
+  **normal_length**: The length of the plane normal vector.
+  
+  *Returns*
+  
+  A VTK assembly with the plane and the normal.
+  '''
   assembly = vtk.vtkAssembly()
+  planeActor = add_plane_to_grid(plane, grid, origin, opacity=opacity)
   assembly.AddPart(cutActor)
-  if show_normal:
-    # add an arrow to display the normal to the plane
-    arrowActor = unit_arrow_3d(origin, normal_length*numpy.array(plane.GetNormal()), make_unit=False)
-    assembly.AddPart(arrowActor)
+  # add an arrow to display the normal to the plane
+  arrowActor = unit_arrow_3d(origin, normal_length*numpy.array(plane.GetNormal()), make_unit=False)
+  assembly.AddPart(arrowActor)
   return assembly
   
 def axes_actor(length = 1.0, axisLabels = True):

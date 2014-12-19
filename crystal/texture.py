@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt, colors, cm
 class PoleFigure:
   '''A class to handle pole figures.
   
-  Pole figure is a popular tool to plot multiple crystal orientations, 
+  A pole figure is a popular tool to plot multiple crystal orientations, 
   either in the sample coordinate system (direct pole figure) or 
   alternatively plotting a particular direction in the crystal 
   coordinate system (inverse pole figure).
@@ -59,7 +59,7 @@ class PoleFigure:
     else:
       raise TypeError('unsupported crystal structure', structure)
 
-  def plot_pole_figures(self):
+  def plot_pole_figures(self, display=True):
     '''Plot and save a picture with both direct and inverse pole figures.
     
     ::
@@ -86,7 +86,10 @@ class PoleFigure:
     # inverse PF
     ax2 = fig.add_subplot(122, aspect='equal')
     self.plot_ipf(ax = ax2)
-    plt.savefig(self.microstructure.name + '_pole_figure.pdf',format='pdf')
+    if display:
+      plt.show()
+    else:
+      plt.savefig(self.microstructure.name + '_pole_figure.pdf', format='pdf')
 
   def plot_crystal_dir(self, c_dir, mk='o', col='k', ax=None, ann=False, lab=''):
     '''Helper function to plot a crystal direction.'''
@@ -219,3 +222,35 @@ class PoleFigure:
     ax.axis([-1.1,1.1,-1.1,1.1])
     ax.axis('off')
     ax.set_title('inverse %s projection' % self.proj)
+
+  @staticmethod
+  def plot(orientation):
+    '''Plot a pole figure for a single orientation.
+
+    A file empty.pdf will be written with both direct and inverse pole
+    figures.
+    
+    Parameters:
+    
+    **orientation**: the crystalline `Orientation` to plot.
+    '''
+    micro = Microstructure()
+    micro.grains.append(Grain(1, orientation))
+    pf = PoleFigure(micro)
+    pf.plot_pole_figures(display=True)
+
+  @staticmethod
+  def plot_euler(phi1, Phi, phi2):
+    '''Directly plot a pole figure for a single orientation given its 
+    three Euler angles.
+
+    Parameters:
+    
+    **phi1**: first Euler angle.
+    
+    **Phi**: second Euler angle.
+    
+    **phi2**: third Euler angle.
+    '''
+    PoleFigure.plot(Orientation.from_euler(np.array([phi1, Phi, phi2])))
+    

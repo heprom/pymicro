@@ -9,18 +9,22 @@ from matplotlib import pyplot as plt, colors, cm
 from xml.dom.minidom import Document, parse
 
 class Orientation:
-  '''
-  Crystallographic orientation class.
-  this follows the passive rotation definition which means that it brings 
+  '''Crystallographic orientation class.
+
+  This follows the passive rotation definition which means that it brings 
   the sample coordinate system into coincidence with the crystal coordinate 
   system. Then one may express a vector Vc in the crystal coordinate system 
   from the vector in the sample coordinate system Vs by:
   
-  Vc = B.Vs
+  .. math::
+
+    Vc = B.Vs
   
   and inversely (because B^-1=B^T):
   
-  Vs = B^T.Vc
+  .. math::
+
+    Vs = B^T.Vc
   '''
 
   def __init__(self, matrix):

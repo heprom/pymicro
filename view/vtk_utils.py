@@ -612,12 +612,28 @@ def apply_orientation_to_actor(actor, orientation):
   transform.RotateZ(orientation.phi2())
   actor.SetUserTransform(transform)
 
-def read_image_data(file_name, size, header=0, data_type='uint8', verbose=False):
+def read_image_data(file_name, size, header_size=0, data_type='uint8', verbose=False):
   '''
   vtk helper function to read a 3d data file.
   The size is needed in the form (x, y, z) as well a string describing
   the data type in numpy format (uint8 is assumed by default).
   Lower file left and little endian are assumed.
+
+  *Parameters*
+
+  **file_name**: the name of the file to read.
+
+  **size**: a sequence of three number describing the size of the 3d data set
+  
+  **header_size**: size of the header to skip in bytes (0 by default)
+  
+  **data_type**: a string describing the data type in numpy format ('uint8' by default)
+  
+  **verbose**: verbose mode (False by default)
+  
+  *Returns*
+  
+  A VTK data array
   '''
   vtk_type = to_vtk_type(data_type)
   if verbose:
@@ -626,7 +642,7 @@ def read_image_data(file_name, size, header=0, data_type='uint8', verbose=False)
   reader = vtk.vtkImageReader2() # 2 is faster
   reader.SetDataScalarType(vtk_type)
   reader.SetFileDimensionality(3)
-  reader.SetHeaderSize(header)
+  reader.SetHeaderSize(header_size)
   reader.SetDataByteOrderToLittleEndian()
   reader.FileLowerLeftOn()
   reader.SetDataExtent (0, size[0]-1, 0, size[1]-1, 0, size[2]-1)
@@ -693,9 +709,9 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   actor.GetProperty().SetOpacity(opacity)
   return actor
 
-def map_data_with_clip(data, lut = gray_cmap()):
-  '''
-  This method construct an actor to map a 3d dataset.
+def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
+  '''This method construct an actor to map a 3d dataset.
+
   1/8 of the data is clipped out to have a better view of the interior.
   It requires a fair amount of memory so downsample your data if you can
   (it may not be visible at all on the resulting image).
@@ -721,6 +737,8 @@ def map_data_with_clip(data, lut = gray_cmap()):
   
   **lut**: VTK look up table (default: `gray_cmap`).
 
+  **cell_data**: boolean to map cell data or point data if False (True by default)
+  
   *Returns*
 
   The method return a vtkActor that can be directly added to a renderer.
@@ -730,31 +748,60 @@ def map_data_with_clip(data, lut = gray_cmap()):
   bbox = vtk.vtkBox()
   bbox.SetXMin(size[0]/2., -1, size[2]/2.)
   bbox.SetXMax(size[0], size[1]/2., size[2])
+  return map_data(data, bbox, lut = lut)
 
+def map_data(data, function, lut = gray_cmap(), cell_data=True):
+  '''This method construct an actor to map a 3d dataset.
+
+  It requires a fair amount of memory so downsample your data if you can
+  (it may not be visible at all on the resulting image).
+  
+  *Parameters*
+
+  **data**: the dataset to map, in VTK format.
+  
+  **function**: VTK implicit function where to map the data.
+  
+  **lut**: VTK look up table (default: `gray_cmap`).
+
+  **cell_data**: boolean to map cell data or point data if False (True by default)
+  
+  *Returns*
+
+  The method return a vtkActor that can be directly added to a renderer.
+  '''  
   # use extract geometry filter to access the data
   extract = vtk.vtkExtractGeometry()
   extract.SetInput(data)
   extract.ExtractInsideOff()
   extract.ExtractBoundaryCellsOn()
-  extract.SetImplicitFunction(bbox)
+  extract.SetImplicitFunction(function)
 
   mapper = vtk.vtkDataSetMapper()
   mapper.ScalarVisibilityOn()
   mapper.SetLookupTable(lut)
   mapper.UseLookupTableScalarRangeOn()
-  mapper.SetScalarModeToUsePointData();
-  mapper.SetColorModeToMapScalars();
+  if cell_data:
+    mapper.SetScalarModeToUseCellData()
+  else:
+    mapper.SetScalarModeToUsePointData()
+  mapper.SetColorModeToMapScalars()
   mapper.SetInput(extract.GetOutput())
   mapper.Update()
   actor = vtk.vtkActor()
   actor.SetMapper(mapper)
   return actor
   
-'''
-  Setup the camera with usual viewing parameters.
+def setup_camera(size=(100, 100, 100)):
+  '''Setup the camera with usual viewing parameters.
+
   The camera is looking at the center of the data with the Z-axis vertical.
-'''
-def setup_camera(size=(100,100,100)):
+
+  *Parameters*
+  
+  **size**: the size of the 3d data set (100x100x100 by default).
+
+  '''
   cam = vtk.vtkCamera()
   cam.SetViewUp(0, 0, 1)
   cam.SetPosition(2*size[0], -2*size[1], 2*size[2])

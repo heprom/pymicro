@@ -2,8 +2,9 @@
 #-*- coding: utf-8 -*-
 
 import os, wx, numpy as np
-from pymicro.view.wxPlotPanel import PlotPanel
 from matplotlib import pyplot, colors, cm
+
+from pymicro.apps.wxPlotPanel import PlotPanel
 from pymicro.file.file_utils import edf_read
 from pymicro.view.vtk_utils import vol_view, grid_vol_view
 

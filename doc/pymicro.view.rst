@@ -25,11 +25,3 @@ view Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`wxPlotPanel` Module
--------------------------
-
-.. automodule:: pymicro.view.wxPlotPanel
-    :members:
-    :undoc-members:
-    :show-inheritance:
-

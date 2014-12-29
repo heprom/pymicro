@@ -3,11 +3,12 @@
 
 import os, wx, pickle
 import thread
-from pymicro.view.wxPlotPanel import PlotPanel
 from numpy import shape, linspace, zeros_like, pi, cos, sin, tan
-from matplotlib import cm
-from pymicro.diffraction.waxd import *
 from math import atan
+from matplotlib import cm
+
+from pymicro.apps.wxPlotPanel import PlotPanel
+from pymicro.diffraction.waxd import *
 
 class ImPanel(PlotPanel):
   '''The ImPanel extends PlotPanel to draw the image in a matplotlib 
@@ -17,9 +18,9 @@ class ImPanel(PlotPanel):
     Right now, drawing the image is very long (several seconds), 
     we need to find a way around that.'''
 
-  '''Initialize a new ImPanel. This Set some references on the parent, 
-  the image to draw and call PlotPanel __init__ method.'''
   def __init__(self, parent, image=None, color=None, dpi=None, **kwargs):
+    '''Initialize a new ImPanel. This Set some references on the parent, 
+    the image to draw and call PlotPanel __init__ method.'''
     # initialize Panel
     self.parent = parent
     self.im = image

@@ -14,7 +14,7 @@ if __name__ == '__main__':
   ren.SetBackground(1., 1., 1.)
 
   # create the unit lattice cell
-  l = Lattice.cubic(1.0)
+  l = Lattice.face_centered_cubic(1.0)
   
   # create the slip planes and the cubic lattice actor
   hklplanes = HklPlane.get_family('111')

@@ -4,7 +4,7 @@
 import vtk
 import os, numpy as np
 
-class vtkAnimationScene():
+class vtkAnimationScene:
 
   def __init__(self, ren, ren_size=(600, 600)):
     self.timer_count = 0
@@ -38,7 +38,7 @@ class vtkAnimationScene():
 '''
 Abstract class for all vtk animation stuff.
 '''
-class vtkAnimation():
+class vtkAnimation:
   
   def __init__(self, t):
     self.timer_count = 0

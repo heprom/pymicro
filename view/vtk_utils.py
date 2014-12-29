@@ -376,25 +376,79 @@ def unit_arrow_3d(start, vector, color=orange, make_unit=True):
   arrowActor.GetProperty().SetColor(color)
   return arrowActor
 
-def lattice_grid(lattice, origin=[0., 0., 0.]):
+def lattice_points(lattice, origin=[0., 0., 0.]):
   '''
-  Create a mesh representation of a crystal lattice.
-  A vtkUnstructuredGrid class is used with one hexaedron element
-  corresponding to the lattice.
+  Create a vtk representation of a the lattice points.
+
+  A vtkPoints instance is used to store the lattice points, including 
+  the points not on the lattice corners according to the system 
+  centering (may be P, I, F for instance).
+
+  *Parameters*
+  
+  **lattice**: the `Lattice` instance from which to construct the points.
+  
+  **origin**: cartesian coordinates of the origin.
+  
+  *Returns*
+  
+  A vtkPoints with all the lattice points ordered such that the first 8 
+  points describe the lattice cell.
   '''
   [A, B, C] = lattice.matrix
   O = origin
 
   # create the eight points based on the lattice matrix
-  Points = vtk.vtkPoints()
-  Points.InsertNextPoint(O)
-  Points.InsertNextPoint(O+A)
-  Points.InsertNextPoint(O+A+B)
-  Points.InsertNextPoint(O+B)
-  Points.InsertNextPoint(O+C)
-  Points.InsertNextPoint(O+C+A)
-  Points.InsertNextPoint(O+C+A+B)
-  Points.InsertNextPoint(O+C+B)
+  points = vtk.vtkPoints()
+  points.InsertNextPoint(O)
+  points.InsertNextPoint(O+A)
+  points.InsertNextPoint(O+A+B)
+  points.InsertNextPoint(O+B)
+  points.InsertNextPoint(O+C)
+  points.InsertNextPoint(O+C+A)
+  points.InsertNextPoint(O+C+A+B)
+  points.InsertNextPoint(O+C+B)
+  if lattice._centering == 'P':
+    pass # nothing to do
+  elif lattice._centering == 'I':
+    points.InsertNextPoint(O+0.5*C+0.5*A+0.5*B)
+  elif lattice._centering == 'A':
+    points.InsertNextPoint(O+0.5*B+0.5*C)
+    points.InsertNextPoint(O+0.5*B+0.5*C+A)
+  elif lattice._centering == 'B':
+    points.InsertNextPoint(O+0.5*C+0.5*A)
+    points.InsertNextPoint(O+0.5*C+0.5*A+B)
+  elif lattice._centering == 'C':
+    points.InsertNextPoint(O+0.5*A+0.5*B)
+    points.InsertNextPoint(O+0.5*A+0.5*B+C)
+  elif lattice._centering == 'F':
+    points.InsertNextPoint(O+0.5*A+0.5*B)
+    points.InsertNextPoint(O+0.5*A+0.5*B+C)
+    points.InsertNextPoint(O+0.5*B+0.5*C)
+    points.InsertNextPoint(O+0.5*B+0.5*C+A)
+    points.InsertNextPoint(O+0.5*C+0.5*A)
+    points.InsertNextPoint(O+0.5*C+0.5*A+B)
+  return points
+  
+def lattice_grid(lattice, origin=[0., 0., 0.]):
+  '''
+  Create a mesh representation of a crystal lattice.
+
+  A vtkUnstructuredGrid instance is used with one hexaedron element
+  corresponding to the lattice system.
+
+  *Parameters*
+  
+  **lattice**: the `Lattice` instance from which to construct the grid.
+  
+  **origin**: cartesian coordinates of the origin.
+  
+  *Returns*
+  
+  A vtkUnstructuredGrid with one hexaedron cell representing the crystal 
+  lattice.
+  '''
+  points = lattice_points(lattice, origin=[0., 0., 0.])
 
   # ids list
   Ids = vtk.vtkIdList()
@@ -411,7 +465,7 @@ def lattice_grid(lattice, origin=[0., 0., 0.]):
   grid = vtk.vtkUnstructuredGrid()
   grid.Allocate(1, 1)
   grid.InsertNextCell(12, Ids) # 12 is hexaedron cell type
-  grid.SetPoints(Points)
+  grid.SetPoints(points)
   return grid
 
 def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
@@ -451,7 +505,7 @@ def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
   grid.SetPoints(points)
   return grid
   
-def lattice_3d(grid, sphereRadius=0.1, tubeRadius=0.02):
+def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02):
   '''
   Create the 3D representation of a crystal lattice.
   the lattice edges are shown using a vtkTubeFilter and the atoms are 
@@ -460,8 +514,7 @@ def lattice_3d(grid, sphereRadius=0.1, tubeRadius=0.02):
   .. code-block:: python
 
     l = Lattice.cubic(1.0)
-    grid = lattice_grid(l)
-    Edges, Vertices = lattice_3d(grid)
+    Edges, Vertices = lattice_3d(l)
     ren = vtk.vtkRenderer()
     ren.AddActor(Edges)
     ren.AddActor(Vertices)
@@ -477,8 +530,8 @@ def lattice_3d(grid, sphereRadius=0.1, tubeRadius=0.02):
 
   *Parameters*
   
-  **grid**: vtkUnstructuredGrid
-  The vtk grid representing the lattice.
+  **lattice**: Lattice
+  The Lattice instance representing the crystal lattice.
 
   **sphereRadius**: float
   Size of the spheres representing the atoms (default: 0.1).
@@ -490,6 +543,7 @@ def lattice_3d(grid, sphereRadius=0.1, tubeRadius=0.02):
 
   The method return two actors, representing the lattice edges and vertices.
   '''
+  grid = lattice_grid(lattice)
   Edges = vtk.vtkExtractEdges()
   Edges.SetInput(grid)
   Tubes = vtk.vtkTubeFilter()
@@ -588,7 +642,7 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
       arrowActor = unit_arrow_3d(origin, a*hklplane.normal(), make_unit=False)
       assembly.AddPart(arrowActor)
   
-  Edges, Vertices = lattice_3d(grid, tubeRadius=0.02*a, sphereRadius=0.1*a)
+  Edges, Vertices = lattice_3d(lattice, tubeRadius=0.02*a, sphereRadius=0.1*a)
   # add the two actors to the renderer
   assembly.AddPart(Edges)
   assembly.AddPart(Vertices)

@@ -13,7 +13,7 @@
 
 import sys, os
 import mock
-MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.image', 'matplotlib.cm', 'matplotlib.colors', 'scipy.ndimage', 'wx', 'vtk', 'vtk.util', 'vtk.util.colors', '_tifffile']
+MOCK_MODULES = ['numpy', 'scipy', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.image', 'matplotlib.cm', 'matplotlib.colors', 'scipy.ndimage', 'wx', 'wx.Panel', 'vtk', 'vtk.util', 'vtk.util.colors', '_tifffile'] #, 'ImPanel', 'PlotPanel']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -22,6 +22,7 @@ for mod_name in MOCK_MODULES:
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.abspath('../crystal'))
 sys.path.insert(0, os.path.abspath('../file'))
+sys.path.insert(0, os.path.abspath('../apps'))
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.append(os.path.abspath('sphinxext'))

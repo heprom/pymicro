@@ -5,69 +5,76 @@ matplotlib.use('WXAgg')
 import numpy as num
 import wx
 
-class PlotPanel (wx.Panel):
-    """The PlotPanel has a Figure and a Canvas. OnSize events simply set a 
-flag, and the actual resizing of the figure is triggered by an Idle event."""
-    def __init__( self, parent, color=None, dpi=None, **kwargs ):
-        from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
-        from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as NavigationToolbar
-        #from matplotlib.backends.backend_wx import FigureCanvasWx as FigureCanvas
-        from matplotlib.figure import Figure
+class PlotPanel(wx.Panel):
+  '''A wx panel with a matplotlib canvas.
+  
+  The PlotPanel extends the wx.Panel base class and has a matplotlib 
+  Figure and Canvas to draw/plot interesting things on the panel.
+  
+  OnSize events simply set a flag, and the actual resizing of the figure 
+  is triggered by an Idle event.'''
 
-        # initialize Panel
-        if 'id' not in kwargs.keys():
-            kwargs['id'] = wx.ID_ANY
-        if 'style' not in kwargs.keys():
-            kwargs['style'] = wx.NO_FULL_REPAINT_ON_RESIZE
-        wx.Panel.__init__( self, parent, **kwargs )
+  def __init__(self, parent, color=None, dpi=None, **kwargs):
+    '''Initialisation of the PlotPanel instance.'''
+    from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
+    from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as NavigationToolbar
+    #from matplotlib.backends.backend_wx import FigureCanvasWx as FigureCanvas
+    from matplotlib.figure import Figure
 
-        # initialize matplotlib stuff
-        dpi = 72
-        print 'dpi=',dpi
-        self.figure = Figure((2.0, 2.0), dpi)
-        self.canvas = FigureCanvas( self, -1, self.figure )
-        self.SetColor( color )
-        self.toolbar = NavigationToolbar(self.canvas)
+    # initialize Panel
+    if 'id' not in kwargs.keys():
+        kwargs['id'] = wx.ID_ANY
+    if 'style' not in kwargs.keys():
+        kwargs['style'] = wx.NO_FULL_REPAINT_ON_RESIZE
+    wx.Panel.__init__( self, parent, **kwargs )
 
-        self.vbox = wx.BoxSizer(wx.VERTICAL)
-        self.vbox.Add(self.canvas, 1, wx.LEFT | wx.TOP | wx.GROW)
-        self.vbox.Add(self.toolbar, 0, wx.EXPAND)
-        self.SetSizer(self.vbox)
-        self.vbox.Fit(self)
+    # initialize matplotlib stuff
+    dpi = 72
+    print 'dpi=',dpi
+    self.figure = Figure((2.0, 2.0), dpi)
+    self.canvas = FigureCanvas( self, -1, self.figure )
+    self.SetColor( color )
+    self.toolbar = NavigationToolbar(self.canvas)
 
-        #self._SetSize()
-        self.draw()
+    self.vbox = wx.BoxSizer(wx.VERTICAL)
+    self.vbox.Add(self.canvas, 1, wx.LEFT | wx.TOP | wx.GROW)
+    self.vbox.Add(self.toolbar, 0, wx.EXPAND)
+    self.SetSizer(self.vbox)
+    self.vbox.Fit(self)
 
-        #self._resizeflag = False
+    #self._SetSize()
+    self.draw()
 
-        #self.Bind(wx.EVT_IDLE, self._onIdle)
-        #self.Bind(wx.EVT_SIZE, self._onSize)
+    #self._resizeflag = False
 
-    def SetColor( self, rgbtuple=None ):
-        """Set figure and canvas colours to be the same."""
-        if rgbtuple is None:
-            rgbtuple = wx.SystemSettings.GetColour( wx.SYS_COLOUR_BTNFACE ).Get()
-        clr = [c/255. for c in rgbtuple]
-        self.figure.set_facecolor( clr )
-        self.figure.set_edgecolor( clr )
-        self.canvas.SetBackgroundColour( wx.Colour( *rgbtuple ) )
+    #self.Bind(wx.EVT_IDLE, self._onIdle)
+    #self.Bind(wx.EVT_SIZE, self._onSize)
 
-    def _onSize( self, event ):
-        self._resizeflag = True
+  def SetColor( self, rgbtuple=None ):
+      """Set figure and canvas colours to be the same."""
+      if rgbtuple is None:
+          rgbtuple = wx.SystemSettings.GetColour( wx.SYS_COLOUR_BTNFACE ).Get()
+      clr = [c/255. for c in rgbtuple]
+      self.figure.set_facecolor( clr )
+      self.figure.set_edgecolor( clr )
+      self.canvas.SetBackgroundColour( wx.Colour( *rgbtuple ) )
 
-    def _onIdle( self, evt ):
-        if self._resizeflag:
-            self._resizeflag = False
-            self._SetSize()
+  def _onSize( self, event ):
+      self._resizeflag = True
 
-    def _SetSize( self ):
-        pixels = tuple( self.parent.GetClientSize() )
-        self.SetSize( pixels )
-        self.canvas.SetSize( pixels )
-        self.figure.set_size_inches( float( pixels[0] )/self.figure.get_dpi(),
-                                     float( pixels[1] )/self.figure.get_dpi() )
+  def _onIdle( self, evt ):
+      if self._resizeflag:
+          self._resizeflag = False
+          self._SetSize()
 
-    def draw(self): pass # abstract, to be overridden by child classes
+  def _SetSize( self ):
+      pixels = tuple( self.parent.GetClientSize() )
+      self.SetSize( pixels )
+      self.canvas.SetSize( pixels )
+      self.figure.set_size_inches( float( pixels[0] )/self.figure.get_dpi(),
+                                   float( pixels[1] )/self.figure.get_dpi() )
+
+  def draw(self): pass # abstract, to be overridden by child classes
 
 if __name__ == '__main__':
     class DemoPlotPanel (PlotPanel):

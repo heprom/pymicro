@@ -1,5 +1,5 @@
 '''The lattice module define the class to handle 
-   3D crystal lattices (the 7 Bravais lattices).
+   3D crystal lattices (the 14 Bravais lattices).
 '''
 import itertools
 import numpy as np
@@ -13,15 +13,27 @@ class Lattice:
   This particular class has been partly inspired from the pymatgen 
   project at https://github.com/materialsproject/pymatgen
 
-  Any of the 7 Bravais lattice can be easily created and manipulated.
+  Any of the 7 lattice systems (each corresponding to one point group) 
+  can be easily created and manipulated.
+  
+  The lattice centering can be specified to form any of the 14 Bravais 
+  lattices:
+
+   * Primitive (P): lattice points on the cell corners only (default);
+   * Body (I): one additional lattice point at the center of the cell;
+   * Face (F): one additional lattice point at the center of each of 
+     the faces of the cell;
+   * Base (A, B or C): one additional lattice point at the center of 
+     each of one pair of the cell faces.
+  
   ::
 
     a = 0.352 # FCC Nickel
-    l = Lattice.cubic(a)
+    l = Lattice.face_centered_cubic(a)
     print(l.volume())
   '''
   
-  def __init__(self, matrix):
+  def __init__(self, matrix, centering='P'):
     '''Create a crystal lattice (unit cel).
     
     Create a lattice from a 3x3 matrix.
@@ -38,6 +50,7 @@ class Lattice:
     self._angles = angles
     self._lengths = lengths
     self._matrix = m
+    self._centering = centering
   
   def __repr__(self):
     f = lambda x: "%0.1f" % x
@@ -57,17 +70,85 @@ class Lattice:
   @staticmethod
   def cubic(a):
     '''
-    Create a cubic Lattice unit cell with length parameter a.
+    Create a cubic Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter (a = b = c here)
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a primitice cubic lattice.
     '''
     return Lattice([[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]])
 
   @staticmethod
+  def body_centered_cubic(a):
+    '''
+    Create a body centered cubic Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter (a = b = c here)
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a body centered cubic 
+    lattice.
+    '''
+    return Lattice.from_parameters(a, a, a, 90, 90, 90, 'I')
+
+  @staticmethod
+  def face_centered_cubic(a):
+    '''
+    Create a face centered cubic Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter (a = b = c here)
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a face centered cubic 
+    lattice.
+    '''
+    return Lattice.from_parameters(a, a, a, 90, 90, 90, 'F')
+
+  @staticmethod
   def tetragonal(a, c):
     '''
-    Create a tetragonal Lattice unit cell with 2 different length 
-    parameters a and c.
+    Create a tetragonal Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter
+    
+    **c**: third lattice length parameter (b = a here)
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a primitive tetragonal 
+    lattice.
     '''
     return Lattice.from_parameters(a, a, c, 90, 90, 90)
+
+  @staticmethod
+  def body_centered_tetragonal(a, c):
+    '''
+    Create a body centered tetragonal Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter
+    
+    **c**: third lattice length parameter (b = a here)
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a body centered tetragonal 
+    lattice.
+    '''
+    return Lattice.from_parameters(a, a, c, 90, 90, 90, 'I')
 
   @staticmethod
   def orthorombic(a, b, c):
@@ -76,6 +157,66 @@ class Lattice:
     parameters a, b and c.
     '''
     return Lattice.from_parameters(a, b, c, 90, 90, 90)
+
+  @staticmethod
+  def base_centered_orthorombic(a, b, c):
+    '''
+    Create a based centered orthorombic Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter
+    
+    **b**: second lattice length parameter
+    
+    **c**: third lattice length parameter
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a based centered orthorombic 
+    lattice.
+    '''
+    return Lattice.from_parameters(a, b, c, 90, 90, 90, 'C')
+
+  @staticmethod
+  def body_centered_orthorombic(a, b, c):
+    '''
+    Create a body centered orthorombic Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter
+    
+    **b**: second lattice length parameter
+    
+    **c**: third lattice length parameter
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a body centered orthorombic 
+    lattice.
+    '''
+    return Lattice.from_parameters(a, b, c, 90, 90, 90, 'I')
+
+  @staticmethod
+  def face_centered_orthorombic(a, b, c):
+    '''
+    Create a face centered orthorombic Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter
+    
+    **b**: second lattice length parameter
+    
+    **c**: third lattice length parameter
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a face centered orthorombic 
+    lattice.
+    '''
+    return Lattice.from_parameters(a, b, c, 90, 90, 90, 'F')
 
   @staticmethod    
   def hexagonal(a, c):
@@ -97,8 +238,31 @@ class Lattice:
     '''
     Create a monoclinic Lattice unit cell with 3 different length 
     parameters a, b and c. The cell angle is given by alpha.
+    The lattice centering id primitive ie. 'P'
     '''
     return Lattice.from_parameters(a, b, c, alpha, 90, 90)
+
+  @staticmethod
+  def base_centered_monoclinic(a, b, c, alpha):
+    '''
+    Create a based centered monoclinic Lattice unit cell.
+
+    *Parameters*
+    
+    **a**: first lattice length parameter
+    
+    **b**: second lattice length parameter
+    
+    **c**: third lattice length parameter
+    
+    **alpha**: first lattice angle parameter
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to a based centered monoclinic 
+    lattice.
+    '''
+    return Lattice.from_parameters(a, b, c, alpha, 90, 90, 'C')
       
   @staticmethod
   def triclinic(a, b, c, alpha, beta, gamma):
@@ -107,19 +271,40 @@ class Lattice:
     parameters a, b, c and three different cell angles alpha, beta 
     and gamma.
 
-    ..note
+    ..note::
     
       This method is here for the sake of completeness since one can 
-      create the triclinic cell directly using the from_parameters method.
+      create the triclinic cell directly using the `from_parameters` 
+      method.
     '''
     return Lattice.from_parameters(a, b, c, alpha, beta, gamma)
       
   @staticmethod
-  def from_parameters(a, b, c, alpha, beta, gamma):
+  def from_parameters(a, b, c, alpha, beta, gamma, centering='P'):
     '''
     Create a Lattice using unit cell lengths and angles (in degrees).
+    The lattice centering can also be specified (among 'P', 'I', 'F', 
+    'A', 'B' or 'C').
 
-    Returns: A Lattice with the specified lattice parameters.
+    *Parameters*
+    
+    **a**: first lattice length parameter
+    
+    **b**: second lattice length parameter
+    
+    **c**: third lattice length parameter
+    
+    **alpha**: first lattice angle parameter
+    
+    **beta**: second lattice angle parameter
+    
+    **gamma**: third lattice angle parameter
+    
+    **centering**: lattice centering ('P' by default)
+    
+    *Returns*
+    
+    A `Lattice` instance with the specified lattice parameters.
     '''
     alpha_r = radians(alpha)
     beta_r = radians(beta)
@@ -132,7 +317,7 @@ class Lattice:
     vector_a = [a * np.sin(beta_r), 0.0, a * np.cos(beta_r)]
     vector_b = [-b * np.sin(alpha_r) * np.cos(gamma_star), b * np.sin(alpha_r) * np.sin(gamma_star), b * np.cos(alpha_r)]
     vector_c = [0.0, 0.0, float(c)]
-    return Lattice([vector_a, vector_b, vector_c])    
+    return Lattice([vector_a, vector_b, vector_c], centering)
 
   def volume(self):
     '''Compute the volume of the unit cell.'''

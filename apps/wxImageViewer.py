@@ -2,7 +2,7 @@
 #-*- coding: utf-8 -*-
 
 import sys, wx, os, re, numpy as np
-from pymicro.view.wxPlotPanel import PlotPanel
+from pymicro.apps.wxPlotPanel import PlotPanel
 from matplotlib import pyplot, colors, cm
 import matplotlib.image as mpimg
 from pymicro.file.file_utils import edf_read
@@ -95,8 +95,7 @@ class wxImageViewerFrame(wx.Frame):
     print 'self.path=',self.path
     # read image depending on file extension (only .png .tif and .edf supported)
     if self.path.endswith('.edf'):
-      self.im = edf_read(im_file, header_size=2048, verbose=True, \
-        return_header=False)[:,:,0].transpose()
+      self.im = edf_read(im_file).transpose()
     elif self.path.endswith('.png'):
       self.im = mpimg.imread(im_file)
     elif self.path.endswith('.tif'):

@@ -1,18 +1,18 @@
 apps Package
 ============
 
-:mod:`wxRadialProfile` Module
------------------------------
+:mod:`apps` Package
+-------------------
 
-.. automodule:: pymicro.apps.wxRadialProfile
+.. automodule:: pymicro.apps
     :members:
     :undoc-members:
     :show-inheritance:
 
-:mod:`wxVolumeViewer` Module
-----------------------------
+:mod:`wxPlotPanel` Module
+-------------------------
 
-.. automodule:: pymicro.apps.wxVolumeViewer
+.. automodule:: pymicro.apps.wxPlotPanel
     :members:
     :undoc-members:
     :show-inheritance:

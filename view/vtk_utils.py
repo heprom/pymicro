@@ -915,7 +915,7 @@ def show_grains(data):
   '''Create a 3d actor of all the grains in a labeled numpy array.
   
   Given a 3d numpy array, this function compute the skin of all the 
-  grains (labels > 1). the background is assumed to be zero and is 
+  grains (labels > 0). the background is assumed to be zero and is 
   removed. The actor produced is colored by the grain ids using the 
   random color map, see `rand_cmap`.
   
@@ -934,7 +934,7 @@ def show_grains(data):
   grid.SetScalarType(vtk.VTK_UNSIGNED_SHORT)
   grid.SetExtent(0, size[0], 0, size[1], 0, size[2]) # for cell data
   grid.GetCellData().SetScalars(vtk_data_array)
-  visible = numpy_support.numpy_to_vtk(numpy.ravel(data > 1, order='F').astype(numpy.uint8), deep=1)
+  visible = numpy_support.numpy_to_vtk(numpy.ravel(data > 0, order='F').astype(numpy.uint8), deep=1)
   grid.SetCellVisibilityArray(visible)
 
   # use extract geometry filter to access the data

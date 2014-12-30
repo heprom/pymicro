@@ -87,9 +87,9 @@ def edf_read(file_name):
     print 'Dim_2 not defined in header'
     dim_2 = None
   try:
-    print 'Dim_3 not defined in header'
     dim_3 = int(header_values['Dim_3'].split('.')[0])
   except:
+    print 'Dim_3 not defined in header'
     dim_3 = None
   # now read binary data
   header_size = os.path.getsize(file_name) - payload_size

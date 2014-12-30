@@ -5,7 +5,6 @@
 
 """
 
-__version__  = '0.1.0'
 #from wxImageViewer import ImageViewer
 '''
 for some reason shpinx complains about PlotPanel...

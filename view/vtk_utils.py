@@ -408,6 +408,10 @@ def lattice_points(lattice, origin=[0., 0., 0.]):
   points.InsertNextPoint(O+C+A)
   points.InsertNextPoint(O+C+A+B)
   points.InsertNextPoint(O+C+B)
+  # use the point basis if it contain several atoms
+  if len(lattice._basis) > 1:
+    for point in lattice._basis[1:]:
+      points.InsertNextPoint(O + point[0]*A + point[1]*B + point[2]*C)
   if lattice._centering == 'P':
     pass # nothing to do
   elif lattice._centering == 'I':

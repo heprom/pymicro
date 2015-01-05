@@ -31,6 +31,12 @@ class Lattice:
     a = 0.352 # FCC Nickel
     l = Lattice.face_centered_cubic(a)
     print(l.volume())
+
+  Addditionnally the point-basis can be controlled to address non 
+  Bravais lattice cells. It is set to a single atoms at (0,0,0) by 
+  default so that each cell is a Bravais lattice but may be changed to 
+  something more complex to achieve HCP structure or Diamond structure 
+  for instance.
   '''
   
   def __init__(self, matrix, centering='P'):
@@ -51,6 +57,7 @@ class Lattice:
     self._lengths = lengths
     self._matrix = m
     self._centering = centering
+    self._basis = [(0.,0.,0.)]
   
   def __repr__(self):
     f = lambda x: "%0.1f" % x

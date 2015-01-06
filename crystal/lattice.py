@@ -50,7 +50,7 @@ class Lattice:
     angles = np.zeros(3)
     for i in xrange(3):
       j = (i + 1) % 3
-      k = (i + 2) % 3
+      k =  (i + 2) % 3
       angles[i] = dot(m[j], m[k]) / (lengths[j] * lengths[k])
     angles = np.arccos(angles) * 180. / pi
     self._angles = angles

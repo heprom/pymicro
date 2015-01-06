@@ -214,13 +214,13 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
 
   '''
   if autoparse_filename == True:
-    s_type = file_name[:-4].split('_')[-1]
+    s_type = scan_name[:-4].split('_')[-1]
     if s_type == 'uint8':
       data_type = np.uint8
     elif s_type == 'uint16':
       data_type = np.uint16
-    s_size = file_name[:-4].split('_')[-2].split('x')
-    (dim_1, dim_2, dim_3) = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
+    s_size = scan_name[:-4].split('_')[-2].split('x')
+    dims = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
     if verbose: print 'autoparsing filename: data type is set to', type
   if verbose: print 'data type is',type
   if dims == None:

@@ -3,7 +3,6 @@ import numpy as np
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from matplotlib import pyplot as plt, colors, cm
 
-
 class PoleFigure:
   '''A class to handle pole figures.
   
@@ -158,13 +157,24 @@ class PoleFigure:
     ax.axis('off')
     ax.set_title('direct %s projection' % self.proj)
 
-  def sst_symmetry(self, z_rot):
-    '''Perform symmetry according to the unit SST triangle.'''
-    if z_rot[0] < 0: z_rot[0] *= -1.
-    if z_rot[1] < 0: z_rot[1] *= -1.
-    if z_rot[1] > z_rot[0]:
-      z_rot[1], z_rot[0] = z_rot[0], z_rot[1]
-    return z_rot
+  def sst_symmetry_cubic(self, z_rot):
+	'''Perform cubic symmetry according to the unit SST triangle.
+	'''
+
+	if z_rot[0] < 0: z_rot[0] = -z_rot[0]
+	if z_rot[1] < 0: z_rot[1] = -z_rot[1]
+	if z_rot[2] < 0: z_rot[2] = -z_rot[2]
+
+	if (z_rot[2] > z_rot[1]):
+		z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
+	
+	if (z_rot[1] > z_rot[0]):
+		z_rot[0], z_rot[1] = z_rot[1], z_rot[0]
+		
+	if (z_rot[2] > z_rot[1]):
+		z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
+		
+	return [z_rot[1], z_rot[2], z_rot[0]]
     
   def plot_sst(self, ax=None, mk='s', col='r', ann=False):
     ''' Create the inverse pole figure in the unit standard triangle. 

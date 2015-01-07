@@ -105,6 +105,11 @@ class PoleFigure:
       raise TypeError('Error, unsupported projection type', proj)
     ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
       markersize=self.mksize, label=lab)
+    #Next 3 lines are necessary in case c_dir[2]=0, as for
+    #Euler angles [45, 45, 0]
+    if c_dir[2] < 0.000001:
+		ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
+          markersize=self.mksize, label=lab)
     if ann:
       ax.annotate(c_dir.view(), (cp[0], cp[1]-0.1), xycoords='data',
         fontsize=8, horizontalalignment='center', verticalalignment='center')

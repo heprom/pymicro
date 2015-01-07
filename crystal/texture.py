@@ -3,6 +3,7 @@ import numpy as np
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from matplotlib import pyplot as plt, colors, cm
 
+
 class PoleFigure:
   '''A class to handle pole figures.
   

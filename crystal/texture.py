@@ -85,7 +85,7 @@ class PoleFigure:
     self.plot_pf(ax = ax1, mk='o', col='k', ann=False)
     # inverse PF
     ax2 = fig.add_subplot(122, aspect='equal')
-    self.plot_ipf(ax = ax2)
+    self.plot_sst(ax = ax2)
     if display:
       plt.show()
     else:

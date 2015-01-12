@@ -670,6 +670,19 @@ def apply_orientation_to_actor(actor, orientation):
   transform.RotateZ(orientation.phi2())
   actor.SetUserTransform(transform)
 
+def load_STL_actor(name, verbose=False):
+  '''Read a STL file and return the corresponding vtk actor.
+  '''
+  if verbose: print 'adding part: %s' % name
+  part = vtk.vtkSTLReader()
+  part.SetFileName(name + ".STL")
+  part.Update()
+  partMapper = vtk.vtkPolyDataMapper()
+  partMapper.SetInputConnection(part.GetOutputPort())
+  partActor = vtk.vtkActor()
+  partActor.SetMapper(partMapper)
+  return partActor
+  
 def read_image_data(file_name, size, header_size=0, data_type='uint8', verbose=False):
   '''
   vtk helper function to read a 3d data file.
@@ -915,22 +928,7 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
     iren.Initialize()
     iren.Start()
 
-def show_grains(data):
-  '''Create a 3d actor of all the grains in a labeled numpy array.
-  
-  Given a 3d numpy array, this function compute the skin of all the 
-  grains (labels > 0). the background is assumed to be zero and is 
-  removed. The actor produced is colored by the grain ids using the 
-  random color map, see `rand_cmap`.
-  
-  *Parameters*
-  
-  **data**: a labeled numpy array.
-  
-  Returns a vtk actor that can be added to a rendered to show all the 
-  grains colored by their id.
-  
-  '''
+def show_data(data, map_scalars=False, lut=None):
   size = data.shape
   vtk_data_array = numpy_support.numpy_to_vtk(numpy.ravel(data, order='F'), deep=1)
   grid = vtk.vtkUniformGrid()
@@ -952,12 +950,16 @@ def show_grains(data):
   extract.SetImplicitFunction(bbox)
 
   mapper = vtk.vtkDataSetMapper()
-  mapper.ScalarVisibilityOn()
-  lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
-  mapper.SetLookupTable(lut)
-  mapper.UseLookupTableScalarRangeOn()
-  mapper.SetScalarModeToUseCellData();
-  mapper.SetColorModeToMapScalars();
+  mapper.ScalarVisibilityOff()
+  if map_scalars:
+    mapper.ScalarVisibilityOn()
+    mapper.UseLookupTableScalarRangeOn()
+    mapper.SetScalarModeToUseCellData();
+    mapper.SetColorModeToMapScalars();
+    if not lut:
+      # default to the usual gray colormap
+      lut = gray_cmap()
+    mapper.SetLookupTable(lut)
   mapper.SetInput(extract.GetOutput())
   mapper.Update()
   actor = vtk.vtkActor()
@@ -966,6 +968,25 @@ def show_grains(data):
   actor.GetProperty().SetSpecularPower(10)
   actor.GetProperty().SetOpacity(1.0)
   return actor
+
+def show_grains(data):
+  '''Create a 3d actor of all the grains in a labeled numpy array.
+  
+  Given a 3d numpy array, this function compute the skin of all the 
+  grains (labels > 0). the background is assumed to be zero and is 
+  removed. The actor produced is colored by the grain ids using the 
+  random color map, see `rand_cmap`.
+  
+  *Parameters*
+  
+  **data**: a labeled numpy array.
+  
+  Returns a vtk actor that can be added to a rendered to show all the 
+  grains colored by their id.  
+  '''
+  grain_lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
+  grains = show_data(data, map_scalars=True, lut=grain_lut)
+  return grains
 
 def grid_vol_view(scan):
   s_size = scan[:-4].split('_')[-2].split('x')

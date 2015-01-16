@@ -85,7 +85,7 @@ class PoleFigure:
     self.plot_pf(ax = ax1, mk='o', col='k', ann=False)
     # inverse PF
     ax2 = fig.add_subplot(122, aspect='equal')
-    self.plot_ipf(ax = ax2)
+    self.plot_sst(ax = ax2)
     if display:
       plt.show()
     else:
@@ -105,6 +105,11 @@ class PoleFigure:
       raise TypeError('Error, unsupported projection type', proj)
     ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
       markersize=self.mksize, label=lab)
+    #Next 3 lines are necessary in case c_dir[2]=0, as for
+    #Euler angles [45, 45, 0]
+    if c_dir[2] < 0.000001:
+		ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
+          markersize=self.mksize, label=lab)
     if ann:
       ax.annotate(c_dir.view(), (cp[0], cp[1]-0.1), xycoords='data',
         fontsize=8, horizontalalignment='center', verticalalignment='center')
@@ -157,13 +162,24 @@ class PoleFigure:
     ax.axis('off')
     ax.set_title('direct %s projection' % self.proj)
 
-  def sst_symmetry(self, z_rot):
-    '''Perform symmetry according to the unit SST triangle.'''
-    if z_rot[0] < 0: z_rot[0] *= -1.
-    if z_rot[1] < 0: z_rot[1] *= -1.
-    if z_rot[1] > z_rot[0]:
-      z_rot[1], z_rot[0] = z_rot[0], z_rot[1]
-    return z_rot
+  def sst_symmetry_cubic(self, z_rot):
+	'''Perform cubic symmetry according to the unit SST triangle.
+	'''
+
+	if z_rot[0] < 0: z_rot[0] = -z_rot[0]
+	if z_rot[1] < 0: z_rot[1] = -z_rot[1]
+	if z_rot[2] < 0: z_rot[2] = -z_rot[2]
+
+	if (z_rot[2] > z_rot[1]):
+		z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
+	
+	if (z_rot[1] > z_rot[0]):
+		z_rot[0], z_rot[1] = z_rot[1], z_rot[0]
+		
+	if (z_rot[2] > z_rot[1]):
+		z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
+		
+	return [z_rot[1], z_rot[2], z_rot[0]]
     
   def plot_sst(self, ax=None, mk='s', col='r', ann=False):
     ''' Create the inverse pole figure in the unit standard triangle. 

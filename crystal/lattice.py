@@ -50,7 +50,7 @@ class Lattice:
     angles = np.zeros(3)
     for i in xrange(3):
       j = (i + 1) % 3
-      k = (i + 2) % 3
+      k =  (i + 2) % 3
       angles[i] = dot(m[j], m[k]) / (lengths[j] * lengths[k])
     angles = np.arccos(angles) * 180. / pi
     self._angles = angles
@@ -69,6 +69,22 @@ class Lattice:
            " C : " + " ".join(map(f, self._matrix[2]))]
     return "\n".join(out)
   
+  def reciprocal_lattice(self):
+    '''Compute the reciprocal lattice.
+    
+    This computes the three reciprocal lattice vectors defined by
+    
+     * a.a^* = 1
+     * b.b^* = 1
+     * c.c^* = 1
+    '''
+    [a, b, c] = self._matrix
+    V = self.volume()
+    astar = np.cross(b, c) / V
+    bstar = np.cross(c, a) / V
+    cstar = np.cross(a, b) / V
+    return [astar, bstar, cstar]
+    
   @property
   def matrix(self):
     '''Returns a copy of matrix representing the Lattice.'''

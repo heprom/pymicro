@@ -441,6 +441,10 @@ class Grain:
   def dct_omega_angles(self, hkl, lambda_keV, verbose=True):
     '''Compute the two omega angles which satisfy the Bragg condition.
     
+    For a grain with a given crystal orientation sitting on a vertical 
+    rotation axis, there is exactly two omega positions in [0, 2pi] for 
+    which a particular hkl reflexion will fulfil Bragg's law.
+    
     According to the Bragg's law, a crystallographic grain will be in 
     diffracting condition if:
     
@@ -450,6 +454,14 @@ class Grain:
        
     This method solves the associated second order equation to return 
     the two corresponding omega angles.
+    
+    **parameters:**
+    
+    *hkl* The given cristallographic `HklPlane`
+    
+    *lambda_keV* The X-rays energy expressed in keV
+    
+    *verbose* Verbos emode (False by default)
     
     .. warning::
     

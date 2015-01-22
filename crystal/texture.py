@@ -194,7 +194,7 @@ class PoleFigure:
     for grain in self.microstructure.grains:
       B = grain.orientation_matrix()
       # compute z axis and apply SST symmetry
-      z_rot = self.sst_symmetry(B.dot(self.z))
+      z_rot = self.sst_symmetry_cubic(B.dot(self.z))
       print z_rot
       self.plot_crystal_dir(z_rot, mk=mk, col=col, ax=ax, ann=ann)
       if self.verbose: print 'plotting ',self.z,' in sample CS:',z_rot

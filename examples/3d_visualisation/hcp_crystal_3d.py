@@ -20,7 +20,8 @@ if __name__ == '__main__':
   l._basis = [(0., 0., 0.), (2./3, 1./3, 1./2)] # hexagonal compact basis
 
   hcp1 = vtk.vtkAssembly()
-  Edges1, Vertices1 = lattice_3d(l, sphereRadius=0.1*a, tubeRadius=0.02*a)
+  grid = lattice_grid(l)
+  Vertices1 = lattice_vertices(grid, sphereRadius=0.1*a)
   Vertices1.GetProperty().SetColor(0, 0, 0)
   #hcp1.AddPart(Edges1)
   hcp1.AddPart(Vertices1)
@@ -31,7 +32,8 @@ if __name__ == '__main__':
   ren.AddActor(hcp1)
   
   hcp2 = vtk.vtkAssembly()
-  Edges2, Vertices2 = lattice_3d(l, sphereRadius=0.1*a, tubeRadius=0.02*a)
+  grid = lattice_grid(l)
+  Vertices2 = lattice_vertices(grid, sphereRadius=0.1*a)
   Vertices2.GetProperty().SetColor(0, 0, 0)
   #hcp2.AddPart(Edges2)
   hcp2.AddPart(Vertices2)
@@ -42,10 +44,13 @@ if __name__ == '__main__':
   ren.AddActor(hcp2)
 
   hcp3 = vtk.vtkAssembly()
-  Edges3, Vertices3 = lattice_3d(l, sphereRadius=0.102*a, tubeRadius=0.02*a)
   grid = lattice_grid(l)
+  Vertices3 = lattice_vertices(grid, sphereRadius=0.102*a)
   mapper = vtk.vtkDataSetMapper()
-  mapper.SetInput(grid)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    mapper.SetInputData(grid)
+  else:
+    mapper.SetInput(grid)
   ShadowedCell = vtk.vtkActor()
   ShadowedCell.SetMapper(mapper)
   ShadowedCell.GetProperty().SetOpacity(0.3)
@@ -60,7 +65,10 @@ if __name__ == '__main__':
 
   grid = hexagonal_lattice_grid(l)
   Edges = vtk.vtkExtractEdges()
-  Edges.SetInput(grid)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    Edges.SetInputData(grid)
+  else:
+    Edges.SetInput(grid)
   Tubes = vtk.vtkTubeFilter()
   Tubes.SetInputConnection(Edges.GetOutputPort())
   Tubes.SetRadius(0.02*a)
@@ -86,7 +94,7 @@ if __name__ == '__main__':
   ren.SetActiveCamera(cam)
   image_name = os.path.splitext(__file__)[0] + '.png'
   print 'writting %s' % image_name
-  render(ren, save=True, display=True, ren_size=(800,800), name=image_name)
+  render(ren, save=True, display=False, ren_size=(800,800), name=image_name)
 
   from matplotlib import image
   image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

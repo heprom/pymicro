@@ -16,6 +16,7 @@ if __name__ == '__main__':
   ren.SetBackground(1.0, 1.0, 1.0)
 
   # add all the grains
+  from pymicro.view.vtk_utils import show_data
   grains = show_grains(data)
   ren.AddActor(grains)
 

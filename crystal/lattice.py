@@ -347,6 +347,23 @@ class Lattice:
     m = self._matrix
     return abs(np.dot(np.cross(m[0], m[1]), m[2]))
 
+  def get_hkl_family(self, hkl):
+    '''Get a list of the hkl planes composing the given family for 
+    this crystal lattice.
+
+    *Parameters*
+    
+    **hkl**: miller indices of the requested family
+
+    *Returns*
+    
+    A list of the hkl planes in the given family.
+    '''
+    planes = HklPlane.get_family(hkl)
+    for p in planes:
+      p._lattice = self
+    return planes
+
   @staticmethod
   def get_slip_systems(plane_type='111'):
     if plane_type != '111':

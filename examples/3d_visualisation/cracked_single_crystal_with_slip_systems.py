@@ -9,7 +9,7 @@ def create_mesh_outline_3d_with_planes(lattice, orientation, nld):
   grid = lattice_grid(lattice)
   assembly = vtk.vtkAssembly()
   # actor to show the mesh outline (only add edges)
-  Edges, Vertices = lattice_3d(grid)
+  Edges = lattice_edges(grid)
   assembly.AddPart(Edges)
   # actor to show the crack
   top_crack_plane = vtk.vtkPlane()
@@ -100,14 +100,13 @@ if __name__ == '__main__':
   n2 = numpy.array([1.0, 1.0, 1.0])
   l2 = numpy.array([1.0, 1.0, -2.0])
   d2 = '[11-2]'
-  #nld = [[n1,l1,d1]]
   nld = [[n1,l1,d1], [n2,l2,d2]]
 
   # Create the Renderer
   ren = vtk.vtkRenderer()
  
   # we use a unit lattice cell to represent the mesh
-  l_xyz = Lattice.cubic(1.0)
+  l_xyz = Lattice.face_centered_cubic(1.0)
   g1 = create_mesh_outline_3d_with_planes(l_xyz, o1, nld)
   ren.AddActor(g1)
  
@@ -123,7 +122,6 @@ if __name__ == '__main__':
   cam.SetViewUp(0, 0, 1)
   cam.SetPosition(4.0, -1.5, 1.8)
   cam.SetFocalPoint(0.5, 0.5, 0.6)
-  #cam.Dolly(1.0)
   ren.SetActiveCamera(cam)
   
   image_name = os.path.splitext(__file__)[0] + '.png'

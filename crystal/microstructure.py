@@ -373,13 +373,19 @@ class Grain:
     grid = vtk.vtkUniformGrid()
     grid.SetOrigin(-local_com[0], -local_com[1], -local_com[2])
     grid.SetSpacing(1, 1, 1)
-    grid.SetScalarType(vtk.VTK_UNSIGNED_CHAR)
+    if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+      grid.SetScalarType(vtk.VTK_UNSIGNED_CHAR, vtk.vtkInformation())
+    else:
+      grid.SetScalarType(vtk.VTK_UNSIGNED_CHAR)
     if contour:
       grid.SetExtent(0, grain_size[0]-1, 0, grain_size[1]-1, 0, grain_size[2]-1)
       grid.GetPointData().SetScalars(vtk_data_array)
       # contouring selected grain
       contour = vtk.vtkContourFilter()
-      contour.SetInput(grid)
+      if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+        contour.SetInputData(grid)
+      else:
+        contour.SetInput(grid)
       contour.SetValue(0, 0.5)
       contour.Update()
       if verbose: print contour.GetOutput()
@@ -392,7 +398,10 @@ class Grain:
       thresh = vtk.vtkThreshold()
       thresh.ThresholdBetween(0.5, 1.5)
       #thresh.ThresholdBetween(label-0.5, label+0.5)
-      thresh.SetInput(grid)
+      if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+        thresh.SetInputData(grid)
+      else:
+        thresh.SetInput(grid)
       thresh.Update()
       if verbose: print thresh.GetOutput()
       self.SetVtkMesh(thresh.GetOutput())

@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import os
-from file.tifffile import imsave, imread
+from pymicro.file.tifffile import imsave, imread
 
 class TiffTests(unittest.TestCase):
 

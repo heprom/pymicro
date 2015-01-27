@@ -172,8 +172,11 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0),
   n_rot = numpy.dot(Bt, hklplane.normal()/numpy.linalg.norm(hklplane.normal()))
   rot_plane.SetNormal(n_rot)
   #print '[hkl] normal direction expressed in sample coordinate system is: ', n_rot
-  return add_plane_to_grid(rot_plane, grid, origin, opacity=opacity, \
-    show_normal=show_normal, normal_length=normal_length)
+  if show_normal:
+    return add_plane_to_grid(rot_plane, grid, origin, opacity=opacity)
+  else:
+    return add_plane_to_grid_with_normal(rot_plane, grid, origin, \
+    opacity=opacity, normal_length=normal_length)
 
 def add_plane_to_grid(plane, grid, origin, opacity=0.3):
   '''Add a 3d plane inside another object.
@@ -198,7 +201,10 @@ def add_plane_to_grid(plane, grid, origin, opacity=0.3):
   '''
   # cut the unstructured grid with the plane
   planeCut = vtk.vtkCutter()
-  planeCut.SetInput(grid)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    planeCut.SetInputData(grid)
+  else:
+    planeCut.SetInput(grid)
   planeCut.SetCutFunction(plane)
 
   cutMapper = vtk.vtkPolyDataMapper()
@@ -231,7 +237,7 @@ def add_plane_to_grid_with_normal(plane, grid, origin, opacity=0.3, normal_lengt
   '''
   assembly = vtk.vtkAssembly()
   planeActor = add_plane_to_grid(plane, grid, origin, opacity=opacity)
-  assembly.AddPart(cutActor)
+  assembly.AddPart(planeActor)
   # add an arrow to display the normal to the plane
   arrowActor = unit_arrow_3d(origin, normal_length*numpy.array(plane.GetNormal()), make_unit=False)
   assembly.AddPart(arrowActor)
@@ -262,7 +268,10 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
   assembly = vtk.vtkAssembly()
   # create mapper
   mapper = vtk.vtkDataSetMapper()
-  mapper.SetInput(grain.vtkmesh)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    mapper.SetInputData(grain.vtkmesh)
+  else:
+    mapper.SetInput(grain.vtkmesh)
   mapper.ScalarVisibilityOff() # we use the grain id for chosing the color
   lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
   grain_actor = vtk.vtkActor()
@@ -292,7 +301,10 @@ def add_grain_to_3d_scene(grain, hklplanes, show_orientation=False):
   # create mapper
   print 'creating grain actor'
   mapper = vtk.vtkDataSetMapper()
-  mapper.SetInput(grain.vtkmesh)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    mapper.SetInputData(grain.vtkmesh)
+  else:
+    mapper.SetInput(grain.vtkmesh)
   mapper.ScalarVisibilityOff() # we use the grain id for chosing the color
   lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
   grain_actor = vtk.vtkActor()
@@ -395,7 +407,10 @@ def lattice_points(lattice, origin=[0., 0., 0.]):
   A vtkPoints with all the lattice points ordered such that the first 8 
   points describe the lattice cell.
   '''
-  [A, B, C] = lattice.matrix
+  print lattice
+  m = lattice._matrix
+  print m
+  [A, B, C] = m #lattice._matrix
   O = origin
 
   # create the eight points based on the lattice matrix
@@ -473,7 +488,7 @@ def lattice_grid(lattice, origin=[0., 0., 0.]):
   return grid
 
 def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
-  [A, B, C] = lattice.matrix
+  [A, B, C] = lattice._matrix
   O = origin
   points = vtk.vtkPoints()
   points.InsertNextPoint(O)
@@ -508,20 +523,90 @@ def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
   grid.InsertNextCell(16, ids) # 16 is hexagonal prism cell type
   grid.SetPoints(points)
   return grid
+
+def lattice_edges(grid, tubeRadius=0.02):
+  '''
+  Create the 3D representation of crystal lattice edges.
+
+  *Parameters*
+  
+  **grid**: vtkUnstructuredGrid
+  The vtkUnstructuredGrid instance representing the crystal lattice.
+
+  **tubeRadius**: float
+  Radius of the tubes representing the atomic bonds (default: 0.02).
+
+  *Returns*
+
+  The method return a vtk actor for lattice edges.
+  '''
+  Edges = vtk.vtkExtractEdges()
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    Edges.SetInputData(grid)
+  else:
+    Edges.SetInput(grid)
+  Tubes = vtk.vtkTubeFilter()
+  Tubes.SetInputConnection(Edges.GetOutputPort())
+  Tubes.SetRadius(tubeRadius)
+  Tubes.SetNumberOfSides(6)
+  Tubes.UseDefaultNormalOn()
+  Tubes.SetDefaultNormal(.577, .577, .577)
+  # Create the mapper and actor to display the cell edges.
+  TubeMapper = vtk.vtkPolyDataMapper()
+  TubeMapper.SetInputConnection(Tubes.GetOutputPort())
+  Edges = vtk.vtkActor()
+  Edges.SetMapper(TubeMapper)
+  return Edges
+
+def lattice_vertices(grid, sphereRadius=0.1):
+  '''
+  Create the 3D representation of crystal lattice atoms.
+
+  *Parameters*
+  
+  **grid**: vtkUnstructuredGrid
+  The vtkUnstructuredGrid instance representing the crystal lattice.
+
+  **sphereRadius**: float
+  Size of the spheres representing the atoms (default: 0.1).
+
+  *Returns*
+
+  The method return a vtk actor for lattice vertices.
+  '''
+  # Create a sphere to use as a glyph source for vtkGlyph3D.
+  Sphere = vtk.vtkSphereSource()
+  Sphere.SetRadius(sphereRadius)
+  Sphere.SetPhiResolution(20)
+  Sphere.SetThetaResolution(20)
+  Vertices = vtk.vtkGlyph3D()
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    Vertices.SetInputData(grid)
+  else:
+    Vertices.SetInput(grid)
+  Vertices.SetSourceConnection(Sphere.GetOutputPort())
+  # Create a mapper and actor to display the glyphs.
+  SphereMapper = vtk.vtkPolyDataMapper()
+  SphereMapper.SetInputConnection(Vertices.GetOutputPort())
+  SphereMapper.ScalarVisibilityOff()
+  Vertices = vtk.vtkActor()
+  Vertices.SetMapper(SphereMapper)
+  Vertices.GetProperty().SetDiffuseColor(blue)
+  return Vertices
   
 def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02):
   '''
   Create the 3D representation of a crystal lattice.
-  the lattice edges are shown using a vtkTubeFilter and the atoms are 
+
+  The lattice edges are shown using a vtkTubeFilter and the atoms are 
   displayed using spheres. Both tube and sphere radius can be controlled.
 
   .. code-block:: python
 
     l = Lattice.cubic(1.0)
-    Edges, Vertices = lattice_3d(l)
+    cubic = lattice_3d(l)
     ren = vtk.vtkRenderer()
-    ren.AddActor(Edges)
-    ren.AddActor(Vertices)
+    ren.AddActor(cubic)
     render(ren, display=True)
 
   .. figure:: _static/lattice_3d.png
@@ -545,42 +630,18 @@ def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02):
 
   *Returns*
 
-  The method return two actors, representing the lattice edges and vertices.
+  The method return a vtk assembly combining lattice edges and vertices.
   '''
   grid = lattice_grid(lattice)
-  Edges = vtk.vtkExtractEdges()
-  Edges.SetInput(grid)
-  Tubes = vtk.vtkTubeFilter()
-  Tubes.SetInputConnection(Edges.GetOutputPort())
-  Tubes.SetRadius(tubeRadius)
-  Tubes.SetNumberOfSides(6)
-  Tubes.UseDefaultNormalOn()
-  Tubes.SetDefaultNormal(.577, .577, .577)
-  # Create the mapper and actor to display the cell edges.
-  TubeMapper = vtk.vtkPolyDataMapper()
-  TubeMapper.SetInputConnection(Tubes.GetOutputPort())
-  Edges = vtk.vtkActor()
-  Edges.SetMapper(TubeMapper)
-
-  # Create a sphere to use as a glyph source for vtkGlyph3D.
-  Sphere = vtk.vtkSphereSource()
-  Sphere.SetRadius(sphereRadius)
-  Sphere.SetPhiResolution(20)
-  Sphere.SetThetaResolution(20)
-  Vertices = vtk.vtkGlyph3D()
-  Vertices.SetInput(grid)
-  Vertices.SetSource(Sphere.GetOutput())
-  # Create a mapper and actor to display the glyphs.
-  SphereMapper = vtk.vtkPolyDataMapper()
-  SphereMapper.SetInputConnection(Vertices.GetOutputPort())
-  SphereMapper.ScalarVisibilityOff()
-  Vertices = vtk.vtkActor()
-  Vertices.SetMapper(SphereMapper)
-  Vertices.GetProperty().SetDiffuseColor(blue)
-  return Edges, Vertices
+  edges = lattice_edges(grid, tubeRadius=tubeRadius)
+  vertices = lattice_vertices(grid, sphereRadius=sphereRadius)
+  assembly = vtk.vtkAssembly()
+  assembly.AddPart(edges)
+  assembly.AddPart(vertices)
+  return assembly
 
 def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
-  show_normal=True, plane_opacity=1.0):
+  show_atoms=True, show_normal=True, plane_opacity=1.0):
   '''
   Create the 3D representation of a crystal lattice.
   HklPlanes can be displayed within the lattice cell with their normals.
@@ -616,6 +677,9 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
   The crystal orientation with respect to the sample coordinate system
   (default: None).
   
+  **show_atoms** bool
+  A boolean controling if the atoms are shown (default: True)
+
   **show_normal** bool
   A boolean controling if the slip plane normals are shown (default: True)
   
@@ -646,10 +710,11 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
       arrowActor = unit_arrow_3d(origin, a*hklplane.normal(), make_unit=False)
       assembly.AddPart(arrowActor)
   
-  Edges, Vertices = lattice_3d(lattice, tubeRadius=0.02*a, sphereRadius=0.1*a)
+  Edges = lattice_edges(grid, tubeRadius=0.02*a)
+  Vertices = lattice_vertices(grid, sphereRadius=0.1*a)
   # add the two actors to the renderer
   assembly.AddPart(Edges)
-  assembly.AddPart(Vertices)
+  if show_atoms: assembly.AddPart(Vertices)
 
   # finally, apply crystal orientation to the lattice
   assembly.SetOrigin(a/2, b/2, c/2)
@@ -732,7 +797,10 @@ def data_outline(data, corner=False, color=black):
     outlineFilter = vtk.vtkOutlineCornerFilter()
   else:
     outlineFilter = vtk.vtkOutlineFilter()
-  outlineFilter.SetInput(data)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    outlineFilter.SetInputData(data)
+  else:
+    outlineFilter.SetInput(data)
   outlineMapper = vtk.vtkPolyDataMapper()
   outlineMapper.SetInputConnection(outlineFilter.GetOutputPort())
   outline = vtk.vtkActor()
@@ -747,20 +815,50 @@ def box_3d(size=(100, 100, 100), line_color=black):
   l = Lattice.orthorombic(size[0], size[1], size[2])
   grid = lattice_grid(l, origin=[0., 0., 0.])
   edges = vtk.vtkExtractEdges()
-  edges.SetInput(grid)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    edges.SetInputData(grid)
+  else:
+    edges.SetInput(grid)
   mapper = vtk.vtkPolyDataMapper()
   mapper.SetInputConnection(edges.GetOutputPort())
   box = vtk.vtkActor()
   box.SetMapper(mapper)
   box.GetProperty().SetColor(line_color)
   return box
+
+def line_3d(start_point, end_point):
+  '''
+  vtk helper function to draw a line in a 3d scene.
+  '''
+  linePoints = vtk.vtkPoints()
+  linePoints.SetNumberOfPoints(2)
+  linePoints.InsertPoint(0, start_point[0], start_point[1], start_point[2])
+  linePoints.InsertPoint(1, end_point[0], end_point[1], end_point[2])
+  aLine = vtk.vtkLine()
+  aLine.GetPointIds().SetId(0, 0)
+  aLine.GetPointIds().SetId(1, 1)
+  aLineGrid = vtk.vtkUnstructuredGrid()
+  aLineGrid.Allocate(1, 1)
+  aLineGrid.InsertNextCell(aLine.GetCellType(), aLine.GetPointIds())
+  aLineGrid.SetPoints(linePoints)
+  aLineMapper = vtk.vtkDataSetMapper()
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    aLineMapper.SetInputData(aLineGrid)
+  else:
+    aLineMapper.SetInput(aLineGrid)
+  aLineActor = vtk.vtkActor()
+  aLineActor.SetMapper(aLineMapper)
+  return aLineActor
   
 def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discrete=False):
   if discrete:
     contour = vtk.vtkDiscreteMarchingCubes()
   else:
     contour = vtk.vtkContourFilter()
-  contour.SetInput(data)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    contour.SetInputData(data)
+  else:
+    contour.SetInput(data)
   contour.SetValue(0, value)
   contour.Update()
   normals = vtk.vtkPolyDataNormals()
@@ -843,7 +941,10 @@ def map_data(data, function, lut = gray_cmap(), cell_data=True):
   '''  
   # use extract geometry filter to access the data
   extract = vtk.vtkExtractGeometry()
-  extract.SetInput(data)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    extract.SetInputData(data)
+  else:
+    extract.SetInput(data)
   extract.ExtractInsideOff()
   extract.ExtractBoundaryCellsOn()
   extract.SetImplicitFunction(function)
@@ -857,7 +958,13 @@ def map_data(data, function, lut = gray_cmap(), cell_data=True):
   else:
     mapper.SetScalarModeToUsePointData()
   mapper.SetColorModeToMapScalars()
-  mapper.SetInput(extract.GetOutput())
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    mapper.SetInputConnection(extract.GetOutputPort())
+    # with VTK 6, since SetInputData does not create a pipeline, we can also use:
+    #extract.Update()
+    #mapper.SetInputData(extract.GetOutput())
+  else:
+    mapper.SetInput(extract.GetOutput())
   mapper.Update()
   actor = vtk.vtkActor()
   actor.SetMapper(mapper)
@@ -929,11 +1036,33 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
     iren.Start()
 
 def show_data(data, map_scalars=False, lut=None):
+  '''Create a 3d actor representing a numpy array.
+  
+  Given a 3d numpy array, this function compute the skin of the volume. 
+  The scalars can be mapped to the created surface and the colormap 
+  adjusted.
+  
+  *Parameters*
+  
+  **data**: a numpy array.
+  
+  **data**: bool.
+  map the scalar in the data array to the created surface.
+  
+  **lut**: vtk lookup table
+  the colormap used to map the scalars.
+  
+  Returns a vtk actor that can be added to a rendered to show the 
+  3d array.
+  '''
   size = data.shape
   vtk_data_array = numpy_support.numpy_to_vtk(numpy.ravel(data, order='F'), deep=1)
   grid = vtk.vtkUniformGrid()
   grid.SetSpacing(1, 1, 1)
-  grid.SetScalarType(vtk.VTK_UNSIGNED_SHORT)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    grid.SetScalarType(to_vtk_type(data.dtype), vtk.vtkInformation())
+  else:
+    grid.SetScalarType(to_vtk_type(data.dtype))
   grid.SetExtent(0, size[0], 0, size[1], 0, size[2]) # for cell data
   grid.GetCellData().SetScalars(vtk_data_array)
   visible = numpy_support.numpy_to_vtk(numpy.ravel(data > 0, order='F').astype(numpy.uint8), deep=1)
@@ -941,7 +1070,11 @@ def show_data(data, map_scalars=False, lut=None):
 
   # use extract geometry filter to access the data
   extract = vtk.vtkExtractGeometry()
-  extract.SetInput(grid)
+  #extract = vtk.vtkExtractVOI() # much faster but seems not to work with blanking
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    extract.SetInputData(grid)
+  else:
+    extract.SetInput(grid)
   extract.ExtractInsideOn()
   extract.ExtractBoundaryCellsOn()
   bbox = vtk.vtkBox()
@@ -960,7 +1093,10 @@ def show_data(data, map_scalars=False, lut=None):
       # default to the usual gray colormap
       lut = gray_cmap()
     mapper.SetLookupTable(lut)
-  mapper.SetInput(extract.GetOutput())
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    mapper.SetInputConnection(extract.GetOutputPort())
+  else:
+    mapper.SetInput(extract.GetOutput())
   mapper.Update()
   actor = vtk.vtkActor()
   actor.SetMapper(mapper)
@@ -1090,7 +1226,10 @@ def vol_view(scan):
   # threshold to remove background  
   print 'thresholding to remove background'
   thresh = vtk.vtkThreshold()
-  thresh.SetInput(data)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    thresh.SetInputData(data)
+  else:
+    thresh.SetInput(data)
   #thresh.SetInputConnection(data)
   thresh.Update()
   thresh.ThresholdByUpper(1.0)

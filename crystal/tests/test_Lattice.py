@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from crystal.lattice import Lattice
+from pymicro.crystal.lattice import Lattice
 
 class LatticeTests(unittest.TestCase):
 

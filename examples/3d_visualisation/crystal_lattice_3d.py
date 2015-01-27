@@ -1,15 +1,7 @@
 #!/usr/bin/env python
 import vtk
 from pymicro.crystal.lattice import Lattice
-from pymicro.view.vtk_utils import lattice_grid, lattice_3d, axes_actor, render
-
-def create_lattice_3d(lattice):
-  grid = lattice_grid(lattice)
-  Edges, Vertices = lattice_3d(grid)
-  assembly = vtk.vtkAssembly()
-  assembly.AddPart(Edges)
-  assembly.AddPart(Vertices)
-  return assembly
+from pymicro.view.vtk_utils import lattice_grid, lattice_3d, lattice_3d_with_planes, axes_actor, render
 
 if __name__ == '__main__':
   '''
@@ -27,43 +19,43 @@ if __name__ == '__main__':
   gamma = 66
 
   l = Lattice.cubic(a)
-  cubic = create_lattice_3d(l)
+  cubic = lattice_3d(l)
   transform = vtk.vtkTransform()
   transform.Translate(0.5,0.5,0)
   cubic.SetUserTransform(transform)
 
   l = Lattice.tetragonal(a, c)
-  tetragonal = create_lattice_3d(l)
+  tetragonal = lattice_3d(l)
   transform = vtk.vtkTransform()
   transform.Translate(2.0,2.0,0)
   tetragonal.SetUserTransform(transform)
 
   l = Lattice.orthorombic(a, b, c)
-  orthorombic = create_lattice_3d(l)
+  orthorombic = lattice_3d(l)
   transform = vtk.vtkTransform()
   transform.Translate(3.5,3.5,0)
   orthorombic.SetUserTransform(transform)
 
   l = Lattice.hexagonal(a, c)
-  hexagonal = create_lattice_3d(l)
+  hexagonal = lattice_3d(l)
   transform = vtk.vtkTransform()
   transform.Translate(5.0,5.0,0)
   hexagonal.SetUserTransform(transform)
 
   l = Lattice.rhombohedral(a, alpha)
-  rhombohedral = create_lattice_3d(l)
+  rhombohedral = lattice_3d(l)
   transform = vtk.vtkTransform()
   transform.Translate(6.5,6.5,0)
   rhombohedral.SetUserTransform(transform)
 
   l = Lattice.monoclinic(a, b, c, alpha)
-  monoclinic = create_lattice_3d(l)
+  monoclinic = lattice_3d(l)
   transform = vtk.vtkTransform()
   transform.Translate(8.0,8.0,0)
   monoclinic.SetUserTransform(transform)
 
   l = Lattice.triclinic(a, b, c, alpha, beta, gamma)
-  triclinic = create_lattice_3d(l)
+  triclinic = lattice_3d(l)
   transform = vtk.vtkTransform()
   transform.Translate(9.5,9.5,0)
   triclinic.SetUserTransform(transform)

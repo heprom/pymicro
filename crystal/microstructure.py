@@ -158,8 +158,8 @@ class Orientation:
       #raise NameError('x3 is not perpendicular to the (x1,x2) plane')
       
     x1 = x1/np.norm(x1)
-    x1 = x2/np.norm(x2)
-    x1 = x3/np.norm(x3) 
+    x2 = x2/np.norm(x2)
+    x3 = x3/np.norm(x3) 
       
     B = np.array([x1, x2, x3]).transpose()
     return B

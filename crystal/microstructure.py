@@ -156,11 +156,11 @@ class Orientation:
     elif x3 == None:
       x3 = np.cross(x1,x2)
 
-	x1_ = x1/np.linalg.norm(x1)
-	x2_ = x2/np.linalg.norm(x2)
-	x3_ = x3/np.linalg.norm(x3)
+    x1 = x1/np.linalg.norm(x1)
+    x2 = x2/np.linalg.norm(x2)
+    x3 = x3/np.linalg.norm(x3)
       
-    B = np.array([x1_, x2_, x3_]).transpose()
+    B = np.array([x1, x2, x_]).transpose()
     return B
     
   @staticmethod

@@ -141,6 +141,7 @@ class Orientation:
        
        Still need some tests to validate this function
     '''
+    
     if (x1 is None and x2 is None):
       raise NameError('Need at least two vectors to compute the matrix')
     elif (x1==None and x3==None):
@@ -154,14 +155,12 @@ class Orientation:
       x2 = np.cross(x3,x1)
     elif x3 == None:
       x3 = np.cross(x1,x2)
-    #elif (np.cross(x1,x2) != x3/np.norm(x3)):
-      #raise NameError('x3 is not perpendicular to the (x1,x2) plane')
+
+	x1_ = x1/np.linalg.norm(x1)
+	x2_ = x2/np.linalg.norm(x2)
+	x3_ = x3/np.linalg.norm(x3)
       
-    x1 = x1/np.norm(x1)
-    x2 = x2/np.norm(x2)
-    x3 = x3/np.norm(x3) 
-      
-    B = np.array([x1, x2, x3]).transpose()
+    B = np.array([x1_, x2_, x3_]).transpose()
     return B
     
   @staticmethod

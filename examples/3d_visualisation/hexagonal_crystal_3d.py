@@ -34,7 +34,8 @@ if __name__ == '__main__':
   p5 = HklPlane(0, 0, 1, lattice=l)
   hklplanes = [p3,p5]
   hexagon = vtk.vtkAssembly()
-  Edges, Vertices = lattice_3d(grid, tubeRadius=0.025*a, sphereRadius=0.1*a)
+  Edges = lattice_edges(grid, tubeRadius=0.025*a)
+  Vertices = lattice_vertices(grid, sphereRadius=0.1*a)
   hexagon.AddPart(Edges)
   hexagon.AddPart(Vertices)
   hexagon.SetOrigin(a/2, -a*sqrt(3)/2., c/2)

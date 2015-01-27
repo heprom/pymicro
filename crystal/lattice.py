@@ -69,6 +69,22 @@ class Lattice:
            " C : " + " ".join(map(f, self._matrix[2]))]
     return "\n".join(out)
   
+  def reciprocal_lattice(self):
+    '''Compute the reciprocal lattice.
+    
+    This computes the three reciprocal lattice vectors defined by
+    
+     * a.a^* = 1
+     * b.b^* = 1
+     * c.c^* = 1
+    '''
+    [a, b, c] = self._matrix
+    V = self.volume()
+    astar = np.cross(b, c) / V
+    bstar = np.cross(c, a) / V
+    cstar = np.cross(a, b) / V
+    return [astar, bstar, cstar]
+    
   @property
   def matrix(self):
     '''Returns a copy of matrix representing the Lattice.'''
@@ -330,6 +346,23 @@ class Lattice:
     '''Compute the volume of the unit cell.'''
     m = self._matrix
     return abs(np.dot(np.cross(m[0], m[1]), m[2]))
+
+  def get_hkl_family(self, hkl):
+    '''Get a list of the hkl planes composing the given family for 
+    this crystal lattice.
+
+    *Parameters*
+    
+    **hkl**: miller indices of the requested family
+
+    *Returns*
+    
+    A list of the hkl planes in the given family.
+    '''
+    planes = HklPlane.get_family(hkl)
+    for p in planes:
+      p._lattice = self
+    return planes
 
   @staticmethod
   def get_slip_systems(plane_type='111'):

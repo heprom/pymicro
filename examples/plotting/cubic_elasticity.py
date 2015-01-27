@@ -1,5 +1,6 @@
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import pyplot as plt, cm
+import os
 import numpy as np
 
 print 'plotting cubic elasticity...'

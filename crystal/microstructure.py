@@ -98,7 +98,14 @@ class Orientation:
     g = Orientation.Rodrigues2OrientationMatrix(rod)
     o = Orientation(g)
     return o
-
+    
+  #@staticmethod
+  #def from_Zrot(axes):
+    #g = Orientation.Zrot2OrientationMatrix()
+    #o = Orientation(g)
+    #return o
+    
+    
   @staticmethod
   def Euler2OrientationMatrix(euler):
     '''
@@ -125,7 +132,34 @@ class Orientation:
     b33 = c
     B = np.array([[b11, b12, b13], [b21, b22, b23], [b31, b32, b33]])
     return B
-
+  
+  @staticmethod
+  def Zrot2OrientationMatrix(x1=None,x2=None,x3=None):
+    '''Compute the orientation matrix  from the rotated coordinates given in the 
+       .inp file for Zebulon's computations
+       Need at least two vectors to compute cross product
+       
+       Still need some tests to validate this function
+    '''
+    if (x1 is None and x2 is None):
+      raise NameError('Need at least two vectors to compute the matrix')
+    elif (x1==None and x3==None):
+      raise NameError('Need at least two vectors to compute the matrix')
+    elif (x3==None and x2==None):
+      raise NameError('Need at least two vectors to compute the matrix')
+    
+    if x1 == None:
+      x1 = np.cross(x2,x3)
+    elif x2 == None:
+      x2 = np.cross(x3,x1)
+    elif x3 == None:
+      x3 = np.cross(x1,x2)
+    #elif (np.cross(x1,x2) != x3/np.norm(x3)):
+      #raise NameError('x3 is not perpendicular to the (x1,x2) plane')
+      
+    B = np.array([x1, x2, x3]).transpose()
+    return B
+    
   @staticmethod
   def OrientationMatrix2EulerSF(g):
     '''

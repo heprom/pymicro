@@ -101,7 +101,9 @@ class PoleFigure:
     
       micro = Microstructure(name = 'AlLi_sam8')
       micro.grains.append(Grain(11, Orientation.from_euler(np.array([262.364, 16.836, 104.691]))))
-      pf = PoleFigure(hkl='111', proj='stereo', microstructure=micro)
+      Al_fcc = Lattice.face_centered_cubic(0.405) # not really necessary since default lattice is cubic
+      pf = PoleFigure(microstructure=micro, proj='stereo', lattice=Al_fcc, hkl='111')
+      pf.mksize = 12
       pf.color_by_grain_id = True
       pf.pflegend = True # this works well for a few grains
       pf.plot_pole_figures()
@@ -300,11 +302,8 @@ class PoleFigure:
 
   @staticmethod
   def plot(orientation):
-    '''Plot a pole figure for a single orientation.
+    '''Plot a pole figure (both direct and inverse) for a single orientation.
 
-    A file empty.pdf will be written with both direct and inverse pole
-    figures.
-    
     Parameters:
     
     **orientation**: the crystalline `Orientation` to plot.
@@ -318,6 +317,10 @@ class PoleFigure:
   def plot_euler(phi1, Phi, phi2):
     '''Directly plot a pole figure for a single orientation given its 
     three Euler angles.
+
+    ::
+    
+      PoleFigure.plot_euler(10, 20, 30)
 
     Parameters:
     

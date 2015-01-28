@@ -58,12 +58,12 @@ class PoleFigure:
     self.x = np.array([1,0,0])
     self.y = np.array([0,1,0])
     self.z = np.array([0,0,1])
-    '''
+    
     # list all crystal directions
     self.c001s = np.array([[0,0,1],[0,1,0],[1,0,0]], dtype=np.float)
     self.c011s = np.array([[0,1,1],[1,0,1],[1,1,0],[0,-1,1],[-1,0,1],[-1,1,0]], dtype=np.float) / np.sqrt(2)
     self.c111s = np.array([[1,1,1],[-1,-1,1],[1,-1,1],[-1,1,1]], dtype=np.float) / np.sqrt(3)
-    '''
+    
 
   def set_hkl_poles(self, hkl):
     '''Set the pole list to plot.

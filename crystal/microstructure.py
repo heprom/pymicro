@@ -160,7 +160,7 @@ class Orientation:
     x2 = x2/np.linalg.norm(x2)
     x3 = x3/np.linalg.norm(x3)
       
-    B = np.array([x1, x2, x_]).transpose()
+    B = np.array([x1, x2, x3]).transpose()
     return B
     
   @staticmethod

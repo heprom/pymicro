@@ -13,12 +13,14 @@ class PoleFigure:
   coordinate system (inverse pole figure).
   '''
 
-  def __init__(self, microstructure=None, lattice=None, hkl='111', 
+  def __init__(self, microstructure=None, lattice=None, axis = 'Z', hkl='111', 
     proj='stereo', verbose=False):
     '''
     Create an empty PoleFigure object associated with an empty Microstructure.
     
     *Parameters*
+
+    **axis**: the pole figure axis ('Z' by default), vertical axis in the direct pole figure and direction plotted on the inverse pole figure.
 
     **microstructure**: the microstructure containing the collection of orientations to plot (None by default)
 
@@ -42,6 +44,7 @@ class PoleFigure:
     **pflegend**: show the legend (only if color_by_grain_id is active, False by default)
     '''
     self.proj = proj
+    self.axis = axis
     if microstructure:
       self.microstructure = microstructure
     else:
@@ -64,7 +67,6 @@ class PoleFigure:
     self.c011s = np.array([[0,1,1],[1,0,1],[1,1,0],[0,-1,1],[-1,0,1],[-1,1,0]], dtype=np.float) / np.sqrt(2)
     self.c111s = np.array([[1,1,1],[-1,-1,1],[1,-1,1],[-1,1,1]], dtype=np.float) / np.sqrt(3)
     
-
   def set_hkl_poles(self, hkl):
     '''Set the pole list to plot.
 
@@ -79,12 +81,10 @@ class PoleFigure:
       poles.append(p.normal())
     self.poles = poles
     
-  def plot_pole_figures(self, up='Z', plot_sst=True, display=True, save_as='pdf'):
+  def plot_pole_figures(self, plot_sst=True, display=True, save_as='pdf'):
     '''Plot and save a picture with both direct and inverse pole figures.
     
     *Parameters*
-
-    **up**: vertical axis in the direct pole figure ('Z' by default)
 
     **plot_sst**: bool
     controls wether to plot the full inverse pole figure or only the 
@@ -119,7 +119,8 @@ class PoleFigure:
     fig = plt.figure(figsize=(10,5))
     # direct PF
     ax1 = fig.add_subplot(121, aspect='equal')
-    self.plot_pf(ax = ax1, up=up, mk='o', col='k', ann=False)
+    print 'before plot_pf **'
+    self.plot_pf(ax = ax1, mk='o', col='k', ann=False)
     # inverse PF
     ax2 = fig.add_subplot(122, aspect='equal')
     self.plot_sst(ax = ax2)
@@ -129,7 +130,24 @@ class PoleFigure:
       plt.savefig('%s_pole_figure.%s' % (self.microstructure.name, save_as) , format=save_as)
 
   def plot_crystal_dir(self, c_dir, mk='o', col='k', ax=None, ann=False, lab=''):
-    '''Helper function to plot a crystal direction.'''
+    '''Function to plot a crystal direction on a pole figure.
+    
+    **Parameters:**
+    
+    *c_dir* A vector describing the crystal direction
+    
+    *mk* marker used to plot the pole (disc by default)
+    
+    *col* color used to plot the pole (black by default)
+    
+    *ax* a reference to a pyplot ax to draw the pole
+    
+    *ann* bool
+    Annotate the pole with the coordinates of the vector if True (False by default).
+    
+    *lab* str
+    Label to use in the legend of the plot ('' by default).
+    '''
     if c_dir[2] < 0: c_dir *= -1 # make unit vector have z>0
     if self.proj == 'flat':
       cp = c_dir
@@ -145,11 +163,11 @@ class PoleFigure:
     #Next 3 lines are necessary in case c_dir[2]=0, as for
     #Euler angles [45, 45, 0]
     if c_dir[2] < 0.000001:
-		ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
-          markersize=self.mksize, label=lab)
+      ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
+        markersize=self.mksize, label=lab)
     if ann:
       ax.annotate(c_dir.view(), (cp[0], cp[1]-0.1), xycoords='data',
-        fontsize=8, horizontalalignment='center', verticalalignment='center')
+      fontsize=8, horizontalalignment='center', verticalalignment='center')
 
   def plot_line_between_crystal_dir(self, c1, c2, ax=None, steps=11, col='k'):
     '''Plot a curve between two crystal directions.
@@ -189,34 +207,47 @@ class PoleFigure:
     ax.plot([-1,1], [0,0], 'k-')
     ax.plot([0,0], [-1,1], 'k-')
 
-  def plot_pf(self, ax=None, up='Z', mk='o', col='k', ann=False):
+  def plot_pf_dir(self, c_dir, ax=None, mk='o', col='k', ann=False, lab=''):
+    '''Plot a crystal direction in a direct pole figure.'''
+    if self.axis == 'Z':
+      h = 0; v = 1; u = 2
+    elif self.axis == 'Y':
+      h = 0; v = 2; u = 1
+    else:
+      h = 1; v = 2; u = 0
+	# the direction to plot is given by c_dir[h,v,u]
+    if self.verbose: print 'corrected for pf axis:',c_dir[[h,v,u]]
+    self.plot_crystal_dir(c_dir[[h,v,u]], mk=mk, col=col, ax=ax, ann=ann, lab=lab)
+	  
+  def plot_pf(self, ax=None, mk='o', col='k', ann=False):
     '''Create the direct pole figure. '''
     axe_labels = ['X', 'Y', 'Z']
-    if up == 'Z':
+    if self.axis == 'Z':
       h = 0; v = 1; u = 2
-    elif up == 'Y':
-      h = 0; u = 1; v = 2
+    elif self.axis == 'Y':
+      h = 0; v = 2; u = 1
     else:
-      u = 0; h = 1; v = 2
+      h = 1; v = 2; u = 0
     self.plot_pf_background(ax)
     ax.annotate(axe_labels[h], (1.01, 0.0), xycoords='data',
       fontsize=16, horizontalalignment='left', verticalalignment='center')
     ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data',
       fontsize=16, horizontalalignment='center', verticalalignment='bottom')
+    print 'grain list',self.microstructure.grains
     for grain in self.microstructure.grains:
       B = grain.orientation_matrix()
       Bt = B.transpose()
+      print 'pole list',self.poles
       for i, c in enumerate(self.poles):
         label = ''
         c_rot = Bt.dot(c)
-        if self.verbose: print 'plotting ',c,' in sample CS:',c_rot
+        if self.verbose: print 'plotting ',c,' in sample CS (corrected for pf axis):',c_rot
         if self.color_by_grain_id:
           col = Microstructure.rand_cmap().colors[grain.id]
           if self.pflegend and i == 0:
             # only add grain legend for its first pole
             label = 'grain ' + str(grain.id)
-        # the direction to plot is given by c_rot[h,v,u]
-        self.plot_crystal_dir(c_rot[[h,v,u]], mk=mk, col=col, ax=ax, ann=ann, lab=label)
+	self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
     ax.axis([-1.1,1.1,-1.1,1.1])
     if self.pflegend and self.color_by_grain_id:
       ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, \
@@ -225,23 +256,22 @@ class PoleFigure:
     ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
   def sst_symmetry_cubic(self, z_rot):
-	'''Perform cubic symmetry according to the unit SST triangle.
-	'''
+    '''Perform cubic symmetry according to the unit SST triangle.
+    '''
+    if z_rot[0] < 0: z_rot[0] = -z_rot[0]
+    if z_rot[1] < 0: z_rot[1] = -z_rot[1]
+    if z_rot[2] < 0: z_rot[2] = -z_rot[2]
 
-	if z_rot[0] < 0: z_rot[0] = -z_rot[0]
-	if z_rot[1] < 0: z_rot[1] = -z_rot[1]
-	if z_rot[2] < 0: z_rot[2] = -z_rot[2]
-
-	if (z_rot[2] > z_rot[1]):
-		z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
-	
-	if (z_rot[1] > z_rot[0]):
-		z_rot[0], z_rot[1] = z_rot[1], z_rot[0]
-		
-	if (z_rot[2] > z_rot[1]):
-		z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
-		
-	return [z_rot[1], z_rot[2], z_rot[0]]
+    if (z_rot[2] > z_rot[1]):
+      z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
+    
+    if (z_rot[1] > z_rot[0]):
+      z_rot[0], z_rot[1] = z_rot[1], z_rot[0]
+      
+    if (z_rot[2] > z_rot[1]):
+	  z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
+      
+    return [z_rot[1], z_rot[2], z_rot[0]]
     
   def plot_sst(self, ax=None, mk='s', col='r', ann=False):
     ''' Create the inverse pole figure in the unit standard triangle. 
@@ -255,11 +285,17 @@ class PoleFigure:
     # now plot the sample z-axis
     for grain in self.microstructure.grains:
       B = grain.orientation_matrix()
-      # compute z axis and apply SST symmetry
-      z_rot = self.sst_symmetry_cubic(B.dot(self.z))
-      print z_rot
-      self.plot_crystal_dir(z_rot, mk=mk, col=col, ax=ax, ann=ann)
-      if self.verbose: print 'plotting ',self.z,' in sample CS:',z_rot
+      # compute axis and apply SST symmetry
+      if self.axis == 'Z':
+        axis = self.z
+      elif self.axis == 'Y':
+        axis = self.y
+      else:
+        axis = self.x
+      axis_rot = self.sst_symmetry_cubic(B.dot(axis))
+      print axis_rot
+      self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
+      if self.verbose: print 'plotting ',self.axis,' in crystal CS:',axis_rot
     ax.axis('off')
     ax.axis([-0.05,0.45,-0.05,0.40])
     ax.set_title('{%s} SST inverse %s projection' % (self.family, self.proj))
@@ -294,9 +330,15 @@ class PoleFigure:
     # now plot the sample z-axis
     for grain in self.microstructure.grains:
       B = grain.orientation_matrix()
-      z_rot = B.dot(self.z) # HP 09 march 2014 changed from Bt to B
-      self.plot_crystal_dir(z_rot, mk=mk, col=col, ax=ax, ann=ann)
-      if self.verbose: print 'plotting ',self.z,' in sample CS:',z_rot
+      if self.axis == 'Z':
+        axis = self.z
+      elif self.axis == 'Y':
+        axis = self.y
+      else:
+        axis = self.x
+      axis_rot = B.dot(axis)
+      self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
+      if self.verbose: print 'plotting ',self.axis,' in crystal CS:',axis_rot
     ax.axis([-1.1,1.1,-1.1,1.1])
     ax.axis('off')
     ax.set_title('{%s} inverse %s projection' % (self.family, self.proj))
@@ -311,7 +353,8 @@ class PoleFigure:
     '''
     micro = Microstructure()
     micro.grains.append(Grain(1, orientation))
-    pf = PoleFigure(micro)
+    print micro.grains
+    pf = PoleFigure(microstructure=micro)
     pf.plot_pole_figures(display=True)
 
   @staticmethod

@@ -119,7 +119,6 @@ class PoleFigure:
     fig = plt.figure(figsize=(10,5))
     # direct PF
     ax1 = fig.add_subplot(121, aspect='equal')
-    print 'before plot_pf **'
     self.plot_pf(ax = ax1, mk='o', col='k', ann=False)
     # inverse PF
     ax2 = fig.add_subplot(122, aspect='equal')
@@ -233,11 +232,9 @@ class PoleFigure:
       fontsize=16, horizontalalignment='left', verticalalignment='center')
     ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data',
       fontsize=16, horizontalalignment='center', verticalalignment='bottom')
-    print 'grain list',self.microstructure.grains
     for grain in self.microstructure.grains:
       B = grain.orientation_matrix()
       Bt = B.transpose()
-      print 'pole list',self.poles
       for i, c in enumerate(self.poles):
         label = ''
         c_rot = Bt.dot(c)
@@ -273,7 +270,7 @@ class PoleFigure:
       
     return [z_rot[1], z_rot[2], z_rot[0]]
     
-  def plot_sst(self, ax=None, mk='s', col='r', ann=False):
+  def plot_sst(self, ax=None, mk='s', col='k', ann=False):
     ''' Create the inverse pole figure in the unit standard triangle. 
     '''
     c001 = np.array([0,0,1])
@@ -282,7 +279,7 @@ class PoleFigure:
     self.plot_line_between_crystal_dir(c001, c101, ax=ax)
     self.plot_line_between_crystal_dir(c001, c111, ax=ax)
     self.plot_line_between_crystal_dir(c101, c111, ax=ax)
-    # now plot the sample z-axis
+    # now plot the sample axis
     for grain in self.microstructure.grains:
       B = grain.orientation_matrix()
       # compute axis and apply SST symmetry
@@ -293,14 +290,13 @@ class PoleFigure:
       else:
         axis = self.x
       axis_rot = self.sst_symmetry_cubic(B.dot(axis))
-      print axis_rot
       self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
       if self.verbose: print 'plotting ',self.axis,' in crystal CS:',axis_rot
     ax.axis('off')
     ax.axis([-0.05,0.45,-0.05,0.40])
     ax.set_title('{%s} SST inverse %s projection' % (self.family, self.proj))
     
-  def plot_ipf(self, ax=None, mk='s', col='r', ann=False):
+  def plot_ipf(self, ax=None, mk='s', col='k', ann=False):
     ''' Create the inverse pole figure for direction Z. 
     
     Parameters:
@@ -327,7 +323,7 @@ class PoleFigure:
       for c in dirs:
         if np.dot(c,self.z) == 0.0:
           self.plot_crystal_dir(-c, mk=markers[i], col='k', ax=ax, ann=False)
-    # now plot the sample z-axis
+    # now plot the sample axis
     for grain in self.microstructure.grains:
       B = grain.orientation_matrix()
       if self.axis == 'Z':
@@ -353,7 +349,6 @@ class PoleFigure:
     '''
     micro = Microstructure()
     micro.grains.append(Grain(1, orientation))
-    print micro.grains
     pf = PoleFigure(microstructure=micro)
     pf.plot_pole_figures(display=True)
 

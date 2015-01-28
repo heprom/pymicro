@@ -66,7 +66,7 @@ class PoleFigure:
     self.c001s = np.array([[0,0,1],[0,1,0],[1,0,0]], dtype=np.float)
     self.c011s = np.array([[0,1,1],[1,0,1],[1,1,0],[0,-1,1],[-1,0,1],[-1,1,0]], dtype=np.float) / np.sqrt(2)
     self.c111s = np.array([[1,1,1],[-1,-1,1],[1,-1,1],[-1,1,1]], dtype=np.float) / np.sqrt(3)
-    
+
   def set_hkl_poles(self, hkl):
     '''Set the pole list to plot.
 
@@ -175,17 +175,17 @@ class PoleFigure:
     The curve is actually composed of several straight lines segments to 
     draw from direction 1 to direction 2.
 
-    Parameters:
+    **Parameters:**
     
-    **c1**: crystal direction 1
+    *c1*: crystal direction 1
     
-    **c2**: crystal direction 2
+    *c2*: crystal direction 2
     
-    **ax**: a reference to a pyplot ax to draw the line
+    *ax*: a reference to a pyplot ax to draw the line
     
-    **steps**: number of straight lines composing the curve (11 by default)
+    *steps*: number of straight lines composing the curve (11 by default)
     
-    **col**: line color (black by default)
+    *col*: line color (black by default)
     
     '''
     path = np.zeros((steps,2), dtype=float)

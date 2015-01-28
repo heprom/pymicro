@@ -361,6 +361,12 @@ class Grain:
     return SF
 
   def SetVtkMesh(self, mesh):
+    '''Set the VTK mesh of this grain.
+    
+    **Parameters:**
+    
+    *mesh* The grain mesh in VTK format (typically vtkunstructuredgrid)
+    '''
     self.vtkmesh = mesh
     
   def add_vtk_mesh(self, array, contour=True, verbose=False):

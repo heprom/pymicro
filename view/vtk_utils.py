@@ -1124,6 +1124,14 @@ def show_grains(data):
   grains = show_data(data, map_scalars=True, lut=grain_lut)
   return grains
 
+def xray_arrow():
+  xrays_arrow = vtk.vtkArrowSource()
+  xrays_mapper = vtk.vtkPolyDataMapper()
+  xrays_mapper.SetInputConnection(xrays_arrow.GetOutputPort())
+  xrays = vtk.vtkActor()
+  xrays.SetMapper(xrays_mapper)
+  return xrays
+  
 def slits(size, x_slits=0):
   '''Create a 3d schematic represenation of X-ray slits.
   
@@ -1139,21 +1147,23 @@ def slits(size, x_slits=0):
   
   **Returns**:
   
-  A vtk actor representing the slits.
+  A vtk assembly of the 4 corners representing the slits.
   '''
-  corner_points = np.empty((3, 3, 4), dtype=np.float)
+  slits = vtk.vtkAssembly()
+  corner_points = numpy.empty((3, 3, 4), dtype=numpy.float)
   corner_points[:, 0, 0] = [x_slits, -0.6*size[1]/2, -size[2]/2]
   corner_points[:, 1, 0] = [x_slits, -size[1]/2, -size[2]/2]
   corner_points[:, 2, 0] = [x_slits, -size[1]/2, -0.6*size[2]/2]
-  corner_points[:, 0, 1] = [x_slits, -0.6*vol_size[1]/2, vol_size[2]/2]
+  corner_points[:, 0, 1] = [x_slits, -0.6*size[1]/2, size[2]/2]
   corner_points[:, 1, 1] = [x_slits, -size[1]/2, size[2]/2]
   corner_points[:, 2, 1] = [x_slits, -size[1]/2, 0.6*size[2]/2]
   corner_points[:, 0, 2] = [x_slits, 0.6*size[1]/2, -size[2]/2]
-  corner_points[:, 1, 2] = [x_slits, size[1]/2, -vol_size[2]/2]
+  corner_points[:, 1, 2] = [x_slits, size[1]/2, -size[2]/2]
   corner_points[:, 2, 2] = [x_slits, size[1]/2, -0.6*size[2]/2]
-  corner_points[:, 0, 3] = [x_slits, 0.6*size[1]/2, vol_size[2]/2]
+  corner_points[:, 0, 3] = [x_slits, 0.6*size[1]/2, size[2]/2]
   corner_points[:, 1, 3] = [x_slits, size[1]/2, size[2]/2]
   corner_points[:, 2, 3] = [x_slits, size[1]/2, 0.6*size[2]/2]
+  print corner_points
   for c in range(4):
     linePoints = vtk.vtkPoints()
     linePoints.SetNumberOfPoints(3)
@@ -1172,12 +1182,16 @@ def slits(size, x_slits=0):
     slitCorner1Grid.InsertNextCell(line2.GetCellType(), line2.GetPointIds())
     slitCorner1Grid.SetPoints(linePoints)
     slitCorner1Mapper = vtk.vtkDataSetMapper()
-    slitCorner1Mapper.SetInput(slitCorner1Grid)
+    if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+      slitCorner1Mapper.SetInputData(slitCorner1Grid)
+    else:
+      slitCorner1Mapper.SetInput(slitCorner1Grid)
     slitCorner1Actor = vtk.vtkActor()
     slitCorner1Actor.SetMapper(slitCorner1Mapper)
     slitCorner1Actor.GetProperty().SetLineWidth(2.0)
     slitCorner1Actor.GetProperty().SetDiffuseColor(black)
-    return slitCorner1Actor
+    slits.AddPart(slitCorner1Actor)
+  return slits
   
 def grid_vol_view(scan):
   s_size = scan[:-4].split('_')[-2].split('x')

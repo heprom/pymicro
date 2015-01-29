@@ -299,6 +299,39 @@ class Orientation:
     return np.array([r1, r2, r3])
     
   @staticmethod
+  def read_euler_txt(txt_path, data_type='euler'):
+    '''
+    Read a set of grain orientations from a text file.
+    
+    The text file must be organised in columns, the three euler angles 
+    (or the three rodrigues components) must correspond to the first 
+    three columns (the other are ignored).
+    
+    **Parameters**:
+    
+    *txt_path*: path to the text file containing the orientations.
+    
+    **data_type**: 'euler' (default) or 'rodrigues'
+
+    **Returns**:
+    
+    A dictionary with the line number and the corresponding orientation.
+    '''
+    data = np.genfromtxt(txt_path)
+    size = len(data)
+    orientations = []
+    for i in range(size):
+      phi1 = data[i, 0]
+      Phi = data[i, 1]
+      phi2 = data[i, 2]
+      angles = np.array([float(phi1), float(Phi), float(phi2)])
+      if data_type == 'euler':
+        orientations.append([i+1, Orientation.from_euler(angles)])
+      elif dat_type == 'rodrigues':
+        orientations.append([i+1, Orientation.from_rodrigues(angles)])
+    return dict(orientations)
+
+  @staticmethod
   def read_euler_from_zset_inp(inp_path):
     '''
     Read a set of grain orientations from a z-set input file.

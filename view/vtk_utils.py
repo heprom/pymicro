@@ -1192,7 +1192,52 @@ def slits(size, x_slits=0):
     slitCorner1Actor.GetProperty().SetDiffuseColor(black)
     slits.AddPart(slitCorner1Actor)
   return slits
+
+def pin_hole(inner_radius=100, outer_radius=200):
+  pin_hole = vtk.vtkAssembly()
+  disc = vtk.vtkDiskSource()
+  disc.SetCircumferentialResolution(50)
+  disc.SetInnerRadius(inner_radius)
+  disc.SetOuterRadius(outer_radius)
+  disc_mapper = vtk.vtkPolyDataMapper()
+  disc_mapper.SetInputConnection(disc.GetOutputPort())
+  discActor = vtk.vtkActor()
+  discActor.SetMapper(disc_mapper)
+  discActor.GetProperty().SetColor(black)
+  pin_hole.AddPart(discActor)
+  pin_hole.RotateY(90)
+  return pin_hole
+    
+def zone_plate(thk=50, sep=25, n_rings=5):
+  '''Create a 3d schematic represenation of a Fresnel zone plate.
   
+  The 3d represenation is made of a number or concentric rings separated 
+  by a specific distance which control the X-ray focalisation.
+  
+  **Parameters**:
+  
+  *thk*: ring thickness (50 by default).
+  
+  *sep*: ring spacing (25 by default).
+  
+  **Returns**:
+  
+  A vtk assembly of the rings composing the Fresnel zone plate.
+  '''
+  zone_plate = vtk.vtkAssembly()
+  for i in range(n_rings):
+    disc = vtk.vtkDiskSource()
+    disc.SetCircumferentialResolution(50)
+    disc.SetInnerRadius(i*(thk+sep))
+    disc.SetOuterRadius((i+1)*thk + i*sep)
+    disc_mapper = vtk.vtkPolyDataMapper()
+    disc_mapper.SetInputConnection(disc.GetOutputPort())
+    discActor = vtk.vtkActor()
+    discActor.SetMapper(disc_mapper)
+    zone_plate.AddPart(discActor)
+  zone_plate.RotateY(90)
+  return zone_plate
+
 def grid_vol_view(scan):
   s_size = scan[:-4].split('_')[-2].split('x')
   s_type = scan[:-4].split('_')[-1]

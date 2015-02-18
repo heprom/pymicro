@@ -80,6 +80,25 @@ def gray_cmap(table_range=(0,255)):
   lut.Build()
   return lut
 
+def invert_cmap(ref_lut):
+  '''invert a VTK lookup table.
+
+  *Parameters*
+  
+  **ref_lut**: The lookup table to invert.
+
+  *Returns*
+
+  A reverse vtkLookupTable.
+  '''
+  N = ref_let.GetNumberOfTableValues()
+  lut = vtk.vtkLookupTable()
+  lut.SetNumberOfTableValues(N)
+  lut.Build()
+  for i in range(N):
+    lut.SetTableValue(i, ref_lut.GetTableValue(N-i))
+  lut.SetRange(ref_lut.GetTableRange())
+
 def hot_cmap(table_range=(0,255)):
   '''Create a VTK look up table similar to matlab's hot.
 
@@ -911,13 +930,13 @@ def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
   *Returns*
 
   The method return a vtkActor that can be directly added to a renderer.
-  '''  
+  '''
   size = 1 + numpy.array(data.GetExtent()[1::2])
   # implicit function
   bbox = vtk.vtkBox()
   bbox.SetXMin(size[0]/2., -1, size[2]/2.)
   bbox.SetXMax(size[0], size[1]/2., size[2])
-  return map_data(data, bbox, lut = lut)
+  return map_data(data, bbox, lut = lut, cell_data=cell_data)
 
 def map_data(data, function, lut = gray_cmap(), cell_data=True):
   '''This method construct an actor to map a 3d dataset.
@@ -987,7 +1006,7 @@ def setup_camera(size=(100, 100, 100)):
   cam.SetClippingRange(1, 10*max(size))
   return cam
 
-def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.png'):
+def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.png', key_pressed_callback=None):
   '''Render the VTK scene in 3D.
   
   Given a `vtkRenderer`, this function does the actual 3D rendering. It 
@@ -1009,6 +1028,9 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
   
   **name**: a string to used when saving the scene as an image (default 
   is 'render_3d.png').
+  
+  **key_pressed_callback** a function (functions are first class variables)
+  called in interactive mode when a key is pressed.
   '''
   # Create a window for the renderer
   if save:
@@ -1031,6 +1053,8 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
     # Start the initialization and rendering
     iren = vtk.vtkRenderWindowInteractor()
     iren.SetRenderWindow(renWin)
+    if key_pressed_callback:
+      iren.AddObserver("KeyPressEvent", key_pressed_callback)
     renWin.Render()
     iren.Initialize()
     iren.Start()

@@ -127,12 +127,12 @@ def auto_min_max(data, cut=0.0002, nb_bins = 256, verbose=False):
   total = np.sum(n)
   p = np.cumsum(n)
   for i in range(nb_bins):
-    if p[i] > total*0.00002:
+    if p[i] > total*cut:
       min = bins[i]
       if verbose: print 'min = %f (i=%d)' % (min, i)
       break
   for i in range(nb_bins):
-    if total-p[nb_bins-1-i] > total*0.00002:
+    if total-p[nb_bins-1-i] > total*cut :
       max = bins[nb_bins-1-i]
       if verbose: print 'max = %f' % max
       break

@@ -16,7 +16,7 @@ if __name__ == '__main__':
   scan_name = 'steel_bin_431x431x246_uint8'
   scan_path = os.path.join(data_dir, scan_name)
   volsize = np.array(HST_info(scan_path + '.raw.info'))
-  grid = read_image_data(scan_path + '.raw', volsize, header=0, data_type='uint8')
+  grid = read_image_data(scan_path + '.raw', volsize, header_size=0, data_type='uint8')
 
   print('setting actors...')
   damage = contourFilter(grid, 255, opacity=1.0, discrete=True, color=blue, diffuseColor=blue)

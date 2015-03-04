@@ -262,18 +262,32 @@ def add_plane_to_grid_with_normal(plane, grid, origin, opacity=0.3, normal_lengt
   assembly.AddPart(arrowActor)
   return assembly
   
-def axes_actor(length = 1.0, axisLabels = True):
+def axes_actor(length = 1.0, axisLabels = ('x', 'y', 'z'), fontSize=20):
+  '''Build an actor for the cartesian axes.
+  
+  *Parameters:*
+  
+  **length**: The arrow length of the axes (1.0 by default)
+  
+  **axisLabels**: Boolean controling if the axes labels are shown (True by default)
+  
+  **fontSize**: Font size for the axes labels (20 by default)
+
+  *Returns*
+  
+  A VTK assembly representing the cartesian axes.
+  '''
   axes = vtk.vtkAxesActor()
   axes.SetTotalLength(length, length, length)
   axes.SetShaftTypeToCylinder()
   axes.SetCylinderRadius(0.02)
-  if axisLabels == True:
-    axes.SetXAxisLabelText('x')
-    axes.SetYAxisLabelText('y')
-    axes.SetZAxisLabelText('z')
+  if axisLabels:
+    axes.SetXAxisLabelText(axisLabels[0])
+    axes.SetYAxisLabelText(axisLabels[1])
+    axes.SetZAxisLabelText(axisLabels[2])
     axprop = vtk.vtkTextProperty()
     axprop.SetColor(0, 0, 0)
-    axprop.SetFontSize(1)
+    axprop.SetFontSize(fontSize)
     axprop.SetFontFamilyToArial()
     axes.GetXAxisCaptionActor2D().SetCaptionTextProperty(axprop)
     axes.GetYAxisCaptionActor2D().SetCaptionTextProperty(axprop)
@@ -925,15 +939,15 @@ def elevationFilter(data, value, (low, high)):
   contour.Update()
   elevation = vtk.vtkElevationFilter()
   elevation.SetInputConnection(contour.GetOutputPort())
-  elevation.SetLowPoint(0, 0, lo)
-  elevation.SetHighPoint(0, 0, hi)
-  elevation.SetScalarRange(lo, hi)
+  elevation.SetLowPoint(0, 0, low)
+  elevation.SetHighPoint(0, 0, high)
+  elevation.SetScalarRange(low, high)
   elevation.ReleaseDataFlagOn()
   normals = vtk.vtkPolyDataNormals()
   normals.SetInputConnection(elevation.GetOutputPort())
   normals.SetFeatureAngle(60.0)
   mapper = vtk.vtkPolyDataMapper()
-  mapper.SetScalarRange(lo, hi)
+  mapper.SetScalarRange(low, high)
   mapper.SetLookupTable(lut)
   mapper.ImmediateModeRenderingOn()
   mapper.SetInputConnection(normals.GetOutputPort())

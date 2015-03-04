@@ -1129,7 +1129,7 @@ def show_data(data, map_scalars=False, lut=None):
   actor.GetProperty().SetOpacity(1.0)
   return actor
 
-def show_grains(data):
+def show_grains(data, num_colors=2048):
   '''Create a 3d actor of all the grains in a labeled numpy array.
   
   Given a 3d numpy array, this function compute the skin of all the 
@@ -1140,11 +1140,13 @@ def show_grains(data):
   *Parameters*
   
   **data**: a labeled numpy array.
+
+  **num_colors**: number of colors in the lookup table (2048 by default)
   
   Returns a vtk actor that can be added to a rendered to show all the 
   grains colored by their id.  
   '''
-  grain_lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
+  grain_lut = rand_cmap(N=num_colors, first_is_black = True, table_range=(0,num_colors-1))
   grains = show_data(data, map_scalars=True, lut=grain_lut)
   return grains
 

@@ -897,6 +897,51 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   actor.GetProperty().SetOpacity(opacity)
   return actor
 
+def elevationFilter(data, value, (low, high)):
+  '''Create an isosurface and map it with an elevation filter.
+  
+  *Parameters:*
+  
+  **data**: the dataset to map, in VTK format.
+  
+  **value**: the value to use to create the isosurface.
+  
+  **(low, high)**: range to use in the elevation filter.
+
+  *Returns*
+
+  The method return a vtkActor that can be directly added to a renderer.
+  '''
+  lut = vtk.vtkLookupTable()
+  lut.SetHueRange(0.6, 0)
+  lut.SetSaturationRange(1.0, 0)
+  lut.SetValueRange(0.5, 1.0)
+  contour = vtk.vtkDiscreteMarchingCubes()
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    contour.SetInputData(data)
+  else:
+    contour.SetInput(data)
+  contour.SetValue(0, value)
+  contour.Update()
+  elevation = vtk.vtkElevationFilter()
+  elevation.SetInputConnection(contour.GetOutputPort())
+  elevation.SetLowPoint(0, 0, lo)
+  elevation.SetHighPoint(0, 0, hi)
+  elevation.SetScalarRange(lo, hi)
+  elevation.ReleaseDataFlagOn()
+  normals = vtk.vtkPolyDataNormals()
+  normals.SetInputConnection(elevation.GetOutputPort())
+  normals.SetFeatureAngle(60.0)
+  mapper = vtk.vtkPolyDataMapper()
+  mapper.SetScalarRange(lo, hi)
+  mapper.SetLookupTable(lut)
+  mapper.ImmediateModeRenderingOn()
+  mapper.SetInputConnection(normals.GetOutputPort())
+  mapper.Update()
+  actor = vtk.vtkActor()
+  actor.SetMapper(mapper)
+  return actor
+
 def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
   '''This method construct an actor to map a 3d dataset.
 

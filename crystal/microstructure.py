@@ -597,6 +597,24 @@ class Microstructure:
     self.vtkmesh = None
 
   @staticmethod
+  def random_texture(n = 100):
+    '''Generate a random texture microstructure.
+
+    **parameters:**
+    
+    *n* The number of grain orientations in the microstructure.
+    '''
+    from random import random
+    from math import acos
+    m = Microstructure(name = 'random_texture')
+    for i in range(n):
+      phi1 = random() * 360.
+      Phi = 180. * acos(2 * random() - 1) / np.pi
+      phi2 = random() * 360.
+      m.grains.append(Grain(i+1, Orientation.from_euler([phi1, Phi, phi2])))
+    return m
+
+  @staticmethod
   def rand_cmap(N=4096, first_is_black = False):
     '''Creates a random color map.
     

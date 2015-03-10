@@ -1,17 +1,18 @@
 #!/usr/bin/env python
-import vtk, numpy
+import vtk, numpy, os
 from pymicro.crystal.lattice import Lattice, HklPlane
 from pymicro.crystal.microstructure import Orientation
-from pymicro.view.vtk_utils import *
+from pymicro.view.scene3d import Scene3D
+from pymicro.view.vtk_utils import axes_actor, lattice_3d_with_planes, setup_camera
 
 if __name__ == '__main__':
   '''
   Create a 3d scene with a cubic crystal lattice.
   Hkl planes are added to the lattice and displayed.
   '''
-  # Create the Renderer and RenderWindow
-  ren = vtk.vtkRenderer()
-  ren.SetBackground(1., 1., 1.)
+  # Create the 3D scene
+  base_name = os.path.splitext(__file__)[0]
+  s3d = Scene3D(save=True, display=False, ren_size=(800,800), name=base_name)
 
   # create the unit lattice cell
   l = Lattice.face_centered_cubic(1.0)
@@ -20,21 +21,20 @@ if __name__ == '__main__':
   hklplanes = HklPlane.get_family('111')
   cubic  = lattice_3d_with_planes(l, hklplanes, crystal_orientation=None, \
     show_normal=True, plane_opacity=0.5)
-  ren.AddActor(cubic)
+  s3d.add(cubic)
 
   # add axes actor
   axes = axes_actor(0.5)
-  ren.AddViewProp(axes)
+  s3d.add(axes)
 
   # set up camera and render
   cam = setup_camera(size=(1, 1, 1))
   cam.SetFocalPoint(0, 0, 0)
   cam.SetPosition(4, -1.5, 1.5) # change the position to something better
   cam.Dolly(1.1) # get a little closer
-  ren.SetActiveCamera(cam)
-  image_name = os.path.splitext(__file__)[0] + '.png'
-  print 'writting %s' % image_name
-  render(ren, save=True, display=False, ren_size=(800,800), name=image_name)
+  s3d.set_camera(cam)
+  s3d.render(key_pressed_callback=s3d.pymicro_callback)
 
   from matplotlib import image
+  image_name = base_name + '.png'
   image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

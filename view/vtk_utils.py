@@ -269,7 +269,7 @@ def axes_actor(length = 1.0, axisLabels = ('x', 'y', 'z'), fontSize=20):
   
   **length**: The arrow length of the axes (1.0 by default)
   
-  **axisLabels**: Boolean controling if the axes labels are shown (True by default)
+  **axisLabels**: Specify the axes labels (xyz by default), use axisLabels = None to hide the axis labels
   
   **fontSize**: Font size for the axes labels (20 by default)
 

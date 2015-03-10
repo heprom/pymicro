@@ -8,7 +8,8 @@ class Scene3D:
   format. The actual 3D rendering is done by calling the `render` method.
   '''
 
-  def __init__(self, ren_size=(600, 600), display=True, save=False, name='scene_3d', use_frame_counter=False):
+  def __init__(self, ren_size=(600, 600), display=True, save=False, \
+    name='scene_3d', use_frame_counter=False):
     '''Initialization called when creating a new `Scene3D` object.
 
     *Parameters*
@@ -19,11 +20,14 @@ class Scene3D:
     **display**: a boolean to control if the scene has to be displayed 
     interactively to the user (default True).
     
-    **save**: a boolean to to control if the scene has to be saved as a 
+    **save**: a boolean to control if the scene has to be saved as a 
     png image (default False).
     
     **name**: a string to used to describe the scene, it is used in 
     particular when saving the scene as an image (default is 'scene_3d').
+    
+    **use_frame_counter**: a boolean to use an internal frame counter 
+    when saving png images (False by default).
     '''
     ren = vtk.vtkRenderer()
     ren.SetBackground(1., 1., 1.)

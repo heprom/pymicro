@@ -8,35 +8,32 @@ class Scene3D:
   format. The actual 3D rendering is done by calling the `render` method.
   '''
 
-  def __init__(self, ren_size=(600, 600), display=True, save=False, \
-    name='scene_3d', use_frame_counter=False):
+  def __init__(self, display=True, ren_size=(600, 600), name='scene_3d'):
     '''Initialization called when creating a new `Scene3D` object.
 
     *Parameters*
     
+    **display**: a boolean to control if the scene has to be displayed 
+    interactively to the user (default True). If True, a frame counter 
+    is used when saving images using the 's' key pressed callback. If 
+    False a single image is save using the base name.
+    
     **ren_size**: a tuple with two value to set the size of the image in 
     pixels (defalut 600x600).
     
-    **display**: a boolean to control if the scene has to be displayed 
-    interactively to the user (default True).
-    
-    **save**: a boolean to control if the scene has to be saved as a 
-    png image (default False).
-    
     **name**: a string to used to describe the scene, it is used in 
-    particular when saving the scene as an image (default is 'scene_3d').
-    
-    **use_frame_counter**: a boolean to use an internal frame counter 
-    when saving png images (False by default).
+    particular when saving the scene as an image (default is 'scene_3d').    
     '''
     ren = vtk.vtkRenderer()
     ren.SetBackground(1., 1., 1.)
     self.renderer = ren
+    # Create a window for the renderer
+    self.renWin = vtk.vtkRenderWindow()
+    self.renWin.AddRenderer(self.renderer)
+    self.renWin.SetSize(ren_size)
+
     self.display = display
-    self.save = save
-    self.ren_size = ren_size
     self.name = name
-    self.use_frame_counter = use_frame_counter
     self.frame_counter = 0
     self.verbose = True
 
@@ -63,16 +60,12 @@ class Scene3D:
     
     When using the internal frame counter, it is incremented by 1 each
     time this method is called.'''
-    # Create a window for the renderer
-    self.renWin = vtk.vtkRenderWindow()
-    self.renWin.AddRenderer(self.renderer)
-    self.renWin.SetSize(self.ren_size)
     w2i = vtk.vtkWindowToImageFilter()
     writer = vtk.vtkPNGWriter()
     w2i.SetInput(self.renWin)
     w2i.Update()
     writer.SetInputConnection(w2i.GetOutputPort())
-    if self.use_frame_counter:
+    if self.display:
       file_name = '%s_%04d.png' % (self.name, self.frame_counter)
     else:
       file_name = '%s.png' % self.name
@@ -82,6 +75,7 @@ class Scene3D:
     self.renWin.Render()
     writer.Write()
     self.frame_counter += 1
+    del writer, w2i
 
   def print_camera_settings(self):
     '''Print out the active camera settings.'''
@@ -111,7 +105,7 @@ class Scene3D:
     elif key == 'q':
       if self.verbose:
         print "Bye, thanks for using pymicro."
-      sys.exit()
+      sys.exit(0)
 
   def render(self, key_pressed_callback=None):
     '''Render the VTK scene in 3D.
@@ -125,14 +119,8 @@ class Scene3D:
     **key_pressed_callback** a function (functions are first class variables)
     called in interactive mode when a key is pressed.
     '''
-    if self.save:
-      self.save_frame()
     if self.display:
-      # Create a window for the renderer
-      self.renWin = vtk.vtkRenderWindow()
-      self.renWin.AddRenderer(self.renderer)
-      self.renWin.SetSize(self.ren_size)
-      # Start the initialization and rendering
+      # start the initialization and rendering
       iren = vtk.vtkRenderWindowInteractor()
       iren.SetRenderWindow(self.renWin)
       if key_pressed_callback:
@@ -140,4 +128,6 @@ class Scene3D:
       self.renWin.Render()
       iren.Initialize()
       iren.Start()
+    else:
+      self.save_frame()
 

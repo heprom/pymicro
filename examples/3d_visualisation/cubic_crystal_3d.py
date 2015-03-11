@@ -12,7 +12,7 @@ if __name__ == '__main__':
   '''
   # Create the 3D scene
   base_name = os.path.splitext(__file__)[0]
-  s3d = Scene3D(save=True, display=False, ren_size=(800,800), name=base_name)
+  s3d = Scene3D(display=False, ren_size=(800,800), name=base_name)
 
   # create the unit lattice cell
   l = Lattice.face_centered_cubic(1.0)
@@ -33,7 +33,7 @@ if __name__ == '__main__':
   cam.SetPosition(4, -1.5, 1.5) # change the position to something better
   cam.Dolly(1.1) # get a little closer
   s3d.set_camera(cam)
-  s3d.render(key_pressed_callback=s3d.pymicro_callback)
+  s3d.render()
 
   from matplotlib import image
   image_name = base_name + '.png'

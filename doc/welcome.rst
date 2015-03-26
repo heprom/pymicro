@@ -26,6 +26,12 @@ Dependencies
 5. VTK with Python bindings 5.8+ (http://www.vtk.org/) for visualization of
    3D data using the :py:mod:`pymicro.view` package.
 
+External
+========
+
+1. Crystal lattices can be created using CIF files usig the :py:mod:`pymicro.crystal.lattice.from_cif` method. We use PyCifRW to read and parse CIF files.
+2. reading and writing 3d Tiff files is supported via the TiffFile module.
+
 API documentation
 =================
 

@@ -104,7 +104,7 @@ class Lattice:
     Acta Crystallographica Section A, 47(6):655-685 (1991)
     doi = 10.1107/S010876739101067X
 
-    .. warning::
+    .. note::
 
        Lattice constants are given in Angstrom in CIF files and so 
        converted to nanometer.
@@ -511,21 +511,19 @@ class HklPlane(HklObject):
     print p
     print p.interplanar_spacing()
 
-  .. note::
-
-     The calculations have not been thourouhly tested appart 
-     from cubic crystal lattice.
-
   .. warning::
 
-     Right now the we do not make use of the repiprocal lattice to 
-     compute the plane... this should be corrected in the future.
+     The calculations have not yet been thourouhly tested appart 
+     from cubic crystal lattice.
   '''
 
   def normal(self, verbose=False):
     '''Returns the unit vector normal to the plane.
 
     .. warning::
+
+       Right now the we do not make use of the repiprocal lattice to 
+       compute the plane... this should be corrected in the future.
 
        Proof hkl plane hexagonal calculations
     '''
@@ -585,7 +583,7 @@ class HklPlane(HklObject):
   def bragg_angle(self, lambda_keV, verbose=False):
     '''Compute the Bragg angle for this `HklPlane` at the given energy.
     
-    .. warning::
+    .. note::
     
       For this calculation to work properly, the lattice spacing needs 
       to be in nm units.

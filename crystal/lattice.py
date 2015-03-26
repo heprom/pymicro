@@ -104,6 +104,11 @@ class Lattice:
     Acta Crystallographica Section A, 47(6):655-685 (1991)
     doi = 10.1107/S010876739101067X
 
+    .. warning::
+
+       Lattice constants are given in Angstrom in CIF files and so 
+       converted to nanometer.
+
     *Parameters*
     
     **file_path**: The path to the CIF file representing the crystal structure.
@@ -115,9 +120,9 @@ class Lattice:
     cf = CifFile.ReadCif(file_path)
     #crystal = eval('cf[\'%s\']' % symbol)
     crystal = cf.first_block()
-    a = float(crystal['_cell_length_a'])
-    b = float(crystal['_cell_length_b'])
-    c = float(crystal['_cell_length_c'])
+    a = 0.1*float(crystal['_cell_length_a'])
+    b = 0.1*float(crystal['_cell_length_b'])
+    c = 0.1*float(crystal['_cell_length_c'])
     alpha = float(crystal['_cell_angle_alpha'])
     beta = float(crystal['_cell_angle_beta'])
     gamma = float(crystal['_cell_angle_gamma'])

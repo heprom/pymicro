@@ -1,6 +1,8 @@
 '''The lattice module define the class to handle 
    3D crystal lattices (the 14 Bravais lattices).
 '''
+import os
+from pymicro.crystal.cif import CifFile
 import itertools
 import numpy as np
 from numpy import pi, dot, transpose, radians
@@ -89,6 +91,53 @@ class Lattice:
   def matrix(self):
     '''Returns a copy of matrix representing the Lattice.'''
     return np.copy(self._matrix)
+
+  @staticmethod
+  def from_cif(file_path):
+    '''
+    Create a crystal Lattice using information contained in a given CIF 
+    file (Crystallographic Information Framework, a standard for 
+    information interchange in crystallography).
+
+    Reference: S. R. Hall, F. H. Allen and I. D. Brown,
+    The crystallographic information file (CIF): a new standard archive file for crystallography,
+    Acta Crystallographica Section A, 47(6):655-685 (1991)
+    doi = 10.1107/S010876739101067X
+
+    *Parameters*
+    
+    **file_path**: The path to the CIF file representing the crystal structure.
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to the given CIF file.
+    '''
+    cf = CifFile.ReadCif(file_path)
+    #crystal = eval('cf[\'%s\']' % symbol)
+    crystal = cf.first_block()
+    a = float(crystal['_cell_length_a'])
+    b = float(crystal['_cell_length_b'])
+    c = float(crystal['_cell_length_c'])
+    alpha = float(crystal['_cell_angle_alpha'])
+    beta = float(crystal['_cell_angle_beta'])
+    gamma = float(crystal['_cell_angle_gamma'])
+    return Lattice.from_parameters(a, b, c, alpha, beta, gamma)
+
+  @staticmethod
+  def from_symbol(symbol):
+    '''
+    Create a crystal Lattice using information contained in a unit cell.
+
+    *Parameters*
+    
+    **symbol**: The chemical symbol of the crystal (eg 'Al')
+    
+    *Returns*
+    
+    A `Lattice` instance corresponding to the given element.
+    '''
+    path = os.path.dirname(__file__)
+    return Lattice.from_cif(os.path.join(path, 'cif', '%s.cif' % symbol))
 
   @staticmethod
   def cubic(a):

@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-import vtk
+import vtk, os
 from pymicro.crystal.lattice import Lattice
-from pymicro.view.vtk_utils import lattice_grid, lattice_3d, lattice_3d_with_planes, axes_actor, render
+from pymicro.view.scene3d import Scene3D
+from pymicro.view.vtk_utils import lattice_grid, lattice_3d, lattice_3d_with_planes, axes_actor
 
 if __name__ == '__main__':
   '''
@@ -9,6 +10,10 @@ if __name__ == '__main__':
   Each lattice is created separatly and added to the scene
   with a small offset so it is displayed nicely.
   '''
+
+  # create the 3D scene
+  base_name = os.path.splitext(__file__)[0]
+  s3d = Scene3D(display=False, ren_size=(800,400), name=base_name)
 
   # create all the different unit lattice cells
   a = 1.0
@@ -60,25 +65,22 @@ if __name__ == '__main__':
   transform.Translate(9.5,9.5,0)
   triclinic.SetUserTransform(transform)
 
-  # Create the Renderer and RenderWindow
-  ren = vtk.vtkRenderer()
-  ren.AddActor(cubic)
-  ren.AddActor(tetragonal)
-  ren.AddActor(orthorombic)
-  ren.AddActor(hexagonal)
-  ren.AddActor(rhombohedral)
-  ren.AddActor(monoclinic)
-  ren.AddActor(triclinic)
+  # add actors to the 3d scene
+  s3d.add(cubic)
+  s3d.add(tetragonal)
+  s3d.add(orthorombic)
+  s3d.add(hexagonal)
+  s3d.add(rhombohedral)
+  s3d.add(monoclinic)
+  s3d.add(triclinic)
 
   # add axes actor
   axes = axes_actor(length = 0.5)
   transform = vtk.vtkTransform()
   transform.Translate(-0.5, -0.5, 0.0)
   axes.SetUserTransform(transform)
-  ren.AddViewProp(axes)
+  s3d.add(axes)
 
-  # Set the background color.
-  ren.SetBackground(1.0, 1.0, 1.0)
   # set up camera
   cam = vtk.vtkCamera()
   cam.SetViewUp(0, 0, 1)
@@ -86,11 +88,10 @@ if __name__ == '__main__':
   cam.SetFocalPoint(5.5, 5.5, 0)
   cam.SetClippingRange(-20,20)
   cam.Dolly(0.2)
-  ren.SetActiveCamera(cam)
-  import os
-  image_name = os.path.splitext(__file__)[0] + '.png'
-  print 'writting %s' % image_name
-  render(ren, ren_size=(800, 400), save=True, display=False, name=image_name)
+  s3d.set_camera(cam)
+  s3d.render()
 
+  # thumbnail for the image gallery
   from matplotlib import image
+  image_name = base_name + '.png'
   image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

@@ -792,7 +792,7 @@ def read_image_data(file_name, size, header_size=0, data_type='uint8', verbose=F
 
   **file_name**: the name of the file to read.
 
-  **size**: a sequence of three number describing the size of the 3d data set
+  **size**: a sequence of three numbers describing the size of the 3d data set
   
   **header_size**: size of the header to skip in bytes (0 by default)
   
@@ -956,6 +956,40 @@ def elevationFilter(data, value, (low, high)):
   actor.SetMapper(mapper)
   return actor
 
+def numpy_array_to_vtk_grid(data, cell_data=True):
+  '''Transform a 3d numpy data array into a vtk uniform grid with scalar 
+  data.
+
+  *Parameters*
+
+  **data**: the 3d numpy data array.
+
+  **cell_data**: boolean to assign cell data or point data ito the grid (True by default)
+
+  *Returns*
+
+  The method return a vtkUniformGrid with scalar data initialized from 
+  the provided numpy array.
+  '''
+  if not data.ndim == 3:
+    print('warning, data array dimension must be 3')
+    return None
+  size = numpy.shape(data)
+  vtk_data_array = numpy_support.numpy_to_vtk(numpy.ravel(data, order='F'), deep=1)
+  grid = vtk.vtkUniformGrid()
+  if cell_data:
+    grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
+    grid.GetCellData().SetScalars(vtk_data_array)
+  else:
+    grid.SetExtent(0, size[0]-1, 0, size[1]-1, 0, size[2]-1)
+    grid.GetPointData().SetScalars(vtk_data_array)
+  grid.SetSpacing(1, 1, 1)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    grid.SetScalarType(vtk.VTK_UNSIGNED_CHAR, vtk.vtkInformation())
+  else:
+    grid.SetScalarType(vtk.VTK_UNSIGNED_CHAR)
+  return grid
+  
 def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
   '''This method construct an actor to map a 3d dataset.
 
@@ -980,7 +1014,7 @@ def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
   
   *Parameters*
 
-  **data**: the dataset to map, in VTK format.
+  **data**: the dataset to map, in numpy or VTK format.
   
   **lut**: VTK look up table (default: `gray_cmap`).
 
@@ -990,7 +1024,10 @@ def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
 
   The method return a vtkActor that can be directly added to a renderer.
   '''
-  size = 1 + numpy.array(data.GetExtent()[1::2])
+  if type(data) == numpy.ndarray:
+    size = data.shape
+  else:
+    size = 1 + numpy.array(data.GetExtent()[1::2])
   # implicit function
   bbox = vtk.vtkBox()
   bbox.SetXMin(size[0]/2., -1, size[2]/2.)
@@ -1005,7 +1042,7 @@ def map_data(data, function, lut = gray_cmap(), cell_data=True):
   
   *Parameters*
 
-  **data**: the dataset to map, in VTK format.
+  **data**: the dataset to map, in numpy or VTK format.
   
   **function**: VTK implicit function where to map the data.
   
@@ -1016,7 +1053,9 @@ def map_data(data, function, lut = gray_cmap(), cell_data=True):
   *Returns*
 
   The method return a vtkActor that can be directly added to a renderer.
-  '''  
+  '''
+  if type(data) == numpy.ndarray:
+    data = numpy_array_to_vtk_grid(data, cell_data)
   # use extract geometry filter to access the data
   extract = vtk.vtkExtractGeometry()
   if vtk.vtkVersion().GetVTKMajorVersion() > 5:
@@ -1127,7 +1166,7 @@ def show_data(data, map_scalars=False, lut=None):
   
   *Parameters*
   
-  **data**: a numpy array.
+  **data**: the dataset, in numpy or VTK format.
   
   **data**: bool.
   map the scalar in the data array to the created surface.
@@ -1138,18 +1177,16 @@ def show_data(data, map_scalars=False, lut=None):
   Returns a vtk actor that can be added to a rendered to show the 
   3d array.
   '''
-  size = data.shape
-  vtk_data_array = numpy_support.numpy_to_vtk(numpy.ravel(data, order='F'), deep=1)
-  grid = vtk.vtkUniformGrid()
-  grid.SetSpacing(1, 1, 1)
-  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-    grid.SetScalarType(to_vtk_type(data.dtype), vtk.vtkInformation())
+  if type(data) == numpy.ndarray:
+    grid = numpy_array_to_vtk_grid(data, cell_data=True)
+    visible = numpy_support.numpy_to_vtk(numpy.ravel(data > 0, order='F').astype(numpy.uint8), deep=1)
+    grid.SetCellVisibilityArray(visible)
+    #grid.SetPointVisibilityArray(visible)
+    size = data.shape
   else:
-    grid.SetScalarType(to_vtk_type(data.dtype))
-  grid.SetExtent(0, size[0], 0, size[1], 0, size[2]) # for cell data
-  grid.GetCellData().SetScalars(vtk_data_array)
-  visible = numpy_support.numpy_to_vtk(numpy.ravel(data > 0, order='F').astype(numpy.uint8), deep=1)
-  grid.SetCellVisibilityArray(visible)
+    grid = data
+    size = grid.GetExtent()[1::2]
+    print size
 
   # use extract geometry filter to access the data
   extract = vtk.vtkExtractGeometry()

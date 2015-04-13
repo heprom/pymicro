@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-import vtk, numpy
+import vtk, numpy, os
 from pymicro.crystal.lattice import Lattice, HklPlane
 from pymicro.crystal.microstructure import Orientation
+from pymicro.view.scene3d import Scene3D
 from pymicro.view import vtk_utils
 from vtk.util.colors import white, peacock, tomato, red, green, yellow, black, cyan, magenta
 
@@ -12,8 +13,9 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
   A sphere is added to show how a pole figure can be constructed.
   Slip traces on a particular plane can also be shown.
   '''
-  # Create the Renderer
-  ren = vtk.vtkRenderer()
+  # Create the 3D scene
+  base_name = os.path.splitext(__file__)[0]
+  s3d = Scene3D(display=False, ren_size=(800,800), name=base_name)
   m = grain_orientation.orientation_matrix()
   mt = m.transpose()
 
@@ -24,12 +26,19 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
   a = r/2
   l = Lattice.cubic(a)
   grid = vtk_utils.lattice_grid(l)
+  
+  # an assembly is used to gather all the elements of the cubic lattice together
   cubic_lattice = vtk.vtkAssembly()
-  Edges, Vertices = vtk_utils.lattice_3d(grid, tubeRadius=0.01, sphereRadius=0.05)
+  Edges = vtk_utils.lattice_edges(grid, tubeRadius=0.02*a)
+  Vertices = vtk_utils.lattice_vertices(grid, sphereRadius=0.1*a)
+  # add the two actors to the renderer
+  cubic_lattice.AddPart(Edges)
+  cubic_lattice.AddPart(Vertices)
+
   # get a list of hkl planes in the 110 family
   hklplanes = HklPlane.get_family('110')
   colors = [red, green, yellow, black, cyan, magenta] # correspond to pyplot 'rgykcmbw'
-  
+
   # add a vertical plane to show the slip plane intersection
   # note that the plane is rotated towards the crystal CS
   # to make the intersection with the slip plane...
@@ -44,7 +53,6 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
     plane = vtk.vtkPlane()
     plane.SetOrigin(origin)
     plane.SetNormal(hklplane.normal())
-    #FIXME here an assembly is returned and we cannot access the mapper anymore
     hklplaneActor = vtk_utils.add_plane_to_grid(plane, grid, origin)
     cubic_lattice.AddPart(hklplaneActor)
     # get a reference to the vtkPolyData representing the hkl plane
@@ -62,7 +70,10 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
     if show_slip_traces:
       # cut the rotated plane with the vertical plane to display the trace
       slipTrace = vtk.vtkCutter()
-      slipTrace.SetInput(hklplanePolyData)
+      if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+        slipTrace.SetInputData(hklplanePolyData)
+      else:
+        slipTrace.SetInput(hklplanePolyData)
       slipTrace.SetCutFunction(vplane)
       slipTrace.Update() # this is a vtkPolyData
       slipTraceMapper = vtk.vtkPolyDataMapper()
@@ -72,10 +83,6 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
       slipTraceActor.GetProperty().SetColor(colors[i])
       slipTraceActor.GetProperty().SetLineWidth(5)
       cubic_lattice.AddPart(slipTraceActor)
-
-  # add the two actors to the renderer
-  cubic_lattice.AddPart(Edges)
-  cubic_lattice.AddPart(Vertices)
 
   # place the center of the lattice at (0.0, 0.0, 0.0)
   cubic_lattice.SetOrigin(a/2, a/2, a/2)
@@ -97,27 +104,23 @@ def create_pole_figure_3d(grain_orientation, show_arrows=True, show_slip_traces=
   sphereActor.SetMapper(sphereMapper)
   sphereActor.GetProperty().SetOpacity(0.1)
   
-  # add actors and set the background color.
-  ren.AddActor(cubic_lattice)
-  ren.AddActor(sphereActor)
-  axes = vtk_utils.axes_actor(r)
-  ren.AddViewProp(axes)
-  ren.SetBackground(white)
+  # add all actors to the 3d scene
+  s3d.add(cubic_lattice)
+  s3d.add(sphereActor)
+  axes = vtk_utils.axes_actor(r, fontSize=60)
+  s3d.add(axes)
 
   # set up camera
   cam = vtk.vtkCamera()
-  #cam.SetViewUp(0, 1, 0)
   cam.SetViewUp(0, 0, 1)
-  #cam.SetPosition(0, 0, 4*r)
   cam.SetPosition(0, -4*r, 0)
   cam.SetFocalPoint(0, 0, 0)
-  ren.SetActiveCamera(cam)
-  
-  image_name = os.path.splitext(__file__)[0] + '.png'
-  print 'writting %s' % image_name
-  vtk_utils.render(ren, ren_size=(800, 800), save=True, display=False, name=image_name)
+  s3d.set_camera(cam)
+  s3d.render()
 
+  # thumbnail for the image gallery
   from matplotlib import image
+  image_name = base_name + '.png'
   image.thumbnail(image_name, 'thumb_' + image_name, 0.2)
 
 if __name__ == '__main__':

@@ -1,17 +1,18 @@
+from math import sqrt
+import numpy as np
+from pymicro.view.scene3d import Scene3D
 from pymicro.view.vtk_utils import *
 from pymicro.crystal.lattice import HklPlane
 from pymicro.crystal.microstructure import Orientation
-from math import sqrt
-import numpy as np
 
 if __name__ == '__main__':
   '''
   Create a 3d scene with a hexagonal crystal lattice.
   Hkl planes are added to the lattice and displayed.
   '''
-  # Create the Renderer and RenderWindow
-  ren = vtk.vtkRenderer()
-  ren.SetBackground(white)
+  # Create the 3D scene
+  base_name = os.path.splitext(__file__)[0]
+  s3d = Scene3D(display=False, ren_size=(800,800), name=base_name)
 
   # hexagonal lattice
   a = 0.295 # nm
@@ -29,7 +30,7 @@ if __name__ == '__main__':
   offset = l.matrix[0] + l.matrix[1]
   hcp1.SetOrigin(offset)
   hcp1.AddPosition(-offset)
-  ren.AddActor(hcp1)
+  s3d.add(hcp1)
   
   hcp2 = vtk.vtkAssembly()
   grid = lattice_grid(l)
@@ -41,7 +42,7 @@ if __name__ == '__main__':
   offset = l.matrix[0]
   hcp2.SetOrigin(-offset)
   hcp2.AddPosition(offset)
-  ren.AddActor(hcp2)
+  s3d.add(hcp2)
 
   hcp3 = vtk.vtkAssembly()
   grid = lattice_grid(l)
@@ -61,7 +62,7 @@ if __name__ == '__main__':
   offset = l.matrix[1]
   hcp3.SetOrigin(-offset)
   hcp3.AddPosition(offset)
-  ren.AddActor(hcp3)
+  s3d.add(hcp3)
 
   grid = hexagonal_lattice_grid(l)
   Edges = vtk.vtkExtractEdges()
@@ -83,7 +84,7 @@ if __name__ == '__main__':
   offset = 1*l.matrix[0] + 2*l.matrix[1]
   hcp_edges.SetOrigin(-offset)
   hcp_edges.AddPosition(offset)
-  ren.AddActor(hcp_edges)
+  s3d.add(hcp_edges)
 
   # set up camera and render
   cam = setup_camera(size=(a, a, c))
@@ -91,10 +92,10 @@ if __name__ == '__main__':
   cam.SetFocalPoint(center)
   cam.SetPosition(4*a, -2*a, 2.5*a)
   cam.Dolly(0.9)
-  ren.SetActiveCamera(cam)
-  image_name = os.path.splitext(__file__)[0] + '.png'
-  print 'writting %s' % image_name
-  render(ren, save=True, display=False, ren_size=(800,800), name=image_name)
+  s3d.set_camera(cam)
+  s3d.render()
 
+  # thumbnail for the image gallery
   from matplotlib import image
+  image_name = base_name + '.png'
   image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

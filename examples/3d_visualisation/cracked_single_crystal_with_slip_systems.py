@@ -2,10 +2,17 @@
 import vtk, numpy
 from pymicro.crystal.lattice import Lattice, HklPlane
 from pymicro.crystal.microstructure import Orientation
-from vtk.util.colors import *
+from vtk.util.colors import peacock
+from pymicro.view.scene3d import Scene3D
 from pymicro.view.vtk_utils import *
 
 def create_mesh_outline_3d_with_planes(lattice, orientation, nld):
+  '''This is an example of custom vtk function to achieve a very specific 
+  goal. Here a cubic unstructured grid is used an an outline with two 
+  planes representing the crack faces and slip planes and directions.
+  
+  Finally a vtk assembly that can be added to a 3d scene is returned.
+  '''
   grid = lattice_grid(lattice)
   assembly = vtk.vtkAssembly()
   # actor to show the mesh outline (only add edges)
@@ -43,7 +50,6 @@ def create_mesh_outline_3d_with_planes(lattice, orientation, nld):
     hklplaneActor = add_plane_to_grid(plane, grid, None, opacity=0.5)
     # add an arrow to display the normal to the plane
     slip_direction = numpy.cross((-1,0,0), slip_normal)
-    print 'slip direction', slip_direction
     arrowActor = unit_arrow_3d((0.5, 0.5, 0.5), slip_dir_rot, color=peacock)
     assembly.AddPart(arrowActor)
     # add a text actor to display the slip direction
@@ -90,6 +96,10 @@ if __name__ == '__main__':
   Both hkl planes are added at the crack tip and displayed.
   '''
   
+  # Create the 3D scene
+  base_name = os.path.splitext(__file__)[0]
+  s3d = Scene3D(display=False, ren_size=(800,800), name=base_name)
+
   # specify the grain orientation
   o1 = Orientation.from_euler(numpy.array([45., 0., 0.])) #  grain 1
 
@@ -102,31 +112,24 @@ if __name__ == '__main__':
   d2 = '[11-2]'
   nld = [[n1,l1,d1], [n2,l2,d2]]
 
-  # Create the Renderer
-  ren = vtk.vtkRenderer()
- 
   # we use a unit lattice cell to represent the mesh
   l_xyz = Lattice.face_centered_cubic(1.0)
   g1 = create_mesh_outline_3d_with_planes(l_xyz, o1, nld)
-  ren.AddActor(g1)
+  s3d.add(g1)
  
   # add axes actor
   axes = axes_actor(0.5)
-  ren.AddViewProp(axes)
-  
-  # Set the background color.
-  ren.SetBackground(white)
+  s3d.add(axes)
   
   # set up camera
   cam = vtk.vtkCamera()
   cam.SetViewUp(0, 0, 1)
   cam.SetPosition(4.0, -1.5, 1.8)
   cam.SetFocalPoint(0.5, 0.5, 0.6)
-  ren.SetActiveCamera(cam)
+  s3d.set_camera(cam)
+  s3d.render()
   
-  image_name = os.path.splitext(__file__)[0] + '.png'
-  print 'writting %s' % image_name
-  render(ren, save=True, display=False, ren_size=(800,800), name=image_name)
-
+  # thumbnail for the image gallery
   from matplotlib import image
+  image_name = base_name + '.png'
   image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

@@ -8,7 +8,7 @@ class Scene3D:
   format. The actual 3D rendering is done by calling the `render` method.
   '''
 
-  def __init__(self, display=True, ren_size=(600, 600), name='scene_3d'):
+  def __init__(self, display=True, ren_size=(600, 600), name='scene_3d', background=(1., 1., 1.)):
     '''Initialization called when creating a new `Scene3D` object.
 
     *Parameters*
@@ -25,7 +25,7 @@ class Scene3D:
     particular when saving the scene as an image (default is 'scene_3d').    
     '''
     ren = vtk.vtkRenderer()
-    ren.SetBackground(1., 1., 1.)
+    ren.SetBackground(background)
     self.renderer = ren
     # Create a window for the renderer
     self.renWin = vtk.vtkRenderWindow()
@@ -46,6 +46,10 @@ class Scene3D:
     '''
     self.renderer.AddActor(actor)
 
+  def get_renderer(self):
+    '''Get the vtk renderer attached to this 3d scene.'''
+    return self.renderer
+    
   def set_camera(self, cam):
     '''Set the camera for the 3D scene.
 

@@ -10,7 +10,7 @@ if __name__ == '__main__':
   Create a 3d scene with a cubic crystal lattice.
   Hkl planes are added to the lattice and displayed.
   '''
-  # Create the 3D scene
+  # create the 3D scene
   base_name = os.path.splitext(__file__)[0]
   s3d = Scene3D(display=False, ren_size=(800,800), name=base_name)
 
@@ -35,6 +35,7 @@ if __name__ == '__main__':
   s3d.set_camera(cam)
   s3d.render()
 
+  # thumbnail for the image gallery
   from matplotlib import image
   image_name = base_name + '.png'
   image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

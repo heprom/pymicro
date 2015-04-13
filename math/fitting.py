@@ -104,36 +104,36 @@ class FitFunction:
     
     **verbose**: boolean, activate verbose mode
     '''
-      # local function to evaluate the cost
+    # local function to evaluate the cost
+    global it
+    it = 0
+    def cost_func(new_params):
       global it
-      it = 0
-      def cost_func(new_params):
-        global it
-        p = self.get_parameters()
-        if verbose:
-          print 'iteration %d, trying parameters:' % it, p
-          from matplotlib import pyplot as plt
-          if it == 0:
-            plt.plot(x, y, 'bo', label = 'data points')
-            plt.ylim(0, 0.6)
-            plt.grid()
-            plt.legend(numpoints=1,loc='upper left')
-            plt.savefig('fit/fit_%02d.pdf' % it)
-          it += 1
-          plt.clf()
+      p = self.get_parameters()
+      if verbose:
+        print 'iteration %d, trying parameters:' % it, p
+        from matplotlib import pyplot as plt
+        if it == 0:
           plt.plot(x, y, 'bo', label = 'data points')
-          plt.plot(x, self(x), 'k-', label = 'gaussian fit')
           plt.ylim(0, 0.6)
-          plt.title('fitting iteration %02d' % it)
+          plt.grid()
           plt.legend(numpoints=1,loc='upper left')
           plt.savefig('fit/fit_%02d.pdf' % it)
-        for i, pi in enumerate(p):
-          pi.set(new_params[i])
-        return y - self(x)
-        
-      if x is None: x = np.arange(y.shape[0])
-      p = [param.value for param in self.get_parameters()]
-      optimize.leastsq(cost_func, p, Dfun= None)
+        it += 1
+        plt.clf()
+        plt.plot(x, y, 'bo', label = 'data points')
+        plt.plot(x, self(x), 'k-', label = 'gaussian fit')
+        plt.ylim(0, 0.6)
+        plt.title('fitting iteration %02d' % it)
+        plt.legend(numpoints=1,loc='upper left')
+        plt.savefig('fit/fit_%02d.pdf' % it)
+      for i, pi in enumerate(p):
+        pi.set(new_params[i])
+      return y - self(x)
+      
+    if x is None: x = np.arange(y.shape[0])
+    p = [param.value for param in self.get_parameters()]
+    optimize.leastsq(cost_func, p, Dfun= None)
 
 class Gaussian(FitFunction):
   '''first parameter is position, second is sigma, third is height'''

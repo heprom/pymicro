@@ -18,5 +18,6 @@ Subpackages
     pymicro.crystal
     pymicro.diffraction
     pymicro.file
+    pymicro.math
     pymicro.view
 

@@ -27,7 +27,7 @@ Contents:
    welcome
    auto_examples/index.rst
    cookbook
-   modules
+   pymicro
 
 Indices and tables
 ==================

@@ -7,17 +7,19 @@ import numpy as np
 
 def fit(y, x = None, expression=None, nb_params=None, init=None):
   '''Static method to perform curve fitting directly.
+  
+     For instance, to fit some (x,y) data with a gaussian function, simply use:
+     ::
 
-  For instance, to fit some (x,y) data with a gaussian function, simply use:
-  ::
+       F = fit(y, x, expression='Gaussian')
 
-    F = fit(y, x, expression='Gaussian')
+     Alternatively you may specify you own function directly defined with Python, like:
+     ::
 
-  Alternatively you may specify you own function directly defined with Python, like:
-  ::
-    def myf(x, p):
-      return p[0]*x + p[1]
-    F = fit(y, x, expression=myF)
+       def myf(x, p):
+         return p[0]*x + p[1]
+
+       F = fit(y, x, expression=myF, nb_params=2)
   '''
   if expression == 'Gaussian':
     F = Gaussian()

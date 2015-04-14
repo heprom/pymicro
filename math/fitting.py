@@ -1,5 +1,20 @@
 '''The fitting module define some classes to easily perform 1D curve 
-   fitting.
+   fitting. This module supports fitting (x, y) data with a general 
+   mechanism. Any fitting function can be provided to the fit method 
+   and a few general purpose fuctions are predefined:
+   
+    * Gaussian
+    * Lorentzian
+    * Cosine
+    * Voigt
+
+  .. figure:: _static/fitting_functions.png
+      :width: 400 px
+      :height: 300 px
+      :alt: lattice_3d
+      :align: center
+
+      Plot of the predefined fitting function in the fitting module.
 '''
 from scipy import optimize
 from scipy.special import wofz

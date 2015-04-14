@@ -5,24 +5,36 @@ from scipy import optimize
 from scipy.special import wofz
 import numpy as np
 
-def fit(y, x = None, fit_type='Gaussian'):
+def fit(y, x = None, expression=None, nb_params=None, init=None):
   '''Static method to perform curve fitting directly.
 
   For instance, to fit some (x,y) data with a gaussian function, simply use:
   ::
 
-    F = fit(y, x, fit_type='Gaussian')
+    F = fit(y, x, expression='Gaussian')
 
+  Alternatively you may specify you own function directly defined with Python, like:
+  ::
+    def myf(x, p):
+      return p[0]*x + p[1]
+    F = fit(y, x, expression=myF)
   '''
-  if fit_type == 'Gaussian':
+  if expression == 'Gaussian':
     F = Gaussian()
-  elif fit_type == 'Lorentzian':
+  elif expression == 'Lorentzian':
     F = Lorentzian()
-  elif fit_type == 'Cosine':
+  elif expression == 'Cosine':
     F = Cosine()
   else:
-    print('unknown fitting type: %s' % fit_type)
-    return None
+    F = FitFunction()
+    if not nb_params:
+      print('please specify the number of parameters for your fit function, aborting fit...')
+      return None
+    if not init:
+      init = np.ones(nb_params)
+    for i in range(nb_params):
+      F.add_parameter(init[i], 'p%d' % i)
+    F.expression = expression
   F.fit(y, x)
   return F
 
@@ -60,6 +72,7 @@ class FitFunction:
   
   def __init__(self):
     self.parameters = []
+    self.expression = None
   
   def get_parameters(self):
     '''Return the list of parameters of this fit function.'''
@@ -89,6 +102,11 @@ class FitFunction:
     for i in range(len(params)):
       s += ' * %s = %g\n' % (params[i].name, params[i].value)
     return s
+
+  def compute(self, x):
+    '''Evaluate the fit function at coordinates x.'''
+    p = self.get_parameters()
+    return self.expression(x, p)
 
   def fit(self, y, x = None, verbose = False):
     '''Perform fitting on the given data.
@@ -139,6 +157,9 @@ class Gaussian(FitFunction):
   '''first parameter is position, second is sigma, third is height'''
   def __init__(self, position=0.0, sigma=1.0, height=1.0):
     FitFunction.__init__(self)
+    def G(x, p):
+      return p[2].value * np.exp(-((x-p[0].value)/p[1].value)**2)
+    self.expression = G
     self.add_parameter(position, 'position')
     self.add_parameter(sigma, 'sigma')
     self.add_parameter(height, 'height')
@@ -160,15 +181,13 @@ class Gaussian(FitFunction):
     p = self.get_parameters()
     return 2*p[1].value*np.log(2)
   
-  def compute(self, x):
-    '''Evaluate the gauss function at coordinates x.'''
-    p = self.get_parameters()
-    return p[2].value * np.exp(-((x-p[0].value)/p[1].value)**2)
-
 class Lorentzian(FitFunction):
   '''first parameter is position, second is gamma'''
   def __init__(self, position=0.0, gamma=1.0):
     FitFunction.__init__(self)
+    def L(x, p):
+      return p[1].value/np.pi/((x-p[0].value)**2 + p[1].value**2)
+    self.expression = L
     self.add_parameter(position, 'position')
     self.add_parameter(gamma, 'width')
   
@@ -182,14 +201,13 @@ class Lorentzian(FitFunction):
     p = self.get_parameters()
     return 2*p[1].value
 
-  def compute(self, x):
-    p = self.get_parameters()
-    return p[1].value/np.pi/((x-p[0].value)**2 + p[1].value**2)
-
 class Cosine(FitFunction):
   '''first parameter is position, second is width'''
   def __init__(self, position=0.0, width=1.0):
     FitFunction.__init__(self)
+    def C(x, p):
+      return np.cos(np.pi*(x-p[0].value)/(2*p[1].value))
+    self.expression = C
     self.add_parameter(position, 'position')
     self.add_parameter(width, 'width')
   
@@ -202,10 +220,6 @@ class Cosine(FitFunction):
   def fwhm(self):
     p = self.get_parameters()
     return 3./4*p[1].value
-
-  def compute(self, x):
-    p = self.get_parameters()
-    return np.cos(np.pi*(x-p[0].value)/(2*p[1].value))
 
 def voigt(x, sigma, gamma):
    # The Voigt function is also the real part of 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import matplotlib
-matplotlib.use('WXAgg')
+#matplotlib.use('WXAgg')
 
 import numpy as num
 import wx

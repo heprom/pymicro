@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 import matplotlib
 #matplotlib.use('WXAgg')
-
+'''
+matplotlib wx backend is no longer supported in centos 7. This makes it 
+very hard to maintain this code. eventually, it could be rewritten with 
+another backend (qt?).
+'''
 import numpy as num
 import wx
 
@@ -16,8 +20,10 @@ class PlotPanel(wx.Panel):
 
   def __init__(self, parent, color=None, dpi=None, **kwargs):
     '''Initialisation of the PlotPanel instance.'''
-    from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
-    from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as NavigationToolbar
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    ##from matplotlib.backends.backend_agg import NavigationToolbar2Agg as NavigationToolbar
+    #from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
+    #from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as NavigationToolbar
     #from matplotlib.backends.backend_wx import FigureCanvasWx as FigureCanvas
     from matplotlib.figure import Figure
 
@@ -32,13 +38,13 @@ class PlotPanel(wx.Panel):
     dpi = 72
     print 'dpi=',dpi
     self.figure = Figure((2.0, 2.0), dpi)
-    self.canvas = FigureCanvas( self, -1, self.figure )
+    self.canvas = FigureCanvas( self)##, -1, self.figure )
     self.SetColor( color )
-    self.toolbar = NavigationToolbar(self.canvas)
+    ##self.toolbar = NavigationToolbar(self.canvas)
 
     self.vbox = wx.BoxSizer(wx.VERTICAL)
     self.vbox.Add(self.canvas, 1, wx.LEFT | wx.TOP | wx.GROW)
-    self.vbox.Add(self.toolbar, 0, wx.EXPAND)
+    ##self.vbox.Add(self.toolbar, 0, wx.EXPAND)
     self.SetSizer(self.vbox)
     self.vbox.Fit(self)
 

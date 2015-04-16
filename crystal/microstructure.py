@@ -357,6 +357,57 @@ class Orientation:
       angles = np.array([float(phi1), float(Phi), float(phi2)])
       euler.append([elset, Orientation.from_euler(angles)])
     return dict(euler)
+  
+  def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
+    '''Compute the Schmid factor for this crystal orientation and the 
+    given slip system.
+
+    **Parameters**:
+    
+    *slip_system*: a slip system instance.
+    
+    *load_direction*: a unit vector describing the loading direction 
+    (default: vertical axis [0, 0, 1]).
+    
+    **Returns**
+    
+    A number between 0 ad 0.5.
+    '''
+    plane = slip_system.get_slip_plane()
+    Bt = self.orientation_matrix().transpose()
+    n_rot = np.dot(Bt, plane.normal()) # plane.normal() is a unit vector
+    slip = slip_system.get_slip_direction().direction()
+    slip_rot = np.dot(Bt, slip)
+    print n_rot, load_direction, slip_rot
+    SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
+    return SF
+
+  def compute_all_schmid_factors(self, slip_systems, load_direction=[0., 0., 1], verbose=False):
+    '''Compute all Schmid factors for this crystal orientation and the 
+    given list of slip systems.
+
+    **Parameters**:
+    
+    *slip_systems*: a list of the slip system from which to compute the 
+    Schmid factor values.
+    
+    *load_direction*: a unit vector describing the loading direction 
+    (default: vertical axis [0, 0, 1]).
+    
+    *verbose*: activate verbose mode.
+    
+    **Returns**
+    
+    A list of the schmid factors.
+    '''
+    SF_list = []
+    for ss in slip_systems:
+      print ss
+      sf = self.schmid_factor(ss, load_direction)
+      if verbose:
+        print 'Slip system: %s, Schmid factor is %.3f' % (ss, sf)
+      SF_list.append(sf)
+    return SF_list
 
 class Grain:
   '''
@@ -383,15 +434,27 @@ class Grain:
     s += ' * position (%f, %f, %f)\n' % (self.position)
     s += ' * has vtk mesh ? %s\n' % (self.vtkmesh != None)
     return s
-    
+  
   def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
+    '''Compute the Schmid factor of this grain for the given slip system.
+
+    **Parameters**:
+    
+    *slip_system*: a slip system instance.
+    
+    *load_direction*: a unit vector describing the loading direction.
+    
+    **Returns**
+    
+    The Schmid factor of this grain for the given slip system.
+    '''
     plane = slip_system.get_slip_plane()
     Bt = self.orientation_matrix().transpose()
     n_rot = np.dot(Bt, plane.normal()) # plane.normal() is a unit vector
     slip = slip_system.get_slip_direction().direction()
     slip_rot = np.dot(Bt, slip)
     SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
-    return SF
+    return self.orientation.schmid_factor(slip_system, load_direction)
 
   def SetVtkMesh(self, mesh):
     '''Set the VTK mesh of this grain.

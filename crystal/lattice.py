@@ -418,23 +418,6 @@ class Lattice:
       p._lattice = self
     return planes
 
-  @staticmethod
-  def get_slip_systems(plane_type='111'):
-    if plane_type != '111':
-      print 'warning only 111 slip supported for the moment!'
-    planes = HklPlane.get_family(plane_type)
-    slip_systems = []
-    for plane in planes:
-      (h, k, l) = plane.miller_indices()
-      for i in range(3): # 3 slip directions by plane
-        dir_type = np.array([h, k, l])
-        dir_type[i] = 0
-        direction = np.cross(np.array([h, k, l]), dir_type)
-        (u, v, w) = direction
-        slip_dir = HklDirection(u, v, w)
-        slip_systems.append(SlipSystem(plane, slip_dir))
-    return slip_systems
-      
 class SlipSystem:
   '''A class to represent a crystallographic slip system.
   
@@ -460,6 +443,60 @@ class SlipSystem:
     
   def get_slip_direction(self):
     return self._direction
+
+  @staticmethod
+  def get_octaedral_slip_systems():
+    '''A static method to get all slip systems for octaedral slip (ie 
+    111 planes). This does the same as get_slip_systems and only one 
+    function should be kept in the future.
+    '''
+    oct_ss = []
+    planes = HklPlane.get_family('111')
+    slip_dirs = np.zeros((4,3,3))
+    slip_dirs[0,0,:] = [ 1.,-1., 0.] # for (111)
+    slip_dirs[0,1,:] = [-1., 0., 1.] # for (111)
+    slip_dirs[0,2,:] = [ 0., 1.,-1.] # for (111)
+    slip_dirs[1,0,:] = [ 0.,-1., 1.] # for (-111)
+    slip_dirs[1,1,:] = [ 1., 0., 1.] # for (-111)
+    slip_dirs[1,2,:] = [ 1., 1., 0.] # for (-111)
+    slip_dirs[2,0,:] = [-1., 0., 1.] # for (1-11)
+    slip_dirs[2,1,:] = [ 0., 1., 1.] # for (1-11)
+    slip_dirs[2,2,:] = [ 1., 1., 0.] # for (1-11)
+    slip_dirs[3,0,:] = [-1., 1., 0.] # for (11-1)
+    slip_dirs[3,1,:] = [ 1., 0., 1.] # for (11-1)
+    slip_dirs[3,2,:] = [ 0., 1., 1.] # for (11-1)
+    for i, plane in enumerate(planes):
+      for j in range(3):
+        direction = HklDirection(slip_dirs[i,j,0], slip_dirs[i,j,1], slip_dirs[i,j,2])
+        oct_ss.append(SlipSystem(plane, direction))
+    return oct_ss
+    
+  @staticmethod
+  def get_slip_systems(plane_type='111'):
+    '''A static method to get all slip systems for a given hkl plane.
+    
+    A cross product is used to retrive the slip direction from the slip 
+    plane miller indices. This formula may be wrong for planes not in 
+    the (111) family.
+    
+    .. warning::
+    
+      only tested for 111 planes...
+    '''
+    if plane_type != '111':
+      print 'warning only 111 slip supported for the moment!'
+    planes = HklPlane.get_family(plane_type)
+    slip_systems = []
+    for plane in planes:
+      (h, k, l) = plane.miller_indices()
+      for i in range(3): # 3 slip directions by plane
+        dir_type = np.array([h, k, l])
+        dir_type[i] = 0
+        direction = np.cross(np.array([h, k, l]), dir_type)
+        (u, v, w) = direction
+        slip_dir = HklDirection(u, v, w)
+        slip_systems.append(SlipSystem(plane, slip_dir))
+    return slip_systems
 
 class HklObject:
 

@@ -97,7 +97,7 @@ def flat(img, ref, dark):
 
   *Returns*
 
-  **flat**: the flat field corrected image.
+  **flat**: the flat field corrected image (between 0 and 1).
   '''
   flat = (img - dark).astype(np.float32) / (ref - dark).astype(np.float32)
   return flat
@@ -188,16 +188,34 @@ def alpha_cmap(color='red'):
   mycmap._lut[:,-1] = alphas
   return mycmap
 
-def format_coord(x, y):
-  '''
-  Modify the coordinate formatter of pyplot to display the image
-  value of the nearest pixel given x and y.
-  '''
-  n_rows, n_cols = array.shape
-  col = int(x + 0.5)
-  row = int(y + 0.5)
-  if col >= 0 and col < numcols and row >= 0 and row < numrows:
-    z = 10#array[row, col]
-    return 'x=%1.1f, y=%1.1f, z=%1.1f' % (x, y, z)
-  else:
-    return 'x=%1.1f, y=%1.1f' % (x, y)
+class AxShowPixelValue:
+  '''A simple class that wraps a pyplot ax and modify its coordinate 
+  formatter to show the pixel value.'''
+  
+  def __init__(self, ax):
+    '''Create a new AxShowPixelValue instance with a reference to the 
+    given pyplot ax.'''
+    self.ax = ax
+  
+  def imshow(self, array, **kwargs):
+    '''Wraps pyplot imshow function for the ax selected and modify 
+    the coordinate formatter to show the pixel value as well. 
+    All the usual parameters can be passed to imshow.
+    '''
+    self.array = array
+    self.ax.imshow(self.array, **kwargs)
+    self.ax.format_coord = self.format_coord
+
+  def format_coord(self, x, y):
+    '''A function to modify the coordinate formatter of pyplot to 
+    display the pixel value. This is usually called when moving the 
+    mouse above the plotted image.
+    '''
+    n_rows, n_cols = self.array.shape
+    col = int(x + 0.5)
+    row = int(y + 0.5)
+    if col >= 0 and col < n_cols and row >= 0 and row < n_rows:
+      z = self.array[row, col]
+      return 'x=%1.1f, y=%1.1f, z=%1.1f' % (x, y, z)
+    else:
+      return 'x=%1.1f, y=%1.1f' % (x, y)

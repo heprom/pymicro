@@ -8,6 +8,7 @@ pymicro tries to hide some of the complexity of vtk, manipulating 3d arrays and 
 .. toctree::
 
    cookbook/pymicro_and_ipython.rst
+   cookbook/3d_images.rst
    cookbook/steel_damage_analysis.rst
    cookbook/convention_read_write_2d_images.rst
 

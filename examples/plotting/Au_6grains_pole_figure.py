@@ -21,10 +21,10 @@ if __name__ == '__main__':
   micro.grains.append(Grain(2268, Orientation.from_euler(np.array([237.262,125.149,225.615]))))
 
   # create pole figure (both direct and inverse)
-  pf = PoleFigure(hkl='111', proj='stereo', microstructure=micro)
+  pf = PoleFigure(hkl='111', axis='Z', proj='stereo', microstructure=micro)
   pf.color_by_grain_id = True
   pf.pflegend = True # this works well for a few grains
-  pf.plot_pole_figures(up='Z', plot_sst=True, display=False, save_as='png')
+  pf.plot_pole_figures(plot_sst=True, display=False, save_as='png')
 
   image_name = os.path.splitext(__file__)[0] + '.png'
   print 'writting %s' % image_name

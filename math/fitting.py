@@ -14,7 +14,7 @@
       :alt: lattice_3d
       :align: center
 
-      Plot of the predefined fitting function in the fitting module.
+      Plot of the main predefined fitting function in the fitting module.
 '''
 from scipy import optimize
 from scipy.special import wofz
@@ -23,7 +23,26 @@ import numpy as np
 def fit(y, x = None, expression=None, nb_params=None, init=None):
   '''Static method to perform curve fitting directly.
   
-     For instance, to fit some (x,y) data with a gaussian function, simply use:
+    *Parameters*
+    
+    **y**: the data to match (a 1d numpy array)
+
+    **x**: the corresponding x coordinates (optional, None by default)
+
+    **expression**: can be either a string to select a predefined 
+    function or alternatively a user defined function with the signature 
+    f(x, p) (in this case you must specify the length of the parameters 
+    array p via setting nb_params).
+
+    **nb_params**: the number of parameters of the user defined fitting 
+    function (only needed when a custom fitting function is provided, 
+    None by default)
+
+    **init**: a sequence (the length must be equal to the number of 
+    parameters of the fitting function) used to initialise the fitting 
+    function.
+
+    For instance, to fit some (x,y) data with a gaussian function, simply use:
      ::
 
        F = fit(y, x, expression='Gaussian')
@@ -42,6 +61,8 @@ def fit(y, x = None, expression=None, nb_params=None, init=None):
     F = Lorentzian()
   elif expression == 'Cosine':
     F = Cosine()
+  elif expression == 'Voigt':
+    F = Voigt()
   else:
     F = FitFunction()
     if not nb_params:
@@ -147,6 +168,8 @@ class FitFunction:
       p = self.get_parameters()
       if verbose:
         print 'iteration %d, trying parameters:' % it, p
+        it += 1
+        '''
         from matplotlib import pyplot as plt
         if it == 0:
           plt.plot(x, y, 'bo', label = 'data points')
@@ -162,13 +185,14 @@ class FitFunction:
         plt.title('fitting iteration %02d' % it)
         plt.legend(numpoints=1,loc='upper left')
         plt.savefig('fit/fit_%02d.pdf' % it)
+        '''
       for i, pi in enumerate(p):
         pi.set(new_params[i])
       return y - self(x)
       
     if x is None: x = np.arange(y.shape[0])
     p = [param.value for param in self.get_parameters()]
-    optimize.leastsq(cost_func, p, Dfun= None)
+    optimize.leastsq(cost_func, p, Dfun= None, xtol=1.e-6)
 
 class Gaussian(FitFunction):
   '''first parameter is position, second is sigma, third is height'''
@@ -199,20 +223,31 @@ class Gaussian(FitFunction):
     return 2*p[1].value*np.log(2)
   
 class Lorentzian(FitFunction):
-  '''first parameter is position, second is gamma'''
-  def __init__(self, position=0.0, gamma=1.0):
+  '''Lorentzian funtion.
+  
+  The first parameter is the position, the second is gamma. The maximum 
+  of the function is given by height_factor/(pi*gamma). The FWHM is just 2*gamma.
+  '''
+  def __init__(self, position=0.0, gamma=1.0, height_factor=1.0):
     FitFunction.__init__(self)
     def L(x, p):
-      return p[1].value/np.pi/((x-p[0].value)**2 + p[1].value**2)
+      return p[2].value*p[1].value/np.pi/((x-p[0].value)**2 + p[1].value**2)
     self.expression = L
     self.add_parameter(position, 'position')
     self.add_parameter(gamma, 'width')
+    self.add_parameter(height_factor, 'height_factor')
   
   def set_position(self, position):
     self.parameters[0].set(position)
     
   def set_gamma(self, gamma):
     self.parameters[1].set(gamma)
+
+  def set_height(self, height):
+    '''Set the maximum (height) of the Lorentzian function. This 
+    actually set the height factor to the value height*pi*gamma.
+    '''
+    self.parameters[2].set(height*np.pi*self.parameters[1].value)
 
   def fwhm(self):
     p = self.get_parameters()
@@ -238,11 +273,33 @@ class Cosine(FitFunction):
     p = self.get_parameters()
     return 3./4*p[1].value
 
-def voigt(x, sigma, gamma):
-   # The Voigt function is also the real part of 
-   # w(z) = exp(-z^2) erfc(iz), the complex probability function,
-   # which is also known as the Faddeeva function. Scipy has 
-   # implemented this function under the name wofz()
-   z = (x + 1j*gamma) / (sigma * np.sqrt(2))
-   I = wofz(z).real / (sigma * np.sqrt(2) * np.pi)
-   return I
+class Voigt(FitFunction):
+  '''The Voigt function is also the real part of 
+  w(x) = exp(-x**2) erfc(ix), the Faddeeva function. 
+  
+  Here we use one of the popular implementation which is available 
+  in scipy with the wofz function.
+  '''
+  
+  def __init__(self, position=0.0, sigma=1.0, gamma=1.0):
+    FitFunction.__init__(self)
+    def V(x, p):
+      z = (x - p[0].value + 1j*p[2].value) / (p[1].value * np.sqrt(2))
+      return wofz(z).real / (p[1].value * np.sqrt(2) * np.pi)
+    self.expression = V
+    self.add_parameter(position, 'position')
+    self.add_parameter(sigma, 'sigma')
+    self.add_parameter(gamma, 'gamma')
+
+  def set_position(self, position):
+    '''Set the position (center) of the Voigt function.'''
+    self.parameters[0].set(position)
+    
+  def set_sigma(self, sigma):
+    '''Set the sigma of the Voigt function.'''
+    self.parameters[1].set(sigma)
+
+  def fwhm(self):
+    '''Compute the full width at half maximum of the Voigt function.'''
+    p = self.get_parameters()
+    return 2*p[1].value*np.log(2) # correct this !!

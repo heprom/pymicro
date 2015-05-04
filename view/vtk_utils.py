@@ -99,7 +99,74 @@ def invert_cmap(ref_lut):
     lut.SetTableValue(i, ref_lut.GetTableValue(N-i))
   lut.SetRange(ref_lut.GetTableRange())
 
-def hot_cmap(table_range=(0,255)):
+def hsv_cmap(N = 64, table_range=(0, 255)):
+  '''Create a VTK look up table similar to matlab's hsv.
+
+  *Parameters*
+  
+  **N**: int, number of colors in the table.
+  
+  **table_range**: 2 values tuple (default: (0,255))
+  start and end values for the table range.
+
+  *Returns*
+
+  A vtkLookupTable.
+  '''
+  lut = vtk.vtkLookupTable()
+  lut.SetHueRange(0.0, 1.0)
+  lut.SetSaturationRange(1.0, 1.0)
+  lut.SetValueRange(1.0, 1.0)
+  lut.SetNumberOfColors(N)
+  lut.Build()
+  lut.SetRange(table_range)
+  return lut
+
+def jet_cmap(N = 64, table_range=(0, 255)):
+  '''Create a VTK look up table similar to matlab's jet.
+
+  *Parameters*
+  
+  **N**: int, number of colors in the table.
+  
+  **table_range**: 2 values tuple (default: (0,255))
+  start and end values for the table range.
+
+  *Returns*
+
+  A vtkLookupTable from blue to red.
+  '''
+  lut = vtk.vtkLookupTable()
+  lut.SetHueRange(0.667, 0.0)
+  lut.SetNumberOfColors(N)
+  lut.Build()
+  lut.SetRange(table_range)
+  return lut
+
+def hot(N = 64, table_range=(0, 255)):
+  '''from scitools/easyviz/vtk_new_.html'''
+  lut = vtk.vtkLookupTable()
+  inc = 0.01175
+  lut.SetNumberOfColors(256)
+  i = 0
+  r = 0.0; g = 0.0; b = 0.0
+  while r <= 1.:
+    lut.SetTableValue(i, r, g, b, 1)
+    r += inc; i += 1
+  r = 1.
+  while g <= 1.:
+    lut.SetTableValue(i, r, g, b, 1)
+    g += inc; i += 1
+  g = 1.
+  while b <= 1:
+    if i == 256: break
+    lut.SetTableValue(i, r, g, b, 1)
+    b += inc; i += 1
+  lut.Build()
+  lut.SetRange(table_range)
+  return lut
+
+def hot_cmap(table_range=(0, 255)):
   '''Create a VTK look up table similar to matlab's hot.
 
   *Parameters*
@@ -1024,14 +1091,17 @@ def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
 
   The method return a vtkActor that can be directly added to a renderer.
   '''
-  if type(data) == numpy.ndarray:
-    size = data.shape
-  else:
-    size = 1 + numpy.array(data.GetExtent()[1::2])
   # implicit function
   bbox = vtk.vtkBox()
-  bbox.SetXMin(size[0]/2., -1, size[2]/2.)
-  bbox.SetXMax(size[0], size[1]/2., size[2])
+  if type(data) == numpy.ndarray:
+    size = data.shape
+    bbox.SetXMin(size[0]/2., -1, size[2]/2.)
+    bbox.SetXMax(size[0], size[1]/2., size[2])
+  else:
+    e = 0.001
+    bb = grid.GetBounds()
+    bbox.SetXMin((bb[1]-bb[0])/2., bb[2]-e, (bb[5]-bb[4])/2.)
+    bbox.SetXMax(bb[1]+e, (bb[3]-bb[2])/2., bb[5]+e)
   return map_data(data, bbox, lut = lut, cell_data=cell_data)
 
 def map_data(data, function, lut = gray_cmap(), cell_data=True):
@@ -1086,6 +1156,25 @@ def map_data(data, function, lut = gray_cmap(), cell_data=True):
   actor = vtk.vtkActor()
   actor.SetMapper(mapper)
   return actor
+  
+def color_bar(title, lut=None, fmt='%.1e', width=0.5, height=0.075, num_labels=7, font_size=26):
+  bar = vtk.vtkScalarBarActor()
+  if not lut:
+    lut = jet_cmap()
+  bar.SetLookupTable(lut)
+  bar.SetTitle(title)
+  bar.GetPositionCoordinate().SetCoordinateSystemToNormalizedViewport()
+  bar.GetPositionCoordinate().SetValue(0.25, 0.025)
+  bar.SetOrientationToHorizontal()
+  bar.SetLabelFormat(fmt)
+  bar.GetLabelTextProperty().SetColor(0, 0, 0)
+  bar.GetTitleTextProperty().SetColor(0, 0, 0)
+  bar.GetLabelTextProperty().SetFontSize(font_size)
+  bar.GetTitleTextProperty().SetFontSize(font_size)
+  bar.SetWidth(width)
+  bar.SetHeight(height)
+  bar.SetNumberOfLabels(num_labels)
+  return bar
   
 def setup_camera(size=(100, 100, 100)):
   '''Setup the camera with usual viewing parameters.

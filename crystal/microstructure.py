@@ -327,7 +327,7 @@ class Orientation:
       angles = np.array([float(phi1), float(Phi), float(phi2)])
       if data_type == 'euler':
         orientations.append([i+1, Orientation.from_euler(angles)])
-      elif dat_type == 'rodrigues':
+      elif data_type == 'rodrigues':
         orientations.append([i+1, Orientation.from_rodrigues(angles)])
     return dict(orientations)
 

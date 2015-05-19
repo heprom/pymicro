@@ -647,7 +647,15 @@ class HklPlane(HklObject):
   @staticmethod
   def get_family(hkl):
     '''Helper static method to obtain a list of the different
-    slip plane in a particular family.'''
+    slip plane in a particular family.
+    
+    We could build any family with 3 integers automatically:
+    * 1 int nonzero -> 3 planes, eg (001)
+    * 2 equal ints nonzero -> 6 planes, eg (011)
+    * 3 equal ints nonzero -> 4 planes, eg (111)
+    * 2 different ints, all nonzeros -> 12 planes, eg (112) 
+    * 3 different ints, all nonzeros -> 24 planes, eg (123)
+    '''
     family = []
     if hkl == '100':
       family.append(HklPlane(1, 0, 0))
@@ -669,6 +677,19 @@ class HklPlane(HklObject):
       family.append(HklPlane(2, 0, 0))
       family.append(HklPlane(0, 2, 0))
       family.append(HklPlane(0, 0, 2))
+    elif hkl == '211':
+      family.append(HklPlane(1, 1, 2))
+      family.append(HklPlane(-1, 1, 2))
+      family.append(HklPlane(1, -1, 2))
+      family.append(HklPlane(1, 1, -2))
+      family.append(HklPlane(1, 2, 1))
+      family.append(HklPlane(-1, 2, 1))
+      family.append(HklPlane(1, -2, 1))
+      family.append(HklPlane(1, 2, -1))
+      family.append(HklPlane(2, 1, 1))
+      family.append(HklPlane(-2, 1, 1))
+      family.append(HklPlane(-2, 1, -1))
+      family.append(HklPlane(-2, -1, 1))
     elif hkl == '220':
       family.append(HklPlane(2, 2, 0))
       family.append(HklPlane(-2, 2, 0))

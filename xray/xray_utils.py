@@ -1,27 +1,33 @@
 import os, numpy as np
 from matplotlib import pyplot as plt
 
-def plot_xray_trans(mat='Al', t=1.0, rho=1.0, display=False):
+def plot_xray_trans(mat='Al', ts=[1.0], rho=1.0, unit='keV', energy_lim=(1, 100), display=False):
   '''Plot the transmitted intensity of a X-ray beam through a given material.
   
   **Parameters:**
   
   *mat* The material (Chemical composition, eg. 'Al')
   
-  *t* thickness of the material (1.0 by default)
+  *ts* a list of thickness values of the material in mm (1.0 by default)
   
-  *rho* density of the material (1.0 by default)
+  *rho* density of the material in g/cm^3 (1.0 by default)
+  
+  *unit* unit for the energy column (keV by default)
+  
+  *energy_lim* energy bounds in the plot (1, 100 by default)
   
   *display* display the plot or save an image of the plot (False by default)
   '''
   path = os.path.dirname(__file__)
   mu_rho = np.genfromtxt(os.path.join(path, mat + '.txt'), usecols = (0, 1), comments='#')
-  rho = 2.8 # density in g/cm^3
   energy = mu_rho[:,0]
-  # apply Beer-Lambert
-  trans = 100*np.exp(-mu_rho[:,1]*rho*t/10)
-  plt.plot(energy, trans, 'b-', linewidth=3, markersize=10, label='%s %.1f mm' % (mat, t))
-  plt.xlim(1,100)
+  if unit == 'MeV':
+    energy *= 1000
+  for t in ts:
+    # apply Beer-Lambert
+    trans = 100*np.exp(-mu_rho[:,1]*rho*t/10)
+    plt.plot(energy, trans, '-', linewidth=3, markersize=10, label='%s %.1f mm' % (mat, t))
+  plt.xlim(energy_lim)
   plt.grid()
   plt.legend(loc='upper left')
   plt.xlabel('Photon Energy (keV)')

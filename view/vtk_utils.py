@@ -455,9 +455,11 @@ def add_HklPlanes_with_orientation_in_grain(grain, \
     local_orientation.AddPart(hklplaneActor)
   return local_orientation
   
-def unit_arrow_3d(start, vector, color=orange, make_unit=True):
+def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True):
   n = numpy.linalg.norm(vector)
   arrowSource = vtk.vtkArrowSource()
+  arrowSource.SetShaftRadius(radius)
+  arrowSource.SetTipRadius(10*radius/3.)
   # We build a local direct base with X being the unit arrow vector
   X = vector/n
   arb = numpy.array([1,0,0]) # used numpy here, could used the vtkMath module as well...
@@ -1157,6 +1159,12 @@ def map_data(data, function, lut = gray_cmap(), cell_data=True):
   actor.SetMapper(mapper)
   return actor
   
+def set_opacity(assembly, opacity):
+  collection = vtk.vtkPropCollection()
+  assembly.GetActors(collection);
+  for i in range(collection.GetNumberOfItems()):
+    collection.GetItemAsObject(i).GetProperty().SetOpacity(opacity)
+
 def color_bar(title, lut=None, fmt='%.1e', width=0.5, height=0.075, num_labels=7, font_size=26):
   bar = vtk.vtkScalarBarActor()
   if not lut:

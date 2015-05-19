@@ -423,9 +423,8 @@ class Grain:
     self.id = grain_id
     self.orientation = grain_orientation
     self.position = (0, 0, 0)
-    self.volume = 0
+    self.volume = 0 # warning not implemented
     self.vtkmesh = None
-    #self.records = []
 
   def __repr__(self):
     '''Provide a string representation of the class.'''
@@ -544,7 +543,7 @@ class Grain:
     return grain
 
   @staticmethod
-  def from_xml(grain_node):
+  def from_xml(grain_node, verbose=False):
     grain_id = grain_node.childNodes[0]
     grain_orientation = grain_node.childNodes[1]
     orientation = Orientation.from_xml(grain_orientation)
@@ -557,8 +556,8 @@ class Grain:
     grain.position = (xg, yg, zg)
     grain_mesh = grain_node.childNodes[3]
     grain_mesh_file = grain_mesh.childNodes[0].nodeValue
-    print grain_mesh_file
-    grain.load_vtk_repr(grain_mesh_file)
+    if verbose: print grain_mesh_file
+    grain.load_vtk_repr(grain_mesh_file, verbose)
     return grain
     
   def vtk_file_name(self):
@@ -574,9 +573,9 @@ class Grain:
     writer.SetInput(self.vtkmesh)
     writer.Write()
 
-  def load_vtk_repr(self, file_name):
+  def load_vtk_repr(self, file_name, verbose=False):
     import vtk
-    print 'reading ' + file_name
+    if verbose: print 'reading ' + file_name
     reader = vtk.vtkXMLUnstructuredGridReader()
     reader.SetFileName(file_name)
     reader.Update()
@@ -586,7 +585,7 @@ class Grain:
     '''Returns the grain orientation matrix.'''
     return self.orientation.orientation_matrix()
 
-  def dct_omega_angles(self, hkl, lambda_keV, verbose=True):
+  def dct_omega_angles(self, hkl, lambda_keV, verbose=False):
     '''Compute the two omega angles which satisfy the Bragg condition.
     
     For a grain with a given crystal orientation sitting on a vertical 
@@ -615,15 +614,20 @@ class Grain:
     
        Cubic lattice is assumed which turn the matrix S into the identity.
        
+       HP 15/05/2015 this return angles between [-pi,pi] and graphically, 
+       it looks like it corespond to diffraction angles of -h-k-l. This 
+       should be checked carefully.
+       
     '''
     (h, k, l) = hkl.miller_indices()
     (a, b, c) = hkl._lattice._lengths
     theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
     lambda_nm = 1.2398 / lambda_keV
 
-    Bt = self.orientation_matrix().transpose()
-    A = h*Bt[0,0] + k*Bt[1,0] + l*Bt[2,0]
-    B = -h*Bt[0,1] - k*Bt[1,1] - l*Bt[2,1]
+    gt = self.orientation_matrix() # our B (here called gt) corresponds to g^{-1} in Poulsen 2004
+    print 'g^{-1}=',gt
+    A = h*gt[0,0] + k*gt[1,0] + l*gt[2,0]
+    B = -h*gt[0,1] - k*gt[1,1] - l*gt[2,1]
     C = 2*a*np.sin(theta)**2 / lambda_nm
     Delta = 4*(A**2 + B**2 - C**2)
     if Delta < 0:
@@ -691,13 +695,13 @@ class Microstructure:
     return colors.ListedColormap(rand_colors)
     
   @staticmethod
-  def from_xml(xml_file_name, grain_ids=None):
+  def from_xml(xml_file_name, grain_ids=None, verbose=False):
     '''Load a Microstructure object from an xml file.
     
     It is possible to restrict the grains which are loaded by providing 
     the list of ids of the grains of interest.
     '''
-    print grain_ids
+    if verbose and grain_ids: print 'loading only grain ids %s' % grain_ids
     micro = Microstructure()
     dom = parse(xml_file_name)
     root = dom.childNodes[0]
@@ -706,8 +710,8 @@ class Microstructure:
     grains = root.childNodes[1]
     for node in grains.childNodes:
       if grain_ids and not (int(node.childNodes[0].childNodes[0].nodeValue) in grain_ids): continue
-      print node
-      micro.grains.append(Grain.from_xml(node))
+      if verbose: print node
+      micro.grains.append(Grain.from_xml(node, verbose))
     return micro
     
   def get_grain(self, gid):
@@ -780,6 +784,109 @@ class Microstructure:
       writer.SetFileName(vtk_file_name)
       writer.SetInput(self.vtkmesh)
       writer.Write()    
+
+  def dct_projection(self, data, lattice, omega, dif_grains, lambda_keV, d, ps, det_npx=np.array([2048, 2048]), ds=1, display=False, verbose=False):
+    lambda_nm = 1.2398 / lambda_keV
+    # prepare rotation matrix
+    omegar = omega*np.pi/180
+    R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
+    data_abs = np.where(data > 0, 1, 0)
+    # x_max as stated in parallel_beam.py
+    x_max = 1 + 2*np.ceil(np.hypot(*data_abs[:,:,0].shape) / 2 + 1)
+    proj = np.zeros((np.shape(data_abs)[2], x_max), dtype=np.float)
+    if verbose:
+      print 'diffracting grains', dif_grains
+      print 'proj size is ',np.shape(proj)
+    # handle each grain in Bragg condition
+    for (gid, (h, k, l)) in dif_grains:
+      mask_dif = (data == gid)
+      data_abs[mask_dif] = 0 # remove this grain from the absorption
+    data_abs = np.rot90(data_abs, k=3)
+    from catpy.parallel_beam import radon
+    for i in range(np.shape(data_abs)[2]):
+      proj[i,:] = radon(data_abs[:,:,i], [omega])[:,0]
+    # create the detector image (larger than the FOV) by padding the transmission image with zeros
+    full_proj = np.zeros(det_npx / ds, dtype=np.float)
+    if verbose:
+      print 'full proj size is ',np.shape(full_proj)
+      print 'max proj', proj.max()
+      # here we could use np.pad with numpy version > 1.7
+      print int(0.5*det_npx[0]/ds-proj.shape[0]/2.)
+      print int(0.5*det_npx[0]/ds+proj.shape[0]/2.)
+      print int(0.5*det_npx[1]/ds-proj.shape[1]/2.)
+      print int(0.5*det_npx[1]/ds+proj.shape[1]/2.)
+    # let's moderate the direct beam so we see nicely the spots with a 8 bits scale
+    att = 6.0 / ds
+    full_proj[int(0.5*det_npx[0]/ds-proj.shape[0]/2.):int(0.5*det_npx[0]/ds+proj.shape[0]/2.), \
+      int(0.5*det_npx[1]/ds-proj.shape[1]/2.):int(0.5*det_npx[1]/ds+proj.shape[1]/2.)] += proj / att
+    # add diffraction spots
+    from pymicro.crystal.lattice import HklPlane
+    from scipy import ndimage
+    for (gid, (h, k, l)) in dif_grains:
+      # compute scattering vector
+      Bt = self.get_grain(gid).orientation_matrix().transpose()
+      p = HklPlane(h, k, l, lattice)
+      X = np.array([1., 0., 0.])/lambda_nm
+      n = R.dot(Bt.dot(p.normal()))
+      G = n/p.interplanar_spacing() # also G = R.dot(Bt.dot(h*astar + k*bstar + l*cstar))
+      K = X + G
+      # TODO explain the - signs, account for grain position in the rotated sample
+      (u, v) = (d*K[1]/K[0], d*K[2]/K[0]) # unit is mm
+      (u_mic, v_mic) = (1000*u, 1000*v) # unit is micron
+      (up, vp) = (0.5*det_npx[0]/ds + u_mic / (ps*ds), 0.5*det_npx[1]/ds + v_mic / (ps*ds)) # unit is pixel on the detector
+      if verbose:
+        print 'plane normal:', p.normal()
+        print R
+        print 'rotated plane normal:', n
+        print 'scattering vector:', G
+        print 'K = X + G vector', K
+        print 'lenght X', np.linalg.norm(X)
+        print 'lenght K', np.linalg.norm(K)
+        print 'angle between X and K', np.arccos(np.dot(K, X)/(np.linalg.norm(K)*np.linalg.norm(X)))*180/np.pi
+        print 'diffracted beam will hit the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (u, v, up, vp)
+      grain_data = np.where(data == gid, 1, 0)
+      data_dif = grain_data[ndimage.find_objects(data == gid)[0]]
+      x_max = 1 + 2*np.ceil(np.hypot(*data_dif[:,:,0].shape) / 2 + 1)
+      proj_dif = np.zeros((np.shape(data_dif)[2], x_max), dtype=np.float)
+      data_dif = np.rot90(data_dif, k=3) # check this rot90
+      for i in range(np.shape(data_dif)[2]):
+        proj_dif[i,:] = radon(data_dif[:,:,i], [omega])[:,0]
+      if verbose:
+        print '* proj_dif size is ',np.shape(proj_dif)
+        print int(up - proj_dif.shape[0]/2.)
+        print int(up + proj_dif.shape[0]/2.)
+        print int(vp - proj_dif.shape[1]/2.)
+        print int(vp + proj_dif.shape[1]/2.)
+        print 'max proj_dif', proj_dif.max()
+      # add diffraction spot to the image detector
+      try:
+        # warning full_proj image is transposed (we could fix that and plot with .T since pyplot plots images like (y,x))
+        full_proj[int(vp - proj_dif.shape[0]/2.):int(vp + proj_dif.shape[0]/2.), \
+                int(up - proj_dif.shape[1]/2.):int(up + proj_dif.shape[1]/2.)] += proj_dif 
+        #full_proj[int(up - proj_dif.shape[0]/2.):int(up + proj_dif.shape[0]/2.), \
+        #        int(vp - proj_dif.shape[1]/2.):int(vp + proj_dif.shape[1]/2.)] += proj_dif 
+      except:
+        print 'error occured' # grain diffracts outside the detector
+        pass
+      plt.imsave('proj_dif/proj_dif_grain%d_omega=%03.1f.png' % (gid, omega), proj_dif, cmap=cm.gray, origin='lower')
+    if display:
+      fig = plt.figure(figsize=(10,10))
+      ax = fig.add_subplot(111)
+      ax.imshow(full_proj[:,::-1], cmap=cm.gray, vmin=0, vmax=255, origin='lower') # check origin
+      for (h,k,l) in [(1,1,0), (2,0,0), (2,1,1), (2,2,0), (2,2,2), (3,1,0), (3,2,1), (3,3,0), (3,3,2)]:
+        hkl = HklPlane(h, k, l, lattice)
+        theta = hkl.bragg_angle(lambda_keV)
+        print 'bragg angle for %s reflection is %.2f deg' % (hkl.miller_indices(), theta*180./np.pi)
+        t = np.linspace(0.0, 2*np.pi, num=37)
+        L = d*1000/ps/ds*np.tan(2*theta) # 2 theta distance on the detector
+        ax.plot(0.5*det_npx[0]/ds + L*np.cos(t), 0.5*det_npx[1]/ds + L*np.sin(t), 'g--')
+        ax.annotate(str(h)+str(k)+str(l), xy=(0.5*det_npx[0]/ds, 0.5*det_npx[1]/ds + L),  xycoords='data', color='green', horizontalalignment='center', verticalalignment='bottom', fontsize=16)
+      plt.xlim(0, det_npx[0]/ds)
+      plt.ylim(0, det_npx[1]/ds)
+      plt.show()
+    else:
+      # save projection image with origin = lower since Z-axis is upwards
+      plt.imsave('proj/proj_omega=%03.1f.png' % omega, full_proj, cmap=cm.gray, vmin=0, vmax=255, origin='lower')
     
 class EbsdMicrostructure:
   '''

@@ -837,12 +837,12 @@ def apply_orientation_to_actor(actor, orientation):
   transform.RotateZ(orientation.phi2())
   actor.SetUserTransform(transform)
 
-def load_STL_actor(name, verbose=False):
+def load_STL_actor(name, ext='STL', verbose=False):
   '''Read a STL file and return the corresponding vtk actor.
   '''
   if verbose: print 'adding part: %s' % name
   part = vtk.vtkSTLReader()
-  part.SetFileName(name + ".STL")
+  part.SetFileName(name + '.' + ext)
   part.Update()
   partMapper = vtk.vtkPolyDataMapper()
   partMapper.SetInputConnection(part.GetOutputPort())

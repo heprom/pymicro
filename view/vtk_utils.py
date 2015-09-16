@@ -803,27 +803,12 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
 
      A 3D view of a cubic lattice with all four 111 planes displayed.
 
-  *Parameters*
-
-  **hklplanes**: list of `pymicro.crystal.lattice.HklPlane`
-  A list of the hkl planes to add to the lattice.
-
-  **crystal_orientation**: Orientation
-  The crystal orientation with respect to the sample coordinate system
-  (default: None).
-  
-  **show_atoms** bool
-  A boolean controling if the atoms are shown (default: True)
-
-  **show_normal** bool
-  A boolean controling if the slip plane normals are shown (default: True)
-  
-  **plane_opacity** float in [0., 1.0]
-  A float number controlling the slip plane opacity.
-
-  *Returns*
-
-  The method return a vtkAssembly that can be directly added to a renderer.
+  :param hklplanes: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` instances to add to the lattice.
+  :param crystal_orientation: The crystal :py:class:`~pymicro.crystal.microstructure.Orientation` with respect to the sample coordinate system (default: None).
+  :param bool show_atoms: control if the atoms are shown (default: True).
+  :param bool show_normal: control if the slip plane normals are shown (default: True).
+  :param float plane_opacity: A float number in the [0.,1.0] range controlling the slip plane opacity.
+  :return: The method return a vtkAssembly that can be directly added to a renderer.
   '''
   # get grid corresponding to the crystal lattice
   grid = lattice_grid(lattice)
@@ -866,11 +851,8 @@ def apply_orientation_to_actor(actor, orientation):
   the components of the orientation matrix are used directly since 
   they are known without any ambiguity.
 
-  *Parameters*
-
-  **actor**: the vtk actor.
-  
-  **orientation**: an instance of the :py:class:`pymicro.crystal.microstructure.Orientation` class
+  :param vtkActor actor: the vtk actor.
+  :param orientation: an instance of the :py:class:`pymicro.crystal.microstructure.Orientation` class
   '''
   transform = vtk.vtkTransform()
   Bt = orientation.orientation_matrix().transpose()
@@ -891,6 +873,11 @@ def apply_orientation_to_actor(actor, orientation):
 
 def load_STL_actor(name, ext='STL', verbose=False):
   '''Read a STL file and return the corresponding vtk actor.
+
+  :param str name: the base name of the file to read.
+  :param str ext: extension of the file to read.
+  :param bool verbose: verbose mode.
+  :return: the 3d solid in the form of a vtk actor.
   '''
   if verbose: print 'adding part: %s' % name
   part = vtk.vtkSTLReader()

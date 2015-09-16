@@ -860,11 +860,17 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
 
 def apply_orientation_to_actor(actor, orientation):
   '''
-  Transform the actor assembly using the specified Orientation.
+  Transform the actor (or whole assembly) using the specified orientation.
   Here we could use the three euler angles associated with the 
-  orientation with the RotateZ and RotateX methods but the components 
-  of the orientation matrix are used directly since they are known 
-  without any ambiguity.
+  orientation with the RotateZ and RotateX methods of the actor but 
+  the components of the orientation matrix are used directly since 
+  they are known without any ambiguity.
+
+  *Parameters*
+
+  **actor**: the vtk actor.
+  
+  **orientation**: an instance of the :py:class:`pymicro.crystal.microstructure.Orientation` class
   '''
   transform = vtk.vtkTransform()
   Bt = orientation.orientation_matrix().transpose()

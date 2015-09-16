@@ -3,6 +3,7 @@
 '''
 import numpy as np
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
+from pymicro.crystal.lattice import *
 from pymicro.crystal.texture import PoleFigure
 from random import shuffle
 
@@ -35,6 +36,12 @@ def Rodrigues2Euler(rod):
 	print o.euler
 	return o.euler
 
+def SchmidFactor_from_Rod(rod):
+	o = Orientation.from_rodrigues(Rod)
+	print o.schmid_factor
+
+
+
 def euler_from_file(file):
 	f = open(file, "r")
 	f_lines = f.readlines()
@@ -61,7 +68,7 @@ def euler_from_file(file):
 				orientations.append([float(line[0]), float(line[1]), float(line[2])])
 				greylevels.append(float(line[3]))
 			to_return = [orientations, greylevels]
-		elif(len(rawdata[0] == 3)):
+		elif(len(rawdata[0]) == 3):
 			for line in rawdata:
 				orientations.append([float(line[0]), float(line[1]), float(line[2])])
 				greylevels.append(-1.)
@@ -105,3 +112,139 @@ def plot_pole_figures_from_file(file):
 	
 	pf = PoleFigure(m)
 	pf.plot_pole_figures()
+	
+'''
+def Calculate_Omega_dct(Rod,a = 0.405,hkl,E):
+
+	Calculate diffracting onmegas angle for a grain in a given orientation. 
+	Note: I have juste impemanted for {111} planes, {200} should be too!
+	
+	*Parameter*
+	
+	**Rodrigues vector**: (Rod) Rodrigues vector of the given grain
+	
+	**interplanar spacing**: (a) interplanar spacing for the given plane family, by default for the aluminium
+	
+	**Energy**: (E) Energy of the beam in keV
+
+	
+	m = Microstructure()
+	m.name = 'DCT'
+	m.grains = []
+	o = Orientation.from_rodrigues(Rod)
+	g = Grain(1, o)
+	m.grains.append(g)
+	
+    l = Lattice.cubic(a)
+    p = HklPlane(hkl[0], hkl[1],hkl[2] , lattice=l)
+    
+    Grain.dct_omega_angles(g,p,E)
+	
+'''	
+	
+def plot_pole_figures_from_file_Rod(file):
+	Rods = np.genfromtxt(file)
+
+	print np.shape(Rods)
+	
+	m = Microstructure()
+	m.name = 'from_file'
+	m.grains = []
+	
+	for Rod in Rods:
+		o = Orientation.from_rodrigues(Rod)
+		g = Grain(1, o)
+		m.grains.append(g)
+	
+	pf = PoleFigure(m)
+	pf.plot_pole_figures()
+
+
+def calc_poles_id11(pl):
+	'''
+	Compute the two tilts to align a plane normal (pl) expressed in lab coordinates
+	with Z=[0 0 1] in lab coordinates for the id11 diffractometer (ie: samrx ->samry ->diffrz ->diffry)
+	
+	return a numpy array like [samrx,samry]
+	'''
+	
+	def Rx(alpha):
+		Mx = np.array([[1 ,0 ,0],[ 0, np.cos(alpha) ,-np.sin(alpha)],[ 0 , np.sin(alpha) ,np.cos(alpha)]])
+		return Mx
+	
+	def Ry(alpha):
+		My = np.array([[np.cos(alpha),0,np.sin(alpha)],[0,1,0],[-np.sin(alpha),0,np.cos(alpha)]])
+		return My
+		
+	samry = np.arctan(-pl[0]/pl[2])
+	
+	pl_tilted = Ry(samry).dot(pl)
+	
+	print 'tilted (once) plane normal is:'
+	print pl_tilted
+	
+	samrx = np.arctan(pl_tilted[1]/pl_tilted[2])
+	
+	pl_tilted = Rx(samrx).dot(pl_tilted)
+	
+	print 'tilted (twice) plane normal is:'
+	print pl_tilted
+	
+	samrx_deg = samrx*180/np.pi
+	samry_deg = samry*180/np.pi
+	
+	print 'samrx is:'
+	print samrx_deg
+	
+	print 'samry is:'
+	print samry_deg
+	
+	print 'associated Rotation matrix is:'
+	print Rx(samrx).dot(Ry(samry))
+	
+	return np.array([samrx_deg,samry_deg])
+	
+
+
+def Sam2Lab(xyzSam,Sx,Sy,Sz):
+	
+	'''
+	 Return in lab coordinates the xyzA vector initially expressed in Labcoordinates
+	 ***input***
+	 xyzA : vector expressed in  sample coordinates
+	 Sx: x axis of the sample expressed in Lab coordinates
+	 Sy: y axis of the sample expressed in Lab coordinates
+	 Sz: z axis of the sample expressed in Lab coordinates
+	'''
+	 
+	M_L2S = np.array([Sx,Sy,Sz])
+	xyzLab = xyzSam.dot(M_L2S)
+	
+	return xyzLab
+
+
+def Lab2sam(xyzLab,Sx,Sy,Sz):
+	
+	'''
+	 Return in lab coordinates the xyzA vector initially expressed in Labcoordinates
+	 ***input***
+	 xyzA : vector expressed in  sample coordinates
+	 Sx: x axis of the sample expressed in Lab coordinates
+	 Sy: y axis of the sample expressed in Lab coordinates
+	 Sz: z axis of the sample expressed in Lab coordinates
+	'''
+	 
+	M_L2S = np.array([Sx,Sy,Sz])
+	M_S2M = np.linalg.inv(M_L2S)
+	xyzSam = xyzLab.dot(M_S2L)
+	
+	return xyzSam
+	
+
+def Sam2Sam(xyzA,Ax,Ay,Az,Bx,By,Bz):
+	
+	xyzLab = Sam2Lab(xyzsam,Ax,Ay,Az)
+	
+	xyzB = Lab2Sam(xyzLab,Bx,By,Bz)
+	
+	return xyzB

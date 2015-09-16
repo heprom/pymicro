@@ -162,8 +162,7 @@ class PoleFigure:
       raise TypeError('Error, unsupported projection type', proj)
     ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
       markersize=self.mksize, label=lab)
-    #Next 3 lines are necessary in case c_dir[2]=0, as for
-    #Euler angles [45, 45, 0]
+    # Next 3 lines are necessary in case c_dir[2]=0, as for Euler angles [45, 45, 0]
     if c_dir[2] < 0.000001:
       ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
         markersize=self.mksize, label=lab)
@@ -190,16 +189,16 @@ class PoleFigure:
     *col*: line color (black by default)
     
     '''
-    path = np.zeros((steps,2), dtype=float)
-    for j, i in enumerate(np.linspace(0, 1, steps)):
+    path = np.zeros((steps, 2), dtype=float)
+    for j, i in enumerate(np.linspace(0., 1., steps)):
       ci = i*c1 + (1-i)*c2
       ci /= np.linalg.norm(ci)
       if self.proj == 'stereo':
         ci += self.z
         ci /= ci[2]
-      path[j,0] = ci[0]
-      path[j,1] = ci[1]
-    ax.plot(path[:,0], path[:,1], color=col, markersize=self.mksize)
+      path[j, 0] = ci[0]
+      path[j, 1] = ci[1]
+    ax.plot(path[:, 0], path[:, 1], color=col, markersize=self.mksize, linewidth=2)
 
   def plot_pf_background(self, ax):
     '''Helper function to plot the background of the pole figure. '''
@@ -248,6 +247,39 @@ class PoleFigure:
             # only add grain legend for its first pole
             label = 'grain ' + str(grain.id)
 	self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
+    ax.axis([-1.1,1.1,-1.1,1.1])
+    if self.pflegend and self.color_by_grain_id:
+      ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, \
+        prop={'size':10})
+    ax.axis('off')
+    ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
+
+  def plot_pf_hot(self, strain_levels, ax=None, mk='o', col='k', ann=False, min_level = 0.015, max_level = 0.025):
+    '''Create the direct pole figure. '''
+    axe_labels = ['X', 'Y', 'Z']
+    if self.axis == 'Z':
+      h = 0; v = 1; u = 2
+    elif self.axis == 'Y':
+      h = 0; v = 2; u = 1
+    else:
+      h = 1; v = 2; u = 0
+    self.plot_pf_background(ax)
+    ax.annotate(axe_labels[h], (1.01, 0.0), xycoords='data',
+      fontsize=16, horizontalalignment='left', verticalalignment='center')
+    ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data',
+      fontsize=16, horizontalalignment='center', verticalalignment='bottom')
+    for grain in self.microstructure.grains:
+      B = grain.orientation_matrix()
+      Bt = B.transpose()
+      for i, c in enumerate(self.poles):
+        label = ''
+        c_rot = Bt.dot(c)
+        if self.verbose: print 'plotting ',c,' in sample CS (corrected for pf axis):',c_rot
+        if self.color_by_strain_level:
+          strain_level = strain_levels[grain.id]
+          color = int(256*(strain_level-min_level)/float(max_level-min_level))
+          col = self.lut[color][1:4]
+        self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
     ax.axis([-1.1,1.1,-1.1,1.1])
     if self.pflegend and self.color_by_grain_id:
       ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, \
@@ -336,6 +368,8 @@ class PoleFigure:
       else:
         axis = self.x
       axis_rot = B.dot(axis)
+      if self.color_by_grain_id:
+        col = Microstructure.rand_cmap().colors[grain.id]
       self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
       if self.verbose: print 'plotting ',self.axis,' in crystal CS:',axis_rot
     ax.axis([-1.1,1.1,-1.1,1.1])

@@ -283,7 +283,9 @@ class wxRadialProfileFrame(wx.Frame):
     elif self.path.endswith('.dat'):
       self.im = np.genfromtxt(im_file)
     else:
-      self.im = rawmar_read(im_file, 2300)
+      #self.im = rawmar_read(im_file, 2300)
+      from pymicro.file.file_utils import HST_read
+      self.im = HST_read(im_file, data_type=np.uint16, dims=(2048, 2048, 1))[:,:,0]
     self.statusbar.SetStatusText('Image loaded from %s ' % self.path)
 
   def OnCmapSelected(self, event):

@@ -220,7 +220,7 @@ class Gaussian(FitFunction):
   def fwhm(self):
     '''Compute the full width at half maximum of the gauss function.'''
     p = self.get_parameters()
-    return 2*p[1].value*np.log(2)
+    return 2*p[1].value*np.log(2) # check sqrt ??
   
 class Lorentzian(FitFunction):
   '''Lorentzian funtion.
@@ -281,15 +281,16 @@ class Voigt(FitFunction):
   in scipy with the wofz function.
   '''
   
-  def __init__(self, position=0.0, sigma=1.0, gamma=1.0):
+  def __init__(self, position=0.0, sigma=1.0, gamma=1.0, height_factor=1.0):
     FitFunction.__init__(self)
     def V(x, p):
       z = (x - p[0].value + 1j*p[2].value) / (p[1].value * np.sqrt(2))
-      return wofz(z).real / (p[1].value * np.sqrt(2) * np.pi)
+      return p[3].value * wofz(z).real / (p[1].value * np.sqrt(2) * np.pi)
     self.expression = V
     self.add_parameter(position, 'position')
     self.add_parameter(sigma, 'sigma')
     self.add_parameter(gamma, 'gamma')
+    self.add_parameter(height_factor, 'height_factor')
 
   def set_position(self, position):
     '''Set the position (center) of the Voigt function.'''
@@ -299,7 +300,20 @@ class Voigt(FitFunction):
     '''Set the sigma of the Voigt function.'''
     self.parameters[1].set(sigma)
 
+  def set_height(self, height):
+    '''Set the maximum (height) of the Voigt function. This 
+    actually set the height factor to the proper value. Be careful that 
+    if you change the other parameters (sigma, gamma) the maximum height 
+    will be changed.
+    '''
+    maxi = self.compute(self.parameters[0].value)
+    self.parameters[3].set(height / maxi)
+
   def fwhm(self):
-    '''Compute the full width at half maximum of the Voigt function.'''
+    '''Compute the full width at half maximum of the Voigt function.
+    
+    The height factor does not change the fwhm.'''
     p = self.get_parameters()
-    return 2*p[1].value*np.log(2) # correct this !!
+    fg = 2*p[1].value*np.log(2)
+    fl = 2*p[2].value
+    return 0.5346*fl + np.sqrt(0.2166*fl**2+fg**2)

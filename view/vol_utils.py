@@ -165,7 +165,7 @@ def recad(data, min, max):
   data_uint8 = (255 * (data - min) / (max - min)).astype(np.uint8)
   return data_uint8
 
-def alpha_cmap(color='red'):
+def alpha_cmap(color='red', opacity=1.0):
   '''Creating a particular colormap with transparency.
   
   Only values equal to 255 will have a non zero alpha channel.
@@ -175,6 +175,8 @@ def alpha_cmap(color='red'):
   
   **color**: the color to use for non transparents values (ie. 255).
 
+  **opacity**: opacity value to use for visible pixels.
+  
   *Returns*
 
   **mycmap**: a fully transparent colormap except for 255 values.
@@ -184,7 +186,7 @@ def alpha_cmap(color='red'):
   mycmap = mpl.colors.LinearSegmentedColormap.from_list('my_cmap', [color1, color2], 256)
   mycmap._init()
   alphas = np.zeros(mycmap.N+3)
-  alphas[255:] = 1.0 # show only values at 255
+  alphas[255:] = opacity # show only values at 255
   mycmap._lut[:,-1] = alphas
   return mycmap
 
@@ -196,6 +198,7 @@ class AxShowPixelValue:
     '''Create a new AxShowPixelValue instance with a reference to the 
     given pyplot ax.'''
     self.ax = ax
+    self.ax.format_coord = self.format_coord
   
   def imshow(self, array, **kwargs):
     '''Wraps pyplot imshow function for the ax selected and modify 
@@ -204,7 +207,6 @@ class AxShowPixelValue:
     '''
     self.array = array
     self.ax.imshow(self.array, **kwargs)
-    self.ax.format_coord = self.format_coord
 
   def format_coord(self, x, y):
     '''A function to modify the coordinate formatter of pyplot to 
@@ -219,3 +221,12 @@ class AxShowPixelValue:
       return 'x=%1.1f, y=%1.1f, z=%1.1f' % (x, y, z)
     else:
       return 'x=%1.1f, y=%1.1f' % (x, y)
+
+if __name__ == '__main__':
+  import matplotlib
+  img = np.diag(np.linspace(1,10,10))
+  fig = plt.figure()
+  ax = fig.add_subplot(111)
+  myax = AxShowPixelValue(ax)
+  myax.imshow(img, interpolation='nearest')
+  plt.show()

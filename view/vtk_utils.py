@@ -455,7 +455,7 @@ def add_HklPlanes_with_orientation_in_grain(grain, \
     local_orientation.AddPart(hklplaneActor)
   return local_orientation
   
-def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True):
+def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, text_scale=0.1, label=False, vector_normal=None):
   n = numpy.linalg.norm(vector)
   arrowSource = vtk.vtkArrowSource()
   arrowSource.SetShaftRadius(radius)
@@ -488,7 +488,40 @@ def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True):
   arrowActor = vtk.vtkActor()
   arrowActor.SetMapper(mapper)
   arrowActor.GetProperty().SetColor(color)
-  return arrowActor
+  if label:
+    # add a text actor to display the vector coordinates
+    assembly = vtk.vtkAssembly()
+    assembly.AddPart(arrowActor)
+    text = vtk.vtkVectorText()
+    text.SetText(numpy.array_str(vector))
+    textMapper = vtk.vtkPolyDataMapper()
+    textMapper.SetInputConnection(text.GetOutputPort())
+    textTransform = vtk.vtkTransform()
+    start_text = start + vector
+    mt = vtk.vtkMatrix4x4()
+    mt.Identity()
+    mt.DeepCopy((1, 0, 0, start_text[0],
+                 0, 1, 0, start_text[1],
+                 0, 0, 1, start_text[2],
+                 0, 0, 0, 1))
+    # Create the direction cosine matrix
+    if vector_normal == None: vector_normal = Z
+    for i in range(3):
+      mt.SetElement(i, 0, vector[i]);
+      mt.SetElement(i, 1, Y[i]);
+      mt.SetElement(i, 2, vector_normal[i]);
+    textTransform.Identity()
+    textTransform.Concatenate(mt)
+    textTransform.Scale(text_scale, text_scale, text_scale)
+    textActor = vtk.vtkActor()
+    textActor.SetMapper(textMapper)
+    textActor.SetUserTransform(textTransform)
+    textActor.GetProperty().SetColor(color)
+    assembly.AddPart(textActor)
+    return assembly
+  else:
+    return arrowActor
+    
 
 def lattice_points(lattice, origin=[0., 0., 0.]):
   '''
@@ -827,22 +860,41 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
 
 def apply_orientation_to_actor(actor, orientation):
   '''
-  Transform the actor assembly using the specified Orientation.
-  The three euler angles are used according to Bunge's convention.
+  Transform the actor (or whole assembly) using the specified orientation.
+  Here we could use the three euler angles associated with the 
+  orientation with the RotateZ and RotateX methods of the actor but 
+  the components of the orientation matrix are used directly since 
+  they are known without any ambiguity.
+
+  *Parameters*
+
+  **actor**: the vtk actor.
+  
+  **orientation**: an instance of the :py:class:`pymicro.crystal.microstructure.Orientation` class
   '''
   transform = vtk.vtkTransform()
+  Bt = orientation.orientation_matrix().transpose()
+  m = vtk.vtkMatrix4x4()
+  m.Identity()
+  m.DeepCopy((Bt[0,0], Bt[0,1], Bt[0,2], 0,
+              Bt[1,0], Bt[1,1], Bt[1,2], 0,
+              Bt[2,0], Bt[2,1], Bt[2,2], 0,
+                    0,       0,       0, 1))
   transform.Identity()
+  transform.Concatenate(m)
+  '''
   transform.RotateZ(orientation.phi1())
   transform.RotateX(orientation.Phi())
   transform.RotateZ(orientation.phi2())
+  '''
   actor.SetUserTransform(transform)
 
-def load_STL_actor(name, verbose=False):
+def load_STL_actor(name, ext='STL', verbose=False):
   '''Read a STL file and return the corresponding vtk actor.
   '''
   if verbose: print 'adding part: %s' % name
   part = vtk.vtkSTLReader()
-  part.SetFileName(name + ".STL")
+  part.SetFileName(name + '.' + ext)
   part.Update()
   partMapper = vtk.vtkPolyDataMapper()
   partMapper.SetInputConnection(part.GetOutputPort())

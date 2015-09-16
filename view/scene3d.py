@@ -128,7 +128,7 @@ class Scene3D:
       iren = vtk.vtkRenderWindowInteractor()
       iren.SetRenderWindow(self.renWin)
       if key_pressed_callback:
-        iren.AddObserver("KeyPressEvent", key_pressed_callback)
+        iren.AddObserver("KeyPressEvent", self.pymicro_callback)
       self.renWin.Render()
       iren.Initialize()
       iren.Start()

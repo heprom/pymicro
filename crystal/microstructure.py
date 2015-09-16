@@ -351,11 +351,23 @@ class Orientation:
     for l in euler_lines:
       tokens = l.split()
       elset = tokens[tokens.index('**elset')+1]
-      phi1 = tokens[tokens.index('*rotation')+1]
-      Phi = tokens[tokens.index('*rotation')+2]
-      phi2 = tokens[tokens.index('*rotation')+3]
-      angles = np.array([float(phi1), float(Phi), float(phi2)])
-      euler.append([elset, Orientation.from_euler(angles)])
+      irot = tokens.index('*rotation')
+      if tokens[irot+1] == 'x1':
+        x1 = np.empty(3, dtype=float)
+        x1[0] = float(tokens[irot + 2])
+        x1[1] = float(tokens[irot + 3])
+        x1[2] = float(tokens[irot + 4])
+        x3 = np.empty(3, dtype=float)
+        x3[0] = float(tokens[irot + 6])
+        x3[1] = float(tokens[irot + 7])
+        x3[2] = float(tokens[irot + 8])
+        euler.append([elset, Orientation.Zrot2OrientationMatrix(x1=x1, x3=x3)])
+      else: # euler angles
+        phi1 = tokens[irot + 1]
+        Phi = tokens[irot + 2]
+        phi2 = tokens[irot + 3]
+        angles = np.array([float(phi1), float(Phi), float(phi2)])
+        euler.append([elset, Orientation.from_euler(angles)])
     return dict(euler)
   
   def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):

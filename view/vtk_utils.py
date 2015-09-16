@@ -501,11 +501,11 @@ def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, text
     mt = vtk.vtkMatrix4x4()
     mt.Identity()
     mt.DeepCopy((1, 0, 0, start_text[0],
-                0, 1, 0, start_text[1],
-                0, 0, 1, start_text[2],
-                0, 0, 0, 1))
+                 0, 1, 0, start_text[1],
+                 0, 0, 1, start_text[2],
+                 0, 0, 0, 1))
     # Create the direction cosine matrix
-    if not vector_normal: vector_normal = Z
+    if vector_normal == None: vector_normal = Z
     for i in range(3):
       mt.SetElement(i, 0, vector[i]);
       mt.SetElement(i, 1, Y[i]);
@@ -861,13 +861,26 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
 def apply_orientation_to_actor(actor, orientation):
   '''
   Transform the actor assembly using the specified Orientation.
-  The three euler angles are used according to Bunge's convention.
+  Here we could use the three euler angles associated with the 
+  orientation with the RotateZ and RotateX methods but the components 
+  of the orientation matrix are used directly since they are known 
+  without any ambiguity.
   '''
   transform = vtk.vtkTransform()
+  Bt = orientation.orientation_matrix().transpose()
+  m = vtk.vtkMatrix4x4()
+  m.Identity()
+  m.DeepCopy((Bt[0,0], Bt[0,1], Bt[0,2], 0,
+              Bt[1,0], Bt[1,1], Bt[1,2], 0,
+              Bt[2,0], Bt[2,1], Bt[2,2], 0,
+                    0,       0,       0, 1))
   transform.Identity()
+  transform.Concatenate(m)
+  '''
   transform.RotateZ(orientation.phi1())
   transform.RotateX(orientation.Phi())
   transform.RotateZ(orientation.phi2())
+  '''
   actor.SetUserTransform(transform)
 
 def load_STL_actor(name, ext='STL', verbose=False):

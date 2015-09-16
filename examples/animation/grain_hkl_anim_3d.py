@@ -43,14 +43,8 @@ cam.Dolly(0.9)
 ren.SetActiveCamera(cam)
 ren_size = (600, 700)
 name = scan[:-4] + '_anim_3d'
-renWin = vtk.vtkRenderWindow()
-renWin.AddRenderer(ren)
-renWin.SetSize(ren_size)
-iren = vtk.vtkRenderWindowInteractor()
-iren.SetRenderWindow(renWin)
-renWin.Render()
-iren.Initialize()
 
+print('creating the animation scene')
 scene = vtkAnimationScene(ren, ren_size)
 scene.save_image = True
 scene.timer_incr = 10

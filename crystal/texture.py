@@ -329,7 +329,7 @@ class PoleFigure:
       if self.verbose: print 'plotting ',self.axis,' in crystal CS:',axis_rot
     ax.axis('off')
     ax.axis([-0.05,0.45,-0.05,0.40])
-    ax.set_title('{%s} SST inverse %s projection' % (self.family, self.proj))
+    ax.set_title('%s-axis SST inverse %s projection' % (self.axis, self.proj))
     
   def plot_ipf(self, ax=None, mk='s', col='k', ann=False):
     ''' Create the inverse pole figure for direction Z. 
@@ -374,7 +374,7 @@ class PoleFigure:
       if self.verbose: print 'plotting ',self.axis,' in crystal CS:',axis_rot
     ax.axis([-1.1,1.1,-1.1,1.1])
     ax.axis('off')
-    ax.set_title('{%s} inverse %s projection' % (self.family, self.proj))
+    ax.set_title('%s-axis inverse %s projection' % (self.axis, self.proj))
 
   @staticmethod
   def plot(orientation):

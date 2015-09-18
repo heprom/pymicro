@@ -11,13 +11,8 @@ from pymicro.crystal.lattice import Lattice, HklPlane
 def to_vtk_type(type):
   '''Function to get the VTK data type given a numpy data type.
 
-  *Parameters*
-  
-  **type**: the numpy data type like 'uint8', 'uint16'...
-
-  *Returns*
-
-  A VTK data type.
+  :param str type: The numpy data type like 'uint8', 'uint16'...
+  :return: A VTK data type.
   '''
   if type == 'uint8':
     return vtk.VTK_UNSIGNED_CHAR
@@ -30,12 +25,18 @@ def to_vtk_type(type):
   elif type == 'float64':
     return vtk.VTK_DOUBLE
   
-def rand_cmap(N=256, first_is_black = False, table_range=(0,255)):
-  '''Create a VTK look up table with random colors.
+def rand_cmap(N=256, first_is_black=False, table_range=(0,255)):
+  '''Create a VTK lookup table with random colors.
   
-     The first color can be enforced to black and usually figure out 
-     the image background. The random seed is fixed to 13 in order 
-     to consistently produce the same colormap. '''
+  The first color can be enforced to black and usually figure out 
+  the image background. The random seed is fixed to 13 in order 
+  to consistently produce the same colormap.
+  
+  :param int N: The number of colors in the colormap.
+  :param bool first_is_black: Force the first color to be black.
+  :param typle table_range: The range of the VTK lookup table
+  :return: A vtkLookupTable lookup table with N random colors.
+  '''
   numpy.random.seed(13)
   rand_colors = numpy.random.rand(N,3)
   if first_is_black:
@@ -48,10 +49,17 @@ def rand_cmap(N=256, first_is_black = False, table_range=(0,255)):
   lut.SetRange(table_range)
   return lut
 
-def pv_rand_cmap(N=256, first_is_black = False):
-  '''Write out the random color map in paraview xml format. '''
+def pv_rand_cmap(N=256, first_is_black=False):
+  '''Write out the random color map in paraview xml format.
+  
+  This method print out the XML declaration of the random colormap.
+  This may be saved to a text file and used in paraview.
+
+  :param int N: The number of colors in the colormap.
+  :param bool first_is_black: Force the first color to be black.
+  '''
   numpy.random.seed(13)
-  rand_colors = numpy.random.rand(N,3)
+  rand_colors = numpy.random.rand(N, 3)
   if first_is_black:
     rand_colors[0] = [0., 0., 0.] # enforce black background
   print '<ColorMap name="random" space="RGB">'

@@ -18,30 +18,21 @@ class PoleFigure:
     '''
     Create an empty PoleFigure object associated with an empty Microstructure.
     
-    *Parameters*
-
-    **axis**: the pole figure axis ('Z' by default), vertical axis in the direct pole figure and direction plotted on the inverse pole figure.
-
-    **microstructure**: the microstructure containing the collection of orientations to plot (None by default)
-
-    **lattice**: the crystal lattice
+    :param str axis: the pole figure axis ('Z' by default), vertical axis in the direct pole figure and direction plotted on the inverse pole figure.
+    :param microstructure: the :py:class:`~pymicro.crystal.microstructure.Microstructure` containing the collection of orientations to plot (None by default).
+    :param lattice: the crystal :py:class:`~pymicro.crystal.lattice.Lattice`.
 
     .. warning::
 
        Any crystal structure is now supported (you have to set the proper 
        crystal lattice) but it has oly really be tested for cubic.
 
-    **hkl**: slip plane family ('111' by default)
-    
-    **proj**: projection type, can be either 'stereo' (default) or 'flat'
-    
-    **mksize**: marker size as displayed on the plots (12 pts by default)
-    
-    **verbose**: verbose mode (False by default)
-    
-    **color_by_grain_id**: color the spot on the pole figure with grain color (False by default)
-    
-    **pflegend**: show the legend (only if color_by_grain_id is active, False by default)
+    :param str hkl: slip plane family ('111' by default)    
+    :param str proj: projection type, can be either 'stereo' (default) or 'flat'
+    :param int mksize: marker size in pts unit as displayed on the plots (12 by default)    
+    :param bool verbose: verbose mode (False by default)
+    :param bool color_by_grain_id: color the spot on the pole figure with grain color (False by default)
+    :param bool pflegend: show the legend (only if color_by_grain_id is active, False by default)
     '''
     self.proj = proj
     self.axis = axis
@@ -70,9 +61,7 @@ class PoleFigure:
   def set_hkl_poles(self, hkl):
     '''Set the pole list to plot.
 
-    *Parameters*
-
-    **hkl**: slip plane family ('111' by default)
+    :params str hkl: slip plane family ('111' by default)
     '''
     self.family = hkl # keep a record of this
     planes = self.lattice.get_hkl_family(self.family)
@@ -84,18 +73,12 @@ class PoleFigure:
   def plot_pole_figures(self, plot_sst=True, display=True, save_as='pdf'):
     '''Plot and save a picture with both direct and inverse pole figures.
     
-    *Parameters*
-
-    **plot_sst**: bool
-    controls wether to plot the full inverse pole figure or only the 
-    standard stereographic triangle (True by default)
-
-    **display**: bool
-    display the plot if True, else save a picture of the pole figures 
-    (True by default)
-    
-    **save_as** str
-    File format used to save the image such as pdf or png ('pdf' by default)
+    :param bool plot_sst: controls wether to plot the full inverse pole \
+    figure or only the standard stereographic triangle (True by default).
+    :param bool display: display the plot if True, else save a picture \
+    of the pole figures (True by default)
+    :param str save_as: File format used to save the image such as pdf \
+    or png ('pdf' by default)
     
     ::
     
@@ -134,21 +117,13 @@ class PoleFigure:
   def plot_crystal_dir(self, c_dir, mk='o', col='k', ax=None, ann=False, lab=''):
     '''Function to plot a crystal direction on a pole figure.
     
-    **Parameters:**
-    
-    *c_dir* A vector describing the crystal direction
-    
-    *mk* marker used to plot the pole (disc by default)
-    
-    *col* color used to plot the pole (black by default)
-    
-    *ax* a reference to a pyplot ax to draw the pole
-    
-    *ann* bool
-    Annotate the pole with the coordinates of the vector if True (False by default).
-    
-    *lab* str
-    Label to use in the legend of the plot ('' by default).
+    :param c_dir: A vector describing the crystal direction.    
+    :param mk: marker used to plot the pole (disc by default).
+    :param col: color used to plot the pole (black by default).
+    :param ax: a reference to a pyplot ax to draw the pole.
+    :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).    
+    :param str lab: Label to use in the legend of the plot ('' by default).
+    :raise ValueError: if the projection type is not supported
     '''
     if c_dir[2] < 0: c_dir *= -1 # make unit vector have z>0
     if self.proj == 'flat':
@@ -159,7 +134,7 @@ class PoleFigure:
       cp = c
       #cp = np.cross(c, self.z)
     else:
-      raise TypeError('Error, unsupported projection type', proj)
+      raise ValueError('Error, unsupported projection type', proj)
     ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
       markersize=self.mksize, label=lab)
     # Next 3 lines are necessary in case c_dir[2]=0, as for Euler angles [45, 45, 0]
@@ -176,18 +151,11 @@ class PoleFigure:
     The curve is actually composed of several straight lines segments to 
     draw from direction 1 to direction 2.
 
-    **Parameters:**
-    
-    *c1*: crystal direction 1
-    
-    *c2*: crystal direction 2
-    
-    *ax*: a reference to a pyplot ax to draw the line
-    
-    *steps*: number of straight lines composing the curve (11 by default)
-    
-    *col*: line color (black by default)
-    
+    :param c1: vector describing crystal direction 1
+    :param c2: vector describing crystal direction 2
+    :param ax: a reference to a pyplot ax to draw the line
+    :param int: steps: number of straight lines composing the curve (11 by default)
+    :param col: line color (black by default)
     '''
     path = np.zeros((steps, 2), dtype=float)
     for j, i in enumerate(np.linspace(0., 1., steps)):
@@ -201,7 +169,10 @@ class PoleFigure:
     ax.plot(path[:, 0], path[:, 1], color=col, markersize=self.mksize, linewidth=2)
 
   def plot_pf_background(self, ax):
-    '''Helper function to plot the background of the pole figure. '''
+    '''Function to plot the background of the pole figure.
+    
+    :param ax: a reference to a pyplot ax to draw the backgroud.
+    '''
     an = np.linspace(0,2*np.pi,100)
     plt.hold('on')
     ax.plot(np.cos(an), np.sin(an), 'k-')
@@ -221,7 +192,13 @@ class PoleFigure:
     self.plot_crystal_dir(c_dir[[h,v,u]], mk=mk, col=col, ax=ax, ann=ann, lab=lab)
 	  
   def plot_pf(self, ax=None, mk='o', col='k', ann=False):
-    '''Create the direct pole figure. '''
+    '''Create the direct pole figure. 
+    
+    :param ax: a reference to a pyplot ax to draw the poles.
+    :param mk: marker used to plot the poles (disc by default).
+    :param col: symbol color (black by default)
+    :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).    
+    '''
     axe_labels = ['X', 'Y', 'Z']
     if self.axis == 'Z':
       h = 0; v = 1; u = 2
@@ -255,7 +232,18 @@ class PoleFigure:
     ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
   def plot_pf_hot(self, strain_levels, ax=None, mk='o', col='k', ann=False, min_level = 0.015, max_level = 0.025):
-    '''Create the direct pole figure. '''
+    '''Create the direct pole figure, the poles are colored using a hot 
+    colormap to display the strain level of each orientation. 
+
+    :param dict strain_level: a dictionnary containing each strain level \
+    for each grain id in the :py:class:`~pymicro.crystal.microstructure.Microstructure` associated with this pole figure.
+    :param ax: a reference to a pyplot ax to draw the poles.
+    :param mk: marker used to plot the poles (disc by default).
+    :param col: symbol color (black by default)
+    :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).    
+    :param float min_level: minimum strain level to use in the colormap.
+    :param float max_level: maximum strain level to use in the colormap.
+    '''
     axe_labels = ['X', 'Y', 'Z']
     if self.axis == 'Z':
       h = 0; v = 1; u = 2

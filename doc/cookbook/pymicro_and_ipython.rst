@@ -32,3 +32,16 @@ That's it, now you may just type:
   >>> p111.bragg_angle(20)*180/pi
   7.618
 
+pymicro features several static methods to directly compute or plot with one liners, for instance to plot a pole figure for a single orientation without creating a Grain instance and so on you may just type:
+
+.. code-block:: python
+
+  >>> PoleFigure.plot(Orientation.from_rodrigues([0.0885, 0.3889, 0.3268]))
+
+To compute all Schmid factor for this orientation and the {111}[110] slip systems, you can use:
+
+.. code-block:: python
+
+  >>> o = Orientation.from_rodrigues([0.0885, 0.3889, 0.3268])
+  >>> o.compute_all_schmid_factors(SlipSystem.get_octaedral_slip_systems())
+

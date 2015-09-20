@@ -99,7 +99,7 @@ class vtkAnimCameraAroundZ(vtkAnimation):
   
   This class can be used to generate a series of images (default 36)
   while the camera rotate around the vertical axis (defined by the 
-  camera SetViewUp method)?
+  camera SetViewUp method).
   '''
   
   def __init__(self, t, cam, turn=360):

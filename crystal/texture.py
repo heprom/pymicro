@@ -25,7 +25,7 @@ class PoleFigure:
     .. warning::
 
        Any crystal structure is now supported (you have to set the proper 
-       crystal lattice) but it has oly really be tested for cubic.
+       crystal lattice) but it has only really be tested for cubic.
 
     :param str hkl: slip plane family ('111' by default)    
     :param str proj: projection type, can be either 'stereo' (default) or 'flat'
@@ -276,7 +276,12 @@ class PoleFigure:
     ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
   def sst_symmetry_cubic(self, z_rot):
-    '''Perform cubic symmetry according to the unit SST triangle.
+    '''Transform a given vector according to the cubic symmetry.
+    
+    This function transform a vector so that it lies in the unit SST triangle.
+    
+    :param z_rot: vector to transform.
+    :return: the transformed vector.
     '''
     if z_rot[0] < 0: z_rot[0] = -z_rot[0]
     if z_rot[1] < 0: z_rot[1] = -z_rot[1]
@@ -295,6 +300,11 @@ class PoleFigure:
     
   def plot_sst(self, ax=None, mk='s', col='k', ann=False):
     ''' Create the inverse pole figure in the unit standard triangle. 
+
+    :param ax: a reference to a pyplot ax to draw the poles.
+    :param mk: marker used to plot the poles (square by default).
+    :param col: symbol color (black by default)
+    :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).    
     '''
     c001 = np.array([0,0,1])
     c101 = np.array([1,0,1])
@@ -322,15 +332,10 @@ class PoleFigure:
   def plot_ipf(self, ax=None, mk='s', col='k', ann=False):
     ''' Create the inverse pole figure for direction Z. 
     
-    Parameters:
-    
-    **ax**: a reference to a pyplot ax to draw the figure
-    
-    **mk**: marker type (square by default)
-    
-    **col**: marker color (red by default)
-    
-    **ann**: draw annotation near the crystal direction (False by default)
+    :param ax: a reference to a pyplot ax to draw the poles.
+    :param mk: marker used to plot the poles (square by default).
+    :param col: symbol color (black by default)
+    :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).    
     '''
     self.plot_pf_background(ax)
     for c in self.c111s:
@@ -368,9 +373,7 @@ class PoleFigure:
   def plot(orientation):
     '''Plot a pole figure (both direct and inverse) for a single orientation.
 
-    Parameters:
-    
-    **orientation**: the crystalline `Orientation` to plot.
+    :param orientation: the crystalline :py:class:`~pymicro.crystal.microstructure.Microstructure` to plot.
     '''
     micro = Microstructure()
     micro.grains.append(Grain(1, orientation))
@@ -386,13 +389,9 @@ class PoleFigure:
     
       PoleFigure.plot_euler(10, 20, 30)
 
-    Parameters:
-    
-    **phi1**: first Euler angle.
-    
-    **Phi**: second Euler angle.
-    
-    **phi2**: third Euler angle.
+    :param float phi1: first Euler angle (in degree).
+    :param float Phi: second Euler angle (in degree).
+    :param float phi2: third Euler angle (in degree).
     '''
     PoleFigure.plot(Orientation.from_euler(np.array([phi1, Phi, phi2])))
     

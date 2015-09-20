@@ -1301,25 +1301,17 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
     iren.Initialize()
     iren.Start()
 
-def show_data(data, map_scalars=False, lut=None):
+def show_array(data, map_scalars=False, lut=None):
   '''Create a 3d actor representing a numpy array.
   
-  Given a 3d numpy array, this function compute the skin of the volume. 
+  Given a 3d array, this function compute the skin of the volume. 
   The scalars can be mapped to the created surface and the colormap 
-  adjusted.
+  adjusted. If the data is in numpy format it is converted to VTK first.
   
-  *Parameters*
-  
-  **data**: the dataset, in numpy or VTK format.
-  
-  **data**: bool.
-  map the scalar in the data array to the created surface.
-  
-  **lut**: vtk lookup table
-  the colormap used to map the scalars.
-  
-  Returns a vtk actor that can be added to a rendered to show the 
-  3d array.
+  :param data: the dataset, in numpy or VTK format.
+  :param bool map_scalars: map the scalar in the data array to the created surface (False by default).  
+  :param lut: a vtk lookup table (colormap) used to map the scalars.
+  :return: a vtk actor that can be added to a rendered to show the 3d array.
   '''
   if type(data) == numpy.ndarray:
     grid = numpy_array_to_vtk_grid(data, cell_data=True)
@@ -1329,7 +1321,9 @@ def show_data(data, map_scalars=False, lut=None):
     size = data.shape
   else:
     grid = data
-    size = grid.GetExtent()[1::2]
+    bounds = grid.GetBounds()
+    size = (bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
+    #size = grid.GetExtent()[1::2]
     print size
 
   # use extract geometry filter to access the data
@@ -1345,7 +1339,16 @@ def show_data(data, map_scalars=False, lut=None):
   bbox.SetXMin(0, 0, 0)
   bbox.SetXMax(size[0], size[1], size[2])
   extract.SetImplicitFunction(bbox)
+  return show_mesh(extract.GetOutput(), map_scalars, lut)
 
+def show_mesh(grid, map_scalars=False, lut=None):
+  '''Create a 3d actor representing a mesh.
+  
+  :param grid: the vtkUnstructuredGrid object.
+  :param bool map_scalars: map the scalar in the data array to the created surface (False by default).  
+  :param lut: a vtk lookup table (colormap) used to map the scalars.
+  :return: a vtk actor that can be added to a rendered to show the 3d array.
+  '''
   mapper = vtk.vtkDataSetMapper()
   mapper.ScalarVisibilityOff()
   if map_scalars:
@@ -1358,9 +1361,9 @@ def show_data(data, map_scalars=False, lut=None):
       lut = gray_cmap()
     mapper.SetLookupTable(lut)
   if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-    mapper.SetInputConnection(extract.GetOutputPort())
+    mapper.SetInputData(grid)
   else:
-    mapper.SetInput(extract.GetOutput())
+    mapper.SetInput(grid)
   mapper.Update()
   actor = vtk.vtkActor()
   actor.SetMapper(mapper)
@@ -1387,7 +1390,7 @@ def show_grains(data, num_colors=2048):
   grains colored by their id.  
   '''
   grain_lut = rand_cmap(N=num_colors, first_is_black = True, table_range=(0,num_colors-1))
-  grains = show_data(data, map_scalars=True, lut=grain_lut)
+  grains = show_array(data, map_scalars=True, lut=grain_lut)
   return grains
 
 def xray_arrow():

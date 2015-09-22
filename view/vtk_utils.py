@@ -1145,10 +1145,10 @@ def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
   if type(data) == numpy.ndarray:
     size = data.shape
     bbox.SetXMin(size[0]/2., -1, size[2]/2.)
-    bbox.SetXMax(size[0], size[1]/2., size[2])
+    bbox.SetXMax(size[0]+1, size[1]/2., size[2]+1)
   else:
     e = 0.001
-    bb = grid.GetBounds()
+    bb = data.GetBounds()
     bbox.SetXMin((bb[1]-bb[0])/2., bb[2]-e, (bb[5]-bb[4])/2.)
     bbox.SetXMax(bb[1]+e, (bb[3]-bb[2])/2., bb[5]+e)
   return map_data(data, bbox, lut = lut, cell_data=cell_data)

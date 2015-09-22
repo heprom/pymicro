@@ -4,6 +4,26 @@ from pymicro.crystal.lattice import Lattice
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from matplotlib import pyplot as plt, colors, cm
 
+def myhot():
+  '''from scitools/easyviz/vtk_new_.html'''
+  lut = []
+  inc = 0.01175
+  i = 0
+  r = 0.0; g = 0.0; b = 0.0
+  while r <= 1.:
+    lut.append([i, r, g, b, 1])
+    r += inc; i += 1
+  r = 1.
+  while g <= 1.:
+    lut.append([i, r, g, b, 1])
+    g += inc; i += 1
+  g = 1.
+  while b <= 1:
+    if i == 256: break
+    lut.append([i, r, g, b, 1])
+    b += inc; i += 1
+  return lut
+
 class PoleFigure:
   '''A class to handle pole figures.
   
@@ -18,9 +38,9 @@ class PoleFigure:
     '''
     Create an empty PoleFigure object associated with an empty Microstructure.
     
-    :param str axis: the pole figure axis ('Z' by default), vertical axis in the direct pole figure and direction plotted on the inverse pole figure.
     :param microstructure: the :py:class:`~pymicro.crystal.microstructure.Microstructure` containing the collection of orientations to plot (None by default).
     :param lattice: the crystal :py:class:`~pymicro.crystal.lattice.Lattice`.
+    :param str axis: the pole figure axis ('Z' by default), vertical axis in the direct pole figure and direction plotted on the inverse pole figure.
 
     .. warning::
 
@@ -29,13 +49,11 @@ class PoleFigure:
 
     :param str hkl: slip plane family ('111' by default)    
     :param str proj: projection type, can be either 'stereo' (default) or 'flat'
-    :param int mksize: marker size in pts unit as displayed on the plots (12 by default)    
     :param bool verbose: verbose mode (False by default)
-    :param bool color_by_grain_id: color the spot on the pole figure with grain color (False by default)
-    :param bool pflegend: show the legend (only if color_by_grain_id is active, False by default)
     '''
     self.proj = proj
     self.axis = axis
+    self.map_field = None
     if microstructure:
       self.microstructure = microstructure
     else:
@@ -69,7 +87,44 @@ class PoleFigure:
     for p in planes:
       poles.append(p.normal())
     self.poles = poles
+  
+  def set_map_field(self, field_name, field=None, field_min_level=None, field_max_level=None):
+    '''Set the PoleFigure to color poles with the given field.
     
+    This method activates a mode where each symbol in the pole figure 
+    is color coded with respect to a field, which can be either the 
+    grain id, or a given field given in form of a list. If the grain 
+    volume or strain. For the grain id, the color is set according the 
+    each grain id in the :py:class:`~pymicro.crystal.microstructure.Microstructure` 
+    and the :py:meth:`~pymicro.crystal.microstructure.rand_cmap` function. 
+    For a given field, the color is set from the lookup table and 
+    according to the value in the given list. The list must contain a 
+    record for each grain. Minimum and maximum value to map the field 
+    values and the colors can be specify, if not they are directly taken 
+    as the min() and max() of the field. 
+    
+    :param str field_name: The field name, could be 'grain_id', or any other name describing the field.
+    :param list field: A list containing a record for each grain.
+    :param float field_min_level: The minimum value to use for this field.
+    :param float field_max_level: The maximum value to use for this field.
+    :raise ValueError: If the given field does not contain enough values.
+    '''
+    self.map_field = field_name
+    if field_name == 'grain_id':
+      self.field = [g.id for g in self.microstructure.grains]
+    else:
+      if len(field) < len(self.microstructure.grains):
+        raise ValueError('The field must contain a record for each grain in the microstructure')
+      self.field = field
+      if not field_min_level:
+        self.field_min_level = field.min()
+      else:
+        self.field_min_level = field_min_level
+      if not field_max_level:
+        self.field_max_level = field.max()
+      else:
+        self.field_max_level = field_max_level
+      
   def plot_pole_figures(self, plot_sst=True, display=True, save_as='pdf'):
     '''Plot and save a picture with both direct and inverse pole figures.
     
@@ -87,7 +142,7 @@ class PoleFigure:
       Al_fcc = Lattice.face_centered_cubic(0.405) # not really necessary since default lattice is cubic
       pf = PoleFigure(microstructure=micro, proj='stereo', lattice=Al_fcc, hkl='111')
       pf.mksize = 12
-      pf.color_by_grain_id = True
+      pf.set_map_field('grain_id')
       pf.pflegend = True # this works well for a few grains
       pf.plot_pole_figures()
     
@@ -218,58 +273,19 @@ class PoleFigure:
         label = ''
         c_rot = Bt.dot(c)
         if self.verbose: print 'plotting ',c,' in sample CS (corrected for pf axis):',c_rot
-        if self.color_by_grain_id:
-          col = Microstructure.rand_cmap().colors[grain.id]
-          if self.pflegend and i == 0:
-            # only add grain legend for its first pole
-            label = 'grain ' + str(grain.id)
+        if self.map_field:
+          if self.map_field == 'grain_id':
+            col = Microstructure.rand_cmap().colors[grain.id]
+            if self.pflegend and i == 0:
+              # only add grain legend for its first pole
+              label = 'grain ' + str(grain.id)
+          else: # use the field value for this grain
+            color = int(256*(self.field[grain.id] - self.field_min_level) / float(self.field_max_level - self.field_min_level))
+            # col = cm.jet._lut[color]
+            col = myhot()[color][1:4]
 	self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
     ax.axis([-1.1,1.1,-1.1,1.1])
-    if self.pflegend and self.color_by_grain_id:
-      ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, \
-        prop={'size':10})
-    ax.axis('off')
-    ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
-
-  def plot_pf_hot(self, strain_levels, ax=None, mk='o', col='k', ann=False, min_level = 0.015, max_level = 0.025):
-    '''Create the direct pole figure, the poles are colored using a hot 
-    colormap to display the strain level of each orientation. 
-
-    :param dict strain_level: a dictionnary containing each strain level \
-    for each grain id in the :py:class:`~pymicro.crystal.microstructure.Microstructure` associated with this pole figure.
-    :param ax: a reference to a pyplot ax to draw the poles.
-    :param mk: marker used to plot the poles (disc by default).
-    :param col: symbol color (black by default)
-    :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).    
-    :param float min_level: minimum strain level to use in the colormap.
-    :param float max_level: maximum strain level to use in the colormap.
-    '''
-    axe_labels = ['X', 'Y', 'Z']
-    if self.axis == 'Z':
-      h = 0; v = 1; u = 2
-    elif self.axis == 'Y':
-      h = 0; v = 2; u = 1
-    else:
-      h = 1; v = 2; u = 0
-    self.plot_pf_background(ax)
-    ax.annotate(axe_labels[h], (1.01, 0.0), xycoords='data',
-      fontsize=16, horizontalalignment='left', verticalalignment='center')
-    ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data',
-      fontsize=16, horizontalalignment='center', verticalalignment='bottom')
-    for grain in self.microstructure.grains:
-      B = grain.orientation_matrix()
-      Bt = B.transpose()
-      for i, c in enumerate(self.poles):
-        label = ''
-        c_rot = Bt.dot(c)
-        if self.verbose: print 'plotting ',c,' in sample CS (corrected for pf axis):',c_rot
-        if self.color_by_strain_level:
-          strain_level = strain_levels[grain.id]
-          color = int(256*(strain_level-min_level)/float(max_level-min_level))
-          col = self.lut[color][1:4]
-        self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
-    ax.axis([-1.1,1.1,-1.1,1.1])
-    if self.pflegend and self.color_by_grain_id:
+    if self.pflegend and self.map_field == 'grain_id':
       ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, \
         prop={'size':10})
     ax.axis('off')
@@ -361,7 +377,7 @@ class PoleFigure:
       else:
         axis = self.x
       axis_rot = B.dot(axis)
-      if self.color_by_grain_id:
+      if self.map_field == 'grain_id':
         col = Microstructure.rand_cmap().colors[grain.id]
       self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
       if self.verbose: print 'plotting ',self.axis,' in crystal CS:',axis_rot

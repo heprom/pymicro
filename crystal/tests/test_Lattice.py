@@ -20,9 +20,11 @@ class LatticeTests(unittest.TestCase):
     l = Lattice.cubic(0.5)
     self.assertAlmostEqual(l.volume(), 0.125)
   
-  def test_slip_systems(self):
-    print 'test_slip_systems'
-    print Lattice.get_slip_systems(plane_type='111')
+  def test_from_symbol(self):
+    al = Lattice.from_symbol('Al')
+    for i in range(0, 3):
+      self.assertAlmostEqual(al._lengths[i], 0.40495)
+      self.assertEqual(al._angles[i], 90.0)
     
 if __name__ == '__main__':
   unittest.main()

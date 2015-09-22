@@ -614,13 +614,9 @@ class Grain:
     This method solves the associated second order equation to return 
     the two corresponding omega angles.
     
-    **parameters:**
-    
-    *hkl* The given cristallographic `HklPlane`
-    
-    *lambda_keV* The X-rays energy expressed in keV
-    
-    *verbose* Verbos emode (False by default)
+    :param hkl: The given cristallographic :py:class:`~pymicro.crystal.lattice.HklPlane`
+    :param float lambda_keV: The X-rays energy expressed in keV
+    :param bool verbose: Verbose mode (False by default)
     
     .. warning::
     
@@ -628,8 +624,7 @@ class Grain:
        
        HP 15/05/2015 this return angles between [-pi,pi] and graphically, 
        it looks like it corespond to diffraction angles of -h-k-l. This 
-       should be checked carefully.
-       
+       should be checked more carefully.
     '''
     (h, k, l) = hkl.miller_indices()
     (a, b, c) = hkl._lattice._lengths
@@ -637,7 +632,8 @@ class Grain:
     lambda_nm = 1.2398 / lambda_keV
 
     gt = self.orientation_matrix() # our B (here called gt) corresponds to g^{-1} in Poulsen 2004
-    print 'g^{-1}=',gt
+    if verbose:
+      print 'g^{-1}=',gt
     A = h*gt[0,0] + k*gt[1,0] + l*gt[2,0]
     B = -h*gt[0,1] - k*gt[1,1] - l*gt[2,1]
     C = 2*a*np.sin(theta)**2 / lambda_nm

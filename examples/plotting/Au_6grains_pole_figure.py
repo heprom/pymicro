@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
   # create pole figure (both direct and inverse)
   pf = PoleFigure(hkl='111', axis='Z', proj='stereo', microstructure=micro)
-  pf.color_by_grain_id = True
+  pf.set_map_field('grain_id')
   pf.pflegend = True # this works well for a few grains
   pf.plot_pole_figures(plot_sst=True, display=False, save_as='png')
 

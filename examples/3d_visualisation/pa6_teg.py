@@ -20,17 +20,15 @@ if __name__ == '__main__':
   scan_name = 'pa6_teg11_e_crop.raw'
   scan_path = os.path.join(data_dir, scan_name)
   data = HST_read(scan_path, data_type='uint8', verbose=True)
-  size = data.shape
-  grid = numpy_array_to_vtk_grid(data, cell_data=True)
 
   print 'adding the main actor'
-  actor = map_data_with_clip(grid, cell_data=True)
+  actor = map_data_with_clip(data, cell_data=True)
   actor.GetProperty().SetSpecular(.4)
   actor.GetProperty().SetSpecularPower(10)
   s3d.add(actor)
 
   print 'adding bounding box'
-  outline = data_outline(grid)
+  outline = box_3d(size=data.shape)
   outline.GetProperty().SetColor(black)
   s3d.add(outline)
 
@@ -40,7 +38,7 @@ if __name__ == '__main__':
   s3d.add(axes);
 
   print 'setting up camera'
-  cam = setup_camera(size=size)
+  cam = setup_camera(size=data.shape)
   cam.SetClippingRange(1, 5000)
   s3d.set_camera(cam)
   s3d.render()

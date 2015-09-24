@@ -6,7 +6,6 @@ if __name__ == '__main__':
   symbol on the pole figure with the :py:meth:~`pymicro.crystal.texture.set_map_field`
   method.
   '''
-  lut = myhot()
   orientations = Orientation.read_euler_txt('../data/orientation_set.inp')
   micro = Microstructure(name='field')
   for i in range(600):

@@ -4,26 +4,6 @@ from pymicro.crystal.lattice import Lattice
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from matplotlib import pyplot as plt, colors, cm
 
-def myhot():
-  '''from scitools/easyviz/vtk_new_.html'''
-  lut = []
-  inc = 0.01175
-  i = 0
-  r = 0.0; g = 0.0; b = 0.0
-  while r <= 1.:
-    lut.append([i, r, g, b, 1])
-    r += inc; i += 1
-  r = 1.
-  while g <= 1.:
-    lut.append([i, r, g, b, 1])
-    g += inc; i += 1
-  g = 1.
-  while b <= 1:
-    if i == 256: break
-    lut.append([i, r, g, b, 1])
-    b += inc; i += 1
-  return lut
-
 class PoleFigure:
   '''A class to handle pole figures.
   
@@ -88,7 +68,7 @@ class PoleFigure:
       poles.append(p.normal())
     self.poles = poles
   
-  def set_map_field(self, field_name, field=None, field_min_level=None, field_max_level=None):
+  def set_map_field(self, field_name, field=None, field_min_level=None, field_max_level=None, lut='hot'):
     '''Set the PoleFigure to color poles with the given field.
     
     This method activates a mode where each symbol in the pole figure 
@@ -107,9 +87,11 @@ class PoleFigure:
     :param list field: A list containing a record for each grain.
     :param float field_min_level: The minimum value to use for this field.
     :param float field_max_level: The maximum value to use for this field.
+    :param str lut: A string describing the colormap to use (among matplotlib ones available).
     :raise ValueError: If the given field does not contain enough values.
     '''
     self.map_field = field_name
+    self.lut = lut
     if field_name == 'grain_id':
       self.field = [g.id for g in self.microstructure.grains]
     else:
@@ -281,8 +263,8 @@ class PoleFigure:
               label = 'grain ' + str(grain.id)
           else: # use the field value for this grain
             color = int(256*(self.field[grain.id] - self.field_min_level) / float(self.field_max_level - self.field_min_level))
-            # col = cm.jet._lut[color]
-            col = myhot()[color][1:4]
+            col_cmap = cm.get_cmap(self.lut, 256)
+            col = col_cmap(np.arange(256))[color] # directly access the color
 	self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
     ax.axis([-1.1,1.1,-1.1,1.1])
     if self.pflegend and self.map_field == 'grain_id':

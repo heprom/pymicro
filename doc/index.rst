@@ -28,6 +28,7 @@ Contents:
    auto_examples/index.rst
    cookbook
    pymicro
+   changelog
 
 Indices and tables
 ==================

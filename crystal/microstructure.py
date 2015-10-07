@@ -370,6 +370,42 @@ class Orientation:
         euler.append([elset, Orientation.from_euler(angles)])
     return dict(euler)
   
+  def slip_system_orientation_strain_tensor(self, s):
+    '''Compute the orientation strain tensor m^s for this :py:class:`~pymicro.crystal.microstructure.Orientation` 
+    and the given slip system.
+    
+    :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
+
+    .. math::
+
+      m^s_{ij} = \frac{1}{2}\left(l^s_i.n^s_j + l^s_j.n^s_i)
+    '''
+    Bt = self.orientation_matrix().transpose()
+    plane = s.get_slip_plane()
+    n_rot = np.dot(Bt, plane.normal())
+    slip = s.get_slip_direction()
+    l_rot = np.dot(Bt, slip.direction())
+    m = 0.5 * (np.outer(l_rot, n_rot) + np.outer(n_rot, l_rot))
+    return m
+
+  def slip_system_orientation_rotation_tensor(self, s):
+    '''Compute the orientation rotation tensor q^s for this :py:class:`~pymicro.crystal.microstructure.Orientation` 
+    and the given slip system.
+    
+    :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
+
+    .. math::
+
+      q^s_{ij} = \frac{1}{2}\left(l^s_i.n^s_j - l^s_j.n^s_i)
+    '''
+    Bt = self.orientation_matrix().transpose()
+    plane = s.get_slip_plane()
+    n_rot = np.dot(Bt, plane.normal())
+    slip = s.get_slip_direction()
+    l_rot = np.dot(Bt, slip.direction())
+    m = 0.5 * (np.outer(l_rot, n_rot) - np.outer(n_rot, l_rot))
+    return m
+
   def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
     '''Compute the Schmid factor for this crystal orientation and the 
     given slip system.
@@ -390,7 +426,7 @@ class Orientation:
     n_rot = np.dot(Bt, plane.normal()) # plane.normal() is a unit vector
     slip = slip_system.get_slip_direction().direction()
     slip_rot = np.dot(Bt, slip)
-    print n_rot, load_direction, slip_rot
+    #print n_rot, load_direction, slip_rot
     SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
     return SF
 

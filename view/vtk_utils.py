@@ -1324,7 +1324,6 @@ def show_array(data, map_scalars=False, lut=None):
     bounds = grid.GetBounds()
     size = (bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
     #size = grid.GetExtent()[1::2]
-    print size
 
   # use extract geometry filter to access the data
   extract = vtk.vtkExtractGeometry()
@@ -1339,6 +1338,7 @@ def show_array(data, map_scalars=False, lut=None):
   bbox.SetXMin(0, 0, 0)
   bbox.SetXMax(size[0], size[1], size[2])
   extract.SetImplicitFunction(bbox)
+  extract.Update()
   return show_mesh(extract.GetOutput(), map_scalars, lut)
 
 def show_mesh(grid, map_scalars=False, lut=None):

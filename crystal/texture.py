@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
-from pymicro.crystal.lattice import Lattice
+from pymicro.crystal.lattice import Lattice, SlipSystem
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from matplotlib import pyplot as plt, colors, cm
 
@@ -452,71 +452,4 @@ class TaylorModel:
       qs = g.orientation.slip_system_orientation_rotation_tensor(s)
       Wc += dgammas[i] * qs
     print 'plastic spin:\n', Wc
-    return Wc
-
-if __name__ == '__main__':
-  from pymicro.crystal.lattice import SlipSystem
-  from matplotlib import pyplot as plt, rcParams
-  rcParams.update({'font.size': 12})
-  rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
-  g1 = Grain(1, Orientation.from_rodrigues(np.array([0.0885, 0.3889, 0.3268])))
-  g4 = Grain(4, Orientation.from_euler((285.237876, 34.149654, 86.632514)))
-  g10 = Grain(10, Orientation.from_euler((262.554369, 16.763504, 104.492309)))
-  g18 = Grain(18, Orientation.from_euler((225.285091, 32.142108, 97.868337)))
-  micro = Microstructure(name='test')
-  print(g4)
-  print(g10)
-  print(g18)
-  #micro.grains.append(g4)
-  #micro.grains.append(g10)
-  #micro.grains.append(g18)
-  micro.grains.append(g1)
-  pf = PoleFigure(proj='stereo', microstructure=micro)
-  pf.mksize = 18
-  fig = plt.figure(figsize=(6,5))
-  ax1 = fig.add_subplot(111, aspect='equal')
-  pf.plot_sst(ax = ax1, mk='.', col='k', ann=False)
-  ax1.set_title('')
-  axis = np.array([0, 0, 1])
-
-  model = TaylorModel(micro)
-  model.dt = 1e-3
-  model.max_time = 0.001
-  model.nact = 10
-  '''
-  # check solution for 5 to 12 active slip systems
-  n_ss_active = range(5, 13)
-  gamma_tot = []
-  for nact in n_ss_active:
-    dgammas = model.compute_step(nact)
-    gamma_tot.append(np.sum(np.abs(dgammas)))
-    print 'sum dgammas', np.sum(np.abs(dgammas))
-  plt.plot(n_ss_active, gamma_tot, 'o-')
-  plt.ylabel(r"\\gamma")
-  plt.xlabel('number of slip systems involved')
-  plt.show()
-  '''
-  n = int(1 + model.max_time/model.dt)
-  for t in np.linspace(0, model.max_time, n):
-    print('\n*** time = %.3f ***\n' % t)
-    for g in micro.grains:
-      B = g.orientation_matrix()
-      axis_rot_sst_prev = np.array(pf.sst_symmetry_cubic(B.dot(axis)))
-      cgid = Microstructure.rand_cmap().colors[g.id] # color by grain id
-      Wc = model.compute_step(g)
-      print 'exp(model.dt*Wc):\n', np.exp(model.dt * Wc)
-      new_B = B*np.exp(model.dt * Wc)
-      print 'orientation matrix:\n', B
-      print 'new orientation matrix:\n', new_B
-      print 'diff:\n', new_B - B
-      axis_rot_sst = np.array(pf.sst_symmetry_cubic(new_B.dot(axis)))
-      pf.plot_line_between_crystal_dir(axis_rot_sst_prev, axis_rot_sst, ax=ax1, col=cgid, steps=2)
-      # update grain orientation
-      g.orientation = Orientation(new_B)
-  for g in micro.grains:
-    cgid = Microstructure.rand_cmap().colors[g.id] # color by grain id
-    final_dir_sst = pf.sst_symmetry_cubic(g.orientation_matrix().dot(axis))
-    pf.plot_crystal_dir(final_dir_sst, mk='.', col=cgid, ax=ax1, lab='grain %d' % g.id)
-plt.legend(bbox_to_anchor=(0.4, 0.9), loc=1, numpoints=1, prop={'size':14})
-plt.savefig('pf_taylor_%dss.pdf' % model.nact, format='pdf')
-plt.show()    
+    return Wc, dgammas

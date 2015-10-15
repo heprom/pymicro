@@ -1341,12 +1341,15 @@ def show_array(data, map_scalars=False, lut=None):
   extract.Update()
   return show_mesh(extract.GetOutput(), map_scalars, lut)
 
-def show_mesh(grid, map_scalars=False, lut=None):
+def show_mesh(grid, map_scalars=False, lut=None, show_edges=False, edge_color=(0., 0., 0.), edge_line_width=1.0):
   '''Create a 3d actor representing a mesh.
   
   :param grid: the vtkUnstructuredGrid object.
   :param bool map_scalars: map the scalar in the data array to the created surface (False by default).  
   :param lut: a vtk lookup table (colormap) used to map the scalars.
+  :param bool show_edes: display the mesh edges (False by default).
+  :param tuple edge_color: color to use for the mesh edges (black by default).
+  :param float edge_line_width: width of the edge lines (1.0 by default).
   :return: a vtk actor that can be added to a rendered to show the 3d array.
   '''
   mapper = vtk.vtkDataSetMapper()
@@ -1367,6 +1370,10 @@ def show_mesh(grid, map_scalars=False, lut=None):
   mapper.Update()
   actor = vtk.vtkActor()
   actor.SetMapper(mapper)
+  if show_edges:
+    actor.GetProperty().EdgeVisibilityOn()
+    actor.GetProperty().SetEdgeColor(edge_color)
+    actor.GetProperty().SetLineWidth(edge_line_width)
   actor.GetProperty().SetSpecular(.4)
   actor.GetProperty().SetSpecularPower(10)
   actor.GetProperty().SetOpacity(1.0)

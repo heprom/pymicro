@@ -20,7 +20,7 @@ class Orientation:
 
     Vc = B.Vs
   
-  and inversely (because B^-1=B^T):
+  and inversely (because :math:`B^{-1}=B^T`):
   
   .. math::
 
@@ -56,6 +56,70 @@ class Orientation:
   def phi2(self):
     '''Convenience methode to expose the third Euler angle.'''
     return self.euler[2]
+
+  def dc_omega_angles(self, hkl, lambda_keV, verbose=False):
+    '''Compute the two omega angles which satisfy the Bragg condition.
+    
+    For a given crystal orientation sitting on a vertical rotation axis, 
+    there is exactly two omega positions in [0, 2pi] for which a 
+    particular hkl reflexion will fulfil Bragg's law.
+    
+    According to the Bragg's law, a crystallographic grain will be in 
+    diffracting condition if:
+    
+    .. math::
+    
+       \sin\\theta=-[\Omega g^{-1}h]_1
+       
+    This method solves the associated second order equation to return 
+    the two corresponding omega angles.
+    
+    :param hkl: The given cristallographic :py:class:`~pymicro.crystal.lattice.HklPlane`
+    :param float lambda_keV: The X-rays energy expressed in keV
+    :param bool verbose: Verbose mode (False by default)
+    :returns tuple: (w1, w2) the two values of the omega angle.
+    
+    .. warning::
+    
+       Cubic lattice is assumed which turn the matrix S into the identity.
+       
+       HP 15/05/2015 this return angles between [-pi,pi] and graphically, 
+       it looks like it corespond to diffraction angles of -h-k-l. This 
+       should be checked more carefully.
+    '''
+    (h, k, l) = hkl.miller_indices()
+    (a, b, c) = hkl._lattice._lengths
+    theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
+    lambda_nm = 1.2398 / lambda_keV
+
+    gt = self.orientation_matrix() # our B (here called gt) corresponds to g^{-1} in Poulsen 2004
+    if verbose:
+      print 'g^{-1}=',gt
+    A = h*gt[0,0] + k*gt[1,0] + l*gt[2,0]
+    B = -h*gt[0,1] - k*gt[1,1] - l*gt[2,1]
+    C = 2*a*np.sin(theta)**2 / lambda_nm
+    Delta = 4*(A**2 + B**2 - C**2)
+    if Delta < 0:
+      raise ValueError('Delta < 0')
+    if verbose:
+      print 'A=',A
+      print 'B=',B
+      print 'C=',C
+      print 'Delta=',Delta
+    t1 = (B - 0.5 * np.sqrt(Delta)) / (A+C)
+    t2 = (B + 0.5 * np.sqrt(Delta)) / (A+C)
+    w1 = 2 * np.arctan(t1) * 180. / np.pi
+    w2 = 2 * np.arctan(t2) * 180. / np.pi
+    if verbose:
+      print 't1=%.3f and t2=%.3f' % (t1, t2)
+      print 'w1=%.3f and w2=%.3f' % (w1, w2)
+      print 'verifying Acos(w)+Bsin(w)=C:'
+      for t in (t1,t2):
+        print A*(1-t**2)/(1+t**2)+B*2*t/(1+t**2)
+      print 'verifying (A+C)*t**2-2*B*t+(C-A)=0'
+      for t in (t1,t2):
+        print (A+C)*t**2-2*B*t+(C-A)
+    return (w1, w2)
 
   def to_xml(self, doc):
     '''
@@ -378,7 +442,7 @@ class Orientation:
 
     .. math::
 
-      m^s_{ij} = \frac{1}{2}\left(l^s_i.n^s_j + l^s_j.n^s_i)
+      m^s_{ij} = \\frac{1}{2}\left(l^s_i.n^s_j + l^s_j.n^s_i)
     '''
     Bt = self.orientation_matrix().transpose()
     plane = s.get_slip_plane()
@@ -396,7 +460,7 @@ class Orientation:
 
     .. math::
 
-      q^s_{ij} = \frac{1}{2}\left(l^s_i.n^s_j - l^s_j.n^s_i)
+      q^s_{ij} = \\frac{1}{2}\left(l^s_i.n^s_j - l^s_j.n^s_i)
     '''
     Bt = self.orientation_matrix().transpose()
     plane = s.get_slip_plane()
@@ -638,63 +702,16 @@ class Grain:
     
     For a grain with a given crystal orientation sitting on a vertical 
     rotation axis, there is exactly two omega positions in [0, 2pi] for 
-    which a particular hkl reflexion will fulfil Bragg's law.
-    
-    According to the Bragg's law, a crystallographic grain will be in 
-    diffracting condition if:
-    
-    .. math::
-    
-       \sin\\theta=-[\Omega g^{-1}h]_1
-       
-    This method solves the associated second order equation to return 
-    the two corresponding omega angles.
+    which a particular hkl reflexion will fulfil Bragg's law. 
+    See :py:func:`~pymicro.crystal.microstructure.Orientation.dct_omega_angles` 
+    of the :py:class:`~pymicro.crystal.microstructure.Orientation` class.
     
     :param hkl: The given cristallographic :py:class:`~pymicro.crystal.lattice.HklPlane`
     :param float lambda_keV: The X-rays energy expressed in keV
     :param bool verbose: Verbose mode (False by default)
-    
-    .. warning::
-    
-       Cubic lattice is assumed which turn the matrix S into the identity.
-       
-       HP 15/05/2015 this return angles between [-pi,pi] and graphically, 
-       it looks like it corespond to diffraction angles of -h-k-l. This 
-       should be checked more carefully.
+    :returns tuple: (w1, w2) the two values of the omega angle.
     '''
-    (h, k, l) = hkl.miller_indices()
-    (a, b, c) = hkl._lattice._lengths
-    theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
-    lambda_nm = 1.2398 / lambda_keV
-
-    gt = self.orientation_matrix() # our B (here called gt) corresponds to g^{-1} in Poulsen 2004
-    if verbose:
-      print 'g^{-1}=',gt
-    A = h*gt[0,0] + k*gt[1,0] + l*gt[2,0]
-    B = -h*gt[0,1] - k*gt[1,1] - l*gt[2,1]
-    C = 2*a*np.sin(theta)**2 / lambda_nm
-    Delta = 4*(A**2 + B**2 - C**2)
-    if Delta < 0:
-      raise ValueError('Delta < 0')
-    if verbose:
-      print 'A=',A
-      print 'B=',B
-      print 'C=',C
-      print 'Delta=',Delta
-    t1 = (B - 0.5 * np.sqrt(Delta)) / (A+C)
-    t2 = (B + 0.5 * np.sqrt(Delta)) / (A+C)
-    w1 = 2 * np.arctan(t1) * 180. / np.pi
-    w2 = 2 * np.arctan(t2) * 180. / np.pi
-    if verbose:
-      print 't1=%.3f and t2=%.3f' % (t1, t2)
-      print 'w1=%.3f and w2=%.3f' % (w1, w2)
-      print 'verifying Acos(w)+Bsin(w)=C:'
-      for t in (t1,t2):
-        print A*(1-t**2)/(1+t**2)+B*2*t/(1+t**2)
-      print 'verifying (A+C)*t**2-2*B*t+(C-A)=0'
-      for t in (t1,t2):
-        print (A+C)*t**2-2*B*t+(C-A)
-    return (w1, w2)
+    return self.orientation.dct_omega_angles(hkl, lambda_keV, verbose)
     
 class Microstructure:
   '''

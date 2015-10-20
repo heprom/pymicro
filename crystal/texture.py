@@ -173,7 +173,7 @@ class PoleFigure:
     else:
       raise ValueError('Error, unsupported projection type', proj)
     ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
-      markersize=self.mksize, label=lab)
+      markeredgecolor=col, markersize=self.mksize, label=lab)
     # Next 3 lines are necessary in case c_dir[2]=0, as for Euler angles [45, 45, 0]
     if c_dir[2] < 0.000001:
       ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
@@ -294,8 +294,20 @@ class PoleFigure:
     if (z_rot[2] > z_rot[1]):
 	  z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
       
-    return [z_rot[1], z_rot[2], z_rot[0]]
+    return np.array([z_rot[1], z_rot[2], z_rot[0]])
     
+  def get_color_from_field(self, grain):
+    if self.map_field:
+      if self.map_field == 'grain_id':
+        col = Microstructure.rand_cmap().colors[grain.id]
+      else: # use the field value for this grain
+        color = int(256*(self.field[grain.id] - self.field_min_level) / float(self.field_max_level - self.field_min_level))
+        col_cmap = cm.get_cmap(self.lut, 256)
+        col = col_cmap(np.arange(256))[color] # directly access the color
+      return col
+    else:
+      return (0, 0, 0)
+
   def plot_sst(self, ax=None, mk='s', col='k', ann=False):
     ''' Create the inverse pole figure in the unit standard triangle. 
 
@@ -321,7 +333,9 @@ class PoleFigure:
       else:
         axis = self.x
       axis_rot = self.sst_symmetry_cubic(B.dot(axis))
-      self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
+      if self.map_field == 'grain_id':
+        label = 'grain ' + str(grain.id)
+      self.plot_crystal_dir(axis_rot, mk=mk, col=self.get_color_from_field(grain), ax=ax, ann=ann, lab=label)
       if self.verbose: print 'plotting ',self.axis,' in crystal CS:',axis_rot
     ax.axis('off')
     ax.axis([-0.05,0.45,-0.05,0.40])

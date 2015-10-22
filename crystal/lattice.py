@@ -447,24 +447,34 @@ class SlipSystem:
   @staticmethod
   def get_octaedral_slip_systems():
     '''A static method to get all slip systems for octaedral slip (ie 
-    111 planes). This does the same as get_slip_systems and only one 
+    111 planes). In essence, this does the same as get_slip_systems and only one 
     function should be kept in the future.
+    
+    ..note
+    
+      The slip system order is here the same as in the Z-set software 
+      suite for convenience purpose.
     '''
     oct_ss = []
-    planes = HklPlane.get_family('111')
+    planes = []
+    planes.append(HklPlane(1, 1, 1))
+    planes.append(HklPlane(1, -1, 1))
+    planes.append(HklPlane(-1, 1, 1))
+    planes.append(HklPlane(1, 1, -1))
+
     slip_dirs = np.zeros((4,3,3))
-    slip_dirs[0,0,:] = [ 1.,-1., 0.] # for (111)
-    slip_dirs[0,1,:] = [-1., 0., 1.] # for (111)
-    slip_dirs[0,2,:] = [ 0., 1.,-1.] # for (111)
-    slip_dirs[1,0,:] = [ 0.,-1., 1.] # for (-111)
-    slip_dirs[1,1,:] = [ 1., 0., 1.] # for (-111)
-    slip_dirs[1,2,:] = [ 1., 1., 0.] # for (-111)
-    slip_dirs[2,0,:] = [-1., 0., 1.] # for (1-11)
-    slip_dirs[2,1,:] = [ 0., 1., 1.] # for (1-11)
-    slip_dirs[2,2,:] = [ 1., 1., 0.] # for (1-11)
-    slip_dirs[3,0,:] = [-1., 1., 0.] # for (11-1)
-    slip_dirs[3,1,:] = [ 1., 0., 1.] # for (11-1)
-    slip_dirs[3,2,:] = [ 0., 1., 1.] # for (11-1)
+    slip_dirs[0,0,:] = [-1., 0., 1.] # Bd for (111)
+    slip_dirs[0,1,:] = [ 0.,-1., 1.] # Ba for (111)
+    slip_dirs[0,2,:] = [-1., 1., 0.] # Bc for (111)
+    slip_dirs[2,0,:] = [-1., 0., 1.] # Db for (1-11)
+    slip_dirs[2,1,:] = [ 0., 1., 1.] # Dc for (1-11)
+    slip_dirs[2,2,:] = [ 1., 1., 0.] # Da for (1-11)
+    slip_dirs[1,0,:] = [ 0.,-1., 1.] # Ab for (-111)
+    slip_dirs[1,2,:] = [ 1., 1., 0.] # Ad for (-111)
+    slip_dirs[1,1,:] = [ 1., 0., 1.] # Ac for (-111)
+    slip_dirs[3,0,:] = [-1., 1., 0.] # Cb for (11-1)
+    slip_dirs[3,1,:] = [ 1., 0., 1.] # Ca for (11-1)
+    slip_dirs[3,2,:] = [ 0., 1., 1.] # Cd for (11-1)
     for i, plane in enumerate(planes):
       for j in range(3):
         direction = HklDirection(slip_dirs[i,j,0], slip_dirs[i,j,1], slip_dirs[i,j,2])
@@ -473,29 +483,44 @@ class SlipSystem:
     
   @staticmethod
   def get_slip_systems(plane_type='111'):
-    '''A static method to get all slip systems for a given hkl plane.
+    '''A static method to get all slip systems for a given hkl plane family.
     
-    A cross product is used to retrive the slip direction from the slip 
-    plane miller indices. This formula may be wrong for planes not in 
-    the (111) family.
+    :params str plane_type: a string of the 3 miller indices of the crystallocgraphic plane family.
+    :returns list: a list of :py:class:`~pymicro.crystal.lattice.SlipSystem`. 
     
     .. warning::
     
-      only tested for 111 planes...
+      only working for 111 and 112 planes...
     '''
-    if plane_type != '111':
-      print 'warning only 111 slip supported for the moment!'
-    planes = HklPlane.get_family(plane_type)
     slip_systems = []
-    for plane in planes:
-      (h, k, l) = plane.miller_indices()
-      for i in range(3): # 3 slip directions by plane
-        dir_type = np.array([h, k, l])
-        dir_type[i] = 0
-        direction = np.cross(np.array([h, k, l]), dir_type)
-        (u, v, w) = direction
-        slip_dir = HklDirection(u, v, w)
-        slip_systems.append(SlipSystem(plane, slip_dir))
+    if plane_type == '111':
+      slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(-1, 0, 1))) # Bd
+      slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(0, -1, 1))) # Ba
+      slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(-1, 1, 0))) # Bc
+      slip_systems.append(SlipSystem(HklPlane(1, -1, 1), HklDirection(-1, 0, 1))) # Db
+      slip_systems.append(SlipSystem(HklPlane(1, -1, 1), HklDirection(0, 1, 1))) # Dc
+      slip_systems.append(SlipSystem(HklPlane(1, -1, 1), HklDirection(1, 1, 0))) # Da
+      slip_systems.append(SlipSystem(HklPlane(-1, 1, 1), HklDirection(0, -1, 1))) # Ab
+      slip_systems.append(SlipSystem(HklPlane(-1, 1, 1), HklDirection(1, 1, 0))) # Ad
+      slip_systems.append(SlipSystem(HklPlane(-1, 1, 1), HklDirection(1, 0, 1))) # Ac
+      slip_systems.append(SlipSystem(HklPlane(1, 1, -1), HklDirection(-1, 1, 0))) # Cb
+      slip_systems.append(SlipSystem(HklPlane(1, 1, -1), HklDirection(1, 0, 1))) # Ca
+      slip_systems.append(SlipSystem(HklPlane(1, 1, -1), HklDirection(0, 1, 1))) # Cd
+    elif plane_type == '112':
+      slip_systems.append(SlipSystem(HklPlane(1, 1, 2), HklDirection(1, 1, -1)))
+      slip_systems.append(SlipSystem(HklPlane(-1, 1, 2), HklDirection(1, -1, 1)))
+      slip_systems.append(SlipSystem(HklPlane(1, -1, 2), HklDirection(-1, 1, 1)))
+      slip_systems.append(SlipSystem(HklPlane(1, 1, -2), HklDirection(1, 1, 1)))
+      slip_systems.append(SlipSystem(HklPlane(1, 2, 1), HklDirection(1, -1, 1)))
+      slip_systems.append(SlipSystem(HklPlane(-1, 2, 1), HklDirection(1, 1, -1)))
+      slip_systems.append(SlipSystem(HklPlane(1, -2, 1), HklDirection(1, 1, 1)))
+      slip_systems.append(SlipSystem(HklPlane(1, 2, -1), HklDirection(-1, 1, 1)))
+      slip_systems.append(SlipSystem(HklPlane(2, 1, 1), HklDirection(-1, 1, 1)))
+      slip_systems.append(SlipSystem(HklPlane(-2, 1, 1), HklDirection(1, 1, 1)))
+      slip_systems.append(SlipSystem(HklPlane(2, -1, 1), HklDirection(1, 1, -1)))
+      slip_systems.append(SlipSystem(HklPlane(2, 1, -1), HklDirection(1, -1, 1)))
+    else:
+      print 'warning only 111 or 112 slip planes supported for the moment!'
     return slip_systems
 
 class HklObject:
@@ -646,22 +671,32 @@ class HklPlane(HklObject):
     
   @staticmethod
   def get_family(hkl):
-    '''Helper static method to obtain a list of the different
-    slip plane in a particular family.
+    '''Static method to obtain a list of the different crystallographic 
+    planes in a particular family.
     
-    We could build any family with 3 integers automatically:
-    * 1 int nonzero -> 3 planes, eg (001)
-    * 2 equal ints nonzero -> 6 planes, eg (011)
-    * 3 equal ints nonzero -> 4 planes, eg (111)
-    * 2 different ints, all nonzeros -> 12 planes, eg (112) 
-    * 3 different ints, all nonzeros -> 24 planes, eg (123)
+    :params str hkl: a string of 3 numbers corresponding to the miller indices.
+    :raise ValueError: if the given string does not correspond to a supported family.
+    :returns list: a list of the :py:class:`~pymicro.crystal.lattice.HklPlane` in the given hkl family.
+
+    .. note::
+
+      We could build any family with 3 integers automatically:
+      * 1 int nonzero -> 3 planes, eg (001)
+      * 2 equal ints nonzero -> 6 planes, eg (011)
+      * 3 equal ints nonzero -> 4 planes, eg (111)
+      * 2 different ints, all nonzeros -> 12 planes, eg (112) 
+      * 3 different ints, all nonzeros -> 24 planes, eg (123)
     '''
+    if not len(hkl) == 3:
+      raise ValueError('warning, family not supported: %s' % hkl)
     family = []
-    if hkl == '100':
+    l = list(hkl)
+    l.sort() # miller indices are now sorted by increasing order
+    if hkl == '001':
       family.append(HklPlane(1, 0, 0))
       family.append(HklPlane(0, 1, 0))
       family.append(HklPlane(0, 0, 1))
-    elif hkl == '110':
+    elif hkl == '011':
       family.append(HklPlane(1, 1, 0))
       family.append(HklPlane(-1, 1, 0))
       family.append(HklPlane(1, 0, 1))
@@ -673,11 +708,7 @@ class HklPlane(HklObject):
       family.append(HklPlane(-1, 1, 1))
       family.append(HklPlane(1, -1, 1))
       family.append(HklPlane(1, 1, -1))
-    elif hkl == '200':
-      family.append(HklPlane(2, 0, 0))
-      family.append(HklPlane(0, 2, 0))
-      family.append(HklPlane(0, 0, 2))
-    elif hkl == '211':
+    elif hkl == '112' or hkl == '211':
       family.append(HklPlane(1, 1, 2))
       family.append(HklPlane(-1, 1, 2))
       family.append(HklPlane(1, -1, 2))
@@ -688,17 +719,46 @@ class HklPlane(HklObject):
       family.append(HklPlane(1, 2, -1))
       family.append(HklPlane(2, 1, 1))
       family.append(HklPlane(-2, 1, 1))
-      family.append(HklPlane(-2, 1, -1))
-      family.append(HklPlane(-2, -1, 1))
-    elif hkl == '220':
+      family.append(HklPlane(2, -1, 1))
+      family.append(HklPlane(2, 1, -1))
+    elif hkl == '002':
+      family.append(HklPlane(2, 0, 0))
+      family.append(HklPlane(0, 2, 0))
+      family.append(HklPlane(0, 0, 2))
+    elif hkl == '022':
       family.append(HklPlane(2, 2, 0))
       family.append(HklPlane(-2, 2, 0))
       family.append(HklPlane(2, 0, 2))
       family.append(HklPlane(-2, 0, 2))
       family.append(HklPlane(0, 2, 2))
       family.append(HklPlane(0, -2, 2))
+    elif hkl == '123':
+      family.append(HklPlane(1, 2, 3))
+      family.append(HklPlane(-1, 2, 3))
+      family.append(HklPlane(1, -2, 3))
+      family.append(HklPlane(1, 2, -3))
+      family.append(HklPlane(3, 1, 2))
+      family.append(HklPlane(-3, 1, 2))
+      family.append(HklPlane(3, -1, 2))
+      family.append(HklPlane(3, 1, -2))
+      family.append(HklPlane(2, 3, 1))
+      family.append(HklPlane(-2, 3, 1))
+      family.append(HklPlane(2, -3, 1))
+      family.append(HklPlane(2, 3, -1))
+      family.append(HklPlane(1, 3, 2))
+      family.append(HklPlane(-1, 3, 2))
+      family.append(HklPlane(1, -3, 2))
+      family.append(HklPlane(1, 3, -2))
+      family.append(HklPlane(2, 1, 3))
+      family.append(HklPlane(-2, 1, 3))
+      family.append(HklPlane(2, -1, 3))
+      family.append(HklPlane(2, 1, -3))
+      family.append(HklPlane(3, 2, 1))
+      family.append(HklPlane(-3, 2, 1))
+      family.append(HklPlane(3, -2, 1))
+      family.append(HklPlane(3, 2, -1))
     else:
-      print 'warning, family not supported:', hkl
+      raise ValueError('warning, family not supported: %s' % hkl)
     return family
   
   @staticmethod

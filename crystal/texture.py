@@ -333,6 +333,7 @@ class PoleFigure:
       else:
         axis = self.x
       axis_rot = self.sst_symmetry_cubic(B.dot(axis))
+      label = ''
       if self.map_field == 'grain_id':
         label = 'grain ' + str(grain.id)
       self.plot_crystal_dir(axis_rot, mk=mk, col=self.get_color_from_field(grain), ax=ax, ann=ann, lab=label)

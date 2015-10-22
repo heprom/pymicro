@@ -26,17 +26,17 @@ class OrientationTests(unittest.TestCase):
 class OrientationTests(unittest.TestCase):
 
   def setUp(self):
-    print 'testing the Grain class'
+    print 'testing the Orientation class'
 
   def test_Orientation(self):
     lambda_keV = 30
     a = 0.3306 # lattice parameter in nm
     Ti_bcc = Lattice.cubic(a)
     p = HklPlane(0, 1, 1, lattice = Ti_bcc)
-    g = Grain(4, Orientation.from_euler((103.517, 42.911, 266.452)))
-    (w1, w2) = g.dct_omega_angles(p, lambda_keV, verbose=False)
-    self.assertAlmostEqual(w1, -151.66)
-    self.assertAlmostEqual(w2, 16.71)
+    o = Orientation.from_euler((103.517, 42.911, 266.452))
+    (w1, w2) = o.dct_omega_angles(p, lambda_keV, verbose=False)
+    self.assertAlmostEqual(w1, -151.665, 2)
+    self.assertAlmostEqual(w2, 16.709, 2)
 
 if __name__ == '__main__':
   unittest.main()

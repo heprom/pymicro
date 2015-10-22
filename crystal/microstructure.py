@@ -57,7 +57,7 @@ class Orientation:
     '''Convenience methode to expose the third Euler angle.'''
     return self.euler[2]
 
-  def dc_omega_angles(self, hkl, lambda_keV, verbose=False):
+  def dct_omega_angles(self, hkl, lambda_keV, verbose=False):
     '''Compute the two omega angles which satisfy the Bragg condition.
     
     For a given crystal orientation sitting on a vertical rotation axis, 

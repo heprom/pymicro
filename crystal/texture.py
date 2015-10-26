@@ -205,16 +205,28 @@ class PoleFigure:
       path[j, 1] = ci[1]
     ax.plot(path[:, 0], path[:, 1], color=col, markersize=self.mksize, linewidth=2)
 
-  def plot_pf_background(self, ax):
+  def plot_pf_background(self, ax, labels=True):
     '''Function to plot the background of the pole figure.
     
     :param ax: a reference to a pyplot ax to draw the backgroud.
+    :params bool labels: add lables to axes (True by default).
     '''
     an = np.linspace(0,2*np.pi,100)
     plt.hold('on')
     ax.plot(np.cos(an), np.sin(an), 'k-')
     ax.plot([-1,1], [0,0], 'k-')
     ax.plot([0,0], [-1,1], 'k-')
+    axe_labels = ['X', 'Y', 'Z']
+    if self.axis == 'Z':
+      h = 0; v = 1; u = 2
+    elif self.axis == 'Y':
+      h = 0; v = 2; u = 1
+    else:
+      h = 1; v = 2; u = 0
+    ax.annotate(axe_labels[h], (1.01, 0.0), xycoords='data',
+      fontsize=16, horizontalalignment='left', verticalalignment='center')
+    ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data',
+      fontsize=16, horizontalalignment='center', verticalalignment='bottom')
 
   def plot_pf_dir(self, c_dir, ax=None, mk='o', col='k', ann=False, lab=''):
     '''Plot a crystal direction in a direct pole figure.'''
@@ -236,18 +248,7 @@ class PoleFigure:
     :param col: symbol color (black by default)
     :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).    
     '''
-    axe_labels = ['X', 'Y', 'Z']
-    if self.axis == 'Z':
-      h = 0; v = 1; u = 2
-    elif self.axis == 'Y':
-      h = 0; v = 2; u = 1
-    else:
-      h = 1; v = 2; u = 0
     self.plot_pf_background(ax)
-    ax.annotate(axe_labels[h], (1.01, 0.0), xycoords='data',
-      fontsize=16, horizontalalignment='left', verticalalignment='center')
-    ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data',
-      fontsize=16, horizontalalignment='center', verticalalignment='bottom')
     for grain in self.microstructure.grains:
       B = grain.orientation_matrix()
       Bt = B.transpose()
@@ -265,11 +266,66 @@ class PoleFigure:
             color = int(256*(self.field[grain.id] - self.field_min_level) / float(self.field_max_level - self.field_min_level))
             col_cmap = cm.get_cmap(self.lut, 256)
             col = col_cmap(np.arange(256))[color] # directly access the color
-	self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
+        self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
     ax.axis([-1.1,1.1,-1.1,1.1])
     if self.pflegend and self.map_field == 'grain_id':
       ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, \
         prop={'size':10})
+    ax.axis('off')
+    ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
+
+  def create_pf_contour(self, ax=None, ang_step=10):
+    '''Compute the distribution of orientation and plot it using contouring.
+    
+    This plot the distribution of orientation in the microstructure 
+    associated with this PoleFigure instance, as a continuous 
+    distribution using angular bining with the specified step.
+    the distribution is constructed at runtime by discretizing the 
+    angular space and counting the number of poles in each bin.
+    Then the plot_pf_contour method is called to actually plot the data.
+    
+    :param ax: a reference to a pyplot ax to draw the contours.
+    :param int ang_step: angular step in degrees to use for constructing the orientation distribution data (10 degrees by default)
+    '''
+    # discretise the angular space (azimuth and altitude)
+    ang_step *= np.pi / 180 # change to radians
+    n_phi = 1 + 2*np.pi/ang_step
+    n_psi = 1 + 0.5*np.pi/ang_step
+    phis = np.linspace(0, 2*np.pi, n_phi)
+    psis = np.linspace(0, np.pi/2, n_psi)
+    xv, yv = np.meshgrid(phis, psis)
+    values = np.zeros((n_psi, n_phi), dtype=int)
+    for grain in self.microstructure.grains:
+      B = grain.orientation_matrix()
+      Bt = B.transpose()
+      for c in self.poles:
+        c_rot = Bt.dot(c)
+        # handle poles pointing down
+        if c_rot[2] < 0: c_rot *= -1 # make unit vector have z>0
+        if c_rot[1] >=0:
+          phi = np.arccos(c_rot[0]/np.sqrt(c_rot[0]**2 + c_rot[1]**2))
+        else:
+          phi = 2*np.pi - np.arccos(c_rot[0]/np.sqrt(c_rot[0]**2 + c_rot[1]**2))
+        psi = np.arccos(c_rot[2]) # since c_rot is normed
+        i_phi = int((phi + 0.5*ang_step) / ang_step) % n_phi
+        j_psi = int((psi + 0.5*ang_step)/ ang_step) % n_psi
+        values[j_psi, i_phi] += 1
+    if self.proj == 'stereo': # double check which one is flat/stereo
+      x = (2*yv/np.pi)*np.cos(xv)
+      y = (2*yv/np.pi)*np.sin(xv)
+    else:
+      x = np.sin(yv)*np.cos(xv)
+      y = np.sin(yv)*np.sin(xv)
+    # close the pole figure by duplicating azimuth=0
+    values[:,-1] = values[:,0]
+    self.plot_pf_contour(ax, x, y, values)
+    
+  def plot_pf_contour(self, ax, x, y, values):
+    '''Plot the direct pole figure using contours. '''
+    self.plot_pf_background(ax)
+    ax.contourf(x, y, values)
+    #ax.plot(x, y, 'ko')
+    ax.axis([-1.1,1.1,-1.1,1.1])
     ax.axis('off')
     ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
@@ -411,15 +467,15 @@ class PoleFigure:
 class TaylorModel:
   '''A class to carry out texture evolution with the Taylor model.
   
-  Briefly explein the full constrained Taylor model [ref 1938].
+  Briefly explain the full constrained Taylor model [ref 1938].  
   '''
 
   def __init__(self, microstructure):
     self.micro = microstructure # Microstructure instance
-    self.slip_systems = SlipSystem.get_octaedral_slip_systems()
+    self.slip_systems = SlipSystem.get_slip_systems('111')
     self.nact = 5 # number of active slip systems in one grain to accomodate the plastic strain
     self.dt = 1.e-3
-    self.max_time = 1 # sec
+    self.max_time = 0.001 # sec
     self.time = 0.0
     self.L = np.array([[-0.5, 0.0, 0.0], [0.0, -0.5, 0.0], [0.0, 0.0, 1.0]]) # velocity gradient
   
@@ -448,9 +504,20 @@ class TaylorModel:
       M[3, i] += m[1, 1]
       M[4, i] += m[1, 2]
       #M[5, i] += m[2, 2]
-    #dgammas = np.linalg.solve(M, L)
     dgammas = np.linalg.lstsq(M, L, rcond=1.e-3)[0]
-    print 'dgammas =', dgammas
+    '''
+    U, s, V = np.linalg.svd(M) # solve by SVD
+    print 'U:\n'
+    print U
+    print 's:\n'
+    print s
+    print 'V:\n'
+    print V
+    pinv_svd = np.dot(np.dot(V.T, np.linalg.inv(np.diag(s))), U.T)
+    dgammas_svd = np.dot(pinv_svd, L) # solving Ax=b computing x = A^-1*b
+    print 'dgammas (SVD) =', dgammas_svd
+    '''
+    print 'dgammas (LST) =', dgammas
     if check:
       # check consistency
       Lcheck = np.zeros((3, 3), dtype=np.float)

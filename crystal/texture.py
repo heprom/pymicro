@@ -497,7 +497,8 @@ class TaylorModel:
     M = np.zeros((5, self.nact), dtype=np.float)
     for i in range(len(ss_rank)):
       s = self.slip_systems[ss_rank[i]]
-      m = g.orientation.slip_system_orientation_strain_tensor(s)
+      m = g.orientation.slip_system_orientation_tensor(s)
+      #m = g.orientation.slip_system_orientation_strain_tensor(s)
       M[0, i] += m[0, 0]
       M[1, i] += m[0, 1]
       M[2, i] += m[0, 2]
@@ -523,7 +524,8 @@ class TaylorModel:
       Lcheck = np.zeros((3, 3), dtype=np.float)
       for i in range(len(ss_rank)):
         s = self.slip_systems[ss_rank[i]]
-        ms = g.orientation.slip_system_orientation_strain_tensor(s)
+        ms = g.orientation.slip_system_orientation_tensor(s)
+        #ms = g.orientation.slip_system_orientation_strain_tensor(s)
         Lcheck += dgammas[i] * ms
       print 'check:',np.sum(Lcheck - self.L),'\n', Lcheck
       if abs(np.sum(Lcheck - self.L)) > 1e-1:

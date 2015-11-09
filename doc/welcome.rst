@@ -15,6 +15,29 @@ As of version 0.1 (august 2014), pymicro is organised around 4 packages:
    vtk_utils.py for rendering still 3D images and vtk_anim.py to create 
    animations.
 
+Installation
+============
+
+You can grab a copy of the latest version on the git repository at Centre des Materiaux, open a terminal and type:
+
+::
+
+  git clone git://vcs/pymicro
+
+This will create a pymicro folder. Then you must add the folder containing pymicro to the PYTHONPATH environement variable. To do this you can add this line to your .cshrc file:
+
+::
+
+  setenv PYTHONPATH /path/to/folder/containing/pymicro
+
+Then you will be able to use pymicro (you may have to source the .cshrc or restart the terminal). For instance after starting a ipython shell:
+
+::
+
+  from pymicro.file.file_utils import HST_read
+
+If you want to use pymicro interactively and import all modules at ipython startup you may apply the following recipe: :doc:`cookbook/pymicro_and_ipython`
+
 Dependencies
 ============
 

@@ -1,6 +1,18 @@
 import os, numpy as np
 from matplotlib import pyplot as plt
 
+def lambda_keV_to_nm(lambda_keV):
+  return 1.2398 / lambda_keV
+
+def lambda_keV_to_angstrom(lambda_keV):
+  return 12.398 / lambda_keV
+
+def lambda_nm_to_keV(lambda_nm):
+  return lambda_nm / 1.2398
+
+def lambda_angstrom_to_keV(lambda_angstrom):
+  return lambda_angstrom / 12.398
+
 def plot_xray_trans(mat='Al', ts=[1.0], rho=1.0, unit='keV', energy_lim=(1, 100), display=False):
   '''Plot the transmitted intensity of a X-ray beam through a given material.
   

@@ -1000,6 +1000,23 @@ def line_3d(start_point, end_point):
   return aLineActor
   
 def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discrete=False):
+  '''This method create an actor running a contour filter through the 
+  given data set.
+
+  The data set can be equally given in numpy or VTK format (it will be 
+  converted to VTK if needed). The method may require a fair amount of 
+  memory so downsample your data if you can.
+  
+  :params data: the dataset to map, in numpy or VTK format.
+  :params float value: numeric value to use for contouring.
+  :params color: the solid color to use for the contour actor.
+  :params diffuseColor: the diffusive color to use for the contour actor.
+  :params float opacity: the opacity value to use for the actor (1.0 by default).
+  :params bool discrete: use vtkDiscreteMarchingCubes if True (False by default).
+  :returns: The method return a vtkActor that can be directly added to a renderer.
+  '''
+  if type(data) == numpy.ndarray:
+    data = numpy_array_to_vtk_grid(data, False)
   if discrete:
     contour = vtk.vtkDiscreteMarchingCubes()
   else:

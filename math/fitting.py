@@ -53,7 +53,7 @@ def fit(y, x = None, expression=None, nb_params=None, init=None):
        def myf(x, p):
          return p[0]*x + p[1]
 
-       F = fit(y, x, expression=myF, nb_params=2)
+       F = fit(y, x, expression=myf, nb_params=2)
   '''
   if expression == 'Gaussian':
     F = Gaussian()
@@ -69,6 +69,9 @@ def fit(y, x = None, expression=None, nb_params=None, init=None):
       print('please specify the number of parameters for your fit function, aborting fit...')
       return None
     if not init:
+      init = np.ones(nb_params)
+    if not len(init) == nb_params:
+      print('there are more parameters in the fit function than specified in the initialization sequence, aborting initialization...')
       init = np.ones(nb_params)
     for i in range(nb_params):
       F.add_parameter(init[i], 'p%d' % i)

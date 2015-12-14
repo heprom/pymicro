@@ -38,7 +38,7 @@ def rand_cmap(N=256, first_is_black=False, table_range=(0,255)):
   :return: A vtkLookupTable lookup table with N random colors.
   '''
   numpy.random.seed(13)
-  rand_colors = numpy.random.rand(N,3)
+  rand_colors = numpy.random.rand(N, 3)
   if first_is_black:
     rand_colors[0] = [0., 0., 0.] # enforce black background
   lut = vtk.vtkLookupTable()
@@ -1036,7 +1036,6 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   mapper.Update()
   actor = vtk.vtkActor()
   actor.SetMapper(mapper)
-  print 'setting actor color to',color
   actor.GetProperty().SetColor(color)
   actor.GetProperty().SetDiffuseColor(diffuseColor)
   actor.GetProperty().SetSpecular(.4)

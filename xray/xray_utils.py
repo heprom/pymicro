@@ -31,6 +31,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=1.0, unit='keV', energy_lim=(1, 100)
   *display* display the plot or save an image of the plot (False by default)
   '''
   path = os.path.dirname(__file__)
+  print path
   mu_rho = np.genfromtxt(os.path.join(path, mat + '.txt'), usecols = (0, 1), comments='#')
   energy = mu_rho[:,0]
   if unit == 'MeV':

@@ -1,0 +1,78 @@
+****calcul
+ ***mesh 
+  **file poly.geof
+
+ ***resolution newton
+  **sequence
+   *time 1.
+   *increment 10
+   *iteration 5
+   *ratio 0.001
+   *algorithm p1p2p3
+  **init_d_dof sequence
+
+  **automatic_time  global 3
+   *divergence 2. 10
+   *security 1.5
+   *first_dtime 0.1
+   *max_dtime 0.1
+
+ ***bc
+  **impose_nodal_dof
+    top U3  1.0 time
+    bot U3  0.0
+    188 U1  0.     time
+    188 U2  0.     time
+     98 U1  0.     time
+     26 U2  0.     time
+
+***material
+  **elset _ELSET0  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	      8.0377    110.2626    301.7984  
+  **elset _ELSET1  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    0.179900     90.0338    253.9525  
+  **elset _ELSET2  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    152.5150     72.2109    272.4120  
+  **elset _ELSET3  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    251.9731     31.7025    141.8329  
+  **elset _ELSET4  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    352.8895    120.1797    231.6329  
+  **elset _ELSET5  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    152.8924     66.2794     49.9243  
+  **elset _ELSET6  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    244.3496     60.1484    315.9132  
+  **elset _ELSET7  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    193.2092     67.4034     43.1983  
+  **elset _ELSET8  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    358.2946    118.3213    285.3302  
+  **elset _ELSET9  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    210.1579     57.0619    311.9345  
+  **elset _ELSET10  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    174.4946     65.5103     95.4242  
+  **elset _ELSET11  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	     24.2074    120.9493    309.7202  
+  **elset _ELSET12  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    120.1800     48.2094     73.9172  
+  **elset _ELSET13  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    117.1658     94.5149    230.7428  
+  **elset _ELSET14  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    342.7771    133.0468    252.8802  
+  **elset _ELSET15  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    160.1671     35.1694    261.4701  
+  **elset _ELSET16  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    110.1034     46.7320    254.0610  
+  **elset _ELSET17  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    260.9910     18.1481     45.7785  
+  **elset _ELSET18  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	     58.5136     85.6776    246.2527  
+  **elset _ELSET19  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	     12.6940    118.5270     76.8653  
+  **elset _ELSET20  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    185.2679     74.5589     44.5585  
+  **elset _ELSET21  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    278.4728     85.9285    180.2960  
+  **elset _ELSET22  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    296.0155    117.9986     98.8634  
+  **elset _ELSET23  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    223.4200     77.1559     53.9018  
+  **elset _ELSET24  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    261.8049    121.8982    286.0197  
+  **elset _ELSET25  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    179.6914    135.6014    271.9244  
+  **elset _ELSET26  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    124.4605     63.4235    250.5173  
+  **elset _ELSET27  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    317.2601    116.3611    355.1857  
+  **elset _ELSET28  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    225.6780     39.9233    162.7938  
+  **elset _ELSET29  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	     73.7731     31.7455     70.7748  
+  **elset _ELSET30  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    214.7783     77.7252    108.2109  
+  **elset _ELSET31  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    210.8897     52.4585    240.5333  
+  **elset _ELSET32  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	     53.3256    138.3003    244.5561  
+  **elset _ELSET33  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    116.1142     85.4847    130.6964  
+  **elset _ELSET34  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	     16.3745     91.7550    247.2398  
+  **elset _ELSET35  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    279.7722    135.2556    314.3150  
+  **elset _ELSET36  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	     35.0313    112.4407     49.0551  
+  **elset _ELSET37  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	     95.1020    130.9545     97.3608  
+  **elset _ELSET38  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    160.7658     81.7500    268.5441  
+  **elset _ELSET39  *file ti.mat *integration theta_method_a 1.0 1.e-9 150 *rotation	    344.0733     58.7911     28.8080  
+	
+ ***output
+  **output_first
+  **frequency
+   *dtime 0.1
+  **component
+    eto33 sig33 octgeq
+****return
+

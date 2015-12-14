@@ -1,0 +1,18 @@
+***behavior gen_evp 
+ **global_output
+ **elasticity cubic
+   y1111     150000.
+   y1122      75000.
+   y1212     112000.
+ **potential octahedral oct
+%  *store_all
+  *flow norton
+   K 500. n 5.0
+  *isotropic nonlinear
+   R0 100.
+   Q  10.
+   b  350.
+  *interaction slip
+   h1 1. h2 1. h3 1. h4 1. h5 1. h6 1.
+%   h1 1. h2 0. h3 0. h4 0. h5 0. h6 0.
+***return

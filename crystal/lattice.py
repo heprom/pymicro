@@ -555,10 +555,23 @@ class HklDirection(HklObject):
     return '\n'.join(out)
     
   def direction(self):
+    '''Returns a normalized vector corresponding to this crystallographic direction.'''
     (h, k, l) = self.miller_indices()
     l_vect = np.array([h, k, l])
     return l_vect/np.linalg.norm(l_vect)
 
+  def angle_with_direction(self, hkl):
+    '''Computes the angle between this crystallographic direction and 
+    the given direction (in radians).'''
+    return np.arcsin(np.dot(self.direction(), hkl.direction()))
+
+  @staticmethod
+  def angle_between_directions((h1, k1, l1), (h2, k2, l2)):
+    '''Computes the angle between two crystallographic directions (in degrees).'''
+    d1 = HklDirection(h1, k1, l1)
+    d2 = HklDirection(h2, k2, l2)
+    return d1.angle_with_direction(d2)*180/np.pi
+    
 class HklPlane(HklObject):
   '''
   This class define crystallographic planes using Miller indices.

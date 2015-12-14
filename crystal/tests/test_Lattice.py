@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from pymicro.crystal.lattice import Lattice, HklPlane, SlipSystem
+from pymicro.crystal.lattice import Lattice, HklDirection, HklPlane, SlipSystem
 
 class LatticeTests(unittest.TestCase):
 
@@ -25,6 +25,18 @@ class LatticeTests(unittest.TestCase):
     for i in range(0, 3):
       self.assertAlmostEqual(al._lengths[i], 0.40495)
       self.assertEqual(al._angles[i], 90.0)
+
+class HklDirectionTests(unittest.TestCase):
+
+  def setUp(self):
+    print 'testing the HklDirection class'
+
+  def test_angle_between_directions(self):
+    d111 = HklDirection(1, 1, 1)
+    d110 = HklDirection(1, 1, 0)
+    d100 = HklDirection(1, 0, 0)
+    self.assertAlmostEqual(d100.angle_with_direction(d110)*180/np.pi, 45.0)
+    self.assertAlmostEqual(d111.angle_with_direction(d110)*180/np.pi, 54.7356103)
 
 class HklPlaneTests(unittest.TestCase):
 

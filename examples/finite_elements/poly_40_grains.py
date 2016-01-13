@@ -4,8 +4,7 @@ from pymicro.view.vtk_utils import axes_actor, setup_camera, rand_cmap, show_mes
 import os, vtk
 
 base_name = os.path.splitext(__file__)[0]
-calc = FE_Calc(wdir='/home/proudhon/students/jia/polyx/calcul_d5', prefix='calcul')
-#calc = FE_Calc(wdir='../data', prefix='calcul')
+calc = FE_Calc(wdir='../data', prefix='calcul')
 calc.read_ut()
 # compute the grain id field
 gid_field = calc._mesh.compute_grain_id_field(grain_prefix = '_ELSET')

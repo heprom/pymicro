@@ -63,11 +63,59 @@ class Detector2d:
         self.save_path = os.path.dirname(self.image_path)
       print "writing text file"
       np.savetxt(os.path.join(self.save_path, \
-        'Int_%s.txt' % os.path.splitext(os.path.basename(self.image_path))[0]), \
+        'Int_%s_2theta_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0]), \
         (two_theta_values, intensityResult, pointsCounted), \
         header = '# delta (deg) -- norm intensity -- points counted', \
         fmt='%.6e')
     return two_theta_values, intensityResult, pointsCounted
+
+  def sagital_regroup(self, two_theta_mini=None, two_theta_maxi=None, psi_min=None, psi_max=None, psi_step=None, write_txt=False, output_image=False):
+    # assign default values if needed
+    if not two_theta_mini: two_theta_mini = self.two_thetas.min()
+    if not two_theta_maxi: two_theta_maxi = self.two_thetas.max()
+    if not psi_step: psi_step = 1./mar.calib
+    nbOfBins = int((psi_max - psi_min) / psi_step)
+    print '* Sagital regroup (psi binning)'
+    print '  psi range = [%.1f-%.1f] with a %g deg step (%d bins)' % (psi_min, psi_max, psi_step, nbOfBins)
+
+    bin_edges = np.linspace(psi_min, psi_max, 1 + nbOfBins)
+    psi_values = bin_edges[:-1] + 0.5 * psi_step
+    intensityResult = np.zeros(nbOfBins); # this will be the summed intensity
+    pointsCounted = np.zeros(nbOfBins); # this will be the number of pixel contributing to each point
+
+    # calculating bin indices for each pixel
+    binIndices = np.floor((self.psis - psi_min) / psi_step).astype(np.int16)
+    binIndices[self.psis > psi_max] = -1
+    # mark out pixels with negative intensity
+    binIndices[self.corr_data < 0] = -1
+    # mark out pixels outside of psi range [-psi_max, psi_max]
+    if two_theta_mini:
+      binIndices[(self.two_thetas < two_theta_mini)] = -1
+    if two_theta_maxi:
+      binIndices[(self.two_thetas > two_theta_maxi)] = -1
+    for ii in range(nbOfBins):
+        intensityResult[ii] = self.corr_data[binIndices == ii].sum()
+        pointsCounted[ii] = (binIndices == ii).sum()
+    intensityResult /= pointsCounted
+
+    if output_image:
+      print self.image_path
+      print os.path.basename(self.image_path)
+      print os.path.splitext(os.path.basename(self.image_path))
+      output_image_path = os.path.join(self.save_path, \
+        'AR_%s.png' % os.path.splitext(os.path.basename(self.image_path))[0])
+      plt.imsave(output_image_path, binIndices, vmin=0, vmax=nbOfBins)
+
+    if write_txt:
+      if not self.save_path:
+        self.save_path = os.path.dirname(self.image_path)
+      print "writing text file"
+      np.savetxt(os.path.join(self.save_path, \
+        'Int_%s_psi_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0]), \
+        (two_theta_values, intensityResult, pointsCounted), \
+        header = '# psi (deg) -- norm intensity -- points counted', \
+        fmt='%.6e')
+    return psi_values, intensityResult, pointsCounted
 
 class Mar165(Detector2d):
   '''Class to handle a rayonix marccd165.

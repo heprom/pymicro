@@ -445,43 +445,6 @@ class SlipSystem:
     return self._direction
 
   @staticmethod
-  def get_octaedral_slip_systems():
-    '''A static method to get all slip systems for octaedral slip (ie 
-    111 planes). In essence, this does the same as get_slip_systems and only one 
-    function should be kept in the future.
-    
-    ..note
-    
-      The slip system order is here the same as in the Z-set software 
-      suite for convenience purpose.
-    '''
-    oct_ss = []
-    planes = []
-    planes.append(HklPlane(1, 1, 1))
-    planes.append(HklPlane(1, -1, 1))
-    planes.append(HklPlane(-1, 1, 1))
-    planes.append(HklPlane(1, 1, -1))
-
-    slip_dirs = np.zeros((4,3,3))
-    slip_dirs[0,0,:] = [-1., 0., 1.] # Bd for (111)
-    slip_dirs[0,1,:] = [ 0.,-1., 1.] # Ba for (111)
-    slip_dirs[0,2,:] = [-1., 1., 0.] # Bc for (111)
-    slip_dirs[2,0,:] = [-1., 0., 1.] # Db for (1-11)
-    slip_dirs[2,1,:] = [ 0., 1., 1.] # Dc for (1-11)
-    slip_dirs[2,2,:] = [ 1., 1., 0.] # Da for (1-11)
-    slip_dirs[1,0,:] = [ 0.,-1., 1.] # Ab for (-111)
-    slip_dirs[1,2,:] = [ 1., 1., 0.] # Ad for (-111)
-    slip_dirs[1,1,:] = [ 1., 0., 1.] # Ac for (-111)
-    slip_dirs[3,0,:] = [-1., 1., 0.] # Cb for (11-1)
-    slip_dirs[3,1,:] = [ 1., 0., 1.] # Ca for (11-1)
-    slip_dirs[3,2,:] = [ 0., 1., 1.] # Cd for (11-1)
-    for i, plane in enumerate(planes):
-      for j in range(3):
-        direction = HklDirection(slip_dirs[i,j,0], slip_dirs[i,j,1], slip_dirs[i,j,2])
-        oct_ss.append(SlipSystem(plane, direction))
-    return oct_ss
-    
-  @staticmethod
   def get_slip_systems(plane_type='111'):
     '''A static method to get all slip systems for a given hkl plane family.
     

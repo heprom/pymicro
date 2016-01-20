@@ -21,7 +21,9 @@ class Detector2d:
     self.save_path = '.'
     self.correction = 'none' # could be none, bg, flat
 
-  def azimuthal_regroup(self, two_theta_mini=None, two_theta_maxi=None, two_theta_step=None, psi_min=None, psi_max=None, write_txt=False, output_image=False):
+  def azimuthal_regroup(self, two_theta_mini=None, two_theta_maxi=None, \
+      two_theta_step=None, psi_min=None, psi_max=None, write_txt=False, \
+      output_image=False, debug=False):
     # assign default values if needed
     if not two_theta_mini: two_theta_mini = self.two_thetas.min()
     if not two_theta_maxi: two_theta_maxi = self.two_thetas.max()
@@ -32,42 +34,81 @@ class Detector2d:
 
     bin_edges = np.linspace(two_theta_mini, two_theta_maxi, 1 + nbOfBins)
     two_theta_values = bin_edges[:-1] + 0.5 * two_theta_step
-    intensityResult = np.zeros(nbOfBins); # this will be the summed intensity
-    pointsCounted = np.zeros(nbOfBins); # this will be the number of pixel contributing to each point
+    intensityResult = np.zeros(nbOfBins) # this will be the summed intensity
+    counts = np.zeros(nbOfBins) # this will be the number of pixel contributing to each point
 
     # calculating bin indices for each pixel
     binIndices = np.floor((self.two_thetas - two_theta_mini) / two_theta_step).astype(np.int16)
     binIndices[self.two_thetas > two_theta_maxi] = -1
+    binIndices[self.two_thetas < two_theta_mini] = -1
+    ind = np.unique(binIndices)
+    if debug:
+      print(self.psis.min())
+      print(self.psis.max())
+      print(np.max(self.psis < psi_max))
+      plt.imshow(((self.psis < psi_max) & (self.psis > psi_min)).T, interpolation='nearest')
+      #plt.imshow(binIndices.T, interpolation='nearest')
+      plt.colorbar()
+      plt.show()
+      print('bin indices:',ind)
+      for i in range(1,len(ind)):
+        print(ind[i], two_theta_mini + i*two_theta_step)    
+      im = np.ones_like(self.corr_data)
+      im[binIndices < 40] = 0
+      im[binIndices > 57] = 0
+      plt.imshow(im.T, vmin=0, vmax=1, interpolation='nearest', origin='upper')
+      plt.show()
     # mark out pixels with negative intensity
     binIndices[self.corr_data < 0] = -1
-    # mark out pixels outside of phi range which is [0,phi_max] and [180-phi_max,180]
+    # mark out pixels outside of phi range which is [0,psi_max] and [180-psi_max,180]
     if psi_min:
       binIndices[(self.psis < psi_min)] = -1
     if psi_max:
-      binIndices[(self.psis > psi_max) & (self.psis < 180 - psi_max)] = -1
+      binIndices[(self.psis > psi_max)] = -1
+      #binIndices[(self.psis > psi_max) & (self.psis < 180 - psi_max)] = -1
     for ii in range(nbOfBins):
         intensityResult[ii] = self.corr_data[binIndices == ii].sum()
-        pointsCounted[ii] = (binIndices == ii).sum()
-    intensityResult /= pointsCounted
+        counts[ii] = (binIndices == ii).sum()
+    intensityResult /= counts
 
     if output_image:
       print self.image_path
       print os.path.basename(self.image_path)
       print os.path.splitext(os.path.basename(self.image_path))
       output_image_path = os.path.join(self.save_path, \
-        'AR_%s.png' % os.path.splitext(os.path.basename(self.image_path))[0])
-      plt.imsave(output_image_path, binIndices, vmin=0, vmax=nbOfBins)
+        'AR_%s.pdf' % os.path.splitext(os.path.basename(self.image_path))[0])
+      plt.figure()
+      plt.imshow(self.corr_data.T, vmin=0, vmax=2000, interpolation='nearest', origin='upper')
+      # highlight the summed area with black lines
+      div = 10
+      two_theta_corners = np.array([two_theta_mini, two_theta_maxi, two_theta_maxi, two_theta_mini, two_theta_mini])
+      psi_corners = np.array([psi_min, psi_min, psi_max, psi_max, psi_min])
+      two_theta_bounds = []
+      psi_bounds = []
+      for j in range(len(two_theta_corners)-1):
+        for i in range(div):
+          two_theta_bounds.append(two_theta_corners[j] + i*(two_theta_corners[j+1] - two_theta_corners[j])/div)
+          psi_bounds.append(psi_corners[j] + i*(psi_corners[j+1] - psi_corners[j])/div)      
+      # close the loop
+      two_theta_bounds.append(two_theta_mini)
+      psi_bounds.append(psi_min)
+      (x, y) = self.angles_to_pixels(np.array(two_theta_bounds), np.array(psi_bounds))
+      if debug:
+        print(x, y)
+      plt.plot(x, y, 'k-')
+      plt.xlim(0, self.corr_data.shape[1])
+      plt.ylim(self.corr_data.shape[0], 0)
+      plt.savefig(output_image_path, format='pdf')
 
     if write_txt:
       if not self.save_path:
         self.save_path = os.path.dirname(self.image_path)
-      print "writing text file"
-      np.savetxt(os.path.join(self.save_path, \
-        'Int_%s_2theta_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0]), \
-        (two_theta_values, intensityResult, pointsCounted), \
-        header = '# delta (deg) -- norm intensity -- points counted', \
+      txt_path = os.path.join(self.save_path, 'Int_%s_2theta_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0])
+      print('writing text file %s' % txt_path)
+      np.savetxt(txt_path, (two_theta_values, intensityResult, counts), \
+        header = 'delta (deg) -- norm intensity -- points counted', \
         fmt='%.6e')
-    return two_theta_values, intensityResult, pointsCounted
+    return two_theta_values, intensityResult, counts
 
   def sagital_regroup(self, two_theta_mini=None, two_theta_maxi=None, psi_min=None, psi_max=None, psi_step=None, write_txt=False, output_image=False):
     # assign default values if needed
@@ -81,7 +122,7 @@ class Detector2d:
     bin_edges = np.linspace(psi_min, psi_max, 1 + nbOfBins)
     psi_values = bin_edges[:-1] + 0.5 * psi_step
     intensityResult = np.zeros(nbOfBins); # this will be the summed intensity
-    pointsCounted = np.zeros(nbOfBins); # this will be the number of pixel contributing to each point
+    counts = np.zeros(nbOfBins); # this will be the number of pixel contributing to each point
 
     # calculating bin indices for each pixel
     binIndices = np.floor((self.psis - psi_min) / psi_step).astype(np.int16)
@@ -95,16 +136,26 @@ class Detector2d:
       binIndices[(self.two_thetas > two_theta_maxi)] = -1
     for ii in range(nbOfBins):
         intensityResult[ii] = self.corr_data[binIndices == ii].sum()
-        pointsCounted[ii] = (binIndices == ii).sum()
-    intensityResult /= pointsCounted
+        counts[ii] = (binIndices == ii).sum()
+    print counts
+    intensityResult /= counts
 
     if output_image:
       print self.image_path
       print os.path.basename(self.image_path)
       print os.path.splitext(os.path.basename(self.image_path))
       output_image_path = os.path.join(self.save_path, \
-        'AR_%s.png' % os.path.splitext(os.path.basename(self.image_path))[0])
-      plt.imsave(output_image_path, binIndices, vmin=0, vmax=nbOfBins)
+        'AR_%s.pdf' % os.path.splitext(os.path.basename(self.image_path))[0])
+      plt.figure()
+      plt.imshow(self.corr_data.T, vmin=0, vmax=2000, interpolation='nearest', origin='upper')
+      # highlight the summed area with black lines
+      two_theta_bounds = [two_theta_mini*self.calib, two_theta_maxi*self.calib, two_theta_maxi*self.calib, two_theta_mini*self.calib]
+      psi_bounds = [psi_min*self.calib, psi_min*self.calib, psi_max*self.calib, psi_max*self.calib,]
+      plt.plot(two_theta_bounds, psi_bounds, 'k-')
+      plt.xlim(0, self.corr_data.shape[1])
+      plt.ylim(self.corr_data.shape[0], 0)
+      plt.savefig(output_image_path, format='pdf')
+      #plt.imsave(output_image_path, binIndices, vmin=0, vmax=nbOfBins)
 
     if write_txt:
       if not self.save_path:
@@ -112,10 +163,10 @@ class Detector2d:
       print "writing text file"
       np.savetxt(os.path.join(self.save_path, \
         'Int_%s_psi_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0]), \
-        (two_theta_values, intensityResult, pointsCounted), \
-        header = '# psi (deg) -- norm intensity -- points counted', \
+        (two_theta_values, intensityResult, counts), \
+        header = 'psi (deg) -- norm intensity -- points counted', \
         fmt='%.6e')
-    return psi_values, intensityResult, pointsCounted
+    return psi_values, intensityResult, counts
 
 class Mar165(Detector2d):
   '''Class to handle a rayonix marccd165.
@@ -126,6 +177,7 @@ class Mar165(Detector2d):
     Detector2d.__init__(self)
     self.xcen = 1024.
     self.ycen = 1024.
+    self.pixel_size = 0.08 # mm
     self.calib = 1. # pixel by degree
     self.ref = np.ones((2048, 2048), dtype=np.uint16)
     self.dark = np.zeros((2048, 2048), dtype=np.uint16)
@@ -147,6 +199,7 @@ class Mar165(Detector2d):
 
   def compute_geometry(self):
     '''Calculate an array of the image size with the (2theta, psi) for each pixel.'''
+    self.compute_TwoTh_Psi_arrays()
 
   def compute_TwoTh_Psi_arrays(self):
     '''Calculate two arrays (2theta, psi) TwoTheta and Psi angles arrays corresponding to repectively 
@@ -158,10 +211,20 @@ class Mar165(Detector2d):
     distance = self.calib / np.tan(1.0 * deg2rad)
     x = np.linspace(0, 2047, 2048)
     y = np.linspace(0, 2047, 2048)
-    xx, yy = np.meshgrid(x, y)
+    yy, xx = np.meshgrid(y, x)
+    #xx, yy = np.meshgrid(x, y)
     r = np.sqrt((xx - self.xcen)**2 + (yy - self.ycen)**2)
     self.two_thetas = np.arctan(r/distance) * inv_deg2rad
     self.psis = np.arccos((xx - self.xcen) / r) * inv_deg2rad
+
+  def angles_to_pixels(self, two_theta, psi):
+    '''given two values 2theta and psi (that could be arrays), compute the corresponding pixel on the detector.'''
+    distance = self.calib / np.tan(np.pi / 180.)
+    r = distance * np.tan(two_theta * np.pi / 180.)
+    print(psi, np.sign((psi > 90) - 0.5))
+    x = self.xcen + r*np.cos(psi * np.pi / 180.)
+    y = self.ycen - np.sign(psi)*np.sqrt(r**2 - (x - self.xcen)**2)
+    return (x, y)
 
 class Xpad(Detector2d):
   '''Class to handle Xpad like detectors.
@@ -197,14 +260,36 @@ class Xpad(Detector2d):
     self.orientation = 'horizontal' # either 'horizontal' or 'vertical'
     self.verbose = True
     
-  def load_image(self, image_path):
+  def load_image(self, image_path, nxs_prefix, nxs_dataset, nxs_index, nxs_update_geometry=False):
+    '''load an image from a file.
+    
+    The image can be stored as a uint16 binary file (.raw) or in a nexus 
+    file (.nxs). With the nexus format, several arguments must be 
+    specified such as the prefix, the index and the dataset number (as str).
+    '''
     self.image_path = image_path
-    # check the use of using [y, x] array instead of [x, y]
-    self.data = HST_read(self.image_path, data_type=np.uint16, dims=(560, 240, 1))[:,:,0].astype(np.float32).transpose()
-    self.compute_corrected_image()
+    if image_path.endswith('.raw'):
+      # check the use of using [y, x] array instead of [x, y]
+      self.data = HST_read(self.image_path, data_type=np.uint16, dims=(560, 240, 1))[:,:,0].astype(np.float32).transpose()
+      self.compute_corrected_image()
+    elif image_path.endswith('.nxs'):
+      import tables
+      f = tables.openFile(image_path)
+      root = f.root._v_groups.keys()[0]
+      command = 'f.root.__getattr__(\"%s\")' % root
+      images = eval(command + '.scan_data.data_%s.read()' % nxs_dataset) # xpad images
+      delta = eval('f.root.%s%d.DIFFABS.__getattr__(\'D13-1-CX1__EX__DIF.1-DELTA__#1\').raw_value.read()' % (nxs_prefix, nxs_index))
+      gamma = 0.0 #eval('f.root.%s%d.DIFFABS.__getattr__(\'D13-1-CX1__EX__DIF.1-GAMMA__#1\').raw_value.read()' % (nxs_prefix, nxs_index))
+      f.close()
+      self.data = images[0]
+      print(self.data.shape)
+      self.compute_corrected_image()
     if self.orientation == 'vertical':
       self.data = self.data.transpose()
       self.corr_data = self.corr_data.transpose()
+      print('transposing data, shape is', self.corr_data.shape)
+    if nxs_update_geometry:
+      self.compute_TwoTh_Psi_arrays(diffracto_delta = delta, diffracto_gamma = gamma)
 
   def compute_geometry(self):
     '''Calculate the array with the corrected geometry (double pixels).'''
@@ -383,76 +468,3 @@ class Xpad(Detector2d):
     self.two_thetas = twoThArray
     self.psis = psiArray
     return twoThArray, psiArray
-    
-if __name__ == '__main__':
-
-  xpad = Xpad()
-  xpad.mask_flag = 0
-  # calib
-  xpad.XcenDetector = 271.0 + 3*3
-  xpad.YcenDetector = 116.0
-  xpad.deltaOffset = 15.0
-  # read xpad image from nxs file
-  import os, tables
-  scanNo = 18
-  file_name = 's1_10keV_%d.nxs' % scanNo
-  path = 'D:/explCM/test/data/'
-  pathSave = 'D:/explCM/test/data/exploited/'
-  f = tables.openFile(path + file_name)
-  print 'looking at file = %s' % (file_name)
-  fileNameRoot2 = f.root._v_groups.keys()[0]
-  command = "f.root.__getattr__(\""+str(fileNameRoot2)+"\")"
-  test_data = eval(command + ".scan_data.data_06.read()")[0]
-  #from scipy import ndimage
-  #test_data = ndimage.median_filter(test_data, 3)
-
-  fig = plt.figure()
-  fig.add_subplot(211)
-  plt.imshow(test_data, clim=(0,50))
-  print test_data.shape
-  corr_data = xpad.compute_corrected_image(test_data)
-  fig.add_subplot(212)
-  plt.imshow(corr_data, clim=(0,50))
-  # compute 2theta, psi values for this image
-  two_thetas, psis = xpad.compute_TwoTh_Psi_arrays(5.0, 0.0, corr_data)
-  print two_thetas
-  print '\n min',two_thetas.min()
-  print '\n max',two_thetas.max()
-
-  # the result
-  deltaMini = 20.0
-  deltaMaxi = 23.0
-  stepDelta = 0.02
-  nbOfBins = int((deltaMaxi-deltaMini)/stepDelta)+1; 
-  print "   Azimuthal regroup"
-  print "   deltaMini=%f  deltaMaxi=%f  nbOfBins=%d  stepDelta=%f" %(deltaMini, deltaMaxi, nbOfBins, stepDelta)
-
-  deltaResult = np.zeros(nbOfBins); # generate the tables for radial integration, this is delta
-  intensityResult = np.zeros(nbOfBins); # this will be the summed intensity
-  pointsCounted = np.zeros(nbOfBins); # this will be the number of points contributing to each intensity point
-  intensityResultTemp = np.zeros(nbOfBins); #this will be the temp corrected intensity (temporary for plot)
-
-  # calculating binned data
-  print "   2th binning"
-  binIndices = np.floor((two_thetas - deltaMini) / stepDelta).astype(np.uint16)
-  print binIndices
-  # mark out pixels with negative intensity
-  binIndices[corr_data < 0] = -1
-  for ii in range(nbOfBins):
-      intensityResult[ii] = corr_data[binIndices == ii].sum()
-      pointsCounted[ii] = (binIndices == ii).sum()
-  print '** normalizing, mean point counted:', np.mean(pointsCounted)
-  intensityResult /= pointsCounted
-   
-  print "writing text file"
-  np.savetxt(os.path.join(pathSave, 'Int_c1_exptime_air_4.txt'), \
-    (deltaResult, intensityResult, pointsCounted), \
-    header = '# delta (deg) -- norm intensity -- points counted', \
-    fmt='%.6e')
-
-  plt.figure()
-  plt.imshow(two_thetas, cmap=cm.jet)
-  plt.colorbar()
-  #plt.plot(two_thetas[:,120], label='two theta')
-  #plt.plot(psis[280,:], label='gamma')
-  plt.show()

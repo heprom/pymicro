@@ -223,7 +223,7 @@ class Gaussian(FitFunction):
   def fwhm(self):
     '''Compute the full width at half maximum of the gauss function.'''
     p = self.get_parameters()
-    return 2*p[1].value*np.log(2) # check sqrt ??
+    return 2*p[1].value*np.sqrt(np.log(2))
   
 class Lorentzian(FitFunction):
   '''Lorentzian funtion.
@@ -288,7 +288,7 @@ class Voigt(FitFunction):
     FitFunction.__init__(self)
     def V(x, p):
       z = (x - p[0].value + 1j*p[2].value) / (p[1].value * np.sqrt(2))
-      return p[3].value * wofz(z).real / (p[1].value * np.sqrt(2) * np.pi)
+      return p[3].value * wofz(z).real / (p[1].value * np.sqrt(2 * np.pi))
     self.expression = V
     self.add_parameter(position, 'position')
     self.add_parameter(sigma, 'sigma')
@@ -315,8 +315,10 @@ class Voigt(FitFunction):
   def fwhm(self):
     '''Compute the full width at half maximum of the Voigt function.
     
-    The height factor does not change the fwhm.'''
+    The height factor does not change the fwhm. The fwhm can be evaluated 
+    by the width of the associated Gaussian and Lorentzian functions.
+    The fwhm is approximated by the equation from J. Olivero and R. Longbothum [1977]'''
     p = self.get_parameters()
-    fg = 2*p[1].value*np.log(2)
+    fg = 2*p[1].value*np.sqrt(2*np.log(2))
     fl = 2*p[2].value
     return 0.5346*fl + np.sqrt(0.2166*fl**2+fg**2)

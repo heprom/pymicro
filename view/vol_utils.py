@@ -34,20 +34,18 @@ def show_and_save(image, name, dpi=100, colormap=cm.gray, verbose=False):
   plt.savefig(name + '.png', format='png')
   plt.close()
 
-def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False):
+def hist(data, nb_bins=256, data_range=(0,255), show=True, save=False, prefix='data', density=False):
   '''Histogram of a data array.
   
   Compute and plot the gray level histogram of the provided data array.
-
-  .. warning::
-
-     Works only with 8 bit data (ie numpy uint8 data type).
 
   *Parameters*
   
   **data**: the data array to analyse.
   
   **nb_bins**: the number of bins in the histogram.
+  
+  **data_range**: the data range to use in the histogram, (0,255) by default.
   
   **show**: boolean to display the figure using pyplot (defalut True).
 
@@ -69,7 +67,7 @@ def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False)
       Gray level histogram computed on a 512x512x512 8 bits image.
   '''
   print 'computing gray level histogram'
-  hist, bin_edges = np.histogram(data, bins=nb_bins, range=(0,255), density=density)
+  hist, bin_edges = np.histogram(data, bins=nb_bins, range=data_range, density=density)
   bin_centers = 0.5*(bin_edges[:-1] + bin_edges[1:])
   plt.figure(1, figsize=(6,4))
   if density:
@@ -79,8 +77,8 @@ def hist(data, nb_bins=256, show=True, save=False, prefix='data', density=False)
     plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
     plt.bar(bin_centers, hist, width=1, fill=True, color='g', edgecolor='g')
     plt.ylabel('Counts')
-  plt.xlim(0,256)
-  plt.xlabel('8 bit gray level value')
+  plt.xlim(data_range)
+  plt.xlabel('Gray level value')
   if save: plt.savefig(prefix + '_hist.png', format='png')
   if show: plt.show()
 

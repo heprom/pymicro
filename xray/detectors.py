@@ -163,7 +163,7 @@ class Detector2d:
       print "writing text file"
       np.savetxt(os.path.join(self.save_path, \
         'Int_%s_psi_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0]), \
-        (two_theta_values, intensityResult, counts), \
+        (psi_values, intensityResult, counts), \
         header = 'psi (deg) -- norm intensity -- points counted', \
         fmt='%.6e')
     return psi_values, intensityResult, counts

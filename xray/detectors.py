@@ -105,9 +105,13 @@ class Detector2d:
         self.save_path = os.path.dirname(self.image_path)
       txt_path = os.path.join(self.save_path, 'Int_%s_2theta_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0])
       print('writing text file %s' % txt_path)
-      np.savetxt(txt_path, (two_theta_values, intensityResult, counts), \
-        header = 'delta (deg) -- norm intensity -- points counted', \
-        fmt='%.6e')
+      if np.__version__.split('.')[1] > 6:
+        np.savetxt(txt_path, (two_theta_values, intensityResult, counts), \
+          header = 'delta (deg) -- norm intensity -- points counted', \
+          fmt='%.6e')
+      else:
+        np.savetxt(txt_path, (two_theta_values, intensityResult, counts), \
+          fmt='%.6e')
     return two_theta_values, intensityResult, counts
 
   def sagital_regroup(self, two_theta_mini=None, two_theta_maxi=None, psi_min=None, psi_max=None, psi_step=None, write_txt=False, output_image=False):
@@ -160,12 +164,15 @@ class Detector2d:
     if write_txt:
       if not self.save_path:
         self.save_path = os.path.dirname(self.image_path)
+      txt_path = os.path.join(self.save_path, 'Int_%s_psi_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0])
       print "writing text file"
-      np.savetxt(os.path.join(self.save_path, \
-        'Int_%s_psi_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0]), \
-        (psi_values, intensityResult, counts), \
-        header = 'psi (deg) -- norm intensity -- points counted', \
-        fmt='%.6e')
+      if np.__version__.split('.')[1] > 6:
+        np.savetxt(txt_path, (psi_values, intensityResult, counts), \
+          header = 'psi (deg) -- norm intensity -- points counted', \
+          fmt='%.6e')
+      else:
+        np.savetxt(txt_path, (psi_values, intensityResult, counts), \
+          fmt='%.6e')
     return psi_values, intensityResult, counts
 
 class Mar165(Detector2d):

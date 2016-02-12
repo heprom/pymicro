@@ -667,7 +667,7 @@ def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
   grid.SetPoints(points)
   return grid
 
-def lattice_edges(grid, tubeRadius=0.02):
+def lattice_edges(grid, tubeRadius=0.02, tubeColor=grey):
   '''
   Create the 3D representation of crystal lattice edges.
 
@@ -678,6 +678,9 @@ def lattice_edges(grid, tubeRadius=0.02):
 
   **tubeRadius**: float
   Radius of the tubes representing the atomic bonds (default: 0.02).
+
+  **tubeColor**: vtk color
+  Color of the tubes representing the atomis bonds (default: grey).
 
   *Returns*
 
@@ -699,9 +702,10 @@ def lattice_edges(grid, tubeRadius=0.02):
   TubeMapper.SetInputConnection(Tubes.GetOutputPort())
   Edges = vtk.vtkActor()
   Edges.SetMapper(TubeMapper)
+  Edges.GetProperty().SetDiffuseColor(tubeColor)
   return Edges
 
-def lattice_vertices(grid, sphereRadius=0.1):
+def lattice_vertices(grid, sphereRadius=0.1, sphereColor=blue):
   '''
   Create the 3D representation of crystal lattice atoms.
 
@@ -712,6 +716,9 @@ def lattice_vertices(grid, sphereRadius=0.1):
 
   **sphereRadius**: float
   Size of the spheres representing the atoms (default: 0.1).
+
+  **sphereColor**: vtk color
+  Color of the spheres representing the atoms (default: blue).
 
   *Returns*
 
@@ -734,10 +741,10 @@ def lattice_vertices(grid, sphereRadius=0.1):
   SphereMapper.ScalarVisibilityOff()
   Vertices = vtk.vtkActor()
   Vertices.SetMapper(SphereMapper)
-  Vertices.GetProperty().SetDiffuseColor(blue)
+  Vertices.GetProperty().SetDiffuseColor(sphereColor)
   return Vertices
   
-def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02):
+def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02, sphereColor=blue, tubeColor=grey):
   '''
   Create the 3D representation of a crystal lattice.
 
@@ -771,13 +778,19 @@ def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02):
   **tubeRadius**: float
   Radius of the tubes representing the atomic bonds (default: 0.02).
 
+  **sphereColor**: vtk color
+  Color of the spheres representing the atoms (default: blue).
+
+  **tubeColor**: vtk color
+  Color of the tubes representing the atomis bonds (default: grey).
+
   *Returns*
 
   The method return a vtk assembly combining lattice edges and vertices.
   '''
   grid = lattice_grid(lattice)
-  edges = lattice_edges(grid, tubeRadius=tubeRadius)
-  vertices = lattice_vertices(grid, sphereRadius=sphereRadius)
+  edges = lattice_edges(grid, tubeRadius=tubeRadius, tubeColor=tubeColor)
+  vertices = lattice_vertices(grid, sphereRadius=sphereRadius, sphereColor=sphereColor)
   assembly = vtk.vtkAssembly()
   assembly.AddPart(edges)
   assembly.AddPart(vertices)
@@ -1480,7 +1493,7 @@ def slits(size, x_slits=0):
       slitCorner1Mapper.SetInput(slitCorner1Grid)
     slitCorner1Actor = vtk.vtkActor()
     slitCorner1Actor.SetMapper(slitCorner1Mapper)
-    slitCorner1Actor.GetProperty().SetLineWidth(2.0)
+    slitCorner1Actor.GetProperty().SetLineWidth(3.0)
     slitCorner1Actor.GetProperty().SetDiffuseColor(black)
     slits.AddPart(slitCorner1Actor)
   return slits

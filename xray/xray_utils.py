@@ -13,7 +13,7 @@ def lambda_nm_to_keV(lambda_nm):
 def lambda_angstrom_to_keV(lambda_angstrom):
   return lambda_angstrom / 12.398
 
-def plot_xray_trans(mat='Al', ts=[1.0], rho=1.0, unit='keV', energy_lim=(1, 100), display=False):
+def plot_xray_trans(mat='Al', ts=[1.0], rho=1.0, unit='keV', energy_lim=(1, 100), legfmt='%.1f', display=False):
   '''Plot the transmitted intensity of a X-ray beam through a given material.
   
   **Parameters:**
@@ -36,15 +36,16 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=1.0, unit='keV', energy_lim=(1, 100)
   energy = mu_rho[:,0]
   if unit == 'MeV':
     energy *= 1000
+  legstr = '%%s %s mm' % legfmt
   for t in ts:
     # apply Beer-Lambert
     trans = 100*np.exp(-mu_rho[:,1]*rho*t/10)
-    plt.plot(energy, trans, '-', linewidth=3, markersize=10, label='%s %.1f mm' % (mat, t))
+    plt.plot(energy, trans, '-', linewidth=3, markersize=10, label=legstr % (mat, t))
   plt.xlim(energy_lim)
   plt.grid()
   plt.legend(loc='upper left')
   plt.xlabel('Photon Energy (keV)')
-  plt.ylabel('Transmission I/I_0 (%)')
+  plt.ylabel(r'Transmission $I/I_0$ (%)')
   if display:
     plt.show()
   else:

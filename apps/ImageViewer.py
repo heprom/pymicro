@@ -18,28 +18,72 @@ from pymicro.file.file_utils import edf_read
 from pymicro.file.tifffile import TiffFile
 from pymicro.view.vol_utils import hist
 
+class PlotWidget(QWidget):
+
+    def __init__(self, parent=None, image=None, toolbar=True):
+        QWidget.__init__(self, parent)
+        self.data = image
+        self.cmap = 'gray'
+        self.toolbar = toolbar
+        self.create_main_widget()
+        if self.data is not None:
+          self.on_draw()
+
+    def create_main_widget(self):
+        print self.data
+        self.main_widget = QWidget()
+        #self.file_label = QtGui.QLabel()
+        self.fig = Figure((10.0, 8.0), dpi=100)
+        self.canvas = FigureCanvas(self.fig)
+        self.canvas.setParent(self.main_widget)
+        self.canvas.setFocusPolicy(Qt.StrongFocus)
+        self.canvas.setFocus()
+        vbox = QVBoxLayout()
+        vbox.addWidget(self.canvas)  # the matplotlib canvas
+        if self.toolbar:
+          self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_widget)
+          vbox.addWidget(self.mpl_toolbar)
+        self.canvas.mpl_connect('key_press_event', self.on_key_press)
+        self.main_widget.setLayout(vbox)
+
+    def set_image(self, image):
+      self.data = image
+      self.on_draw()
+
+    def on_key_press(self, event):
+        if event.key == 'i':
+          print('* image infos:')
+          print('shape is (%dx%d)' % (np.shape(self.data)[0], np.shape(self.data)[1]))
+          print('min in image= %d, max in image=%d' % (np.min(self.data), np.max(self.data)))
+        elif event.key == 'right':
+          # load next image
+          print(event.key)
+        elif event.key == 'h':
+          # plot the image histogram
+          hist(self.data, data_range=(np.min(self.data), np.max(self.data)), show=True)
+        # implement the default mpl key press events described at
+        # http://matplotlib.org/users/navigation_toolbar.html#navigation-keyboard-shortcuts
+        key_press_handler(event, self.canvas, self.mpl_toolbar)
+
+    def on_draw(self):
+        if not hasattr(self.fig, 'subplot'):
+          self.axes = self.fig.add_subplot(111)
+        self.axes.imshow(self.data, cmap=self.cmap, origin='upper', interpolation='nearest', clim=[np.min(self.data), np.max(self.data)])
+        self.canvas.draw()
+
 class ImageViewerForm(QMainWindow):
   
     def __init__(self, parent=None, image=None):
         QMainWindow.__init__(self, parent)
-        self.data = image
-        self.cmap = 'gray'
-        self.create_main_frame()
-        self.on_draw()
+        self.create_main_frame(image)
+        #self.plot_widget.set_image(image)
+        self.plot_widget.on_draw()
 
-    def create_main_frame(self):
+    def create_main_frame(self, image):
         self.main_frame = QWidget()
-
-        #self.file_label = QtGui.QLabel()
-        self.fig = Figure((10.0, 8.0), dpi=100)
-        self.canvas = FigureCanvas(self.fig)
-        self.canvas.setParent(self.main_frame)
-        self.canvas.setFocusPolicy(Qt.StrongFocus)
-        self.canvas.setFocus()
-
-        self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
-        self.canvas.mpl_connect('key_press_event', self.on_key_press)
-
+        vbox = QVBoxLayout()
+        self.plot_widget = PlotWidget(image=image, toolbar=True)
+        vbox.addWidget(self.plot_widget)
         hbox = QHBoxLayout()
         self.cmap_label = QLabel('color map')
         hbox.addWidget(self.cmap_label)
@@ -49,40 +93,13 @@ class ImageViewerForm(QMainWindow):
         self.cmap_combo.addItem('hot')
         self.cmap_combo.activated[str].connect(self.on_cmap_selected) 
         hbox.addWidget(self.cmap_combo)
-        
-        vbox = QVBoxLayout()
-        vbox.addWidget(self.canvas)  # the matplotlib canvas
-        vbox.addWidget(self.mpl_toolbar)
         vbox.addLayout(hbox)
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
 
-    def set_image(self, image):
-      self.data = image
-      self.on_draw()
-
     def on_cmap_selected(self, text):
-      self.cmap = str(text)
-      self.on_draw()
-
-    def on_draw(self):
-        if not hasattr(self.fig, 'subplot'):
-          self.axes = self.fig.add_subplot(111)
-        self.axes.imshow(self.data, cmap=self.cmap, origin='upper', interpolation='nearest', clim=[np.min(self.data), np.max(self.data)])
-        self.canvas.draw()
-
-    def on_key_press(self, event):
-        if event.key == 'i':
-          print('* image infos:')
-          print('shape is (%dx%d)' % (np.shape(self.data)[0], np.shape(self.data)[1]))
-          print('min in image= %d, max in image=%d' % (np.min(self.data), np.max(self.data)))
-        if event.key == 'h':
-          # plot the histogram
-          hist(self.data, data_range=(np.min(self.data), np.max(self.data)), show=True)
-        # implement the default mpl key press events described at
-        # http://matplotlib.org/users/navigation_toolbar.html#navigation-keyboard-shortcuts
-        key_press_handler(event, self.canvas, self.mpl_toolbar)
-
+      self.plot_widget.cmap = str(text)
+      self.plot_widget.on_draw()
 
 class ImageViewer(QApplication):
 

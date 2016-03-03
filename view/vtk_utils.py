@@ -1056,6 +1056,30 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   actor.GetProperty().SetOpacity(opacity)
   return actor
 
+def volren(data, alpha_channel=None):
+  '''Volume rendering for a 3d array using standard ray casting.
+  
+    :param data: the dataset to render, in numpy or VTK format.
+    :param alpha_channel: a vtkPiecewiseFunction instance, default to linear between 0 and 255 if not given.
+    :returns: The method return a vtkVolume that can be added to a renderer.
+  '''
+  if type(data) == numpy.ndarray:
+    data = numpy_array_to_vtk_grid(data, False)
+  if alpha_channel == None:
+    alpha_channel = vtk.vtkPiecewiseFunction()
+    alpha_channel.AddPoint(0, 0.0)
+    alpha_channel.AddPoint(255, 0.5)
+  volumeProperty = vtk.vtkVolumeProperty()
+  volumeProperty.SetScalarOpacity(alpha_channel)
+  compositeFunction = vtk.vtkVolumeRayCastCompositeFunction()
+  volumeMapper = vtk.vtkVolumeRayCastMapper()
+  volumeMapper.SetVolumeRayCastFunction(compositeFunction)
+  volumeMapper.SetInputData(data)
+  volume = vtk.vtkVolume()
+  volume.SetMapper(volumeMapper)
+  volume.SetProperty(volumeProperty)
+  return volume
+  
 def elevationFilter(data, value, (low, high)):
   '''Create an isosurface and map it with an elevation filter.
   

@@ -1,4 +1,4 @@
-import vtk, sys
+import vtk, sys, os
 
 class Scene3D:
   '''A class to manage a 3D scene using VTK actors.
@@ -8,21 +8,23 @@ class Scene3D:
   format. The actual 3D rendering is done by calling the `render` method.
   '''
 
-  def __init__(self, display=True, ren_size=(600, 600), name='scene_3d', background=(1., 1., 1.)):
+  def __init__(self, display=True, ren_size=(600, 600), name=None, background=(1., 1., 1.)):
     '''Initialization called when creating a new `Scene3D` object.
 
-    *Parameters*
-    
-    **display**: a boolean to control if the scene has to be displayed 
+    :param display: a boolean to control if the scene has to be displayed 
     interactively to the user (default True). If True, a frame counter 
     is used when saving images using the 's' key pressed callback. If 
     False a single image is save using the base name.
     
-    **ren_size**: a tuple with two value to set the size of the image in 
-    pixels (defalut 600x600).
+    :param ren_size: a tuple with two value to set the size of the image 
+    in pixels (defalut 600x600).
     
-    **name**: a string to used to describe the scene, it is used in 
-    particular when saving the scene as an image (default is 'scene_3d').    
+    :param name: a string to used to describe the scene, it is used in 
+    particular when saving the scene as an image. If not set, the file
+    name of the Python script will be used or 'scene_3d' if run 
+    interactively.
+    
+    :param background: the background of the scene (white by default).
     '''
     ren = vtk.vtkRenderer()
     ren.SetBackground(background)
@@ -33,7 +35,13 @@ class Scene3D:
     self.renWin.SetSize(ren_size)
 
     self.display = display
-    self.name = name
+    if name == None:
+      if '__file__' in globals():
+        self.name = os.path.splitext(__file__)[0]
+      else:
+        self.name = 'scene_3d'
+    else:
+      self.name = name
     self.frame_counter = 0
     self.verbose = True
 

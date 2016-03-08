@@ -263,7 +263,7 @@ class PoleFigure:
               # only add grain legend for its first pole
               label = 'grain ' + str(grain.id)
           else: # use the field value for this grain
-            color = int(256*(self.field[grain.id] - self.field_min_level) / float(self.field_max_level - self.field_min_level))
+            color = int(255*(self.field[grain.id] - self.field_min_level) / float(self.field_max_level - self.field_min_level))
             col_cmap = cm.get_cmap(self.lut, 256)
             col = col_cmap(np.arange(256))[color] # directly access the color
         self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
@@ -329,7 +329,8 @@ class PoleFigure:
     ax.axis('off')
     ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
-  def sst_symmetry_cubic(self, z_rot):
+  @staticmethod
+  def sst_symmetry_cubic(z_rot):
     '''Transform a given vector according to the cubic symmetry.
     
     This function transform a vector so that it lies in the unit SST triangle.
@@ -348,7 +349,7 @@ class PoleFigure:
       z_rot[0], z_rot[1] = z_rot[1], z_rot[0]
       
     if (z_rot[2] > z_rot[1]):
-	  z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
+      z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
       
     return np.array([z_rot[1], z_rot[2], z_rot[0]])
     
@@ -357,7 +358,7 @@ class PoleFigure:
       if self.map_field == 'grain_id':
         col = Microstructure.rand_cmap().colors[grain.id]
       else: # use the field value for this grain
-        color = int(256*(self.field[grain.id] - self.field_min_level) / float(self.field_max_level - self.field_min_level))
+        color = int(255*(self.field[grain.id] - self.field_min_level) / float(self.field_max_level - self.field_min_level))
         col_cmap = cm.get_cmap(self.lut, 256)
         col = col_cmap(np.arange(256))[color] # directly access the color
       return col

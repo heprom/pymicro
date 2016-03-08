@@ -93,6 +93,54 @@ class Lattice:
     return np.copy(self._matrix)
 
   @staticmethod
+  def symmetry(crystal_structure='cubic'):
+    ''' define the 24 equivalent cube orientations.
+    
+    :params str crystal_structure: a string describing the crystal structure.
+    :raise ValueError: if the given crystal structure is not cubic or none.
+
+    Those come from Randle & Engler, 2000. For cubic, they correspond to:
+
+     * 1 for pure cube
+     * 9 rot90 arount <001> axes
+     * 6 rot180 around <110> axes
+     * 8 rot 120 around <111> axes)
+    '''
+    if crystal_structure == 'cubic':
+      cubes = np.zeros((24, 3, 3), dtype= np.float)
+      cubes[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+      cubes[1] = np.array([[ 0.,  0., -1.], [0., -1.,  0.], [-1.,  0.,  0.]])
+      cubes[2] = np.array([[ 0.,  0., -1.], [0.,  1.,  0.], [1.,  0.,  0.]])
+      cubes[3] = np.array([[-1.,  0.,  0.], [0.,  1.,  0.], [0.,  0., -1.]])
+      cubes[4] = np.array([[ 0.,  0.,  1.], [0.,  1.,  0.], [-1.,  0.,  0.]])
+      cubes[5] = np.array([[ 1.,  0.,  0.], [0.,  0., -1.], [0.,  1.,  0.]])
+      cubes[6] = np.array([[ 1.,  0.,  0.], [0., -1.,  0.], [0.,  0., -1.]])
+      cubes[7] = np.array([[ 1.,  0.,  0.], [0.,  0.,  1.], [0., -1.,  0.]])
+      cubes[8] = np.array([[ 0., -1.,  0.], [1.,  0.,  0.], [0.,  0.,  1.]])
+      cubes[9] = np.array([[-1.,  0.,  0.], [0., -1.,  0.], [0.,  0.,  1.]])
+      cubes[10] = np.array([[ 0.,  1.,  0.], [-1.,  0.,  0.], [0.,  0.,  1.]])
+      cubes[11] = np.array([[ 0.,  0.,  1.], [1.,  0.,  0.], [0.,  1.,  0.]])
+      cubes[12] = np.array([[ 0.,  1.,  0.], [0.,  0.,  1.], [1.,  0.,  0.]])
+      cubes[13] = np.array([[ 0.,  0., -1.], [-1.,  0.,  0.], [0.,  1.,  0.]])
+      cubes[14] = np.array([[ 0., -1.,  0.], [0.,  0.,  1.], [-1.,  0.,  0.]])
+      cubes[15] = np.array([[ 0.,  1.,  0.], [0.,  0., -1.], [-1.,  0.,  0.]])
+      cubes[16] = np.array([[ 0.,  0., -1.], [1.,  0.,  0.], [0., -1.,  0.]])
+      cubes[17] = np.array([[ 0.,  0.,  1.], [-1.,  0.,  0.], [0., -1.,  0.]])
+      cubes[18] = np.array([[ 0., -1.,  0.], [0.,  0., -1.], [1.,  0.,  0.]])
+      cubes[19] = np.array([[ 0.,  1.,  0.], [1.,  0.,  0.], [0.,  0., -1.]])
+      cubes[20] = np.array([[-1.,  0.,  0.], [0.,  0.,  1.], [0.,  1.,  0.]])
+      cubes[21] = np.array([[ 0.,  0.,  1.], [0., -1.,  0.], [1.,  0.,  0.]])
+      cubes[22] = np.array([[ 0., -1.,  0.], [-1.,  0.,  0.], [0.,  0., -1.]])
+      cubes[23] = np.array([[-1.,  0.,  0.], [0.,  0., -1.], [0., -1.,  0.]])
+      return cubes
+    elif crystal_structure == 'none':
+      equiv = np.zeros((1, 3, 3), dtype= np.float)
+      equiv[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+      return equiv
+    else:
+      raise ValueError('warning, crystal structure not supported: %s' % crystal_structure)
+
+  @staticmethod
   def from_cif(file_path):
     '''
     Create a crystal Lattice using information contained in a given CIF 
@@ -526,7 +574,7 @@ class HklDirection(HklObject):
   def angle_with_direction(self, hkl):
     '''Computes the angle between this crystallographic direction and 
     the given direction (in radians).'''
-    return np.arcsin(np.dot(self.direction(), hkl.direction()))
+    return np.arccos(np.dot(self.direction(), hkl.direction()))
 
   @staticmethod
   def angle_between_directions((h1, k1, l1), (h2, k2, l2)):

@@ -45,6 +45,89 @@ class Orientation:
     s += '\nRodrigues vector = %s' % self.OrientationMatrix2Rodrigues(self._matrix)
     return s
 
+  @staticmethod
+  def cube():
+    '''Create the particular crystal orienation called Cube and which 
+    corresponds to euler angle (0,0,0).'''
+    return Orientation.from_euler((0., 0., 0.))
+
+  @staticmethod
+  def brass():
+    '''Create the particular crystal orienation called Brass and which 
+    corresponds to euler angle (35.264,45,0).'''
+    return Orientation.from_euler((35.264, 45., 0.))
+
+  @staticmethod
+  def copper():
+    '''Create the particular crystal orienation called Copper and which 
+    corresponds to euler angle (90,35.264,45).'''
+    return Orientation.from_euler((90., 35.264, 45.))
+
+  @staticmethod
+  def s3():
+    '''Create the particular crystal orienation called S3 and which 
+    corresponds to euler angle (59,37,63).'''
+    return Orientation.from_euler((58.980, 36.699, 63.435))
+
+  @staticmethod
+  def goss():
+    '''Create the particular crystal orienation called Goss and which 
+    corresponds to euler angle (0,45,0).'''
+    return Orientation.from_euler((0., 45., 0.))
+
+  @staticmethod
+  def shear():
+    '''Create the particular crystal orienation called shear and which 
+    corresponds to euler angle (45,0,0).'''
+    return Orientation.from_euler((45., 0., 0.))
+
+  @staticmethod
+  def misorientation_MacKenzie(psi):
+    '''psi in radians.'''
+    from math import sqrt, sin, cos, tan, pi, acos
+    psidg = 180*psi/pi
+    if psidg >= 0 and psidg <= 45:
+      p = 2./15*(1 - cos(psi))
+    elif psidg > 45 and psidg <= 60:
+      p = 2./15*(3*(sqrt(2)-1)*sin(psi) - 2*(1 - cos(psi)))
+    elif psidg > 60 and psidg <= 60.72:
+      p = 2./15*((3*(sqrt(2)-1) + 4./sqrt(3))*sin(psi) - 6.*(1 - cos(psi)))
+    elif psidg > 60.72 and psidg <= 62.8:
+      X = (sqrt(2)-1)/(1 - (sqrt(2)-1)**2/tan(0.5*psi)**2)**0.5
+      Y = (sqrt(2)-1)**2/((3 - 1/tan(0.5*psi)**2)**0.5)
+      p = (2./15)*((3*(sqrt(2)-1)+4/sqrt(3))*sin(psi) - 6*(1-cos(psi))) \
+        - 8./(5*pi)*(2*(sqrt(2)-1)*acos(X/tan(0.5*psi)) + 1./sqrt(3)*acos(Y/tan(0.5*psi)))*sin(psi) \
+        + 8./(5*pi)*(2*acos((sqrt(2)+1)*X/sqrt(2)) + acos((sqrt(2)+1)*Y/sqrt(2)))*(1-cos(psi))
+    else:
+      p = 0.
+    return p
+    
+  def misorientation_axis(self, orientation):
+    '''Compute the misorientation axis (normalised vector) with another 
+    crystal orientation. This vector is be definition common to both 
+    crystalline orientations.'''
+    delta = np.dot(self.orientation_matrix(), orientation.orientation_matrix().T)
+    n = np.array([delta[1,2] - delta[2,1], delta[2,0] - delta[0,2], delta[0,1] - delta[1,0]])
+    n /= np.sqrt((delta[1,2] - delta[2,1])**2 + (delta[2,0] - delta[0,2])**2 + (delta[0,1] - delta[1,0])**2)
+    return n
+
+  def misorientation_angle(self, orientation, crystal_structure='cubic'):
+    '''Compute the misorientation angle (in radian) with another crystal orientation.'''
+    min_misorientation = np.pi
+    from pymicro.crystal.lattice import Lattice
+    symmetries = Lattice.symmetry(crystal_structure)
+    for i in range(symmetries.shape[0]): # 24 for cubic
+      sym_i = symmetries[i]
+      for j in range(symmetries.shape[0]): # 24 for cubic
+        sym_j = symmetries[j]
+        delta = np.dot(np.dot(self.orientation_matrix(), sym_j), np.dot(sym_i.T, orientation.orientation_matrix().T))
+        cw = 0.5*(delta.trace() - 1)
+        mis = np.arccos(cw)
+        print('%3d misorientation angle %g' % ((24*i+j), mis*180/np.pi))
+        if mis < min_misorientation:
+          min_misorientation = mis
+    return min_misorientation
+
   def phi1(self):
     '''Convenience methode to expose the first Euler angle.'''
     return self.euler[0]
@@ -406,10 +489,10 @@ class Orientation:
       if line.lstrip().startswith('***material'):
         break
     euler_lines = []
-    for j,line in enumerate(lines[i+1:]):  
+    for j,line in enumerate(lines[i+1:]):
       if line.lstrip().startswith('***'):
         break
-      if (not line.lstrip().startswith('%') and line.find('**elset')>0):
+      if (not line.lstrip().startswith('%') and line.find('**elset')>=0):
         euler_lines.append(line)
     euler = []
     for l in euler_lines:

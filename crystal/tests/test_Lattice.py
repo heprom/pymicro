@@ -35,8 +35,10 @@ class HklDirectionTests(unittest.TestCase):
     d111 = HklDirection(1, 1, 1)
     d110 = HklDirection(1, 1, 0)
     d100 = HklDirection(1, 0, 0)
+    dm111 = HklDirection(-1, 1, 1)
     self.assertAlmostEqual(d100.angle_with_direction(d110)*180/np.pi, 45.0)
-    self.assertAlmostEqual(d111.angle_with_direction(d110)*180/np.pi, 54.7356103)
+    self.assertAlmostEqual(d111.angle_with_direction(d110)*180/np.pi, 35.26, 2)
+    self.assertAlmostEqual(d111.angle_with_direction(dm111)*180/np.pi, 70.528, 2)
 
 class HklPlaneTests(unittest.TestCase):
 

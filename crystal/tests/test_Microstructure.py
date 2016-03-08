@@ -23,12 +23,18 @@ class OrientationTests(unittest.TestCase):
     oct_ss = SlipSystem.get_slip_systems(plane_type='111')
     self.assertAlmostEqual(max(o.compute_all_schmid_factors(oct_ss, verbose=True)), 0.4082, 4)
 
-class OrientationTests(unittest.TestCase):
+  def test_misorientation_angle(self):
+    o1 = Orientation.from_euler((0., 0., 0.))
+    o2 = Orientation.from_euler((60., 0., 0.))
+    self.assertAlmostEqual(180/np.pi*o1.misorientation_angle(o2, crystal_structure='none'), 60)
+    self.assertAlmostEqual(180/np.pi*o1.misorientation_angle(o2, crystal_structure='cubic'), 30)
 
-  def setUp(self):
-    print 'testing the Orientation class'
-
-  def test_Orientation(self):
+  def test_misorientation_axis(self):
+    o1 = Orientation.copper()
+    o2 = Orientation.s3()
+    self.assertAlmostEqual(180/np.pi*o1.misorientation_angle(o2, crystal_structure='none'), 19.38, 2) # check value of 19.576
+    
+  def test_dct_omega_angles(self):
     lambda_keV = 30
     a = 0.3306 # lattice parameter in nm
     Ti_bcc = Lattice.cubic(a)

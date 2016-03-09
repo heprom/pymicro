@@ -16,7 +16,7 @@ Example:
 
 As seen it can quick become boring to import all the required modules. To use pymicro seamlessly within ipython, it is recommended to tweak the ipython config in the following way:
 
-you can add the import_modules.py file to the ipython startup pdirectory. This way all the pymicro modules will be imported into the namespace at startup. You can copy it there but the best way is to use a hardlink. This way if pymicro is updated and this file changes, you will have nothing special to do:
+you can add the import_modules.py file to the ipython startup directory. This way all the pymicro modules will be imported into the namespace at startup. You can copy it there but the best way is to use a hardlink. This way if pymicro is updated and this file changes, you will have nothing special to do:
 
 .. code-block:: bash
 
@@ -43,5 +43,5 @@ To compute all Schmid factor for this orientation and the {111}[110] slip system
 .. code-block:: python
 
   >>> o = Orientation.from_rodrigues([0.0885, 0.3889, 0.3268])
-  >>> o.compute_all_schmid_factors(SlipSystem.get_octaedral_slip_systems())
+  >>> o.compute_all_schmid_factors(SlipSystem.get_slip_systems(plane_type='111'))
 

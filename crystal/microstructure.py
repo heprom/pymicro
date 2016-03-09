@@ -123,7 +123,6 @@ class Orientation:
         delta = np.dot(np.dot(self.orientation_matrix(), sym_j), np.dot(sym_i.T, orientation.orientation_matrix().T))
         cw = 0.5*(delta.trace() - 1)
         mis = np.arccos(cw)
-        print('%3d misorientation angle %g' % ((24*i+j), mis*180/np.pi))
         if mis < min_misorientation:
           min_misorientation = mis
     return min_misorientation

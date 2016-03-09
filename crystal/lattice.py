@@ -496,7 +496,7 @@ class SlipSystem:
   def get_slip_systems(plane_type='111'):
     '''A static method to get all slip systems for a given hkl plane family.
     
-    :params str plane_type: a string of the 3 miller indices of the crystallocgraphic plane family.
+    :params str plane_type: a string of the 3 miller indices of the crystallographic plane family.
     :returns list: a list of :py:class:`~pymicro.crystal.lattice.SlipSystem`. 
     
     .. warning::

@@ -1,6 +1,58 @@
 Change log history
 ==================
 
+pymicro version 0.3.1
+---------------------
+
+* updated version number (Henry Proudhon)
+* added new example for misorientation (Henry Proudhon)
+* corrested a few typos (Henry Proudhon)
+* corrected a few small bugs (Henry Proudhon)
+* new orientations types and misorientation code (Henry Proudhon)
+* added symmetry operator for cubic structure (Henry Proudhon)
+* new tests for misorientation caculations (Henry Proudhon)
+* make scene3d more simple to use with better defaults (Henry Proudhon)
+* initial support for volume rendering (Henry Proudhon)
+* working on ImageViewer (Henry Proudhon)
+* new xray absorption data (Henry Proudhon)
+* updated import_modules.py with new functions (Henry Proudhon)
+* new legend format option in plot_xray_trans (Henry Proudhon)
+* new absorption data (Henry Proudhon)
+* added color option for atoms and bond in lattice_3d (Henry Proudhon)
+* fixed version pb with np.savetxt (Henry Proudhon)
+* small fix with psi_values (Henry Proudhon)
+* modified ImageViewer to work with Qt (Henry Proudhon)
+* improved detector code, both for Mar and Xpad (Henry Proudhon)
+* fixed fwhm for Voigt function (Henry Proudhon)
+* removed broken method get_octaedral_slip_systems (Henry Proudhon)
+* added new sagital_regroup method (Henry Proudhon)
+* fix data folder (Henry Proudhon)
+* a first example for finite elements (Henry Proudhon)
+* __init__ file for fe package and texture rst file (Henry Proudhon)
+* initial commit of the finite element part of pymicro (Henry Proudhon)
+* fix typo, remove print output (Henry Proudhon)
+* small fix in xray_utils (Henry Proudhon)
+* new method angle_with_direction (Henry Proudhon)
+* add check for nbParams in init (Henry Proudhon)
+* added lambda to keV conversion functions (Henry Proudhon)
+* added installation section (Henry Proudhon)
+* new example with skimage and radon (Henry Proudhon)
+* docstrings for contourFilter (Henry Proudhon)
+* fix orientation_tensor stuff for Taylor calculation (Henry Proudhon)
+* fix orientation_tensor stuff for Taylor calculation (Henry Proudhon)
+* added contour plot for pole figures and a demonstrating example (Henry Proudhon)
+* added more slip planes families and slip systems families, updated testing (Henry Proudhon)
+* fixed typo in dct_omega_angles (Henry Proudhon)
+* moved dc_omega_angles to the Orientation class (Henry Proudhon)
+* fixed colors when plotting ipf (Henry Proudhon)
+* new options to dsplay mesh edges in show_mesh (Henry Proudhon)
+* cleanup: moved the testing code of TaylorModel to external files (Henry Proudhon)
+* fixed a missing Update which caused the actor not to be displayed (Henry Proudhon)
+* new Taylor model class (experimental) (Henry Proudhon)
+* updated xray data files for Cu and Al (Henry Proudhon)
+* new method to compute a slip system orientation strain and rotation tensors (Henry Proudhon)
+* added change log history to the documentation (Henry Proudhon)
+
 pymicro version 0.3.0
 ---------------------
 

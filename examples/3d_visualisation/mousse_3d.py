@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
   # Create the 3D scene
   base_name = os.path.splitext(__file__)[0]
-  s3d = Scene3D(display=False, ren_size=(600,600), name=base_name, background=black)
+  s3d = Scene3D(display=False, ren_size=(800, 800), name=base_name, background=black)
 
   data_dir = '../data'
   scan = 'mousse_250x250x250_uint8.raw'

@@ -5,7 +5,7 @@ from pymicro.view.vtk_utils import read_image_data, setup_camera, volren
 from pymicro.view.scene3d import Scene3D
 
 base_name = os.path.splitext(__file__)[0]
-s3d = Scene3D(display=False, ren_size=(800, 800), name=base_name)
+s3d = Scene3D(display=True, ren_size=(800, 800), name=base_name)
 size = (200, 200, 100)
 data_dir = '../data'
 scan = 'sand_200x200x100_uint8.raw'

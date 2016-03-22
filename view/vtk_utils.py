@@ -1056,7 +1056,7 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   actor.GetProperty().SetOpacity(opacity)
   return actor
 
-def volren(data, alpha_channel=None):
+def volren(data, alpha_channel=None, color_function=None):
   '''Volume rendering for a 3d array using standard ray casting.
   
     :param data: the dataset to render, in numpy or VTK format.
@@ -1070,6 +1070,8 @@ def volren(data, alpha_channel=None):
     alpha_channel.AddPoint(0, 0.0)
     alpha_channel.AddPoint(255, 0.5)
   volumeProperty = vtk.vtkVolumeProperty()
+  if color_function != None:
+    volumeProperty.SetColor(color_function)
   volumeProperty.SetScalarOpacity(alpha_channel)
   compositeFunction = vtk.vtkVolumeRayCastCompositeFunction()
   volumeMapper = vtk.vtkVolumeRayCastMapper()

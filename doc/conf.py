@@ -58,7 +58,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'pymicro'
-copyright = u'2013-2014, Henry Proudhon'
+copyright = u'2013-2016, Henry Proudhon'
 
 # The project version is extracted from the main __init__.py
 def extract_version():

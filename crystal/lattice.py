@@ -70,7 +70,7 @@ class Lattice:
            " B : " + " ".join(map(f, self._matrix[1])),
            " C : " + " ".join(map(f, self._matrix[2]))]
     return "\n".join(out)
-  
+
   def reciprocal_lattice(self):
     '''Compute the reciprocal lattice.
     
@@ -86,7 +86,7 @@ class Lattice:
     bstar = np.cross(c, a) / V
     cstar = np.cross(a, b) / V
     return [astar, bstar, cstar]
-    
+  
   @property
   def matrix(self):
     '''Returns a copy of matrix representing the Lattice.'''
@@ -632,6 +632,13 @@ class HklPlane(HklObject):
       n = n_hex
     return n/np.linalg.norm(n)
   
+  def scattering_vector(self):
+    [astar, bstar, cstar] = self._lattice.reciprocal_lattice()
+    (h, k, l) = self.miller_indices()
+    # express (h,k,l) in the cartesian crystal CS
+    Gc = h*astar + k*bstar + l*cstar
+    return Gc
+
   def __repr__(self):
     f = lambda x: "%0.3f" % x
     out = ['HKL Plane',

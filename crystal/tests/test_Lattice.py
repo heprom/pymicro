@@ -25,7 +25,7 @@ class LatticeTests(unittest.TestCase):
     for i in range(0, 3):
       self.assertAlmostEqual(al._lengths[i], 0.40495)
       self.assertEqual(al._angles[i], 90.0)
-
+  
 class HklDirectionTests(unittest.TestCase):
 
   def setUp(self):
@@ -46,10 +46,20 @@ class HklPlaneTests(unittest.TestCase):
     print 'testing the HklPlane class'
 
   def test_HklPlane(self):
-    p = HklPlane(1,1,1)
+    p = HklPlane(1, 1, 1)
     n = p.normal()
     self.assertEqual(np.linalg.norm(n), 1)
   
+  def test_scattering_vector(self):
+    Fe_fcc = Lattice.face_centered_cubic(0.287) # FCC iron
+    hkl = HklPlane(2, 0, 0, Fe_fcc)
+    Gc = hkl.scattering_vector()
+    self.assertAlmostEqual(np.linalg.norm(Gc), 1/hkl.interplanar_spacing()) 
+    Al_fcc = Lattice.face_centered_cubic(0.405)
+    hkl = HklPlane(0, 0, 2, lattice = Al_fcc)
+    Gc = hkl.scattering_vector()
+    self.assertAlmostEqual(np.linalg.norm(Gc), 1/hkl.interplanar_spacing()) 
+
   def test_bragg_angle(self):
     l = Lattice.cubic(0.287) # FCC iron
     hkl = HklPlane(2, 0, 0, l) # 200 reflection at 8 keV is at 32.7 deg

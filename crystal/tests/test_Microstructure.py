@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 from pymicro.crystal.microstructure import Orientation, Grain
 from pymicro.crystal.lattice import Lattice, HklPlane, HklDirection, SlipSystem
+from pymicro.xray.xray_utils import lambda_keV_to_nm
 
 class OrientationTests(unittest.TestCase):
 
@@ -34,6 +35,19 @@ class OrientationTests(unittest.TestCase):
     o2 = Orientation.s3()
     self.assertAlmostEqual(180/np.pi*o1.misorientation_angle(o2, crystal_structure='none'), 19.38, 2) # check value of 19.576
     
+  def test_Bragg_condition(self):
+    al = Lattice.from_symbol('Al')
+    p = HklPlane(0, 0, 2, lattice = al)
+    lambda_keV = 42
+    lambda_nm = lambda_keV_to_nm(lambda_keV)
+    rod = [0.1449, -0.0281, 0.0616]
+    o = Orientation.from_rodrigues(rod)
+    (w1, w2) = o.dct_omega_angles(p, lambda_keV, verbose=False)
+    omega = w1 + 180
+    alpha = o.compute_XG_angle(p, omega, verbose=True)
+    theta_bragg = p.bragg_angle(lambda_keV)
+    self.assertAlmostEqual(alpha, 180/np.pi*(np.pi/2 - theta_bragg))
+
   def test_dct_omega_angles(self):
     lambda_keV = 30
     a = 0.3306 # lattice parameter in nm
@@ -43,6 +57,15 @@ class OrientationTests(unittest.TestCase):
     (w1, w2) = o.dct_omega_angles(p, lambda_keV, verbose=False)
     self.assertAlmostEqual(w1, -151.665, 2)
     self.assertAlmostEqual(w2, 16.709, 2)
+  
+  def test_topotomo_tilts(self):
+    al = Lattice.from_symbol('Al')
+    p = HklPlane(0, 0, 2, lattice = al)
+    rod = [0.1449, -0.0281, 0.0616]
+    o = Orientation.from_rodrigues(rod)
+    (ut, lt) = o.topotomo_tilts(p, verbose=True)
+    self.assertAlmostEqual(180/np.pi*ut, 2.236, 3)
+    self.assertAlmostEqual(180/np.pi*lt, -16.615, 3)    
 
 if __name__ == '__main__':
   unittest.main()

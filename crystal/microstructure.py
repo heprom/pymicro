@@ -2,6 +2,14 @@
 The microstructure module provide elementary classes to describe a 
 crystallographic granular microstructure such as mostly present in 
 metallic materials.
+
+It contains several classes which are used to describe a microstructure 
+composed of several grains, each one having its own crystallographic 
+orientation:
+
+ * :py:class:`~pymicro.crystal.microstructure.Microstructure`
+ * :py:class:`~pymicro.crystal.microstructure.Grain`
+ * :py:class:`~pymicro.crystal.microstructure.Orientation`
 '''
 import numpy as np
 import os, vtk
@@ -13,18 +21,18 @@ class Orientation:
 
   This follows the passive rotation definition which means that it brings 
   the sample coordinate system into coincidence with the crystal coordinate 
-  system. Then one may express a vector Vc in the crystal coordinate system 
-  from the vector in the sample coordinate system Vs by:
+  system. Then one may express a vector :math:`V_c` in the crystal coordinate system 
+  from the vector in the sample coordinate system :math:`V_s` by:
   
   .. math::
 
-    Vc = B.Vs
+    V_c = B.V_s
   
   and inversely (because :math:`B^{-1}=B^T`):
   
   .. math::
 
-    Vs = B^T.Vc
+    V_s = B^T.V_c
   '''
 
   def __init__(self, matrix):
@@ -35,6 +43,7 @@ class Orientation:
     self.rod = Orientation.OrientationMatrix2Rodrigues(g)
 
   def orientation_matrix(self):
+    '''Returns the orientation matrix in the form of a 3x3 numpy array.'''
     return self._matrix
 
   def __repr__(self):
@@ -83,7 +92,13 @@ class Orientation:
 
   @staticmethod
   def misorientation_MacKenzie(psi):
-    '''psi in radians.'''
+    '''Return the fraction of the misorientations corresponding to the 
+    given :math:`\\psi` angle in the refenrece solution derived By MacKenzie in 
+    his 1958 paper.
+    
+    :param psi: the misorientation angle in radians.
+    :returns: the value in the cummulative distribution corresponding to psi.
+    '''
     from math import sqrt, sin, cos, tan, pi, acos
     psidg = 180*psi/pi
     if psidg >= 0 and psidg <= 45:
@@ -103,16 +118,29 @@ class Orientation:
     return p
     
   def misorientation_axis(self, orientation):
-    '''Compute the misorientation axis (normalised vector) with another 
-    crystal orientation. This vector is be definition common to both 
-    crystalline orientations.'''
+    '''Compute the misorientation axis with another crystal orientation. 
+    This vector is by definition common to both crystalline orientations.
+    
+    :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class.
+    :returns: the misorientation axis (normalised vector).
+    '''
     delta = np.dot(self.orientation_matrix(), orientation.orientation_matrix().T)
     n = np.array([delta[1,2] - delta[2,1], delta[2,0] - delta[0,2], delta[0,1] - delta[1,0]])
     n /= np.sqrt((delta[1,2] - delta[2,1])**2 + (delta[2,0] - delta[0,2])**2 + (delta[0,1] - delta[1,0])**2)
     return n
 
   def misorientation_angle(self, orientation, crystal_structure='cubic'):
-    '''Compute the misorientation angle (in radian) with another crystal orientation.'''
+    '''Compute the misorientation angle (in radian) with another crystal 
+    orientation.
+    
+    Considering all the possible crystal symmetries, this angle is 
+    defined as the minium angle of rotation about the misorientation 
+    axis to bring the two lattices into coincidence.
+    
+    :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
+    :param str crystal_structure: a string describing the crystal structure, 'cubic' by default.
+    :returns float: the misorientation angle in radians.
+    '''
     min_misorientation = np.pi
     from pymicro.crystal.lattice import Lattice
     symmetries = Lattice.symmetry(crystal_structure)
@@ -139,33 +167,80 @@ class Orientation:
     '''Convenience methode to expose the third Euler angle.'''
     return self.euler[2]
 
+  def compute_XG_angle(self, hkl, omega, verbose=False):
+    '''Compute the angle between the scattering vector :math:`\mathbf{G_{l}}` 
+    and :math:`\mathbf{-X}` the X-ray unit vector at a given angular position :math:`\\omega`.
+    
+    A given hkl plane defines the scattering vector :math:`\mathbf{G_{hkl}}` by 
+    the miller indices in the reciprocal space. It is expressed in the 
+    cartesian coordinate system by :math:`\mathbf{B}.\mathbf{G_{hkl}}` and in the 
+    laboratory coordinate system accounting for the crystal orientation 
+    by :math:`\mathbf{g}^{-1}.\mathbf{B}.\mathbf{G_{hkl}}`.
+    
+    The crystal is assumed to be placed on a rotation stage around the 
+    laboratory vertical axis. The scattering vector can finally be 
+    written as :math:`\mathbf{G_l}=\mathbf{\\Omega}.\mathbf{g}^{-1}.\mathbf{B}.\mathbf{G_{hkl}}`.
+    The X-rays unit vector is :math:`\mathbf{X}=[1, 0, 0]`. So the computed angle 
+    is :math:`\\alpha=acos(-\mathbf{X}.\mathbf{G_l}/||\mathbf{G_l}||`
+    
+    The Bragg condition is fulfilled when :math:`\\alpha=\pi/2-\\theta_{Bragg}`
+    
+    :param hkl: the hkl plane, an instance of :py:class:`~pymicro.crystal.lattice.HklPlane` 
+    :param omega: the angle of rotation of the crystal around the laboratory vertical axis.
+    :param bool verbose: activate verbose mode (False by default).
+    :return float: the angle between :math:`-\mathbf{X}` and :math:`\mathbf{G_{l}}` in degrees.
+    '''
+    X = np.array([1., 0., 0.])
+    Bt = self.orientation_matrix().transpose()
+    Gc = hkl.scattering_vector()
+    Gs = Bt.dot(Gc) # in the cartesian sample CS
+    omegar = omega*np.pi/180
+    R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
+    Gl = R.dot(Gs)
+    alpha = np.arccos(np.dot(-X, Gl)/np.linalg.norm(Gl))*180/np.pi
+    if verbose:
+      print('scattering vector in the crystal CS', Gc)
+      print('scattering vector in the sample CS', Gs)
+      print('scattering vector in the laboratory CS (including Omega rotation)', Gl)
+      print('angle (deg) between -X and G', alpha)
+    return alpha
+
   def dct_omega_angles(self, hkl, lambda_keV, verbose=False):
     '''Compute the two omega angles which satisfy the Bragg condition.
     
     For a given crystal orientation sitting on a vertical rotation axis, 
-    there is exactly two omega positions in [0, 2pi] for which a 
+    there is exactly two omega positions in :math:`[0, 2\pi]` for which a 
     particular hkl reflexion will fulfil Bragg's law.
     
-    According to the Bragg's law, a crystallographic grain will be in 
-    diffracting condition if:
+    According to the Bragg's law, a crystallographic plane of a given 
+    grain will be in diffracting condition if:
     
     .. math::
     
-       \sin\\theta=-[\Omega g^{-1}h]_1
-       
+       \sin\\theta=-[\mathbf{\Omega}.\mathbf{g}^{-1}\mathbf{G_c}]_1
+    
+    with :math:`\mathbf{\Omega}` the matrix associated with the rotation 
+    axis:
+
+    .. math::
+    
+       \mathbf{\Omega}=\\begin{array}
+                       \cos\omega & -\sin\omega & 0 \\\
+                       \sin\omega & \cos\omega  & 0 \\\
+                       0          & 0           & 1 \\\
+                       \\end{array}
+
     This method solves the associated second order equation to return 
     the two corresponding omega angles.
     
-    :param hkl: The given cristallographic :py:class:`~pymicro.crystal.lattice.HklPlane`
+    :param hkl: The given cristallographic plane :py:class:`~pymicro.crystal.lattice.HklPlane`
     :param float lambda_keV: The X-rays energy expressed in keV
     :param bool verbose: Verbose mode (False by default)
-    :returns tuple: (w1, w2) the two values of the omega angle.
+    :returns tuple: :math:`(\omega_1, \omega_2)` the two values of the rotation angle around the vertical axis (in degrees).
     
-    .. warning::
+    .. note::
     
-       Cubic lattice is assumed which turn the matrix S into the identity.
-       
-       HP 15/05/2015 this return angles between [-pi,pi] and graphically, 
+       HP 15/05/2015 this return angles between :math:`[-\pi,\pi]` and graphically, 
        it looks like it corespond to diffraction angles of -h-k-l. This 
        should be checked more carefully.
     '''
@@ -202,6 +277,110 @@ class Orientation:
       for t in (t1,t2):
         print (A+C)*t**2-2*B*t+(C-A)
     return (w1, w2)
+  
+  def rotating_crystal(self, hkl, lambda_keV, omega_step=0.5, display=True, verbose=False):
+    from pymicro.xray.xray_utils import lambda_keV_to_nm
+    lambda_nm = lambda_keV_to_nm(lambda_keV)
+    X = np.array([1., 0., 0.])/lambda_nm
+    print 'magnitude of X', np.linalg.norm(X)
+    Bt = self.orientation_matrix().transpose()
+    (h, k, l) = hkl.miller_indices()
+    theta = hkl.bragg_angle(lambda_keV)*180./np.pi
+    print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, theta))
+    Gc = hkl.scattering_vector()
+    Gs = Bt.dot(Gc)
+    alphas = []
+    twothetas = []
+    magnitude_K = []
+    omegas = np.linspace(0.0, 360.0, num=360.0/omega_step, endpoint=False)
+    for omega in omegas:
+      print('\n** COMPUTING AT OMEGA=%03.1f deg' % omega)
+      # prepare rotation matrix
+      omegar = omega*np.pi/180
+      R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
+      #R = R.dot(Rlt).dot(Rut) # with tilts
+      Gl = R.dot(Gs)
+      print('scattering vector in laboratory CS', Gl)
+      n = R.dot(Bt.dot(hkl.normal()))
+      print 'plane normal:', hkl.normal()
+      print R
+      print 'rotated plane normal:', n, ' with a norm of', np.linalg.norm(n)
+      G = n/hkl.interplanar_spacing() # here G == N
+      print 'G vector:', G, ' with a norm of', np.linalg.norm(G)
+      K = X + G
+      print 'X + G vector', K
+      magnitude_K.append(np.linalg.norm(K))
+      print 'magnitude of K', np.linalg.norm(K)
+      alpha = np.arccos(np.dot(-X, G)/(np.linalg.norm(-X)*np.linalg.norm(G)))*180/np.pi
+      print 'angle between -X and G', alpha
+      alphas.append(alpha)
+      twotheta = np.arccos(np.dot(K, X)/(np.linalg.norm(K)*np.linalg.norm(X)))*180/np.pi
+      print 'angle (deg) between K and X', twotheta
+      twothetas.append(twotheta)
+    print 'min alpha angle is ', min(alphas)
+    
+    # compute omega_1 and omega_2 to verify graphically
+    (w1, w2) = self.dct_omega_angles(hkl, lambda_keV, verbose=False)
+
+    # gather the results in a single figure
+    fig = plt.figure(figsize=(12,10))
+    fig.add_subplot(311)
+    plt.title('Looking for (%d%d%d) Bragg reflexions' % (h, k, l))
+    plt.plot(omegas, alphas, 'k-')
+    plt.xlim(0,360)
+    plt.ylim(0,180)
+    plt.xticks(np.arange(0,390, 30))
+    # add bragg condition
+    plt.axhline(90-theta, xmin=0, xmax=360, linewidth=2)
+    plt.annotate('$\pi/2-\\theta_{Bragg}$', xycoords='data', xy=(360,90-theta), horizontalalignment='left', verticalalignment='center', fontsize=16)
+    # add omega solutions
+    plt.axvline(w1 + 180, ymin=0, ymax=180, linewidth=2, linestyle='dashed', color='gray')
+    plt.axvline(w2 + 180, ymin=0, ymax=180, linewidth=2, linestyle='dashed', color='gray')
+    plt.annotate('$\\omega_1$', xycoords='data', xy=(w1+180,0), horizontalalignment='center', verticalalignment='bottom', fontsize=16)
+    plt.annotate('$\\omega_2$', xycoords='data', xy=(w2+180,0), horizontalalignment='center', verticalalignment='bottom', fontsize=16)
+    plt.ylabel(r'Angle between $-X$ and $\mathbf{G}$')
+    fig.add_subplot(312)
+    plt.plot(omegas, twothetas, 'k-')
+    plt.xlim(0,360)
+    #plt.ylim(0,180)
+    plt.xticks(np.arange(0,390, 30))
+    plt.axhline(2*theta, xmin=0, xmax=360, linewidth=2)
+    plt.annotate('$2\\theta_{Bragg}$', xycoords='data', xy=(360,2*theta), horizontalalignment='left', verticalalignment='center', fontsize=16)
+    plt.axvline(w1 + 180, linewidth=2, linestyle='dashed', color='gray')
+    plt.axvline(w2 + 180, linewidth=2, linestyle='dashed', color='gray')
+    plt.ylabel('Angle between $X$ and $K$')
+    fig.add_subplot(313)
+    plt.plot(omegas, magnitude_K, 'k-')
+    plt.xlim(0,360)
+    plt.axhline(np.linalg.norm(X), xmin=0, xmax=360, linewidth=2)
+    plt.annotate('$1/\\lambda$', xycoords='data', xy=(360,1/lambda_nm), horizontalalignment='left', verticalalignment='center', fontsize=16)
+    plt.axvline(w1 + 180, linewidth=2, linestyle='dashed', color='gray')
+    plt.axvline(w2 + 180, linewidth=2, linestyle='dashed', color='gray')
+    plt.xlabel(r'Angle of rotation $\omega$')
+    plt.ylabel(r'Magnitude of $X+G$ (nm$^{-1}$)')
+    plt.subplots_adjust(top=0.925,bottom=0.05,left=0.1,right=0.9)
+    if display:
+      plt.show()
+    else:
+      plt.savefig('rotating_crystal_plot_%d%d%d.pdf' % (h, k, l))
+
+  def topotomo_tilts(self, hkl, verbose=False):
+    '''Compute the tilts for topotomography alignment.
+    
+    :param hkl: the hkl plane, an instance of :py:class:`~pymicro.crystal.lattice.HklPlane` 
+    :param bool verbose: activate verbose mode (False by default).
+    :returns tuple: (ut, lt) the two values of tilts to apply (in radians).
+    '''
+    Bt = self.orientation_matrix().transpose()
+    Gc = hkl.scattering_vector()
+    Gs = Bt.dot(Gc) # in the cartesian sample CS
+    # find topotomo tilts
+    ut = np.arctan(-Gs[0]/Gs[2])
+    lt = np.arctan(Gs[1]/(-Gs[0]*np.sin(ut) + Gs[2]*np.cos(ut)))
+    if verbose:
+      print('up tilt (samry) should be %.3f' % (ut*180/np.pi))
+      print('low tilt (samrx) should be %.3f' % (lt*180/np.pi))
+    return (ut, lt)
 
   def to_xml(self, doc):
     '''
@@ -453,15 +632,9 @@ class Orientation:
     (or the three rodrigues components) must correspond to the first 
     three columns (the other are ignored).
     
-    **Parameters**:
-    
-    *txt_path*: path to the text file containing the orientations.
-    
-    **data_type**: 'euler' (default) or 'rodrigues'
-
-    **Returns**:
-    
-    A dictionary with the line number and the corresponding orientation.
+    :param str txt_path: path to the text file containing the orientations.
+    :param str data_type: 'euler' (default) or 'rodrigues'
+    :returns dict: a dictionary with the line number and the corresponding orientation.
     '''
     data = np.genfromtxt(txt_path)
     size = len(data)
@@ -479,8 +652,24 @@ class Orientation:
 
   @staticmethod
   def read_euler_from_zset_inp(inp_path):
-    '''
-    Read a set of grain orientations from a z-set input file.
+    '''Read a set of grain orientations from a z-set input file.
+    
+    In z-set input files, the orientation data may be specified 
+    either using the rotation of two vector, euler angles or 
+    rodrigues components directly. For instance the following 
+    lines are extracted from a polycrystalline calculation file 
+    using the rotation keyword:
+
+    ::
+
+     **elset elset1 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 0.438886 -1.028805 0.197933 x3 1.038339 0.893172 1.003888
+     **elset elset2 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 0.178825 -0.716937 1.043300 x3 0.954345 0.879145 1.153101
+     **elset elset3 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 -0.540479 -0.827319 1.534062 x3 1.261700 1.284318 1.004174
+     **elset elset4 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 -0.941278 0.700996 0.034552 x3 1.000816 1.006824 0.885212
+     **elset elset5 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 -2.383786 0.479058 -0.488336 x3 0.899545 0.806075 0.984268
+
+    :param str inp_path: the path to the ascii file to read.
+    :returns dict: a dictionary of the orientations associated with the elset names.
     '''
     inp = open(inp_path)
     lines = inp.readlines()
@@ -489,6 +678,7 @@ class Orientation:
         break
     euler_lines = []
     for j,line in enumerate(lines[i+1:]):
+      # read until next *** block
       if line.lstrip().startswith('***'):
         break
       if (not line.lstrip().startswith('%') and line.find('**elset')>=0):
@@ -496,7 +686,7 @@ class Orientation:
     euler = []
     for l in euler_lines:
       tokens = l.split()
-      elset = tokens[tokens.index('**elset')+1]
+      elset = tokens[tokens.index('**elset') + 1]
       irot = tokens.index('*rotation')
       if tokens[irot+1] == 'x1':
         x1 = np.empty(3, dtype=float)
@@ -573,16 +763,9 @@ class Orientation:
     '''Compute the Schmid factor for this crystal orientation and the 
     given slip system.
 
-    **Parameters**:
-    
-    *slip_system*: a slip system instance.
-    
-    *load_direction*: a unit vector describing the loading direction 
-    (default: vertical axis [0, 0, 1]).
-    
-    **Returns**
-    
-    A number between 0 ad 0.5.
+    :param slip_system: a slip system instance.
+    :param load_direction: a unit vector describing the loading direction (default: vertical axis [0, 0, 1]).
+    :returns float: a number between 0 ad 0.5.
     '''
     plane = slip_system.get_slip_plane()
     Bt = self.orientation_matrix().transpose()
@@ -597,19 +780,10 @@ class Orientation:
     '''Compute all Schmid factors for this crystal orientation and the 
     given list of slip systems.
 
-    **Parameters**:
-    
-    *slip_systems*: a list of the slip system from which to compute the 
-    Schmid factor values.
-    
-    *load_direction*: a unit vector describing the loading direction 
-    (default: vertical axis [0, 0, 1]).
-    
-    *verbose*: activate verbose mode.
-    
-    **Returns**
-    
-    A list of the schmid factors.
+    :param slip_systems: a list of the slip system from which to compute the Schmid factor values.
+    :param load_direction: a unit vector describing the loading direction (default: vertical axis [0, 0, 1]).
+    :param bool verbose: activate verbose mode.
+    :returns list: a list of the schmid factors.
     '''
     SF_list = []
     for ss in slip_systems:

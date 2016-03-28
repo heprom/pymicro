@@ -443,7 +443,7 @@ class PoleFigure:
   def plot(orientation):
     '''Plot a pole figure (both direct and inverse) for a single orientation.
 
-    :param orientation: the crystalline :py:class:`~pymicro.crystal.microstructure.Microstructure` to plot.
+    :param orientation: the crystalline :py:class:`~pymicro.crystal.microstructure.Orientation` to plot.
     '''
     micro = Microstructure()
     micro.grains.append(Grain(1, orientation))

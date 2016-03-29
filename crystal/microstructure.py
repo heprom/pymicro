@@ -1125,8 +1125,7 @@ class Microstructure:
     omegar = omega*np.pi/180
     R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
     data_abs = np.where(data > 0, 1, 0)
-    # x_max as stated in parallel_beam.py
-    x_max = 1 + 2*np.ceil(np.hypot(*data_abs[:,:,0].shape) / 2 + 1)
+    x_max = np.ceil(max(data_abs.shape[0], data_abs.shape[1])*2**0.5)
     proj = np.zeros((np.shape(data_abs)[2], x_max), dtype=np.float)
     if verbose:
       print 'diffracting grains', dif_grains
@@ -1135,8 +1134,7 @@ class Microstructure:
     for (gid, (h, k, l)) in dif_grains:
       mask_dif = (data == gid)
       data_abs[mask_dif] = 0 # remove this grain from the absorption
-    data_abs = np.rot90(data_abs, k=3)
-    from catpy.parallel_beam import radon
+    from skimage.transform import radon
     for i in range(np.shape(data_abs)[2]):
       proj[i,:] = radon(data_abs[:,:,i], [omega])[:,0]
     # create the detector image (larger than the FOV) by padding the transmission image with zeros
@@ -1150,7 +1148,7 @@ class Microstructure:
       print int(0.5*det_npx[1]/ds-proj.shape[1]/2.)
       print int(0.5*det_npx[1]/ds+proj.shape[1]/2.)
     # let's moderate the direct beam so we see nicely the spots with a 8 bits scale
-    att = 6.0 / ds
+    att = 1.0 # 6.0 / ds
     full_proj[int(0.5*det_npx[0]/ds-proj.shape[0]/2.):int(0.5*det_npx[0]/ds+proj.shape[0]/2.), \
       int(0.5*det_npx[1]/ds-proj.shape[1]/2.):int(0.5*det_npx[1]/ds+proj.shape[1]/2.)] += proj / att
     # add diffraction spots
@@ -1180,11 +1178,11 @@ class Microstructure:
         print 'diffracted beam will hit the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (u, v, up, vp)
       grain_data = np.where(data == gid, 1, 0)
       data_dif = grain_data[ndimage.find_objects(data == gid)[0]]
-      x_max = 1 + 2*np.ceil(np.hypot(*data_dif[:,:,0].shape) / 2 + 1)
+      x_max = np.ceil(max(data_dif.shape[0], data_dif.shape[1])*2**0.5)
       proj_dif = np.zeros((np.shape(data_dif)[2], x_max), dtype=np.float)
-      data_dif = np.rot90(data_dif, k=3) # check this rot90
       for i in range(np.shape(data_dif)[2]):
-        proj_dif[i,:] = radon(data_dif[:,:,i], [omega])[:,0]
+        a = radon(data_dif[:,:,i], [omega])
+        proj_dif[i,:] = a[:,0]
       if verbose:
         print '* proj_dif size is ',np.shape(proj_dif)
         print int(up - proj_dif.shape[0]/2.)

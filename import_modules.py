@@ -1,6 +1,7 @@
 print 'importing functions from the pymicro library'
 from pymicro.apps.wxImageViewer import ImageViewer
 from pymicro.apps.wxVolumeViewer import wxVolumeViewer
+from pymicro.apps.View import View
 
 from pymicro.crystal.lattice import *
 from pymicro.crystal.microstructure import *

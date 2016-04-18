@@ -232,8 +232,8 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
   if verbose: print 'volume size is ', nx, 'x', ny, 'x', len(zrange)
   f = open(scan_name, 'rb')
   data = np.empty((ny, nx, len(zrange)), dtype=type)
-  if verbose: print 'reading volume... from byte ',f.tell()
   f.seek(header_size + np.dtype(data_type).itemsize * nx * ny * zrange[0])
+  if verbose: print('reading volume... from byte %d' % f.tell())
   data = np.reshape(np.fromstring( \
       f.read(np.dtype(data_type).itemsize * len(zrange) * ny * nx), \
       data_type).astype(data_type), (len(zrange), ny, nx), order='C')

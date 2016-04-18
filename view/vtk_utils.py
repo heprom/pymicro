@@ -1074,7 +1074,10 @@ def volren(data, alpha_channel=None, color_function=None):
   compositeFunction = vtk.vtkVolumeRayCastCompositeFunction()
   volumeMapper = vtk.vtkVolumeRayCastMapper()
   volumeMapper.SetVolumeRayCastFunction(compositeFunction)
-  volumeMapper.SetInputData(data)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    volumeMapper.SetInputData(data)
+  else:
+    volumeMapper.SetInput(data)
   volume = vtk.vtkVolume()
   volume.SetMapper(volumeMapper)
   volume.SetProperty(volumeProperty)

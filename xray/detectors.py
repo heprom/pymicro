@@ -105,7 +105,7 @@ class Detector2d:
         self.save_path = os.path.dirname(self.image_path)
       txt_path = os.path.join(self.save_path, 'Int_%s_2theta_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0])
       print('writing text file %s' % txt_path)
-      if np.__version__.split('.')[1] > 6:
+      if int(np.__version__.split('.')[1]) > 6:
         np.savetxt(txt_path, (two_theta_values, intensityResult, counts), \
           header = 'delta (deg) -- norm intensity -- points counted', \
           fmt='%.6e')
@@ -166,7 +166,7 @@ class Detector2d:
         self.save_path = os.path.dirname(self.image_path)
       txt_path = os.path.join(self.save_path, 'Int_%s_psi_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0])
       print "writing text file"
-      if np.__version__.split('.')[1] > 6:
+      if int(np.__version__.split('.')[1]) > 6:
         np.savetxt(txt_path, (psi_values, intensityResult, counts), \
           header = 'psi (deg) -- norm intensity -- points counted', \
           fmt='%.6e')

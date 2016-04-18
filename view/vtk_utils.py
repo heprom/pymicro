@@ -431,12 +431,15 @@ def add_local_orientation_axes(orientation, axes_length=30):
   # use a vtkAxesActor to display the crystal orientation
   local_orientation = vtk.vtkAssembly()
   axes = axes_actor(length = axes_length, axisLabels = False)
+  apply_orientation_to_actor(axes, orientation)
+  '''
   transform = vtk.vtkTransform()
   transform.Identity()
   transform.RotateZ(orientation.phi1())
   transform.RotateX(orientation.Phi())
   transform.RotateZ(orientation.phi2())
   axes.SetUserTransform(transform)
+  '''
   local_orientation.AddPart(axes)
   return local_orientation
 
@@ -449,12 +452,7 @@ def add_HklPlanes_with_orientation_in_grain(grain, \
   # use a vtkAxesActor to display the crystal orientation
   local_orientation = vtk.vtkAssembly()
   grain_axes = axes_actor(length = 30, axisLabels = False)
-  transform = vtk.vtkTransform()
-  transform.Identity()
-  transform.RotateZ(grain.orientation.phi1())
-  transform.RotateX(grain.orientation.Phi())
-  transform.RotateZ(grain.orientation.phi2())
-  grain_axes.SetUserTransform(transform)
+  apply_orientation_to_actor(grain_axes, grain.orientation)
   local_orientation.AddPart(grain_axes)
   # add all hkl planes to the grain
   for hklplane in hklplanes:
@@ -883,7 +881,7 @@ def apply_orientation_to_actor(actor, orientation):
               Bt[1,0], Bt[1,1], Bt[1,2], 0,
               Bt[2,0], Bt[2,1], Bt[2,2], 0,
                     0,       0,       0, 1))
-  transform.Identity()
+  #transform.Identity()
   transform.Concatenate(m)
   '''
   transform.RotateZ(orientation.phi1())
@@ -1285,6 +1283,34 @@ def color_bar(title, lut=None, fmt='%.1e', width=0.5, height=0.075, num_labels=7
   bar.SetHeight(height)
   bar.SetNumberOfLabels(num_labels)
   return bar
+
+def text(text, font_size=20, color=(0, 0, 0), hor_align='center', coords=(0.5, 0.5)):
+  '''Create a 2D text actor to add to a 3d scene.
+  
+  :params int font_size: the font size (20 by default).
+  :params tuple color: the face color (black by default).
+  :params str hor_align: horizontal alignment, should be 'left', 'center' or 'right' (center by default).
+  :params tuple coords: a sequence of two values between 0 and 1.
+  :returns an actor for the text to add to a renderer.
+  '''
+  textMapper = vtk.vtkTextMapper()
+  textMapper.SetInput(text)
+  tprop = textMapper.GetTextProperty()
+  tprop.SetFontSize(font_size)
+  tprop.SetFontFamilyToArial()
+  tprop.BoldOff()
+  if hor_align == 'left':
+    tprop.SetJustificationToLeft()
+  elif hor_align == 'center':
+    tprop.SetJustificationToCentered()
+  elif hor_align == 'right':
+    tprop.SetJustificationToRight()
+  tprop.SetColor(color)
+  textActor = vtk.vtkActor2D()
+  textActor.SetMapper(textMapper)
+  textActor.GetPositionCoordinate().SetCoordinateSystemToNormalizedDisplay()
+  textActor.GetPositionCoordinate().SetValue(coords[0], coords[1])
+  return textActor
   
 def setup_camera(size=(100, 100, 100)):
   '''Setup the camera with usual viewing parameters.

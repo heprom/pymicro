@@ -582,6 +582,27 @@ class HklDirection(HklObject):
     d1 = HklDirection(h1, k1, l1)
     d2 = HklDirection(h2, k2, l2)
     return d1.angle_with_direction(d2)*180/np.pi
+  
+  def find_planes_in_zone(self, max_miller=5):
+    '''
+    This method finds the hkl planes in zone with the crystallographic 
+    direction. If (u,v,w) denotes the zone axis, this means finding all 
+    hkl planes which verify :math:`h.u + k.v + l.w = 0`.
+    
+    :param max_miller: The maximum miller index to limt the search`
+    :returns list: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` 
+    objects describing all the planes in zone with the direction.
+    '''
+    indices = range(-max_miller, max_miller+1)
+    hklplanes_in_zone = []
+    for h in indices:
+      for k in indices:
+        for l in indices:
+          if h == k == l == 0: # skip (0, 0, 0)
+            continue
+          if np.dot(np.array([h, k, l]), self.direction()) == 0:
+            hklplanes_in_zone.append(HklPlane(h, k, l, self._lattice))
+    return(hklplanes_in_zone)
     
 class HklPlane(HklObject):
   '''
@@ -723,11 +744,11 @@ class HklPlane(HklObject):
     family = []
     l = list(hkl)
     l.sort() # miller indices are now sorted by increasing order
-    if hkl == '001':
+    if hkl == '001' or hkl == '010' or hkl == '100':
       family.append(HklPlane(1, 0, 0))
       family.append(HklPlane(0, 1, 0))
       family.append(HklPlane(0, 0, 1))
-    elif hkl == '011':
+    elif hkl in ['011', '101', '110']:
       family.append(HklPlane(1, 1, 0))
       family.append(HklPlane(-1, 1, 0))
       family.append(HklPlane(1, 0, 1))

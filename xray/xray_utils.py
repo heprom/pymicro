@@ -8,10 +8,10 @@ def lambda_keV_to_angstrom(lambda_keV):
   return 12.398 / lambda_keV
 
 def lambda_nm_to_keV(lambda_nm):
-  return lambda_nm / 1.2398
+  return 1.2398 / lambda_nm
 
 def lambda_angstrom_to_keV(lambda_angstrom):
-  return lambda_angstrom / 12.398
+  return 12.398 / lambda_angstrom
 
 def plot_xray_trans(mat='Al', ts=[1.0], rho=1.0, unit='keV', energy_lim=(1, 100), legfmt='%.1f', display=False):
   '''Plot the transmitted intensity of a X-ray beam through a given material.

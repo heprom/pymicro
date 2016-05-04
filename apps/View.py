@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from pymicro.view.scene3d import Scene3D
 from pymicro.view.vtk_utils import *
-from pymicro.crystal.microstructure import Orientation
+from pymicro.crystal.microstructure import Grain, Orientation
 from pymicro.crystal.lattice import Lattice
 
 class View():
@@ -31,6 +31,8 @@ class View():
       else:
         print('Unrecognized file extenstion: %s' % ext)
         sys.exit(1)
+    elif isinstance(args, Grain):
+      actor = grain_3d(args)
     elif isinstance(args, Orientation):
       l = Lattice.cubic(1.0)
       (a, b, c) = l._lengths

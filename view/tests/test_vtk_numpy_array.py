@@ -3,6 +3,30 @@ import numpy as np
 import vtk
 from vtk.util import numpy_support
 
+class VtkUtilsTests(unittest.TestCase):
+
+  def setUp(self):
+    print 'testing vtk_utils'
+    from pymicro.crystal.lattice import Lattice
+    from pymicro.crystal.microstructure import Orientation
+    from pymicro.view.vtk_utils import lattice_grid, lattice_edges, apply_orientation_to_actor
+
+  def test_apply_orientation_to_actor(self):
+    o = Orientation.from_rodrigues([0.0885, 0.3889, 0.3268])
+    Bt = o.orientation_matrix().transpose() # to go from crystal to lab coordinate Vl = Bt.Vc
+    l = Lattice.cubic(1.0)
+    (a, b, c) = l._lengths
+    grid = lattice_grid(l)
+    actor = lattice_edges(grid)
+    apply_orientation_to_actor(actor, o)
+    m = actor.GetUserTransform().GetMatrix()
+    for i in range(3):
+      for j in range(3):
+        self.assertEqual(Bt[i, j], m.GetElement(i, j))
+
+  def tearDown(self):
+    pass
+
 class VtkNumpyArrayTests(unittest.TestCase):
 
   def setUp(self):

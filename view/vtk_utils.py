@@ -1088,11 +1088,11 @@ def elevationFilter(data, value, (low, high)):
   
   :param data: the dataset to map, in VTK format.
   :param float value: the value to use to create the isosurface.
-  :param tuple (low, high): range to use in the elevation filter. 
-  If single values are used, the function assume a Z-elevation filter 
-  and will use those values. Alternatively, you may specify 2 points 
+  :param tuple (low, high): range to use in the elevation filter. \
+  If single values are used, the function assume a Z-elevation filter \
+  and will use those values. Alternatively, you may specify 2 points \
   in (x, y, z) form which define the line used in the elevation filter.
-  :returns vtkActor: The method return an actor that can be directly 
+  :returns vtkActor: The method return an actor that can be directly \
   added to a renderer.
   '''
   lut = vtk.vtkLookupTable()

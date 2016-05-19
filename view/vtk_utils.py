@@ -1086,17 +1086,14 @@ def volren(data, alpha_channel=None, color_function=None):
 def elevationFilter(data, value, (low, high)):
   '''Create an isosurface and map it with an elevation filter.
   
-  *Parameters:*
-  
-  **data**: the dataset to map, in VTK format.
-  
-  **value**: the value to use to create the isosurface.
-  
-  **(low, high)**: range to use in the elevation filter.
-
-  *Returns*
-
-  The method return a vtkActor that can be directly added to a renderer.
+  :param data: the dataset to map, in VTK format.
+  :param float value: the value to use to create the isosurface.
+  :param tuple (low, high): range to use in the elevation filter. 
+  If single values are used, the function assume a Z-elevation filter 
+  and will use those values. Alternatively, you may specify 2 points 
+  in (x, y, z) form which define the line used in the elevation filter.
+  :returns vtkActor: The method return an actor that can be directly 
+  added to a renderer.
   '''
   lut = vtk.vtkLookupTable()
   lut.SetHueRange(0.6, 0)
@@ -1111,8 +1108,14 @@ def elevationFilter(data, value, (low, high)):
   contour.Update()
   elevation = vtk.vtkElevationFilter()
   elevation.SetInputConnection(contour.GetOutputPort())
-  elevation.SetLowPoint(0, 0, low)
-  elevation.SetHighPoint(0, 0, high)
+  if type(low) == tuple:
+    elevation.SetLowPoint(low)
+  else:
+    elevation.SetLowPoint(0, 0, low)
+  if type(high) == tuple:
+    elevation.SetHighPoint(high)
+  else:
+    elevation.SetHighPoint(0, 0, high)
   elevation.SetScalarRange(low, high)
   elevation.ReleaseDataFlagOn()
   normals = vtk.vtkPolyDataNormals()

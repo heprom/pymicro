@@ -1110,13 +1110,11 @@ def elevationFilter(data, value, (low, high), low_point=None, high_point=None):
   elevation = vtk.vtkElevationFilter()
   elevation.SetInputConnection(contour.GetOutputPort())
   if low_point == None:
-    elevation.SetLowPoint(0, 0, low)
-  else:
-    elevation.SetLowPoint(low)
+    low_point = (0, 0, low)
   if high_point== None:
-    elevation.SetHighPoint(0, 0, high)
-  else:
-    elevation.SetHighPoint(high)
+    high_point = (0, 0, high)
+  elevation.SetLowPoint(low_point)
+  elevation.SetHighPoint(high_point)
   elevation.SetScalarRange(low, high)
   elevation.ReleaseDataFlagOn()
   normals = vtk.vtkPolyDataNormals()

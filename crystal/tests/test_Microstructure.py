@@ -43,20 +43,44 @@ class OrientationTests(unittest.TestCase):
     rod = [0.1449, -0.0281, 0.0616]
     o = Orientation.from_rodrigues(rod)
     (w1, w2) = o.dct_omega_angles(p, lambda_keV, verbose=False)
-    omega = w1 + 180
-    alpha = o.compute_XG_angle(p, omega, verbose=True)
-    theta_bragg = p.bragg_angle(lambda_keV)
-    self.assertAlmostEqual(alpha, 180/np.pi*(np.pi/2 - theta_bragg))
+    # test the two solution of the rotating crystal
+    for omega in (w1, w2):
+      alpha = o.compute_XG_angle(p, omega, verbose=True)
+      theta_bragg = p.bragg_angle(lambda_keV)
+      self.assertAlmostEqual(alpha, 180/np.pi*(np.pi/2 - theta_bragg))
 
   def test_dct_omega_angles(self):
     lambda_keV = 30
+    lambda_nm = 1.2398 / lambda_keV
     a = 0.3306 # lattice parameter in nm
     Ti_bcc = Lattice.cubic(a)
-    p = HklPlane(0, 1, 1, lattice = Ti_bcc)
+    (h, k, l) = (0, 1, 1)
+    hkl = HklPlane(h, k, l, lattice = Ti_bcc)
     o = Orientation.from_euler((103.517, 42.911, 266.452))
-    (w1, w2) = o.dct_omega_angles(p, lambda_keV, verbose=False)
-    self.assertAlmostEqual(w1, -151.665, 2)
-    self.assertAlmostEqual(w2, 16.709, 2)
+    theta = hkl.bragg_angle(lambda_keV, verbose=False)
+
+    gt = o.orientation_matrix() # our B (here called gt) corresponds to g^{-1} in Poulsen 2004
+    A = h*gt[0,0] + k*gt[1,0] + l*gt[2,0]
+    B = -h*gt[0,1] - k*gt[1,1] - l*gt[2,1]
+    C = -2*a*np.sin(theta)**2 / lambda_nm # the minus sign comes from the main equation
+    Delta = 4*(A**2 + B**2 - C**2)
+    self.assertEqual(Delta > 0, True)
+    #print 'A=',A
+    #print 'B=',B
+    #print 'C=',C
+    #print 'Delta=',Delta
+    t1 = (B - 0.5 * np.sqrt(Delta)) / (A + C)
+    t2 = (B + 0.5 * np.sqrt(Delta)) / (A + C)
+    #print 'verifying Acos(w)+Bsin(w)=C:'
+    for t in (t1, t2):
+      x = A*(1-t**2)/(1+t**2)+B*2*t/(1+t**2)
+      self.assertAlmostEqual(x, C, 2)
+    #print 'verifying (A+C)*t**2-2*B*t+(C-A)=0'
+    for t in (t1,t2):
+      self.assertAlmostEqual((A+C)*t**2-2*B*t+(C-A), 0.0, 2)
+    (w1, w2) = o.dct_omega_angles(hkl, lambda_keV, verbose=False)
+    self.assertAlmostEqual(w1, 196.709, 2)
+    self.assertAlmostEqual(w2, 28.334, 2)
   
   def test_topotomo_tilts(self):
     al = Lattice.from_symbol('Al')

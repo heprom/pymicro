@@ -209,8 +209,8 @@ class Orientation:
     '''Compute the two omega angles which satisfy the Bragg condition.
     
     For a given crystal orientation sitting on a vertical rotation axis, 
-    there is exactly two omega positions in :math:`[0, 2\pi]` for which a 
-    particular hkl reflexion will fulfil Bragg's law.
+    there is exactly two omega positions in :math:`[0, 2\pi]` for which 
+    a particular hkl reflexion will fulfil Bragg's law.
     
     According to the Bragg's law, a crystallographic plane of a given 
     grain will be in diffracting condition if:
@@ -236,13 +236,8 @@ class Orientation:
     :param hkl: The given cristallographic plane :py:class:`~pymicro.crystal.lattice.HklPlane`
     :param float lambda_keV: The X-rays energy expressed in keV
     :param bool verbose: Verbose mode (False by default)
-    :returns tuple: :math:`(\omega_1, \omega_2)` the two values of the rotation angle around the vertical axis (in degrees).
-    
-    .. note::
-    
-       HP 15/05/2015 this return angles between :math:`[-\pi,\pi]` and graphically, 
-       it looks like it corespond to diffraction angles of -h-k-l. This 
-       should be checked more carefully.
+    :returns tuple: :math:`(\omega_1, \omega_2)` the two values of the \
+    rotation angle around the vertical axis (in degrees).    
     '''
     (h, k, l) = hkl.miller_indices()
     (a, b, c) = hkl._lattice._lengths
@@ -250,32 +245,20 @@ class Orientation:
     lambda_nm = 1.2398 / lambda_keV
 
     gt = self.orientation_matrix() # our B (here called gt) corresponds to g^{-1} in Poulsen 2004
-    if verbose:
-      print 'g^{-1}=',gt
     A = h*gt[0,0] + k*gt[1,0] + l*gt[2,0]
     B = -h*gt[0,1] - k*gt[1,1] - l*gt[2,1]
-    C = 2*a*np.sin(theta)**2 / lambda_nm
+    C = -2*a*np.sin(theta)**2 / lambda_nm # the minus sign comes from the main equation
     Delta = 4*(A**2 + B**2 - C**2)
     if Delta < 0:
       raise ValueError('Delta < 0')
-    if verbose:
-      print 'A=',A
-      print 'B=',B
-      print 'C=',C
-      print 'Delta=',Delta
-    t1 = (B - 0.5 * np.sqrt(Delta)) / (A+C)
-    t2 = (B + 0.5 * np.sqrt(Delta)) / (A+C)
+    t1 = (B - 0.5 * np.sqrt(Delta)) / (A + C)
+    t2 = (B + 0.5 * np.sqrt(Delta)) / (A + C)
     w1 = 2 * np.arctan(t1) * 180. / np.pi
     w2 = 2 * np.arctan(t2) * 180. / np.pi
+    if w1 < 0: w1 += 360.
+    if w2 < 0: w2 += 360.
     if verbose:
-      print 't1=%.3f and t2=%.3f' % (t1, t2)
-      print 'w1=%.3f and w2=%.3f' % (w1, w2)
-      print 'verifying Acos(w)+Bsin(w)=C:'
-      for t in (t1,t2):
-        print A*(1-t**2)/(1+t**2)+B*2*t/(1+t**2)
-      print 'verifying (A+C)*t**2-2*B*t+(C-A)=0'
-      for t in (t1,t2):
-        print (A+C)*t**2-2*B*t+(C-A)
+      print('the two omega values in degrees fulfilling the Bragg condition are (%.1f, %.1f)' % (w1, w2))
     return (w1, w2)
   
   def rotating_crystal(self, hkl, lambda_keV, omega_step=0.5, display=True, verbose=False):
@@ -1120,6 +1103,11 @@ class Microstructure:
       writer.Write()    
 
   def dct_projection(self, data, lattice, omega, dif_grains, lambda_keV, d, ps, det_npx=np.array([2048, 2048]), ds=1, display=False, verbose=False):
+    '''Compute the detector image in dct configuration.
+    
+    :params np.ndarray data: The 3d data set from which to compute the projection.
+    
+    '''
     lambda_nm = 1.2398 / lambda_keV
     # prepare rotation matrix
     omegar = omega*np.pi/180

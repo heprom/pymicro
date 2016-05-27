@@ -268,7 +268,7 @@ class Xpad(Detector2d):
     self.orientation = 'horizontal' # either 'horizontal' or 'vertical'
     self.verbose = True
     
-  def load_image(self, image_path, nxs_prefix, nxs_dataset, nxs_index, nxs_update_geometry=False, stack='first'):
+  def load_image(self, image_path, nxs_prefix=None, nxs_dataset=None, nxs_index=None, nxs_update_geometry=False, stack='first'):
     '''load an image from a file.
     
     The image can be stored as a uint16 binary file (.raw) or in a nexus 
@@ -305,7 +305,7 @@ class Xpad(Detector2d):
       if stack == 'first':
         image = rawdata[0,:,:]
       elif stack == 'median':
-        image = np.median(image, axis=0)
+        image = np.median(rawdata, axis=0)
       self.data = image
       print(self.data.shape)
       self.compute_corrected_image()
@@ -380,10 +380,17 @@ class Xpad(Detector2d):
   def compute_corrected_image(self):
     '''Compute a corrected image.
     
-    First tiling and double pixels are accounted for to obtain a proper 
-    geometry where each pixel of the image represent the same physical 
-    zone. Then the intensity is corrected either via background 
-    substraction or flat field correction.'''
+    First the intensity is corrected either via background substraction 
+    or flat field correction. Then tiling and double pixels are accounted 
+    for to obtain a proper geometry where each pixel of the image 
+    represent the same physical zone.'''
+    # now apply intensity corrections based on the value of self.correction
+    if self.correction == 'bg':
+      self.corr_data = self.data - self.bg
+    elif self.correction == 'flat':
+      self.corr_data = (self.data - self.dark).astype(np.float32) / (self.ref - self.dark).astype(np.float32)
+    else:
+      self.corr_data = self.data.copy()
     newX_array, newY_array, newX_Ifactor_array = self.compute_geometry()
     image_corr1_sizeX = len(newX_array)
     image_corr1_sizeY = len(newY_array)
@@ -395,10 +402,10 @@ class Xpad(Detector2d):
             Ifactor = newX_Ifactor_array[x]
             if (Ifactor > 0):
                 #print "pos"
-                thisCorrectedImage[y, x] = self.data[yold, xold]*Ifactor
+                thisCorrectedImage[y, x] = self.corr_data[yold, xold]*Ifactor
             if(Ifactor < 0):
                 #print "neg"
-                thisCorrectedImage[y, x] = (self.data[yold, xold-1]+self.data[yold, xold+1])/2.0/self.factorIdoublePixel
+                thisCorrectedImage[y, x] = (self.corr_data[yold, xold-1]+self.corr_data[yold, xold+1])/2.0/self.factorIdoublePixel
                     
     # correct the double lines (last and 1st line of the modules, at their junction)
     lineIndex1 = self.chip_sizeY-1; # last line of module1 = 119, is the 1st line to correct
@@ -430,12 +437,6 @@ class Xpad(Detector2d):
       self.corr_data = np.ma.array(thisCorrectedImage, mask = double_pixel_mask)
     else:
       self.corr_data = thisCorrectedImage
-
-    # now apply intensity corrections based on the value of self.correction
-    if self.correction == 'bg':
-      self.corr_data = self.data - self.bg
-    elif self.correction == 'flat':
-      self.corr_data = (self.data - self.dark).astype(np.float32) / (self.ref - self.dark).astype(np.float32)
 
   def compute_TwoTh_Psi_arrays(self, diffracto_delta, diffracto_gamma):
     '''Computes TwoTheta and Psi angles arrays corresponding to repectively 

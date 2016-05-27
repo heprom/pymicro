@@ -197,6 +197,7 @@ class Mar165(Detector2d):
     self.compute_corrected_image()
     
   def compute_corrected_image(self):
+    '''Compute a corrected image either via background substraction or flat field correction.'''
     if self.correction == 'none':
       self.corr_data = self.data
     elif self.correction == 'bg':
@@ -267,28 +268,45 @@ class Xpad(Detector2d):
     self.orientation = 'horizontal' # either 'horizontal' or 'vertical'
     self.verbose = True
     
-  def load_image(self, image_path, nxs_prefix, nxs_dataset, nxs_index, nxs_update_geometry=False):
+  def load_image(self, image_path, nxs_prefix, nxs_dataset, nxs_index, nxs_update_geometry=False, stack='first'):
     '''load an image from a file.
     
     The image can be stored as a uint16 binary file (.raw) or in a nexus 
     file (.nxs). With the nexus format, several arguments must be 
     specified such as the prefix, the index and the dataset number (as str).
+    :param str image_path: relative or absolute path to the file containing the image.
+    :param str nxs_prefix: the nexus prefix hardcoded into the xml tree.
+    :param str nxs_dataset: the dataset number.
+    :param int nxs_index: the nexus index.
+    :param bool nxs_update_geometry: if True the compute_TwoTh_Psi_arrays method is called after loading the image.
+    :params str stack: indicates what to do if many images are present, \
+    'first' (default) to keep only the first one, 'median' to compute \
+    the median over the third dimension.
     '''
     self.image_path = image_path
     if image_path.endswith('.raw'):
-      # check the use of using [y, x] array instead of [x, y]
-      self.data = HST_read(self.image_path, data_type=np.uint16, dims=(560, 240, 1))[:,:,0].astype(np.float32).transpose()
+      # check the use of [y, x] array instead of [x, y]
+      rawdata = HST_read(self.image_path, data_type=np.uint16, dims=(560, 240, 1))
+      if stack == 'first':
+        image = rawdata[:,:,0]
+      elif stack == 'median':
+        image = np.median(image, axis=2)
+      self.data = image.astype(np.float32).transpose()
       self.compute_corrected_image()
     elif image_path.endswith('.nxs'):
       import tables
       f = tables.openFile(image_path)
       root = f.root._v_groups.keys()[0]
       command = 'f.root.__getattr__(\"%s\")' % root
-      images = eval(command + '.scan_data.data_%s.read()' % nxs_dataset) # xpad images
+      rawdata = eval(command + '.scan_data.data_%s.read()' % nxs_dataset) # xpad images
       delta = eval('f.root.%s%d.DIFFABS.__getattr__(\'D13-1-CX1__EX__DIF.1-DELTA__#1\').raw_value.read()' % (nxs_prefix, nxs_index))
       gamma = 0.0 #eval('f.root.%s%d.DIFFABS.__getattr__(\'D13-1-CX1__EX__DIF.1-GAMMA__#1\').raw_value.read()' % (nxs_prefix, nxs_index))
       f.close()
-      self.data = images[0]
+      if stack == 'first':
+        image = rawdata[0,:,:]
+      elif stack == 'median':
+        image = np.median(image, axis=0)
+      self.data = image
       print(self.data.shape)
       self.compute_corrected_image()
     if self.orientation == 'vertical':
@@ -360,6 +378,12 @@ class Xpad(Detector2d):
     return newX_array, newY_array, newX_Ifactor_array
   
   def compute_corrected_image(self):
+    '''Compute a corrected image.
+    
+    First tiling and double pixels are accounted for to obtain a proper 
+    geometry where each pixel of the image represent the same physical 
+    zone. Then the intensity is corrected either via background 
+    substraction or flat field correction.'''
     newX_array, newY_array, newX_Ifactor_array = self.compute_geometry()
     image_corr1_sizeX = len(newX_array)
     image_corr1_sizeY = len(newY_array)
@@ -389,8 +413,15 @@ class Xpad(Detector2d):
 
     if self.mask_flag == 1:
       double_pixel_mask = np.zeros_like(thisCorrectedImage)
-      hlist = ((0,4+self.mask_size_increase), (77-self.mask_size_increase,85+self.mask_size_increase),  (160-self.mask_size_increase,168+self.mask_size_increase), (243-self.mask_size_increase,250+self.mask_size_increase), (326-self.mask_size_increase,332+self.mask_size_increase), (410-self.mask_size_increase,417+self.mask_size_increase), (492-self.mask_size_increase,498+self.mask_size_increase), (573-self.mask_size_increase,577))
-      print hlist
+      hlist = ( \
+        (0, 4 + self.mask_size_increase), \
+        (77 - self.mask_size_increase, 85 + self.mask_size_increase), \
+        (160 - self.mask_size_increase, 168 + self.mask_size_increase), \
+        (243 - self.mask_size_increase, 250 + self.mask_size_increase), \
+        (326 - self.mask_size_increase, 332 + self.mask_size_increase), \
+        (410 - self.mask_size_increase, 417 + self.mask_size_increase), \
+        (492 - self.mask_size_increase, 498 + self.mask_size_increase), \
+        (573 - self.mask_size_increase, 577))
       for (xLineStart, xLineEnd) in hlist:
         double_pixel_mask[:,xLineStart:xLineEnd+1] = True
       vlist = ((118, 125),)
@@ -399,6 +430,12 @@ class Xpad(Detector2d):
       self.corr_data = np.ma.array(thisCorrectedImage, mask = double_pixel_mask)
     else:
       self.corr_data = thisCorrectedImage
+
+    # now apply intensity corrections based on the value of self.correction
+    if self.correction == 'bg':
+      self.corr_data = self.data - self.bg
+    elif self.correction == 'flat':
+      self.corr_data = (self.data - self.dark).astype(np.float32) / (self.ref - self.dark).astype(np.float32)
 
   def compute_TwoTh_Psi_arrays(self, diffracto_delta, diffracto_gamma):
     '''Computes TwoTheta and Psi angles arrays corresponding to repectively 

@@ -1,7 +1,7 @@
 import os
 import sys
 import vtk
-import numpy
+import numpy as np
 from vtk.util.colors import black, white, grey, blue, orange
 from vtk.util import numpy_support
 
@@ -37,8 +37,8 @@ def rand_cmap(N=256, first_is_black=False, table_range=(0,255)):
   :param typle table_range: The range of the VTK lookup table
   :return: A vtkLookupTable lookup table with N random colors.
   '''
-  numpy.random.seed(13)
-  rand_colors = numpy.random.rand(N, 3)
+  np.random.seed(13)
+  rand_colors = np.random.rand(N, 3)
   if first_is_black:
     rand_colors[0] = [0., 0., 0.] # enforce black background
   lut = vtk.vtkLookupTable()
@@ -58,8 +58,8 @@ def pv_rand_cmap(N=256, first_is_black=False):
   :param int N: The number of colors in the colormap.
   :param bool first_is_black: Force the first color to be black.
   '''
-  numpy.random.seed(13)
-  rand_colors = numpy.random.rand(N, 3)
+  np.random.seed(13)
+  rand_colors = np.random.rand(N, 3)
   if first_is_black:
     rand_colors[0] = [0., 0., 0.] # enforce black background
   print '<ColorMap name="random" space="RGB">'
@@ -263,7 +263,7 @@ def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0),
   rot_plane.SetOrigin(origin)
   # rotate the plane by setting the normal
   Bt = orientation.orientation_matrix().transpose()
-  n_rot = numpy.dot(Bt, hklplane.normal()/numpy.linalg.norm(hklplane.normal()))
+  n_rot = np.dot(Bt, hklplane.normal()/np.linalg.norm(hklplane.normal()))
   rot_plane.SetNormal(n_rot)
   #print '[hkl] normal direction expressed in sample coordinate system is: ', n_rot
   if show_normal:
@@ -333,7 +333,7 @@ def add_plane_to_grid_with_normal(plane, grid, origin, opacity=0.3, normal_lengt
   planeActor = add_plane_to_grid(plane, grid, origin, opacity=opacity)
   assembly.AddPart(planeActor)
   # add an arrow to display the normal to the plane
-  arrowActor = unit_arrow_3d(origin, normal_length*numpy.array(plane.GetNormal()), make_unit=False)
+  arrowActor = unit_arrow_3d(origin, normal_length*np.array(plane.GetNormal()), make_unit=False)
   assembly.AddPart(arrowActor)
   return assembly
   
@@ -462,15 +462,15 @@ def add_HklPlanes_with_orientation_in_grain(grain, \
   return local_orientation
   
 def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, text_scale=0.1, label=False, vector_normal=None):
-  n = numpy.linalg.norm(vector)
+  n = np.linalg.norm(vector)
   arrowSource = vtk.vtkArrowSource()
   arrowSource.SetShaftRadius(radius)
   arrowSource.SetTipRadius(10*radius/3.)
   # We build a local direct base with X being the unit arrow vector
   X = vector/n
-  arb = numpy.array([1,0,0]) # used numpy here, could used the vtkMath module as well...
-  Z = numpy.cross(X, arb)
-  Y = numpy.cross(Z, X)
+  arb = np.array([1,0,0]) # used numpy here, could used the vtkMath module as well...
+  Z = np.cross(X, arb)
+  Y = np.cross(Z, X)
   m = vtk.vtkMatrix4x4()
   m.Identity()
   m.DeepCopy((1, 0, 0, start[0],
@@ -499,7 +499,7 @@ def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, text
     assembly = vtk.vtkAssembly()
     assembly.AddPart(arrowActor)
     text = vtk.vtkVectorText()
-    text.SetText(numpy.array_str(vector))
+    text.SetText(np.array_str(vector))
     textMapper = vtk.vtkPolyDataMapper()
     textMapper.SetInputConnection(text.GetOutputPort())
     textTransform = vtk.vtkTransform()
@@ -1010,6 +1010,41 @@ def line_3d(start_point, end_point):
   aLineActor.SetMapper(aLineMapper)
   return aLineActor
   
+def circle_line_3d(center=(0,0,0), radius=1, normal=(0,0,1), resolution=1):
+  '''Function to draw a circle in a 3d scene.
+
+  :params tuple center: the center of the cricle.
+  :params float radius: the radius of the circle.
+  :params tuple normal: the normal to the plane of the circle.
+  :params float resolution: the resolution in degree.
+  :returns vtkActor: The method return a vtkActor that can be directly \
+  added to a 3d scene.
+  '''
+  n = int(360/resolution)
+  linePoints = vtk.vtkPoints()
+  linePoints.SetNumberOfPoints(n+1)
+  aLineGrid = vtk.vtkUnstructuredGrid()
+  aLineGrid.Allocate(1, n)
+  aLineGrid.SetPoints(linePoints)
+  linePoints.InsertPoint(0, center[0] + radius, center[1], center[2]) # starting point
+  for i in range(n):
+    linePoints.InsertPoint(i+1, \
+      center[0] + radius*np.cos(resolution*(i+1)*np.pi/180), \
+      center[1] + radius*np.sin(resolution*(i+1)*np.pi/180), \
+      center[2])
+    line = vtk.vtkLine()
+    line.GetPointIds().SetId(0, i)
+    line.GetPointIds().SetId(1, i+1)
+    aLineGrid.InsertNextCell(line.GetCellType(), line.GetPointIds())
+  aLineMapper = vtk.vtkDataSetMapper()
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    aLineMapper.SetInputData(aLineGrid)
+  else:
+    aLineMapper.SetInput(aLineGrid)
+  aLineActor = vtk.vtkActor()
+  aLineActor.SetMapper(aLineMapper)
+  return aLineActor
+
 def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discrete=False):
   '''This method create an actor running a contour filter through the 
   given data set.
@@ -1026,7 +1061,7 @@ def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discr
   :params bool discrete: use vtkDiscreteMarchingCubes if True (False by default).
   :returns: The method return a vtkActor that can be directly added to a renderer.
   '''
-  if type(data) == numpy.ndarray:
+  if type(data) == np.ndarray:
     data = numpy_array_to_vtk_grid(data, False)
   if discrete:
     contour = vtk.vtkDiscreteMarchingCubes()
@@ -1061,7 +1096,7 @@ def volren(data, alpha_channel=None, color_function=None):
     :param alpha_channel: a vtkPiecewiseFunction instance, default to linear between 0 and 255 if not given.
     :returns: The method return a vtkVolume that can be added to a renderer.
   '''
-  if type(data) == numpy.ndarray:
+  if type(data) == np.ndarray:
     data = numpy_array_to_vtk_grid(data, False)
   if alpha_channel == None:
     alpha_channel = vtk.vtkPiecewiseFunction()
@@ -1148,8 +1183,8 @@ def numpy_array_to_vtk_grid(data, cell_data=True):
   if not data.ndim == 3:
     print('warning, data array dimension must be 3')
     return None
-  size = numpy.shape(data)
-  vtk_data_array = numpy_support.numpy_to_vtk(numpy.ravel(data, order='F'), deep=1)
+  size = np.shape(data)
+  vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(data, order='F'), deep=1)
   grid = vtk.vtkUniformGrid()
   if cell_data:
     grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
@@ -1200,7 +1235,7 @@ def map_data_with_clip(data, lut = gray_cmap(), cell_data=True):
   '''
   # implicit function
   bbox = vtk.vtkBox()
-  if type(data) == numpy.ndarray:
+  if type(data) == np.ndarray:
     size = data.shape
     bbox.SetXMin(size[0]/2., -1, size[2]/2.)
     bbox.SetXMax(size[0]+1, size[1]/2., size[2]+1)
@@ -1231,7 +1266,7 @@ def map_data(data, function, lut = gray_cmap(), cell_data=True):
 
   The method return a vtkActor that can be directly added to a renderer.
   '''
-  if type(data) == numpy.ndarray:
+  if type(data) == np.ndarray:
     data = numpy_array_to_vtk_grid(data, cell_data)
   # use extract geometry filter to access the data
   extract = vtk.vtkExtractGeometry()
@@ -1399,9 +1434,9 @@ def show_array(data, map_scalars=False, lut=None):
   :param lut: a vtk lookup table (colormap) used to map the scalars.
   :return: a vtk actor that can be added to a rendered to show the 3d array.
   '''
-  if type(data) == numpy.ndarray:
+  if type(data) == np.ndarray:
     grid = numpy_array_to_vtk_grid(data, cell_data=True)
-    visible = numpy_support.numpy_to_vtk(numpy.ravel(data > 0, order='F').astype(numpy.uint8), deep=1)
+    visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
     grid.SetCellVisibilityArray(visible)
     #grid.SetPointVisibilityArray(visible)
     size = data.shape
@@ -1512,7 +1547,7 @@ def slits(size, x_slits=0):
   A vtk assembly of the 4 corners representing the slits.
   '''
   slits = vtk.vtkAssembly()
-  corner_points = numpy.empty((3, 3, 4), dtype=numpy.float)
+  corner_points = np.empty((3, 3, 4), dtype=np.float)
   corner_points[:, 0, 0] = [x_slits, -0.6*size[1]/2, -size[2]/2]
   corner_points[:, 1, 0] = [x_slits, -size[1]/2, -size[2]/2]
   corner_points[:, 2, 0] = [x_slits, -size[1]/2, -0.6*size[2]/2]
@@ -1659,7 +1694,7 @@ def grid_vol_view(scan):
   cam.Dolly(0.6)
   cam.SetClippingRange(0,1000)
   # add axes actor
-  l = 0.5*numpy.mean(size)
+  l = 0.5*np.mean(size)
   axes = axes_actor(length = l, axisLabels = True)
   # Create renderer
   ren = vtk.vtkRenderer()

@@ -1017,7 +1017,7 @@ def circle_line_3d(center=(0,0,0), radius=1, normal=(0,0,1), resolution=1):
   :params float radius: the radius of the circle.
   :params tuple normal: the normal to the plane of the circle.
   :params float resolution: the resolution in degree.
-  :returns vtkActor: The method return a vtkActor that can be directly \
+  :return vtkActor: The method return a vtkActor that can be directly \
   added to a 3d scene.
   '''
   n = int(360/resolution)
@@ -1517,7 +1517,7 @@ def show_grains(data, num_colors=2048):
   Returns a vtk actor that can be added to a rendered to show all the 
   grains colored by their id.  
   '''
-  grain_lut = rand_cmap(N=num_colors, first_is_black = True, table_range=(0,num_colors-1))
+  grain_lut = rand_cmap(N=num_colors, first_is_black = True, table_range=(0, num_colors-1))
   grains = show_array(data, map_scalars=True, lut=grain_lut)
   return grains
 

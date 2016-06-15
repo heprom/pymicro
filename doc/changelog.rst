@@ -1,6 +1,43 @@
 Change log history
 ==================
 
+pymicro version 0.3.2
+---------------------
+
+* updated version number (Henry Proudhon)
+* docstring changes (Henry Proudhon)
+* a few tweaks in dct_projection (Henry Proudhon)
+* changed numpy in np and added a new method circle_line_3d (Henry Proudhon)
+* update flat field code for xpad (Henry Proudhon)
+* improved xpad code to hangle multiple images in raw or nxs, added flat field correction (Henry Proudhon)
+* fixed minus sign in dct_omega_angles (Henry Proudhon)
+* one more fix to the elevationFilter (Henry Proudhon)
+* changed the way the elevation axis is handled (Henry Proudhon)
+* fixed broken docstring in elevationFilter (Henry Proudhon)
+* added the possibility to use any axis in the elevationFilter (Henry Proudhon)
+* added new example with segmented crack (Henry Proudhon)
+* add grain objects to View (Henry Proudhon)
+* new find_planes_in_zone method (Henry Proudhon)
+* fixed bug in lambda_nm_to_keV and lambda_angstrom_to_keV (Henry Proudhon)
+* updated documentation (Henry Proudhon)
+* recompiled some figures (Henry Proudhon)
+* new test apply_orientation_to_actor (Henry Proudhon)
+* added skimage dependency (Henry Proudhon)
+* fixed vtk version problem for function volren (Henry Proudhon)
+* fixed vtk version problem for function volren (Henry Proudhon)
+* small fix with f.tell() (Henry Proudhon)
+* fix int conversion for numpy version (Henry Proudhon)
+* imporved View app and added it to the list of imported modules (Henry Proudhon)
+* modified dct_projection to use radon from skimage (Henry Proudhon)
+* new methods for rotating crystals and topotomography alignment with tests (Henry Proudhon)
+* new method to compute the scattering vector (Henry Proudhon)
+* corrected type in docstring (Henry Proudhon)
+* changed copyright year (Henry Proudhon)
+* missing file from previous commit (Henry Proudhon)
+* increased a bit the resolution for 2 examples (Henry Proudhon)
+* added example for volume rendering (Henry Proudhon)
+* added change log history to the documentation (Henry Proudhon)
+
 pymicro version 0.3.1
 ---------------------
 

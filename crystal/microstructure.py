@@ -1106,7 +1106,8 @@ class Microstructure:
     '''Compute the detector image in dct configuration.
     
     :params np.ndarray data: The 3d data set from which to compute the projection.
-    
+    :params lattice: The crystal lattice of the material.
+    :params float omega: The rotation angle at which the projection is computed.
     '''
     lambda_nm = 1.2398 / lambda_keV
     # prepare rotation matrix
@@ -1136,7 +1137,7 @@ class Microstructure:
       print int(0.5*det_npx[1]/ds-proj.shape[1]/2.)
       print int(0.5*det_npx[1]/ds+proj.shape[1]/2.)
     # let's moderate the direct beam so we see nicely the spots with a 8 bits scale
-    att = 1.0 # 6.0 / ds
+    att = 6.0 / ds # 1.0
     full_proj[int(0.5*det_npx[0]/ds-proj.shape[0]/2.):int(0.5*det_npx[0]/ds+proj.shape[0]/2.), \
       int(0.5*det_npx[1]/ds-proj.shape[1]/2.):int(0.5*det_npx[1]/ds+proj.shape[1]/2.)] += proj / att
     # add diffraction spots
@@ -1188,7 +1189,7 @@ class Microstructure:
       except:
         print 'error occured' # grain diffracts outside the detector
         pass
-      plt.imsave('proj_dif/proj_dif_grain%d_omega=%03.1f.png' % (gid, omega), proj_dif, cmap=cm.gray, origin='lower')
+      plt.imsave('proj_dif/proj_dif_grain%d_omega=%05.1f.png' % (gid, omega), proj_dif, cmap=cm.gray, origin='lower')
     if display:
       fig = plt.figure(figsize=(10,10))
       ax = fig.add_subplot(111)
@@ -1206,7 +1207,7 @@ class Microstructure:
       plt.show()
     else:
       # save projection image with origin = lower since Z-axis is upwards
-      plt.imsave('proj/proj_omega=%03.1f.png' % omega, full_proj, cmap=cm.gray, vmin=0, vmax=255, origin='lower')
+      plt.imsave('proj/proj_omega=%05.1f.png' % omega, full_proj, cmap=cm.gray, vmin=0, vmax=100, origin='lower')
     
 class EbsdMicrostructure:
   '''

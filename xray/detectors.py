@@ -4,7 +4,7 @@ rcParams.update({'font.size': 12})
 rcParams['text.latex.preamble'] = [r"\usepackage{amsmath}"]
 rcParams['image.interpolation'] = 'nearest'
 from pymicro.file.file_utils import HST_read, HST_write
-
+from pymicro.file.tifffile import TiffFile
 
 class Detector2d:
   '''Class to handle 2D detectors.
@@ -20,6 +20,7 @@ class Detector2d:
     self.image_path = None
     self.save_path = '.'
     self.correction = 'none' # could be none, bg, flat
+    self.orientation = 'horizontal' # either 'horizontal' or 'vertical'
 
   def azimuthal_regroup(self, two_theta_mini=None, two_theta_maxi=None, \
       two_theta_step=None, psi_min=None, psi_max=None, write_txt=False, \
@@ -27,7 +28,7 @@ class Detector2d:
     # assign default values if needed
     if not two_theta_mini: two_theta_mini = self.two_thetas.min()
     if not two_theta_maxi: two_theta_maxi = self.two_thetas.max()
-    if not two_theta_step: two_theta_step = 1./mar.calib
+    if not two_theta_step: two_theta_step = 1./self.calib
     nbOfBins = int((two_theta_maxi - two_theta_mini) / two_theta_step)
     print '* Azimuthal regroup (two theta binning)'
     print '  delta range = [%.1f-%.1f] with a %g deg step (%d bins)' % (two_theta_mini, two_theta_maxi, two_theta_step, nbOfBins)
@@ -78,7 +79,7 @@ class Detector2d:
       output_image_path = os.path.join(self.save_path, \
         'AR_%s.pdf' % os.path.splitext(os.path.basename(self.image_path))[0])
       plt.figure()
-      plt.imshow(self.corr_data.T, vmin=0, vmax=2000, interpolation='nearest', origin='upper')
+      plt.imshow(self.corr_data, vmin=0, vmax=2000, interpolation='nearest', origin='upper')
       # highlight the summed area with black lines
       div = 10
       two_theta_corners = np.array([two_theta_mini, two_theta_maxi, two_theta_maxi, two_theta_mini, two_theta_mini])
@@ -175,6 +176,64 @@ class Detector2d:
           fmt='%.6e')
     return psi_values, intensityResult, counts
 
+class Varian2520(Detector2d):
+  '''Class to handle a Varian Paxscan 2520 detector.
+  
+  The flat panel detector produce 16 unsigned (1840, 1456) images.
+  '''
+  def __init__(self):
+    Detector2d.__init__(self)
+    self.xcen = 920.
+    self.ycen = 728.
+    self.pixel_size = 0.127 # mm
+    self.calib = 1. # pixel by degree
+    self.ref = np.ones((1840, 1456), dtype=np.uint16)
+    self.dark = np.zeros((1840, 1456), dtype=np.uint16)
+    self.bg = np.zeros((1840, 1456), dtype=np.uint16)
+
+  def load_image(self, image_path):
+    print('loading image %s' % image_path)
+    self.image_path = image_path
+    self.data = TiffFile(image_path).asarray().T.astype(np.float32)
+    self.compute_corrected_image()
+    
+  def compute_corrected_image(self):
+    if self.correction == 'none':
+      self.corr_data = self.data
+    elif self.correction == 'bg':
+      self.corr_data = self.data - self.bg
+    elif self.correction == 'flat':
+      self.corr_data = (self.data - self.dark).astype(np.float32) / (self.ref - self.dark).astype(np.float32)
+
+  def compute_geometry(self):
+    '''Calculate an array of the image size with the (2theta, psi) for each pixel.'''
+    self.compute_TwoTh_Psi_arrays()
+
+  def compute_TwoTh_Psi_arrays(self):
+    '''Calculate two arrays (2theta, psi) TwoTheta and Psi angles arrays corresponding to repectively
+    the vertical and the horizontal pixels.
+    '''
+    deg2rad = np.pi / 180.
+    inv_deg2rad = 1. / deg2rad
+    # distance xpad to sample, in pixel units
+    distance = self.calib / np.tan(1.0 * deg2rad)
+    x = np.linspace(0, 1839, 1840)
+    y = np.linspace(0, 1455, 1456)
+    yy, xx = np.meshgrid(y, x)
+    #xx, yy = np.meshgrid(x, y)
+    r = np.sqrt((xx - self.xcen)**2 + (yy - self.ycen)**2)
+    self.two_thetas = np.arctan(r/distance) * inv_deg2rad
+    self.psis = np.arccos((xx - self.xcen) / r) * inv_deg2rad
+
+  def angles_to_pixels(self, two_theta, psi):
+    '''given two values 2theta and psi (that could be arrays), compute the corresponding pixel on the detector.'''
+    distance = self.calib / np.tan(np.pi / 180.)
+    r = distance * np.tan(two_theta * np.pi / 180.)
+    print(psi, np.sign((psi > 90) - 0.5))
+    x = self.xcen + r*np.cos(psi * np.pi / 180.)
+    y = self.ycen - np.sign(psi)*np.sqrt(r**2 - (x - self.xcen)**2)
+    return (x, y)
+
 class Mar165(Detector2d):
   '''Class to handle a rayonix marccd165.
   
@@ -265,7 +324,6 @@ class Xpad(Detector2d):
     self.calib = 85.62 # pixels in 1 deg.
     self.XcenDetector = 451.7 + 5*3
     self.YcenDetector = 116.0 # position of direct beam on xpad at del=gam=0
-    self.orientation = 'horizontal' # either 'horizontal' or 'vertical'
     self.verbose = True
     
   def load_image(self, image_path, nxs_prefix=None, nxs_dataset=None, nxs_index=None, nxs_update_geometry=False, stack='first'):

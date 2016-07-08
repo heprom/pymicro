@@ -468,7 +468,9 @@ def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, text
   arrowSource.SetTipRadius(10*radius/3.)
   # We build a local direct base with X being the unit arrow vector
   X = vector/n
-  arb = np.array([1,0,0]) # used numpy here, could used the vtkMath module as well...
+  arb = np.array([1, 0, 0]) # used numpy here, could used the vtkMath module as well...
+  if np.dot(X, arb) == 1:
+    arb = np.array([0, 1, 0])
   Z = np.cross(X, arb)
   Y = np.cross(Z, X)
   m = vtk.vtkMatrix4x4()

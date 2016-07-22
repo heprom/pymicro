@@ -440,18 +440,18 @@ class PoleFigure:
     ax.set_title('%s-axis inverse %s projection' % (self.axis, self.proj))
 
   @staticmethod
-  def plot(orientation):
+  def plot(orientation, **kwargs):
     '''Plot a pole figure (both direct and inverse) for a single orientation.
 
     :param orientation: the crystalline :py:class:`~pymicro.crystal.microstructure.Orientation` to plot.
     '''
     micro = Microstructure()
     micro.grains.append(Grain(1, orientation))
-    pf = PoleFigure(microstructure=micro)
+    pf = PoleFigure(microstructure=micro, **kwargs)
     pf.plot_pole_figures(display=True)
 
   @staticmethod
-  def plot_euler(phi1, Phi, phi2):
+  def plot_euler(phi1, Phi, phi2, **kwargs):
     '''Directly plot a pole figure for a single orientation given its 
     three Euler angles.
 
@@ -463,7 +463,7 @@ class PoleFigure:
     :param float Phi: second Euler angle (in degree).
     :param float phi2: third Euler angle (in degree).
     '''
-    PoleFigure.plot(Orientation.from_euler(np.array([phi1, Phi, phi2])))
+    PoleFigure.plot(Orientation.from_euler(np.array([phi1, Phi, phi2])), **kwargs)
     
 class TaylorModel:
   '''A class to carry out texture evolution with the Taylor model.

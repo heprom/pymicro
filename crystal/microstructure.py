@@ -117,6 +117,17 @@ class Orientation:
       p = 0.
     return p
     
+  @staticmethod
+  def misorientation_axis_from_delta(delta):
+    '''Compute the misorientation axis from the misorientation matrix. 
+    
+    :param delta: The misorientation 3x3 matrix.
+    :returns: the misorientation axis (normalised vector).
+    '''
+    n = np.array([delta[1,2] - delta[2,1], delta[2,0] - delta[0,2], delta[0,1] - delta[1,0]])
+    n /= np.sqrt((delta[1,2] - delta[2,1])**2 + (delta[2,0] - delta[0,2])**2 + (delta[0,1] - delta[1,0])**2)
+    return n
+
   def misorientation_axis(self, orientation):
     '''Compute the misorientation axis with another crystal orientation. 
     This vector is by definition common to both crystalline orientations.
@@ -125,9 +136,7 @@ class Orientation:
     :returns: the misorientation axis (normalised vector).
     '''
     delta = np.dot(self.orientation_matrix(), orientation.orientation_matrix().T)
-    n = np.array([delta[1,2] - delta[2,1], delta[2,0] - delta[0,2], delta[0,1] - delta[1,0]])
-    n /= np.sqrt((delta[1,2] - delta[2,1])**2 + (delta[2,0] - delta[0,2])**2 + (delta[0,1] - delta[1,0])**2)
-    return n
+    return Orientation.misorientation_axis_from_delta(delta)
 
   def misorientation_angle(self, orientation, crystal_structure='cubic'):
     '''Compute the misorientation angle (in radian) with another crystal 
@@ -144,16 +153,53 @@ class Orientation:
     min_misorientation = np.pi
     from pymicro.crystal.lattice import Lattice
     symmetries = Lattice.symmetry(crystal_structure)
-    for i in range(symmetries.shape[0]): # 24 for cubic
-      sym_i = symmetries[i]
+    (gA, gB) = (self.orientation_matrix(), orientation.orientation_matrix()) # nicknames
+    for (g1, g2) in [(gA, gB), (gB, gA)]:
       for j in range(symmetries.shape[0]): # 24 for cubic
         sym_j = symmetries[j]
-        delta = np.dot(np.dot(self.orientation_matrix(), sym_j), np.dot(sym_i.T, orientation.orientation_matrix().T))
+        delta = np.dot(g2, np.dot(sym_j, g1).T) # from T. Rollet lecture's
+        #delta = np.dot(np.dot(sym_j, self.orientation_matrix()), np.dot(orientation.orientation_matrix().T, sym_i.T)) #TODO check this
+        ##delta = np.dot(np.dot(self.orientation_matrix(), sym_j), np.dot(sym_i.T, orientation.orientation_matrix().T))
         cw = 0.5*(delta.trace() - 1)
         mis = np.arccos(cw)
         if mis < min_misorientation:
           min_misorientation = mis
     return min_misorientation
+
+  def disorientation(self, orientation, crystal_structure='cubic'):
+    '''Compute the disorientation another crystal orientation.
+    
+    Considering all the possible crystal symmetries, the disorientation 
+    is defined as the combination of the minimum misorientation angle 
+    and the misorientation axis lying in the fundamental zone. 
+    
+    :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
+    :param str crystal_structure: a string describing the crystal structure, 'cubic' by default.
+    :returns tuple: the misorientation angle in radians, the axis as a numpy vector (crystal coordinates), the axis as a numpy vector (sample coordinates).
+    '''
+    the_angle = np.pi
+    from pymicro.crystal.lattice import Lattice
+    symmetries = Lattice.symmetry(crystal_structure)
+    (gA, gB) = (self.orientation_matrix(), orientation.orientation_matrix()) # nicknames
+    for (g1, g2) in [(gA, gB), (gB, gA)]:
+      for j in range(symmetries.shape[0]):
+        sym_j = symmetries[j]
+        oj = np.dot(sym_j, g1) # the crystal symmetry operator is left applied
+        for i in range(symmetries.shape[0]):
+          sym_i = symmetries[i]
+          oi = np.dot(sym_i, g2)
+          delta = np.dot(oi, oj.T)
+          cw = 0.5*(delta.trace() - 1)
+          mis_angle = np.arccos(cw)
+          if mis_angle < the_angle:
+            # now compute the misorientation axis, should check if it lies in the fundamental zone
+            mis_axis = Orientation.misorientation_axis_from_delta(delta)
+            # here we have np.dot(oi.T, mis_axis) = np.dot(oj.T, mis_axis)
+            #print(mis_axis, mis_angle*180/np.pi, np.dot(oj.T, mis_axis))
+            the_angle = mis_angle
+            the_axis = mis_axis
+            the_axis_xyz = np.dot(oi.T, the_axis)
+    return (the_angle, the_axis, the_axis_xyz)
 
   def phi1(self):
     '''Convenience methode to expose the first Euler angle.'''

@@ -373,6 +373,19 @@ def axes_actor(length = 1.0, axisLabels = ('x', 'y', 'z'), fontSize=20):
 
 def grain_3d(grain, hklplanes=None, show_normal=False, \
   plane_opacity=1.0, show_orientation=False):
+  '''Creates a 3d representation of a crystallographic grain.
+  
+  This method creates a vtkActor object of the surface mesh 
+  representing a Grain object. An optional list of crystallographic 
+  planes can be given
+
+  :params grain: the Grain object to be shown in 3d.
+  :params list hklplanes: the list of HklPlanes object to add to the assembly.
+  :params bool show_normal: show also the normal to the hkl planes if True.
+  :params float plane_opacity: set the opacity of the grain actor.
+  :params bool show_orientation: show also the grain orientation with a vtkAxesActor placed at the grain center if True.
+  :returns: a vtkAssembly of the grain mesh and the optional hkl planes.
+  '''
   assembly = vtk.vtkAssembly()
   # create mapper
   mapper = vtk.vtkDataSetMapper()
@@ -383,6 +396,8 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
   mapper.ScalarVisibilityOff() # we use the grain id for chosing the color
   lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
   grain_actor = vtk.vtkActor()
+  print grain.id
+  print(lut.GetTableValue(grain.id)[0:3])
   grain_actor.GetProperty().SetColor(lut.GetTableValue(grain.id)[0:3])
   grain_actor.SetMapper(mapper)
   assembly.AddPart(grain_actor)
@@ -461,7 +476,7 @@ def add_HklPlanes_with_orientation_in_grain(grain, \
     local_orientation.AddPart(hklplaneActor)
   return local_orientation
   
-def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, text_scale=0.1, label=False, vector_normal=None):
+def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, label=False, text=None, text_scale=0.1, vector_normal=None):
   n = np.linalg.norm(vector)
   arrowSource = vtk.vtkArrowSource()
   arrowSource.SetShaftRadius(radius)
@@ -500,10 +515,14 @@ def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, text
     # add a text actor to display the vector coordinates
     assembly = vtk.vtkAssembly()
     assembly.AddPart(arrowActor)
-    text = vtk.vtkVectorText()
-    text.SetText(np.array_str(vector))
+    vectorText = vtk.vtkVectorText()
+    if text == None:
+      # display the vector coordinates as text
+      vectorText.SetText(np.array_str(vector))
+    else:
+      vectorText.SetText(text)
     textMapper = vtk.vtkPolyDataMapper()
-    textMapper.SetInputConnection(text.GetOutputPort())
+    textMapper.SetInputConnection(vectorText.GetOutputPort())
     textTransform = vtk.vtkTransform()
     start_text = start + vector
     mt = vtk.vtkMatrix4x4()
@@ -744,12 +763,14 @@ def lattice_vertices(grid, sphereRadius=0.1, sphereColor=blue):
   Vertices.GetProperty().SetDiffuseColor(sphereColor)
   return Vertices
   
-def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02, sphereColor=blue, tubeColor=grey):
+def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02, sphereColor=blue, tubeColor=grey, crystal_orientation=None, show_atoms=True, show_edges=True):
   '''
   Create the 3D representation of a crystal lattice.
 
   The lattice edges are shown using a vtkTubeFilter and the atoms are 
   displayed using spheres. Both tube and sphere radius can be controlled.
+  Crystal orientation can also be provided which rotates the whole 
+  assembly appropriately.
 
   .. code-block:: python
 
@@ -767,55 +788,47 @@ def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02, sphereColor=blue, tub
 
       A 3D view of a cubic lattice.
 
-  *Parameters*
-  
-  **lattice**: Lattice
-  The Lattice instance representing the crystal lattice.
-
-  **sphereRadius**: float
-  Size of the spheres representing the atoms (default: 0.1).
-
-  **tubeRadius**: float
-  Radius of the tubes representing the atomic bonds (default: 0.02).
-
-  **sphereColor**: vtk color
-  Color of the spheres representing the atoms (default: blue).
-
-  **tubeColor**: vtk color
-  Color of the tubes representing the atomis bonds (default: grey).
-
-  *Returns*
-
-  The method return a vtk assembly combining lattice edges and vertices.
+  :param Lattice lattice: The Lattice instance representing the crystal lattice.
+  :param float sphereRadius: Size of the spheres representing the atoms (default: 0.1).
+  :param float tubeRadius: Radius of the tubes representing the atomic bonds (default: 0.02).
+  :param tuple sphereColor: Color of the spheres representing the atoms (default: blue).
+  :param tuple tubeColor: Color of the tubes representing the atomis bonds (default: grey).
+  :param crystal_orientation: The crystal :py:class:`~pymicro.crystal.microstructure.Orientation` with respect to the sample coordinate system (default: None).
+  :param bool show_atoms: Control if the atoms are shown (default: True).
+  :param bool show_edges: Control if the eges of the lattice are shown (default: True).
+  :return: The method return a vtk assembly combining lattice edges and vertices.
   '''
   grid = lattice_grid(lattice)
-  edges = lattice_edges(grid, tubeRadius=tubeRadius, tubeColor=tubeColor)
-  vertices = lattice_vertices(grid, sphereRadius=sphereRadius, sphereColor=sphereColor)
+  (a, b, c) = lattice._lengths
+  edges = lattice_edges(grid, tubeRadius=tubeRadius*a, tubeColor=tubeColor)
+  vertices = lattice_vertices(grid, sphereRadius=sphereRadius*a, sphereColor=sphereColor)
   assembly = vtk.vtkAssembly()
-  assembly.AddPart(edges)
-  assembly.AddPart(vertices)
+  if show_edges: assembly.AddPart(edges)
+  if show_atoms: assembly.AddPart(vertices)
+  # finally, apply crystal orientation to the lattice
+  assembly.SetOrigin(a/2, b/2, c/2)
+  assembly.AddPosition(-a/2, -b/2, -c/2)
+  if crystal_orientation != None:
+    apply_orientation_to_actor(assembly, crystal_orientation)
   return assembly
 
-def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
-  show_atoms=True, show_normal=True, plane_opacity=1.0):
+def lattice_3d_with_planes(lattice, hklplanes, show_normal=True, \
+  plane_opacity=1.0, **kwargs):
   '''
   Create the 3D representation of a crystal lattice.
   HklPlanes can be displayed within the lattice cell with their normals.
-  A single vtk actor in form of an assembly is returned.
-  Crystal orientation can also be provided which rotates the whole assembly appropriately.
+  A single vtk actor in form of an assembly is returned. Additional parameters are passed to the `lattice_3d` method to control how the lattice is pictured.
 
   .. code-block:: python
 
     l = Lattice.cubic(1.0)
-    o = Orientation.from_euler((344.0, 125.0, 217.0))
-
-    grid = lattice_grid(l)
+    o = Orientation.from_euler([344.0, 125.0, 217.0])
     hklplanes = Hklplane.get_family('111')
-    cubic = lattice_3d_with_planes(grid, hklplanes, crystal_orientation=o, \\
-      show_normal=True, plane_opacity=0.5)
-    ren = vtk.vtkRenderer()
-    ren.AddActor(cubic)
-    render(ren, display=True)
+    cubic = lattice_3d_with_planes(l, hklplanes, show_normal=True, \\
+      plane_opacity=0.5, crystal_orientation=o)
+    s3d = Scene3D()
+    s3d.add(cubic)
+    s3d.render()
 
   .. figure:: _static/cubic_crystal_3d.png
      :width: 300 px
@@ -825,20 +838,17 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
      A 3D view of a cubic lattice with all four 111 planes displayed.
 
   :param hklplanes: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` instances to add to the lattice.
-  :param crystal_orientation: The crystal :py:class:`~pymicro.crystal.microstructure.Orientation` with respect to the sample coordinate system (default: None).
-  :param bool show_atoms: control if the atoms are shown (default: True).
-  :param bool show_normal: control if the slip plane normals are shown (default: True).
+  :param bool show_normal: Control if the slip plane normals are shown (default: True).
   :param float plane_opacity: A float number in the [0.,1.0] range controlling the slip plane opacity.
+  :param **kwargs: additional parameters are passed to the `lattice_3d` method.
   :return: The method return a vtkAssembly that can be directly added to a renderer.
   '''
-  # get grid corresponding to the crystal lattice
   grid = lattice_grid(lattice)
   (a, b, c) = lattice._lengths
-  
-  # an assembly is used to gather all the actors together
-  assembly = vtk.vtkAssembly()
-
-  # display all the hkl planes (with normal)
+  # get the atoms+edges assembly corresponding to the crystal lattice
+  assembly = lattice_3d(lattice, **kwargs)
+  parts = assembly.GetParts()
+  # display all the hkl planes
   for hklplane in hklplanes:
     origin = (a/2, b/2, c/2)
     plane = vtk.vtkPlane()
@@ -850,18 +860,6 @@ def lattice_3d_with_planes(lattice, hklplanes, crystal_orientation=None, \
       # add an arrow to display the normal to the plane
       arrowActor = unit_arrow_3d(origin, a*hklplane.normal(), make_unit=False)
       assembly.AddPart(arrowActor)
-  
-  Edges = lattice_edges(grid, tubeRadius=0.02*a)
-  Vertices = lattice_vertices(grid, sphereRadius=0.1*a)
-  # add the two actors to the renderer
-  assembly.AddPart(Edges)
-  if show_atoms: assembly.AddPart(Vertices)
-
-  # finally, apply crystal orientation to the lattice
-  assembly.SetOrigin(a/2, b/2, c/2)
-  assembly.AddPosition(-a/2, -b/2, -c/2)
-  if crystal_orientation != None:
-    apply_orientation_to_actor(assembly, crystal_orientation)
   return assembly
 
 def apply_orientation_to_actor(actor, orientation):

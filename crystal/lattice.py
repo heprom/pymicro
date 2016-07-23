@@ -74,8 +74,13 @@ class Lattice:
   def reciprocal_lattice(self):
     '''Compute the reciprocal lattice.
     
-    This computes the three reciprocal lattice vectors defined by
+    The reciprocal lattice defines a crystal in terms of vectors that 
+    are normal to a plane and whose lengths are the inverse of the 
+    interplanar spacing. This method computes the three reciprocal 
+    lattice vectors defined by:
     
+    .. math::
+
      * a.a^* = 1
      * b.b^* = 1
      * c.c^* = 1
@@ -94,51 +99,64 @@ class Lattice:
 
   @staticmethod
   def symmetry(crystal_structure='cubic'):
-    ''' define the 24 equivalent cube orientations.
+    '''Define the equivalent crystal symmetries.
     
-    :params str crystal_structure: a string describing the crystal structure.
-    :raise ValueError: if the given crystal structure is not cubic or none.
-
-    Those come from Randle & Engler, 2000. For cubic, they correspond to:
+    Those come from Randle & Engler, 2000. For instance in the cubic 
+    crystal struture, there are 24 equivalent cube orientations, they 
+    correspond to:
 
      * 1 for pure cube
-     * 9 rot90 arount <001> axes
-     * 6 rot180 around <110> axes
-     * 8 rot 120 around <111> axes)
+     * 9 possible 90 degrees rotations around <001> axes
+     * 6 possible 180 degrees rotations around <110> axes
+     * 8 possible 120 degrees rotations around <111> axes
+
+    :params str crystal_structure: a string describing the crystal structure.
+    :raise ValueError: if the given crystal structure is not cubic or none.
+    :returns array: A numpy array of shape (n, 3, 3) where n is the \
+    number of symmetries of the given crystal structure.
     '''
     if crystal_structure == 'cubic':
-      cubes = np.zeros((24, 3, 3), dtype= np.float)
-      cubes[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
-      cubes[1] = np.array([[ 0.,  0., -1.], [0., -1.,  0.], [-1.,  0.,  0.]])
-      cubes[2] = np.array([[ 0.,  0., -1.], [0.,  1.,  0.], [1.,  0.,  0.]])
-      cubes[3] = np.array([[-1.,  0.,  0.], [0.,  1.,  0.], [0.,  0., -1.]])
-      cubes[4] = np.array([[ 0.,  0.,  1.], [0.,  1.,  0.], [-1.,  0.,  0.]])
-      cubes[5] = np.array([[ 1.,  0.,  0.], [0.,  0., -1.], [0.,  1.,  0.]])
-      cubes[6] = np.array([[ 1.,  0.,  0.], [0., -1.,  0.], [0.,  0., -1.]])
-      cubes[7] = np.array([[ 1.,  0.,  0.], [0.,  0.,  1.], [0., -1.,  0.]])
-      cubes[8] = np.array([[ 0., -1.,  0.], [1.,  0.,  0.], [0.,  0.,  1.]])
-      cubes[9] = np.array([[-1.,  0.,  0.], [0., -1.,  0.], [0.,  0.,  1.]])
-      cubes[10] = np.array([[ 0.,  1.,  0.], [-1.,  0.,  0.], [0.,  0.,  1.]])
-      cubes[11] = np.array([[ 0.,  0.,  1.], [1.,  0.,  0.], [0.,  1.,  0.]])
-      cubes[12] = np.array([[ 0.,  1.,  0.], [0.,  0.,  1.], [1.,  0.,  0.]])
-      cubes[13] = np.array([[ 0.,  0., -1.], [-1.,  0.,  0.], [0.,  1.,  0.]])
-      cubes[14] = np.array([[ 0., -1.,  0.], [0.,  0.,  1.], [-1.,  0.,  0.]])
-      cubes[15] = np.array([[ 0.,  1.,  0.], [0.,  0., -1.], [-1.,  0.,  0.]])
-      cubes[16] = np.array([[ 0.,  0., -1.], [1.,  0.,  0.], [0., -1.,  0.]])
-      cubes[17] = np.array([[ 0.,  0.,  1.], [-1.,  0.,  0.], [0., -1.,  0.]])
-      cubes[18] = np.array([[ 0., -1.,  0.], [0.,  0., -1.], [1.,  0.,  0.]])
-      cubes[19] = np.array([[ 0.,  1.,  0.], [1.,  0.,  0.], [0.,  0., -1.]])
-      cubes[20] = np.array([[-1.,  0.,  0.], [0.,  0.,  1.], [0.,  1.,  0.]])
-      cubes[21] = np.array([[ 0.,  0.,  1.], [0., -1.,  0.], [1.,  0.,  0.]])
-      cubes[22] = np.array([[ 0., -1.,  0.], [-1.,  0.,  0.], [0.,  0., -1.]])
-      cubes[23] = np.array([[-1.,  0.,  0.], [0.,  0., -1.], [0., -1.,  0.]])
-      return cubes
+      sym = np.zeros((24, 3, 3), dtype= np.float)
+      sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+      sym[1] = np.array([[ 0.,  0., -1.], [0., -1.,  0.], [-1.,  0.,  0.]])
+      sym[2] = np.array([[ 0.,  0., -1.], [0.,  1.,  0.], [1.,  0.,  0.]])
+      sym[3] = np.array([[-1.,  0.,  0.], [0.,  1.,  0.], [0.,  0., -1.]])
+      sym[4] = np.array([[ 0.,  0.,  1.], [0.,  1.,  0.], [-1.,  0.,  0.]])
+      sym[5] = np.array([[ 1.,  0.,  0.], [0.,  0., -1.], [0.,  1.,  0.]])
+      sym[6] = np.array([[ 1.,  0.,  0.], [0., -1.,  0.], [0.,  0., -1.]])
+      sym[7] = np.array([[ 1.,  0.,  0.], [0.,  0.,  1.], [0., -1.,  0.]])
+      sym[8] = np.array([[ 0., -1.,  0.], [1.,  0.,  0.], [0.,  0.,  1.]])
+      sym[9] = np.array([[-1.,  0.,  0.], [0., -1.,  0.], [0.,  0.,  1.]])
+      sym[10] = np.array([[ 0.,  1.,  0.], [-1.,  0.,  0.], [0.,  0.,  1.]])
+      sym[11] = np.array([[ 0.,  0.,  1.], [1.,  0.,  0.], [0.,  1.,  0.]])
+      sym[12] = np.array([[ 0.,  1.,  0.], [0.,  0.,  1.], [1.,  0.,  0.]])
+      sym[13] = np.array([[ 0.,  0., -1.], [-1.,  0.,  0.], [0.,  1.,  0.]])
+      sym[14] = np.array([[ 0., -1.,  0.], [0.,  0.,  1.], [-1.,  0.,  0.]])
+      sym[15] = np.array([[ 0.,  1.,  0.], [0.,  0., -1.], [-1.,  0.,  0.]])
+      sym[16] = np.array([[ 0.,  0., -1.], [1.,  0.,  0.], [0., -1.,  0.]])
+      sym[17] = np.array([[ 0.,  0.,  1.], [-1.,  0.,  0.], [0., -1.,  0.]])
+      sym[18] = np.array([[ 0., -1.,  0.], [0.,  0., -1.], [1.,  0.,  0.]])
+      sym[19] = np.array([[ 0.,  1.,  0.], [1.,  0.,  0.], [0.,  0., -1.]])
+      sym[20] = np.array([[-1.,  0.,  0.], [0.,  0.,  1.], [0.,  1.,  0.]])
+      sym[21] = np.array([[ 0.,  0.,  1.], [0., -1.,  0.], [1.,  0.,  0.]])
+      sym[22] = np.array([[ 0., -1.,  0.], [-1.,  0.,  0.], [0.,  0., -1.]])
+      sym[23] = np.array([[-1.,  0.,  0.], [0.,  0., -1.], [0., -1.,  0.]])
+    elif crystal_structure == 'tetragonal':
+      sym = np.zeros((8, 3, 3), dtype= np.float)
+      sym[0] = np.array([[ 1.,  0.,  0.], [0.,  1.,  0.], [0.,  0.,  1.]])
+      sym[1] = np.array([[ 0., -1.,  0.], [1.,  0.,  0.], [0.,  0.,  1.]])
+      sym[2] = np.array([[-1.,  0.,  0.], [0., -1.,  0.], [0.,  0.,  1.]])
+      sym[3] = np.array([[ 0.,  1.,  0.], [-1.,  0.,  0.], [0.,  0.,  1.]])
+      sym[4] = np.array([[ 1.,  0.,  0.], [0., -1.,  0.], [0.,  0., -1.]])
+      sym[5] = np.array([[-1.,  0.,  0.], [0.,  1.,  0.], [0.,  0., -1.]])
+      sym[6] = np.array([[ 0.,  1.,  0.], [1.,  0.,  0.], [0.,  0., -1.]])
+      sym[7] = np.array([[ 0., -1.,  0.], [-1.,  0.,  0.], [0.,  0., -1.]])
     elif crystal_structure == 'none':
-      equiv = np.zeros((1, 3, 3), dtype= np.float)
-      equiv[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
-      return equiv
+      sym = np.zeros((1, 3, 3), dtype= np.float)
+      sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
     else:
       raise ValueError('warning, crystal structure not supported: %s' % crystal_structure)
+    return sym
 
   @staticmethod
   def from_cif(file_path):
@@ -433,7 +451,7 @@ class Lattice:
     '''
     alpha_r = radians(alpha)
     beta_r = radians(beta)
-    gamma_r = radians(gamma)    
+    gamma_r = radians(gamma)
     val = (np.cos(alpha_r) * np.cos(beta_r) - np.cos(gamma_r)) \
       / (np.sin(alpha_r) * np.sin(beta_r))
     #Sometimes rounding errors result in values slightly > 1.
@@ -443,6 +461,17 @@ class Lattice:
     vector_b = [-b * np.sin(alpha_r) * np.cos(gamma_star), b * np.sin(alpha_r) * np.sin(gamma_star), b * np.cos(alpha_r)]
     vector_c = [0.0, 0.0, float(c)]
     return Lattice([vector_a, vector_b, vector_c], centering)
+    '''
+    # this is a transposed version of the cartesian-crystal matrix
+    val = (np.cos(gamma_r) - np.cos(alpha_r) * np.cos(beta_r)) \
+      / (np.sin(alpha_r) * np.sin(beta_r))
+    delta = np.arccos(val)
+    M = [[a * np.sin(beta_r), b * np.sin(alpha_r) * np.cos(delta), 0.0],
+         [0.0, b * np.sin(alpha_r) * np.sin(delta), 0.0],
+         [a * np.cos(beta_r), b * np.cos(alpha_r), float(c)]]
+    return Lattice(M)
+    # there is a third version in H. Poulsen's book p34. should check everything is consistent...
+    '''
 
   def volume(self):
     '''Compute the volume of the unit cell.'''
@@ -566,9 +595,12 @@ class HklDirection(HklObject):
     return '\n'.join(out)
     
   def direction(self):
-    '''Returns a normalized vector corresponding to this crystallographic direction.'''
+    '''Returns a normalized vector, expressed in the cartesian 
+    coordinate system, corresponding to this crystallographic direction.
+    '''
     (h, k, l) = self.miller_indices()
-    l_vect = np.array([h, k, l])
+    M = self._lattice.matrix.T # the columns of M are the a, b, c vector in the cartesian coordinate system
+    l_vect = M.dot(np.array([h, k, l]))
     return l_vect/np.linalg.norm(l_vect)
 
   def angle_with_direction(self, hkl):
@@ -609,54 +641,50 @@ class HklPlane(HklObject):
   This class define crystallographic planes using Miller indices.
   
   A plane can be create by speficying its Miller indices and the 
-  crystal lattice (default is cubic with lattice parameter of 1.0)
+  crystal lattice (default is cubic with lattice parameter of 1.0). 
+
   ::
 
     a = 0.405 # FCC Aluminium
     l = Lattice.cubic(a)
     p = HklPlane(1, 1, 1, lattice=l)
-    print p
-    print p.interplanar_spacing()
+    print(p)
+    print(p.scattering_vector())
+    print(p.interplanar_spacing())
 
-  .. warning::
+  .. note::
 
-     The calculations have not yet been thourouhly tested appart 
-     from cubic crystal lattice.
+    Miller indices are defined in terms of the inverse of the intercept 
+    of the plane on the three crystal axes a, b, and c.
   '''
 
-  def normal(self, verbose=False):
+  def normal(self):
     '''Returns the unit vector normal to the plane.
-
-    .. warning::
-
-       Right now the we do not make use of the repiprocal lattice to 
-       compute the plane... this should be corrected in the future.
-
-       Proof hkl plane hexagonal calculations
+    
+    We use of the repiprocal lattice to compute the normal to the plane
+    and return a normalised vector.
     '''
-    (alpha, beta, gamma) = self._lattice._angles
-    (h, k, l) = self.miller_indices()
-    isHexagonal = np.linalg.norm(np.array([alpha, beta, gamma]) - np.array([90.0, 90.0, 120.0])) < 0.001
-    (h, k, l) = self.miller_indices()
-    n = np.zeros(3)
-    a = self._lattice._matrix[0]
-    b = self._lattice._matrix[1]
-    c = self._lattice._matrix[2]
-    if verbose:
-      print 'computing hkl plane normal with indices',h,k,l
-      print 'lattice angles:', (alpha, beta, gamma)
-      print 'lattice vectors:', a, b, c
-    n = h*a + k*b + l*c
-    if isHexagonal:
-      n_hex = np.array([2*n[0] + n[1], n[0] + 2*n[1], n[2]])
-      print 'HCP plane', self.miller_indices(), 'is normal to', n_hex
-      n = n_hex
+    n = self.scattering_vector()
     return n/np.linalg.norm(n)
   
   def scattering_vector(self):
+    '''Calculate the scattering vector of this `HklPlane`.
+    
+    The scattering vector (or reciprocal lattice vector) is normal to 
+    this `HklPlane` and its length is equal to the inverse of the 
+    interplanar spacing. In the cartesian coordinate system of the 
+    crystal, it is given by:
+    
+    ..math
+    
+      G_c = h.a^* + k.b^* + l.c^*
+      
+    :return: a numpy vector expressed in the cartesian coordinate system 
+    of the crystal.
+    '''
     [astar, bstar, cstar] = self._lattice.reciprocal_lattice()
     (h, k, l) = self.miller_indices()
-    # express (h,k,l) in the cartesian crystal CS
+    # express (h, k, l) in the cartesian crystal CS
     Gc = h*astar + k*bstar + l*cstar
     return Gc
 
@@ -686,7 +714,7 @@ class HklPlane(HklObject):
     (a, b, c) = self._lattice._lengths
     (h, k, l) = self.miller_indices()
     (alpha, beta, gamma) = radians(self._lattice._angles)
-    #d = a / np.sqrt(h**2 + k**2 + l**2) # for cubic structure
+    #d = a / np.sqrt(h**2 + k**2 + l**2) # for cubic structure only
     d = self._lattice.volume() / np.sqrt(h**2*b**2*c**2*np.sin(alpha)**2 + \
       k**2*a**2*c**2*np.sin(beta)**2 + l**2*a**2*b**2*np.sin(gamma)**2 + \
       2*h*l*a*b**2*c*(np.cos(alpha)*np.cos(gamma) - np.cos(beta)) + \

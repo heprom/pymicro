@@ -2,14 +2,14 @@ import unittest
 import numpy as np
 import vtk
 from vtk.util import numpy_support
+from pymicro.crystal.lattice import Lattice
+from pymicro.crystal.microstructure import Orientation
+from pymicro.view.vtk_utils import lattice_grid, lattice_edges, apply_orientation_to_actor
 
 class VtkUtilsTests(unittest.TestCase):
 
   def setUp(self):
     print 'testing vtk_utils'
-    from pymicro.crystal.lattice import Lattice
-    from pymicro.crystal.microstructure import Orientation
-    from pymicro.view.vtk_utils import lattice_grid, lattice_edges, apply_orientation_to_actor
 
   def test_apply_orientation_to_actor(self):
     o = Orientation.from_rodrigues([0.0885, 0.3889, 0.3268])

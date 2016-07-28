@@ -6,12 +6,12 @@ from pymicro.crystal.texture import PoleFigure
 
 N = 500 # number of grains
 micro = Microstructure.random_texture(N)
-# look at misorientation between adjacent grains
+# look at misorientation between pair of grains
 misorientations = []
 for i in range(2, len(micro.grains)):
   o1 =  micro.get_grain(i-1).orientation
   o2 =  micro.get_grain(i).orientation
-  w = 180/np.pi*o1.misorientation_angle(o2)
+  w = 180/np.pi*o1.disorientation(o2)[0]
   misorientations.append(w)
 
 # plt misorientations histogram

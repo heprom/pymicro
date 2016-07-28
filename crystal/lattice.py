@@ -625,6 +625,7 @@ class HklDirection(HklObject):
     :returns list: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` 
     objects describing all the planes in zone with the direction.
     '''
+    (u, v, w) = self.miller_indices()
     indices = range(-max_miller, max_miller+1)
     hklplanes_in_zone = []
     for h in indices:
@@ -632,7 +633,7 @@ class HklDirection(HklObject):
         for l in indices:
           if h == k == l == 0: # skip (0, 0, 0)
             continue
-          if np.dot(np.array([h, k, l]), self.direction()) == 0:
+          if np.dot(np.array([h, k, l]), np.array([u, v, w])) == 0:
             hklplanes_in_zone.append(HklPlane(h, k, l, self._lattice))
     return(hklplanes_in_zone)
     

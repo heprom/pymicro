@@ -121,7 +121,7 @@ class Orientation:
   def misorientation_axis_from_delta(delta):
     '''Compute the misorientation axis from the misorientation matrix. 
     
-    :param delta: The misorientation 3x3 matrix.
+    :param delta: The 3x3 misorientation matrix.
     :returns: the misorientation axis (normalised vector).
     '''
     n = np.array([delta[1,2] - delta[2,1], delta[2,0] - delta[0,2], delta[0,1] - delta[1,0]])
@@ -137,41 +137,34 @@ class Orientation:
     '''
     delta = np.dot(self.orientation_matrix(), orientation.orientation_matrix().T)
     return Orientation.misorientation_axis_from_delta(delta)
-
-  def misorientation_angle(self, orientation, crystal_structure='cubic'):
-    '''Compute the misorientation angle (in radian) with another crystal 
-    orientation.
     
-    Considering all the possible crystal symmetries, this angle is 
-    defined as the minium angle of rotation about the misorientation 
-    axis to bring the two lattices into coincidence.
+  @staticmethod
+  def misorientation_angle_from_delta(delta):
+    '''Compute the misorientation angle from the misorientation matrix.
     
-    :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
-    :param str crystal_structure: a string describing the crystal structure, 'cubic' by default.
+    Compute the angle assocated with this misorientation matrix :math:`\\Delta g`. It is defined as :math:`\\omega = \\arccos(\\text{trace}(\\Delta g)/2-1)`.
+    
+    .. note::
+    
+      This does not account for the crystal symmetries. If you want to 
+      find the disorientation between two orientations, use the 
+      :py:meth:`~pymicro.crystal.microstructure.Orientation.disorientation` 
+      method.
+    
+    :param delta: The 3x3 misorientation matrix.
     :returns float: the misorientation angle in radians.
     '''
-    min_misorientation = np.pi
-    from pymicro.crystal.lattice import Lattice
-    symmetries = Lattice.symmetry(crystal_structure)
-    (gA, gB) = (self.orientation_matrix(), orientation.orientation_matrix()) # nicknames
-    for (g1, g2) in [(gA, gB), (gB, gA)]:
-      for j in range(symmetries.shape[0]): # 24 for cubic
-        sym_j = symmetries[j]
-        delta = np.dot(g2, np.dot(sym_j, g1).T) # from T. Rollet lecture's
-        #delta = np.dot(np.dot(sym_j, self.orientation_matrix()), np.dot(orientation.orientation_matrix().T, sym_i.T)) #TODO check this
-        ##delta = np.dot(np.dot(self.orientation_matrix(), sym_j), np.dot(sym_i.T, orientation.orientation_matrix().T))
-        cw = 0.5*(delta.trace() - 1)
-        mis = np.arccos(cw)
-        if mis < min_misorientation:
-          min_misorientation = mis
-    return min_misorientation
+    cw = 0.5*(delta.trace() - 1)
+    omega = np.arccos(cw)
+    return omega
 
   def disorientation(self, orientation, crystal_structure='cubic'):
     '''Compute the disorientation another crystal orientation.
     
     Considering all the possible crystal symmetries, the disorientation 
     is defined as the combination of the minimum misorientation angle 
-    and the misorientation axis lying in the fundamental zone. 
+    and the misorientation axis lying in the fundamental zone, which 
+    can be used to bring the two lattices into coincidence.
     
     :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
     :param str crystal_structure: a string describing the crystal structure, 'cubic' by default.
@@ -189,8 +182,7 @@ class Orientation:
           sym_i = symmetries[i]
           oi = np.dot(sym_i, g2)
           delta = np.dot(oi, oj.T)
-          cw = 0.5*(delta.trace() - 1)
-          mis_angle = np.arccos(cw)
+          mis_angle = Orientation.misorientation_angle_from_delta(delta)
           if mis_angle < the_angle:
             # now compute the misorientation axis, should check if it lies in the fundamental zone
             mis_axis = Orientation.misorientation_axis_from_delta(delta)

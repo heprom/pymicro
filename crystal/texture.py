@@ -440,13 +440,19 @@ class PoleFigure:
     ax.set_title('%s-axis inverse %s projection' % (self.axis, self.proj))
 
   @staticmethod
-  def plot(orientation, **kwargs):
-    '''Plot a pole figure (both direct and inverse) for a single orientation.
+  def plot(orientations, **kwargs):
+    '''Plot a pole figure (both direct and inverse) for a list of orientations.
 
-    :param orientation: the crystalline :py:class:`~pymicro.crystal.microstructure.Orientation` to plot.
+    :param orientations: the list of crystalline :py:class:`~pymicro.crystal.microstructure.Orientation` to plot.
     '''
     micro = Microstructure()
-    micro.grains.append(Grain(1, orientation))
+    if isinstance(orientations, list):
+      for i in range(len(orientations)):
+        micro.grains.append(Grain(i+1, orientations[i]))
+    elif isinstance(args, Orientation):
+      micro.grains.append(Grain(1, orientation))
+    else:
+        print('Unrecognized argument: %s' % orientations.__repr__)
     pf = PoleFigure(microstructure=micro, **kwargs)
     pf.plot_pole_figures(display=True)
 

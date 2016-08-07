@@ -353,7 +353,10 @@ def axes_actor(length = 1.0, axisLabels = ('x', 'y', 'z'), fontSize=20):
   A VTK assembly representing the cartesian axes.
   '''
   axes = vtk.vtkAxesActor()
-  axes.SetTotalLength(length, length, length)
+  if type(length) == float:
+    axes.SetTotalLength(length, length, length)
+  else:
+    axes.SetTotalLength(length)
   axes.SetShaftTypeToCylinder()
   axes.SetCylinderRadius(0.02)
   if axisLabels:
@@ -550,7 +553,7 @@ def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, labe
     return arrowActor
     
 
-def lattice_points(lattice, origin=[0., 0., 0.]):
+def lattice_points(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
   '''
   Create a vtk representation of a the lattice points.
 
@@ -558,95 +561,82 @@ def lattice_points(lattice, origin=[0., 0., 0.]):
   the points not on the lattice corners according to the system 
   centering (may be P, I, F for instance).
 
-  *Parameters*
-  
-  **lattice**: the `Lattice` instance from which to construct the points.
-  
-  **origin**: cartesian coordinates of the origin.
-  
-  *Returns*
-  
-  A vtkPoints with all the lattice points ordered such that the first 8 
-  points describe the lattice cell.
+  :param Lattice lattice: The Lattice instance from which to construct the points.
+  :param tuple origin: cartesian coordinates of the origin.
+  :param int m: the number of cells in the [100] direction (1 by default).
+  :param int n: the number of cells in the [010] direction (1 by default).
+  :param int p: the number of cells in the [001] direction (1 by default).
+  :return: A vtkPoints with all the lattice points ordered such that the first 8*(m*n*p) points describe the lattice cells.
   '''
-  print lattice
-  m = lattice._matrix
-  print m
-  [A, B, C] = m #lattice._matrix
+  [A, B, C] = lattice._matrix
   O = origin
-
-  # create the eight points based on the lattice matrix
   points = vtk.vtkPoints()
-  points.InsertNextPoint(O)
-  points.InsertNextPoint(O+A)
-  points.InsertNextPoint(O+A+B)
-  points.InsertNextPoint(O+B)
-  points.InsertNextPoint(O+C)
-  points.InsertNextPoint(O+C+A)
-  points.InsertNextPoint(O+C+A+B)
-  points.InsertNextPoint(O+C+B)
-  # use the point basis if it contain several atoms
-  if len(lattice._basis) > 1:
-    for point in lattice._basis[1:]:
-      points.InsertNextPoint(O + point[0]*A + point[1]*B + point[2]*C)
-  if lattice._centering == 'P':
-    pass # nothing to do
-  elif lattice._centering == 'I':
-    points.InsertNextPoint(O+0.5*C+0.5*A+0.5*B)
-  elif lattice._centering == 'A':
-    points.InsertNextPoint(O+0.5*B+0.5*C)
-    points.InsertNextPoint(O+0.5*B+0.5*C+A)
-  elif lattice._centering == 'B':
-    points.InsertNextPoint(O+0.5*C+0.5*A)
-    points.InsertNextPoint(O+0.5*C+0.5*A+B)
-  elif lattice._centering == 'C':
-    points.InsertNextPoint(O+0.5*A+0.5*B)
-    points.InsertNextPoint(O+0.5*A+0.5*B+C)
-  elif lattice._centering == 'F':
-    points.InsertNextPoint(O+0.5*A+0.5*B)
-    points.InsertNextPoint(O+0.5*A+0.5*B+C)
-    points.InsertNextPoint(O+0.5*B+0.5*C)
-    points.InsertNextPoint(O+0.5*B+0.5*C+A)
-    points.InsertNextPoint(O+0.5*C+0.5*A)
-    points.InsertNextPoint(O+0.5*C+0.5*A+B)
+  # create all the points based on the lattice matrix
+  for k in range(p+1):
+    for j in range(n+1):
+      for i in range(m+1):
+        points.InsertNextPoint(O + i*A + j*B + k*C)
+  # now add extra points to represent the lattice centering
+  for k in range(p):
+    for j in range(n):
+      for i in range(m):
+        O = origin + i*A + j*B + k*C
+        if lattice._centering == 'P':
+          pass # nothing to do
+        elif lattice._centering == 'I':
+          points.InsertNextPoint(O + 0.5*A + 0.5*B + 0.5*C)
+        elif lattice._centering == 'A':
+          points.InsertNextPoint(O + 0.5*B + 0.5*C)
+          points.InsertNextPoint(O + A + 0.5*B + 0.5*C)
+        elif lattice._centering == 'B':
+          points.InsertNextPoint(O + 0.5*A + 0.5*C)
+          points.InsertNextPoint(O + 0.5*A + B + 0.5*C)
+        elif lattice._centering == 'C':
+          points.InsertNextPoint(O + 0.5*A + 0.5*B)
+          points.InsertNextPoint(O + 0.5*A + 0.5*B + C)
+        elif lattice._centering == 'F':
+          points.InsertNextPoint(O + 0.5*A + 0.5*B)
+          points.InsertNextPoint(O + 0.5*A + 0.5*B + C)
+          points.InsertNextPoint(O + 0.5*B + 0.5*C)
+          points.InsertNextPoint(O + 0.5*B + 0.5*C + A)
+          points.InsertNextPoint(O + 0.5*C + 0.5*A)
+          points.InsertNextPoint(O + 0.5*C + 0.5*A + B)
   return points
   
-def lattice_grid(lattice, origin=[0., 0., 0.]):
+def lattice_grid(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
   '''
   Create a mesh representation of a crystal lattice.
 
-  A vtkUnstructuredGrid instance is used with one hexaedron element
-  corresponding to the lattice system.
+  A vtkUnstructuredGrid instance is used with a hexaedron element
+  corresponding to the lattice system. Any number of cells can be 
+  displayed (just one by default).
 
-  *Parameters*
-  
-  **lattice**: the `Lattice` instance from which to construct the grid.
-  
-  **origin**: cartesian coordinates of the origin.
-  
-  *Returns*
-  
-  A vtkUnstructuredGrid with one hexaedron cell representing the crystal 
-  lattice.
+  :param Lattice lattice: The Lattice instance from which to construct the grid.
+  :param tuple origin: cartesian coordinates of the origin.
+  :param int m: the number of cells in the [100] direction (1 by default).
+  :param int n: the number of cells in the [010] direction (1 by default).
+  :param int p: the number of cells in the [001] direction (1 by default).
+  :return: A vtkUnstructuredGrid with (m x n x p) hexaedron cell representing the crystal lattice.
   '''
-  points = lattice_points(lattice, origin=[0., 0., 0.])
-
-  # ids list
-  Ids = vtk.vtkIdList()
-  Ids.InsertNextId(0)
-  Ids.InsertNextId(1)
-  Ids.InsertNextId(2)
-  Ids.InsertNextId(3)
-  Ids.InsertNextId(4)
-  Ids.InsertNextId(5)
-  Ids.InsertNextId(6)
-  Ids.InsertNextId(7)
-
-  # build the unstructured grid with one cell
+  points = lattice_points(lattice, origin, m, n, p)
+  # build the unstructured grid with m x n x p cells
   grid = vtk.vtkUnstructuredGrid()
-  grid.Allocate(1, 1)
-  grid.InsertNextCell(12, Ids) # 12 is hexaedron cell type
   grid.SetPoints(points)
+  grid.Allocate(p*n*m, 1)
+  for k in range(p):
+    for j in range(n):
+      for i in range(m):
+        # ids list
+        Ids = vtk.vtkIdList()
+        Ids.InsertNextId(i + j*(m+1) + k*(m+1)*(n+1))
+        Ids.InsertNextId(i+1 + j*(m+1) + k*(m+1)*(n+1))
+        Ids.InsertNextId(i+1 + (j+1)*(m+1) + k*(m+1)*(n+1))
+        Ids.InsertNextId(i + (j+1)*(m+1) + k*(m+1)*(n+1))
+        Ids.InsertNextId(i + j*(m+1) + (k+1)*(m+1)*(n+1))
+        Ids.InsertNextId(i+1 + j*(m+1) + (k+1)*(m+1)*(n+1))
+        Ids.InsertNextId(i+1 + (j+1)*(m+1) + (k+1)*(m+1)*(n+1))
+        Ids.InsertNextId(i + (j+1)*(m+1) + (k+1)*(m+1)*(n+1))
+        grid.InsertNextCell(vtk.VTK_HEXAHEDRON, Ids)
   return grid
 
 def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
@@ -762,8 +752,105 @@ def lattice_vertices(grid, sphereRadius=0.1, sphereColor=blue):
   Vertices.SetMapper(SphereMapper)
   Vertices.GetProperty().SetDiffuseColor(sphereColor)
   return Vertices
+
+def crystal_vertices(crystal, origin=(0., 0., 0.), m=1, n=1, p=1, hide_outside=True):
+  '''
+  Create the 3D representation of the atoms in a given crystal, taking 
+  into account the crystal lattice and the basis which can be composed 
+  of any motif.
+
+  :param tuple origin: cartesian coordinates of the origin.
+  :param int m: the number of cells in the [100] direction (1 by default).
+  :param int n: the number of cells in the [010] direction (1 by default).
+  :param int p: the number of cells in the [001] direction (1 by default).
+  :param bool hide_outside: do not displays atoms outside the displayed unit cells if True.
+  :return: The method return a vtk actor with all the crystal atoms.
+  '''
+  data = vtk.vtkPolyData()
+  # sphere glyph for one atom
+  Sphere = vtk.vtkSphereSource()
+  Sphere.SetPhiResolution(20)
+  Sphere.SetThetaResolution(20)
+  points = lattice_points(crystal._lattice, origin, m, n, p)
+  # setup a vtkGlyph3D instance
+  Vertices = vtk.vtkGlyph3D()
+  Vertices.SetScaleModeToScaleByScalar()
+  Vertices.SetScaleFactor(1.0)
+  if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+    Vertices.SetInputData(data)
+  else:
+    Vertices.SetInput(data)
+  Vertices.SetSourceConnection(Sphere.GetOutputPort())
+  Vertices.SetColorModeToColorByScalar()
+  # Create a mapper and actor to display the glyphs.
+  SphereMapper = vtk.vtkPolyDataMapper()
+  SphereMapper.SetInputConnection(Vertices.GetOutputPort())
+  SphereMapper.ScalarVisibilityOn()
+
+  atom_points = vtk.vtkPoints()
+  color_scalars = vtk.vtkFloatArray()
+  color_scalars.SetName('color')
+  radius_scalars = vtk.vtkFloatArray()
+  radius_scalars.SetName('radius')
+  radius = 0.1 * min(crystal._lattice._lengths) # default for atoms
+  bounds = np.array([m, n, p]) * crystal._lattice._lengths
+  for pid in range(points.GetNumberOfPoints()):
+    point = points.GetPoint(pid)
+    for l in range(len(crystal._basis)):
+      basis_position = crystal._basis[l] * crystal._lattice._lengths
+      print(point)
+      position = np.array(point) + np.array(basis_position)
+      # if needed skip things outside
+      eps = 1e-6
+      if hide_outside and (position[0] - origin[0] > bounds[0] + eps or position[1] - origin[1] > bounds[1] + eps or position[2] - origin[2] > bounds[2] + eps):
+        continue
+      atom_points.InsertNextPoint(position)
+      color_scalars.InsertNextValue(float(l))
+      radius_scalars.InsertNextValue(crystal._sizes[l] * min(crystal._lattice._lengths))
+  data.SetPoints(atom_points)
+  # perpare a scalar array with the two components: radius and color
+  scalar_data = vtk.vtkFloatArray()
+  scalar_data.SetNumberOfComponents(2)
+  scalar_data.SetNumberOfTuples(color_scalars.GetNumberOfTuples())
+  scalar_data.CopyComponent(0, radius_scalars, 0)
+  scalar_data.CopyComponent(1, color_scalars, 0)
+  scalar_data.SetName('scalar_data')
+  data.GetPointData().AddArray(scalar_data)
+  data.GetPointData().SetActiveScalars('scalar_data')
+
+  # make the corresponding lut
+  lut = vtk.vtkLookupTable()
+  N = len(crystal._basis)
+  lut.SetNumberOfTableValues(N)
+  lut.Build()
+  for i in range(N):
+    color = crystal._colors[i]
+    lut.SetTableValue(i, color[0], color[1], color[2])
+  lut.SetRange(0, N-1)
+  SphereMapper.SetLookupTable(lut)
+  SphereMapper.ColorByArrayComponent('scalar_data', 1)
+  atoms = vtk.vtkActor()
+  atoms.SetMapper(SphereMapper)
+  return atoms
+
+def crystal_3d(crystal, origin=(0., 0., 0.), m=1, n=1, p=1, \
+  sphereRadius=0.1, tubeRadius=0.02, sphereColor=blue, tubeColor=grey, hide_outside=True):
+
+  assembly = vtk.vtkAssembly()
+  print crystal
+  grid = lattice_grid(crystal._lattice, origin, m, n, p)
+  (a, b, c) = crystal._lattice._lengths
+  edges = lattice_edges(grid, tubeRadius=tubeRadius*a, tubeColor=tubeColor)
+  vertices = crystal_vertices(crystal, origin, m, n, p, hide_outside)
+  assembly.AddPart(edges)
+  assembly.AddPart(vertices)
+  assembly.SetOrigin(origin)#m*a/2, n*b/2, p*c/2)
+  assembly.AddPosition(-np.array(origin))#-m*a/2, -n*b/2, -p*c/2)
+  return assembly
   
-def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02, sphereColor=blue, tubeColor=grey, crystal_orientation=None, show_atoms=True, show_edges=True):
+def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
+  sphereRadius=0.05, tubeRadius=0.02, sphereColor=black, tubeColor=grey, \
+  crystal_orientation=None, show_atoms=True, show_edges=True):
   '''
   Create the 3D representation of a crystal lattice.
 
@@ -789,25 +876,29 @@ def lattice_3d(lattice, sphereRadius=0.1, tubeRadius=0.02, sphereColor=blue, tub
       A 3D view of a cubic lattice.
 
   :param Lattice lattice: The Lattice instance representing the crystal lattice.
-  :param float sphereRadius: Size of the spheres representing the atoms (default: 0.1).
+  :param tuple origin: cartesian coordinates of the origin.
+  :param int m: the number of cells in the [100] direction (1 by default).
+  :param int n: the number of cells in the [010] direction (1 by default).
+  :param int p: the number of cells in the [001] direction (1 by default).
+  :param float sphereRadius: Size of the spheres representing the atoms (default: 0.05).
   :param float tubeRadius: Radius of the tubes representing the atomic bonds (default: 0.02).
-  :param tuple sphereColor: Color of the spheres representing the atoms (default: blue).
+  :param tuple sphereColor: Color of the spheres representing the atoms (default: black).
   :param tuple tubeColor: Color of the tubes representing the atomis bonds (default: grey).
   :param crystal_orientation: The crystal :py:class:`~pymicro.crystal.microstructure.Orientation` with respect to the sample coordinate system (default: None).
   :param bool show_atoms: Control if the atoms are shown (default: True).
   :param bool show_edges: Control if the eges of the lattice are shown (default: True).
   :return: The method return a vtk assembly combining lattice edges and vertices.
   '''
-  grid = lattice_grid(lattice)
+  grid = lattice_grid(lattice, origin, m, n, p)
   (a, b, c) = lattice._lengths
-  edges = lattice_edges(grid, tubeRadius=tubeRadius*a, tubeColor=tubeColor)
-  vertices = lattice_vertices(grid, sphereRadius=sphereRadius*a, sphereColor=sphereColor)
+  edges = lattice_edges(grid, tubeRadius=tubeRadius*min(lattice._lengths), tubeColor=tubeColor)
+  vertices = lattice_vertices(grid, sphereRadius=sphereRadius*min(lattice._lengths), sphereColor=sphereColor)
   assembly = vtk.vtkAssembly()
   if show_edges: assembly.AddPart(edges)
   if show_atoms: assembly.AddPart(vertices)
   # finally, apply crystal orientation to the lattice
-  assembly.SetOrigin(a/2, b/2, c/2)
-  assembly.AddPosition(-a/2, -b/2, -c/2)
+  assembly.SetOrigin(origin)#m*a/2, n*b/2, p*c/2)
+  assembly.AddPosition(-np.array(origin))#-m*a/2, -n*b/2, -p*c/2)
   if crystal_orientation != None:
     apply_orientation_to_actor(assembly, crystal_orientation)
   return assembly

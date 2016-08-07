@@ -828,7 +828,7 @@ class Grain:
   def __init__(self, grain_id, grain_orientation):
     self.id = grain_id
     self.orientation = grain_orientation
-    self.position = (0, 0, 0)
+    self.position = np.array([0., 0., 0.])
     self.volume = 0 # warning not implemented
     self.vtkmesh = None
 
@@ -836,7 +836,7 @@ class Grain:
     '''Provide a string representation of the class.'''
     s = '%s\n * id = %d\n' % (self.__class__.__name__, self.id)
     s += ' * %s\n' % (self.orientation)
-    s += ' * position (%f, %f, %f)\n' % (self.position)
+    s += ' * position %s\n' % np.array_str(self.position)
     s += ' * has vtk mesh ? %s\n' % (self.vtkmesh != None)
     return s
   

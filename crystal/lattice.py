@@ -8,9 +8,46 @@ import numpy as np
 from numpy import pi, dot, transpose, radians
 from matplotlib import pyplot as plt
 
+class Crystal:
+  '''
+  The Crystal class to create any particular crystal structure.
+  
+  A crystal instance is composed by:
+  
+   * one of the 14 Bravais lattice
+   * a point basis (or motif)
+  '''
+
+  def __init__(self, lattice, basis=None, basis_labels=None, basis_sizes=None, basis_colors=None):
+    '''
+    Create a Crystal instance with the given lattice and basis.
+    
+    This create a new instance of a Crystal object. The given lattice 
+    is assigned to the crystal. If the basis is not specified, it will 
+    be one atom at (0., 0., 0.).
+
+    :param lattice: the :py:class:`~pymicro.crystal.lattice.Lattice` instance of the crystal.
+    :param list basis: A list of tuples containing the position of the atoms in the motif.
+    :param list basis_labels: A list of strings containing the description of the atoms in the motif.
+    :param list basis_labels: A list of float between 0. and 1. (default 0.1) to sale the atoms in the motif.
+    :param list basis_colors: A list of vtk colors of the atoms in the motif.
+    '''
+    self._lattice = lattice
+    if basis == None:
+      # default to one atom at (0, 0, 0)
+      self._basis = [(0., 0., 0.)]
+      self._labels = ['?']
+      self._sizes = [0.1]
+      self._colors = [(0., 0., 1.)]
+    else:
+      self._basis = basis
+      self._labels = basis_labels
+      self._sizes = basis_sizes
+      self._colors = basis_colors
+
 class Lattice:
   '''
-  Crystal lattice class.
+  The Lattice class to create one of the 14 Bravais lattices.
 
   This particular class has been partly inspired from the pymatgen 
   project at https://github.com/materialsproject/pymatgen
@@ -35,14 +72,14 @@ class Lattice:
     print(l.volume())
 
   Addditionnally the point-basis can be controlled to address non 
-  Bravais lattice cells. It is set to a single atoms at (0,0,0) by 
+  Bravais lattice cells. It is set to a single atoms at (0, 0, 0) by 
   default so that each cell is a Bravais lattice but may be changed to 
   something more complex to achieve HCP structure or Diamond structure 
   for instance.
   '''
   
   def __init__(self, matrix, centering='P'):
-    '''Create a crystal lattice (unit cel).
+    '''Create a crystal lattice (unit cell).
     
     Create a lattice from a 3x3 matrix.
     Each row in the matrix represents one lattice vector.
@@ -59,7 +96,6 @@ class Lattice:
     self._lengths = lengths
     self._matrix = m
     self._centering = centering
-    self._basis = [(0.,0.,0.)]
   
   def __repr__(self):
     f = lambda x: "%0.1f" % x

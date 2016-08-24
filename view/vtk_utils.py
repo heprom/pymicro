@@ -353,7 +353,7 @@ def axes_actor(length = 1.0, axisLabels = ('x', 'y', 'z'), fontSize=20):
   A VTK assembly representing the cartesian axes.
   '''
   axes = vtk.vtkAxesActor()
-  if type(length) == float:
+  if type(length) == float or type(length) == int:
     axes.SetTotalLength(length, length, length)
   else:
     axes.SetTotalLength(length)

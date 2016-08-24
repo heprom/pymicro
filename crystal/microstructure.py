@@ -90,6 +90,35 @@ class Orientation:
     corresponds to euler angle (45,0,0).'''
     return Orientation.from_euler((45., 0., 0.))
 
+  def get_ipf_colour(self, axis=np.array([0., 0., 1.])):
+    '''Compute the IPF (inverse pole figure) colour for this orientation.
+    
+    Given a particular axis expressed in the laboratory coordinate system, 
+    one can compute the so called IPF colour based on that direction 
+    expressed in the crystal coordinate system as :math:`[x_c,y_c,z_c]`.
+    There is only one tuple (u,v,w) such that:
+
+    .. math::
+
+      [x_c,y_c,z_c]=u.[0,0,1]+v.[0,1,1]+w.[1,1,1]
+      
+    and it is used to assign the RGB colour.
+    '''
+    axis /= np.linalg.norm(axis)
+    from pymicro.crystal.lattice import Lattice
+    for sym in Lattice.symmetry(crystal_structure='cubic'):
+      #Vc = PoleFigure.sst_symmetry_cubic(np.dot(self.orientation_matrix(), axis))
+      Osym = np.dot(sym, self.orientation_matrix())
+      Vc = np.dot(Osym, axis)
+      if Vc[2] < 0:
+        Vc *= -1.
+      uvw = np.array([Vc[2] - Vc[1], Vc[1] - Vc[0], Vc[0]])
+      uvw /= np.linalg.norm(uvw)
+      if (uvw[0] >= 0. and uvw[0] <= 1.0) and (uvw[1] >= 0. and uvw[1] <= 1.0) and (uvw[2] >= 0. and uvw[2] <= 1.0):
+        print('found sym for sst')
+        break
+    return uvw
+
   @staticmethod
   def misorientation_MacKenzie(psi):
     '''Return the fraction of the misorientations corresponding to the 
@@ -658,6 +687,8 @@ class Orientation:
     :returns dict: a dictionary with the line number and the corresponding orientation.
     '''
     data = np.genfromtxt(txt_path)
+    print(data.shape)
+    print(data[0])
     size = len(data)
     orientations = []
     for i in range(size):
@@ -1137,7 +1168,10 @@ class Microstructure:
       print 'writting ' + vtk_file_name
       writer = vtk.vtkXMLMultiBlockDataWriter()
       writer.SetFileName(vtk_file_name)
-      writer.SetInput(self.vtkmesh)
+      if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+        writer.SetInputData(self.vtkmesh)
+      else:
+        writer.SetInput(self.vtkmesh)
       writer.Write()    
 
   def dct_projection(self, data, lattice, omega, dif_grains, lambda_keV, d, ps, det_npx=np.array([2048, 2048]), ds=1, display=False, verbose=False):

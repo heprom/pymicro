@@ -569,7 +569,14 @@ class SlipSystem:
       only working for 111 and 112 planes...
     '''
     slip_systems = []
-    if plane_type == '111':
+    if plane_type == '001':
+      slip_systems.append(SlipSystem(HklPlane(0, 0, 1), HklDirection(-1, 1, 0))) # E5
+      slip_systems.append(SlipSystem(HklPlane(0, 0, 1), HklDirection(1, 1, 0))) # E6
+      slip_systems.append(SlipSystem(HklPlane(1, 0, 0), HklDirection(0, 1, 1))) # F1
+      slip_systems.append(SlipSystem(HklPlane(1, 0, 0), HklDirection(0, -1, 1))) # F2
+      slip_systems.append(SlipSystem(HklPlane(0, 1, 0), HklDirection(-1, 0, 1))) # G4
+      slip_systems.append(SlipSystem(HklPlane(0, 1, 0), HklDirection(1, 0, 1))) # G3
+    elif plane_type == '111':
       slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(-1, 0, 1))) # Bd
       slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(0, -1, 1))) # Ba
       slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(-1, 1, 0))) # Bc
@@ -596,7 +603,7 @@ class SlipSystem:
       slip_systems.append(SlipSystem(HklPlane(2, -1, 1), HklDirection(1, 1, -1)))
       slip_systems.append(SlipSystem(HklPlane(2, 1, -1), HklDirection(1, -1, 1)))
     else:
-      print 'warning only 111 or 112 slip planes supported for the moment!'
+      print 'warning only 001, 111 or 112 slip planes supported for the moment!'
     return slip_systems
 
 class HklObject:

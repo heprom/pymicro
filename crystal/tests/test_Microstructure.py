@@ -95,5 +95,20 @@ class OrientationTests(unittest.TestCase):
     self.assertAlmostEqual(180/np.pi*ut, 2.236, 3)
     self.assertAlmostEqual(180/np.pi*lt, -16.615, 3)    
 
+  def test_IPF_color(self):
+    o1 = Orientation.cube() # 001 // Z
+    o2 = Orientation.from_euler([35.264, 45., 0.]) # 011 // Z
+    o3 = Orientation.from_euler([0., 54.736, 45.]) # 111 // Z
+    orientations = [o1, o2, o3]
+    targets = [np.array([1., 0., 0.]), np.array([0., 1., 0.]), np.array([0., 0., 1.])]
+    for case in range(2):
+      o = orientations[case]
+      print(o)
+      target = targets[case]
+      col = o.get_ipf_colour()
+      print(col)
+      for i in range(3):
+        self.assertAlmostEqual(col[i], target[i])
+
 if __name__ == '__main__':
   unittest.main()

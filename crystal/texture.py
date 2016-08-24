@@ -449,8 +449,8 @@ class PoleFigure:
     if isinstance(orientations, list):
       for i in range(len(orientations)):
         micro.grains.append(Grain(i+1, orientations[i]))
-    elif isinstance(args, Orientation):
-      micro.grains.append(Grain(1, orientation))
+    elif isinstance(orientations, Orientation):
+      micro.grains.append(Grain(1, orientations))
     else:
         print('Unrecognized argument: %s' % orientations.__repr__)
     pf = PoleFigure(microstructure=micro, **kwargs)

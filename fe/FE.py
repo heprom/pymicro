@@ -182,7 +182,7 @@ class FE_Mesh():
     out += 'nb of nodes = %d\n' % self.get_number_of_nodes()
     out += 'nb of elements = %d\n' % self.get_number_of_elements()
     out += 'list of elsets:' + self._elset_names.__repr__()
-    if len(sel._lisets) > 0:
+    if len(self._lisets) > 0:
       out += 'list of lisets:' + self._liset_names.__repr__()
     return out
 

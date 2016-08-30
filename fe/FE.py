@@ -277,8 +277,8 @@ class FE_Mesh():
         el_node_nb = 20
       else:
       '''
-      el_node_nb = int(el_type[3:].split('_')[0])
-      if (el_type not in ['c2d3', 's3d3', 'c3d4', 'c3d6', 'c3d20', 'c3d15', 'c3d13', 'c3d10', 'c3d10_4', 'c3d8', 'c2d4', 'c2d8', 'c2d8r']):
+      el_node_nb = int(el_type[3:].split('_')[0].split('r')[0])
+      if (el_type not in ['c2d3', 's3d3', 'c3d4', 'c3d6', 'c3d20', 'c3d20r', 'c3d15', 'c3d13', 'c3d10', 'c3d10_4', 'c3d8', 'c2d4', 'c2d8', 'c2d8r']):
         print 'error, element type %s is not supported yet' % el_type
         continue
       element = FE_Element(el_id, el_type)

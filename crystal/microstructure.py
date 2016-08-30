@@ -103,15 +103,21 @@ class Orientation:
       [x_c,y_c,z_c]=u.[0,0,1]+v.[0,1,1]+w.[1,1,1]
       
     and it is used to assign the RGB colour.
+
+    .. warning::
+
+       hard coded for the cubic crysta symmetry for now on, it should 
+       be rather straightforward to generalize this to any symmetry 
+       making use of the Lattice.symmetry() method.
     '''
     axis /= np.linalg.norm(axis)
     from pymicro.crystal.lattice import Lattice
+    # find the axis lying in the fundamental zone
     for sym in Lattice.symmetry(crystal_structure='cubic'):
-      #Vc = PoleFigure.sst_symmetry_cubic(np.dot(self.orientation_matrix(), axis))
       Osym = np.dot(sym, self.orientation_matrix())
       Vc = np.dot(Osym, axis)
       if Vc[2] < 0:
-        Vc *= -1.
+        Vc *= -1. # using the upward direction
       uvw = np.array([Vc[2] - Vc[1], Vc[1] - Vc[0], Vc[0]])
       uvw /= np.linalg.norm(uvw)
       if (uvw[0] >= 0. and uvw[0] <= 1.0) and (uvw[1] >= 0. and uvw[1] <= 1.0) and (uvw[2] >= 0. and uvw[2] <= 1.0):

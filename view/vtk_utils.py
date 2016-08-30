@@ -981,12 +981,14 @@ def apply_orientation_to_actor(actor, orientation):
   '''
   actor.SetUserTransform(transform)
 
-def load_STL_actor(name, ext='STL', verbose=False):
+def load_STL_actor(name, ext='STL', verbose=False, color=grey, feature_edges=False):
   '''Read a STL file and return the corresponding vtk actor.
 
   :param str name: the base name of the file to read.
   :param str ext: extension of the file to read.
   :param bool verbose: verbose mode.
+  :param tuple color: the color to use for the actor.
+  :param bool feature_edges: show boundary edges (default False).
   :return: the 3d solid in the form of a vtk actor.
   '''
   if verbose: print 'adding part: %s' % name
@@ -997,7 +999,23 @@ def load_STL_actor(name, ext='STL', verbose=False):
   partMapper.SetInputConnection(part.GetOutputPort())
   partActor = vtk.vtkActor()
   partActor.SetMapper(partMapper)
-  return partActor
+  partActor.GetProperty().SetColor(color)
+  if feature_edges:
+    extract = vtk.vtkFeatureEdges()
+    extract.SetInputConnection(part.GetOutputPort())
+    edge_mapper = vtk.vtkPolyDataMapper()
+    edge_mapper.SetInputConnection(extract.GetOutputPort())
+    edge_mapper.SetScalarVisibility(0)
+    edge_actor = vtk.vtkActor()
+    edge_actor.SetMapper(edge_mapper)
+    edge_actor.GetProperty().SetColor(0, 0, 0)
+    edge_actor.GetProperty().SetLineWidth(3.0)
+    stl_part = vtk.vtkAssembly()
+    stl_part.AddPart(partActor)
+    stl_part.AddPart(edge_actor)
+    return stl_part
+  else:
+    return partActor
   
 def read_image_data(file_name, size, header_size=0, data_type='uint8', verbose=False):
   '''
@@ -1392,7 +1410,7 @@ def map_data(data, function, lut = gray_cmap(), cell_data=True):
   
 def set_opacity(assembly, opacity):
   collection = vtk.vtkPropCollection()
-  assembly.GetActors(collection);
+  assembly.GetActors(collection)
   for i in range(collection.GetNumberOfItems()):
     collection.GetItemAsObject(i).GetProperty().SetOpacity(opacity)
 
@@ -1513,7 +1531,7 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
     iren.Initialize()
     iren.Start()
 
-def show_array(data, map_scalars=False, lut=None):
+def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
   '''Create a 3d actor representing a numpy array.
   
   Given a 3d array, this function compute the skin of the volume. 
@@ -1527,9 +1545,10 @@ def show_array(data, map_scalars=False, lut=None):
   '''
   if type(data) == np.ndarray:
     grid = numpy_array_to_vtk_grid(data, cell_data=True)
-    visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
-    grid.SetCellVisibilityArray(visible)
-    #grid.SetPointVisibilityArray(visible)
+    if hide_zero_values:
+      visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
+      grid.SetCellVisibilityArray(visible)
+      #grid.SetPointVisibilityArray(visible)
     size = data.shape
   else:
     grid = data

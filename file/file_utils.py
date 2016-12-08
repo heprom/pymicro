@@ -44,9 +44,9 @@ def edf_info(file_name, header_size=None):
     h = np.fromstring(f.read(512))
     header_values = unpack_header(h)
     total_file_size = os.path.getsize(file_name)
-    payload_size = int(header_values['Size'])
+    payload_size = int(header_values['Size'].split('.')[0])
     header_size = total_file_size - payload_size
-    print 'determined header size is:', header_size
+    print('determined header size is %d bytes' % header_size)
     f.seek(0)
   h = np.fromstring(f.read(header_size))
   f.close()
@@ -76,9 +76,9 @@ def edf_read(file_name):
   header_values = edf_info(file_name)
   f = open(file_name, 'r')
   data_type = esrf_to_numpy_datatype(header_values['DataType'])
-  print header_values['DataType'], data_type
+  print(header_values['DataType'], data_type)
   # get the payload size
-  payload_size = int(header_values['Size'])
+  payload_size = int(header_values['Size'].split('.')[0])
   # get the image size from the ascii header
   dim_1 = int(header_values['Dim_1'].split('.')[0])
   try:

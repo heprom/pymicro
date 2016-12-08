@@ -99,13 +99,14 @@ def invert_cmap(ref_lut):
 
   A reverse vtkLookupTable.
   '''
-  N = ref_let.GetNumberOfTableValues()
+  N = ref_lut.GetNumberOfTableValues()
   lut = vtk.vtkLookupTable()
   lut.SetNumberOfTableValues(N)
   lut.Build()
   for i in range(N):
     lut.SetTableValue(i, ref_lut.GetTableValue(N-i))
   lut.SetRange(ref_lut.GetTableRange())
+  return lut
 
 def hsv_cmap(N = 64, table_range=(0, 255)):
   '''Create a VTK look up table similar to matlab's hsv.
@@ -353,7 +354,7 @@ def axes_actor(length = 1.0, axisLabels = ('x', 'y', 'z'), fontSize=20):
   A VTK assembly representing the cartesian axes.
   '''
   axes = vtk.vtkAxesActor()
-  if type(length) == float or type(length) == int:
+  if type(length) == float or type(length) == int or type(length) == np.int64:
     axes.SetTotalLength(length, length, length)
   else:
     axes.SetTotalLength(length)
@@ -375,7 +376,7 @@ def axes_actor(length = 1.0, axisLabels = ('x', 'y', 'z'), fontSize=20):
   return axes
 
 def grain_3d(grain, hklplanes=None, show_normal=False, \
-  plane_opacity=1.0, show_orientation=False):
+  plane_opacity=1.0, show_orientation=False, N=2048):
   '''Creates a 3d representation of a crystallographic grain.
   
   This method creates a vtkActor object of the surface mesh 
@@ -387,6 +388,7 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
   :params bool show_normal: show also the normal to the hkl planes if True.
   :params float plane_opacity: set the opacity of the grain actor.
   :params bool show_orientation: show also the grain orientation with a vtkAxesActor placed at the grain center if True.
+  :params int N: the number of colors to use in the colormap.
   :returns: a vtkAssembly of the grain mesh and the optional hkl planes.
   '''
   assembly = vtk.vtkAssembly()
@@ -397,7 +399,7 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
   else:
     mapper.SetInput(grain.vtkmesh)
   mapper.ScalarVisibilityOff() # we use the grain id for chosing the color
-  lut = rand_cmap(N=2048, first_is_black = True, table_range=(0,2047))
+  lut = rand_cmap(N, first_is_black = True, table_range=(0, N-1))
   grain_actor = vtk.vtkActor()
   print grain.id
   print(lut.GetTableValue(grain.id)[0:3])
@@ -736,8 +738,8 @@ def lattice_vertices(grid, sphereRadius=0.1, sphereColor=blue):
   # Create a sphere to use as a glyph source for vtkGlyph3D.
   Sphere = vtk.vtkSphereSource()
   Sphere.SetRadius(sphereRadius)
-  Sphere.SetPhiResolution(20)
-  Sphere.SetThetaResolution(20)
+  Sphere.SetPhiResolution(40)
+  Sphere.SetThetaResolution(40)
   Vertices = vtk.vtkGlyph3D()
   if vtk.vtkVersion().GetVTKMajorVersion() > 5:
     Vertices.SetInputData(grid)
@@ -850,7 +852,7 @@ def crystal_3d(crystal, origin=(0., 0., 0.), m=1, n=1, p=1, \
   
 def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
   sphereRadius=0.05, tubeRadius=0.02, sphereColor=black, tubeColor=grey, \
-  crystal_orientation=None, show_atoms=True, show_edges=True):
+  crystal_orientation=None, show_atoms=True, show_edges=True, cell_clip=False):
   '''
   Create the 3D representation of a crystal lattice.
 
@@ -858,6 +860,11 @@ def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
   displayed using spheres. Both tube and sphere radius can be controlled.
   Crystal orientation can also be provided which rotates the whole 
   assembly appropriately.
+  
+  The origin of the actor can be t=either specified directly using a 
+  tuple or set using a string as follow:
+  
+   * mid the middle of the lattice cell(s)
 
   .. code-block:: python
 
@@ -876,7 +883,7 @@ def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
       A 3D view of a cubic lattice.
 
   :param Lattice lattice: The Lattice instance representing the crystal lattice.
-  :param tuple origin: cartesian coordinates of the origin.
+  :param tuple or string origin: cartesian coordinates of the origin.
   :param int m: the number of cells in the [100] direction (1 by default).
   :param int n: the number of cells in the [010] direction (1 by default).
   :param int p: the number of cells in the [001] direction (1 by default).
@@ -887,18 +894,47 @@ def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
   :param crystal_orientation: The crystal :py:class:`~pymicro.crystal.microstructure.Orientation` with respect to the sample coordinate system (default: None).
   :param bool show_atoms: Control if the atoms are shown (default: True).
   :param bool show_edges: Control if the eges of the lattice are shown (default: True).
+  :param bool cell_clip: Clip the lattice points glyphs by the cell (default: False).
   :return: The method return a vtk assembly combining lattice edges and vertices.
   '''
-  grid = lattice_grid(lattice, origin, m, n, p)
   (a, b, c) = lattice._lengths
+  if origin == 'mid':
+    origin = (m*a/2, n*b/2, p*c/2)
+  grid = lattice_grid(lattice, (0., 0., 0.), m, n, p) # we use the actor origin
   edges = lattice_edges(grid, tubeRadius=tubeRadius*min(lattice._lengths), tubeColor=tubeColor)
   vertices = lattice_vertices(grid, sphereRadius=sphereRadius*min(lattice._lengths), sphereColor=sphereColor)
   assembly = vtk.vtkAssembly()
   if show_edges: assembly.AddPart(edges)
-  if show_atoms: assembly.AddPart(vertices)
+  if show_atoms:
+    if cell_clip:
+      # use boolean operation
+      epsilon = 1.e-6
+      cube = vtk.vtkCubeSource()
+      cube.SetCenter(a/2, b/2, c/2)
+      cube.SetXLength(a+epsilon)
+      cube.SetYLength(b+epsilon)
+      cube.SetZLength(c+epsilon)
+      strips = vtk.vtkStripper()
+      strips.SetInputConnection(cube.GetOutputPort())
+      strips.Update()
+      triangles = vtk.vtkTriangleFilter()
+      triangles.SetInputData(cube.GetOutput())
+      bool_filter = vtk.vtkBooleanOperationPolyDataFilter()
+      bool_filter.SetOperation(bool_filter.VTK_INTERSECTION)
+      bool_filter.SetInputConnection(0, triangles.GetOutputPort())
+      bool_filter.SetInputConnection(1, vertices.GetMapper().GetInputAlgorithm().GetOutputPort())
+      clip_mapper = vtk.vtkPolyDataMapper()
+      clip_mapper.SetInputConnection(bool_filter.GetOutputPort(0))
+      clip_mapper.SetScalarVisibility(0)
+      clip_actor = vtk.vtkActor()
+      clip_actor.SetMapper(clip_mapper)
+      clip_actor.GetProperty().SetColor(sphereColor)
+      assembly.AddPart(clip_actor)
+    else:
+      assembly.AddPart(vertices)
   # finally, apply crystal orientation to the lattice
-  assembly.SetOrigin(origin)#m*a/2, n*b/2, p*c/2)
-  assembly.AddPosition(-np.array(origin))#-m*a/2, -n*b/2, -p*c/2)
+  apply_translation_to_actor(assembly, -np.array(origin))
+  #assembly.SetOrigin(origin)#m*a/2, n*b/2, p*c/2)
   if crystal_orientation != None:
     apply_orientation_to_actor(assembly, crystal_orientation)
   return assembly
@@ -953,6 +989,21 @@ def lattice_3d_with_planes(lattice, hklplanes, show_normal=True, \
       assembly.AddPart(arrowActor)
   return assembly
 
+def apply_translation_to_actor(actor, trans):
+  '''
+  Transform the actor (or whole assembly) using the specified translation.
+
+  :param vtkActor actor: the vtk actor.
+  :param trans: a 3 component numpy vector or sequence describing the translation to apply in scene units.
+  '''
+  transform = actor.GetUserTransform()
+  if transform == None:
+    transform = vtk.vtkTransform() 
+    transform.Identity()
+  transform.PostMultiply()
+  transform.Translate(trans[0], trans[1], trans[2])
+  actor.SetUserTransform(transform)
+
 def apply_orientation_to_actor(actor, orientation):
   '''
   Transform the actor (or whole assembly) using the specified orientation.
@@ -964,7 +1015,10 @@ def apply_orientation_to_actor(actor, orientation):
   :param vtkActor actor: the vtk actor.
   :param orientation: an instance of the :py:class:`pymicro.crystal.microstructure.Orientation` class
   '''
-  transform = vtk.vtkTransform()
+  transform = actor.GetUserTransform()
+  if transform == None:
+    transform = vtk.vtkTransform()
+    transform.Identity()
   Bt = orientation.orientation_matrix().transpose()
   m = vtk.vtkMatrix4x4()
   m.Identity()
@@ -972,13 +1026,7 @@ def apply_orientation_to_actor(actor, orientation):
               Bt[1,0], Bt[1,1], Bt[1,2], 0,
               Bt[2,0], Bt[2,1], Bt[2,2], 0,
                     0,       0,       0, 1))
-  #transform.Identity()
   transform.Concatenate(m)
-  '''
-  transform.RotateZ(orientation.phi1())
-  transform.RotateX(orientation.Phi())
-  transform.RotateZ(orientation.phi2())
-  '''
   actor.SetUserTransform(transform)
 
 def load_STL_actor(name, ext='STL', verbose=False, color=grey, feature_edges=False):
@@ -1421,7 +1469,7 @@ def color_bar(title, lut=None, fmt='%.1e', width=0.5, height=0.075, num_labels=7
   bar.SetLookupTable(lut)
   bar.SetTitle(title)
   bar.GetPositionCoordinate().SetCoordinateSystemToNormalizedViewport()
-  bar.GetPositionCoordinate().SetValue(0.25, 0.025)
+  bar.GetPositionCoordinate().SetValue(0.5*(1 - width), 0.025)
   bar.SetOrientationToHorizontal()
   bar.SetLabelFormat(fmt)
   bar.GetLabelTextProperty().SetColor(0, 0, 0)
@@ -1550,11 +1598,11 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
       grid.SetCellVisibilityArray(visible)
       #grid.SetPointVisibilityArray(visible)
     size = data.shape
+    bounds = (0, size[0], 0, size[1], 0, size[2])
   else:
     grid = data
     bounds = grid.GetBounds()
     size = (bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
-    #size = grid.GetExtent()[1::2]
 
   # use extract geometry filter to access the data
   extract = vtk.vtkExtractGeometry()
@@ -1566,8 +1614,8 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
   extract.ExtractInsideOn()
   extract.ExtractBoundaryCellsOn()
   bbox = vtk.vtkBox()
-  bbox.SetXMin(0, 0, 0)
-  bbox.SetXMax(size[0], size[1], size[2])
+  bbox.SetXMin(bounds[0::2])
+  bbox.SetXMax(bounds[1::2])
   extract.SetImplicitFunction(bbox)
   extract.Update()
   return show_mesh(extract.GetOutput(), map_scalars, lut)
@@ -1594,6 +1642,18 @@ def show_mesh(grid, map_scalars=False, lut=None, show_edges=False, edge_color=(0
       # default to the usual gray colormap
       lut = gray_cmap()
     mapper.SetLookupTable(lut)
+  '''
+  # we should be able to use the normals ?
+  extract = vtk.vtkGeometryFilter() # from unstructured grid to poly data
+  extract.SetInputData(grid)
+  extract.Update()
+  print('number of points in poly data = %d' % extract.GetOutput().GetNumberOfPoints())
+  mapper = vtk.vtkPolyDataMapper()
+  #normals = vtk.vtkPolyDataNormals()
+  #normals.SetInputConnection(extract.GetOutputPort())
+  #normals.SetFeatureAngle(60.0)
+  mapper.SetInputConnection(extract.GetOutputPort())
+  '''
   if vtk.vtkVersion().GetVTKMajorVersion() > 5:
     mapper.SetInputData(grid)
   else:
@@ -1630,6 +1690,37 @@ def show_grains(data, num_colors=2048):
   grain_lut = rand_cmap(N=num_colors, first_is_black = True, table_range=(0, num_colors-1))
   grains = show_array(data, map_scalars=True, lut=grain_lut)
   return grains
+
+def show_boundaries(grid, array_name, array_id=0):
+  array = grid.GetCellData().GetArray(array_id)
+  assert array.GetName() == array_name
+  assert array.GetDataType() == vtk.VTK_UNSIGNED_SHORT or array.GetDataType() == vtk.VTK_UNSIGNED_CHAR or array.GetDataType() == vtk.VTK_INT
+  grid.GetCellData().SetActiveScalars(array_name)
+  # we use a vtkAppendPolyData to gather all the boundaries
+  append = vtk.vtkAppendPolyData()
+  gids_range = array.GetRange()
+  print('field range used to find the bounaries:', gids_range)
+  for gid in range(int(gids_range[0]), 1 + int(gids_range[1])):
+    print('trying gid=%d' % gid)
+    thresh = vtk.vtkThreshold()
+    thresh.SetInputData(grid)
+    thresh.ThresholdBetween(gid -0.5, gid + 0.5)
+    thresh.SetInputArrayToProcess(1, 0, 0, 0, array_name)
+    geometryFilter = vtk.vtkGeometryFilter()
+    geometryFilter.SetInputConnection(thresh.GetOutputPort())
+    append.AddInputConnection(geometryFilter.GetOutputPort())
+  boundariesExtractor = vtk.vtkFeatureEdges()
+  boundariesExtractor.SetInputConnection(append.GetOutputPort())
+  boundariesExtractor.BoundaryEdgesOn()
+  boundariesMapper = vtk.vtkPolyDataMapper()
+  boundariesMapper.SetInputConnection(boundariesExtractor.GetOutputPort())
+  boundariesMapper.ScalarVisibilityOff()
+  boundariesMapper.Update()
+  boundariesActor = vtk.vtkActor()
+  boundariesActor.SetMapper(boundariesMapper)
+  boundariesActor.GetProperty().EdgeVisibilityOn()
+  boundariesActor.GetProperty().SetLineWidth(4.0)
+  return boundariesActor
 
 def xray_arrow():
   xrays_arrow = vtk.vtkArrowSource()

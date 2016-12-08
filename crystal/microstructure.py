@@ -106,7 +106,7 @@ class Orientation:
 
     .. warning::
 
-       hard coded for the cubic crysta symmetry for now on, it should 
+       hard coded for the cubic crystal symmetry for now on, it should 
        be rather straightforward to generalize this to any symmetry 
        making use of the Lattice.symmetry() method.
     '''
@@ -317,6 +317,7 @@ class Orientation:
     theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
     lambda_nm = 1.2398 / lambda_keV
 
+    # TODO check this as it seems B is just equal to g
     gt = self.orientation_matrix() # our B (here called gt) corresponds to g^{-1} in Poulsen 2004
     A = h*gt[0,0] + k*gt[1,0] + l*gt[2,0]
     B = -h*gt[0,1] - k*gt[1,1] - l*gt[2,1]
@@ -693,8 +694,6 @@ class Orientation:
     :returns dict: a dictionary with the line number and the corresponding orientation.
     '''
     data = np.genfromtxt(txt_path)
-    print(data.shape)
-    print(data[0])
     size = len(data)
     orientations = []
     for i in range(size):
@@ -845,7 +844,6 @@ class Orientation:
     '''
     SF_list = []
     for ss in slip_systems:
-      print ss
       sf = self.schmid_factor(ss, load_direction)
       if verbose:
         print 'Slip system: %s, Schmid factor is %.3f' % (ss, sf)
@@ -1136,6 +1134,20 @@ class Microstructure:
   
   def SetVtkMesh(self, mesh):
     self.vtkmesh = mesh
+
+  def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
+    '''
+    Outputs the material block corresponding to this microstructure for 
+    a finite element calculation with z-set.
+
+    :param str mat_file: The name of the file where the material behaviour is located
+    :param str grain_prefix: The grain prefix used to name the elsets corresponding to the different grains
+    '''
+    f = open('elset_list.txt', 'w')
+    for g in self.grains:
+      o = g.orientation
+      f.write('  **elset %s%d *file %s *integration theta_method_a 1.0 1.e-9 150 *rotation %7.3f %7.3f %7.3f\n' % (grain_prefix, g.id, mat_file, o.phi1(), o.Phi(), o.phi2()))
+    f.close()
 
   def to_xml(self, doc):
     '''

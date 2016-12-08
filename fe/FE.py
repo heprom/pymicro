@@ -330,6 +330,8 @@ class FE_Mesh():
           tokens = line.split()
           if tokens[0] == 'line':
             new_liset.append([int(tokens[1]), int(tokens[2])])
+          elif tokens[0] == 'quad':
+            new_liset.append([int(tokens[1]), int(tokens[3])])
         if fe_mesh._liset_names.count(liset_name) == 0:
           fe_mesh._liset_names.append(liset_name)
           print 'adding new liset: %s' % liset_name
@@ -589,7 +591,7 @@ class FE_Element():
       return 18
     elif self._type in ['c3d15r', 's3d3']:
       return 6
-    elif self._type in ['c3d13r']:
+    elif self._type in ['c3d10', 'c3d13r']:
       return 5
     elif self._type in ['c2d8r']:
       return 1

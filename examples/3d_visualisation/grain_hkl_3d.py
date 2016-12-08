@@ -43,12 +43,10 @@ if __name__ == '__main__':
 
   print 'adding a lattice to picture the grain orientation'
   lat_size = 20
-  l = Lattice.cubic(lat_size)
+  l = Lattice.face_centered_cubic(lat_size)
   cubic = lattice_3d_with_planes(l, hklplanes, crystal_orientation=grain.orientation, \
-    show_normal=True, plane_opacity=1.0)
-  tra = cubic.GetUserTransform()
-  tra.PostMultiply()
-  tra.Translate(lat_size, lat_size, lat_size)
+    show_normal=True, plane_opacity=1.0, origin='mid', sphereColor=grey, sphereRadius=0.1)
+  apply_translation_to_actor(cubic, (lat_size, lat_size, lat_size))
 
   print 'adding axes'
   axes = axes_actor(length = 100, fontSize=60)

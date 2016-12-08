@@ -13,7 +13,7 @@ if __name__ == '__main__':
   '''
   # create the 3D scene
   base_name = os.path.splitext(__file__)[0]
-  s3d = Scene3D(display=False, ren_size=(1000,800), name=base_name)
+  s3d = Scene3D(display=True, ren_size=(1000,800), name=base_name)
 
   # reading volume
   data_dir = '../data/'
@@ -27,10 +27,15 @@ if __name__ == '__main__':
   skin = contourFilter(grid, 2, opacity=0.5, discrete=True)
   outline = data_outline(grid)
 
+  # add a color bar
+  lut = crack.GetMapper().GetLookupTable()
+  bar = color_bar('Elevation', lut, fmt='%.0f', width=0.5, height=0.075, num_labels=5, font_size=26)
+  
   # add actors to the scene
   s3d.add(outline)
   s3d.add(skin)
   s3d.add(crack)
+  s3d.add(bar)
 
   # setup LTS axes
   axes = axes_actor(length=volsize[2], axisLabels=('L','T','S'), fontSize=30)

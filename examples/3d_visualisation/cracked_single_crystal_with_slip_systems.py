@@ -118,7 +118,7 @@ if __name__ == '__main__':
   s3d.add(g1)
  
   # add axes actor
-  axes = axes_actor(0.5)
+  axes = axes_actor(0.5, fontSize=40)
   s3d.add(axes)
   
   # set up camera

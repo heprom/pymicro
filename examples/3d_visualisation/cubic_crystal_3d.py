@@ -19,19 +19,19 @@ if __name__ == '__main__':
   
   # create the slip planes and the cubic lattice actor
   hklplanes = HklPlane.get_family('111')
-  cubic  = lattice_3d_with_planes(l, hklplanes, crystal_orientation=None, \
-    show_normal=True, plane_opacity=0.5)
+  cubic  = lattice_3d_with_planes(l, hklplanes, origin='mid', \
+    crystal_orientation=None, show_normal=True, plane_opacity=0.5)
   s3d.add(cubic)
 
   # add axes actor
-  axes = axes_actor(0.5)
+  axes = axes_actor(0.5, fontSize=50)
   s3d.add(axes)
 
   # set up camera and render
   cam = setup_camera(size=(1, 1, 1))
   cam.SetFocalPoint(0, 0, 0)
   cam.SetPosition(4, -1.5, 1.5) # change the position to something better
-  cam.Dolly(1.1) # get a little closer
+  cam.Dolly(1.2) # get a little closer
   s3d.set_camera(cam)
   s3d.render()
 

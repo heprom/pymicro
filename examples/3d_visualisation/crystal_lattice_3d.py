@@ -2,7 +2,7 @@
 import vtk, os
 from pymicro.crystal.lattice import Lattice
 from pymicro.view.scene3d import Scene3D
-from pymicro.view.vtk_utils import lattice_grid, lattice_3d, lattice_3d_with_planes, axes_actor
+from pymicro.view.vtk_utils import lattice_grid, lattice_3d, lattice_3d_with_planes, axes_actor, apply_translation_to_actor
 
 if __name__ == '__main__':
   '''
@@ -25,45 +25,31 @@ if __name__ == '__main__':
 
   l = Lattice.cubic(a)
   cubic = lattice_3d(l)
-  transform = vtk.vtkTransform()
-  transform.Translate(0.5,0.5,0)
-  cubic.SetUserTransform(transform)
+  apply_translation_to_actor(cubic, (0.5, 0.5, 0.0))
 
   l = Lattice.tetragonal(a, c)
   tetragonal = lattice_3d(l)
-  transform = vtk.vtkTransform()
-  transform.Translate(2.0,2.0,0)
-  tetragonal.SetUserTransform(transform)
+  apply_translation_to_actor(tetragonal, (2.0, 2.0, 0.0))
 
   l = Lattice.orthorombic(a, b, c)
   orthorombic = lattice_3d(l)
-  transform = vtk.vtkTransform()
-  transform.Translate(3.5,3.5,0)
-  orthorombic.SetUserTransform(transform)
+  apply_translation_to_actor(orthorombic, (3.5, 3.5, 0.0))
 
   l = Lattice.hexagonal(a, c)
   hexagonal = lattice_3d(l)
-  transform = vtk.vtkTransform()
-  transform.Translate(5.0,5.0,0)
-  hexagonal.SetUserTransform(transform)
+  apply_translation_to_actor(hexagonal, (5.0, 5.0, 0.0))
 
   l = Lattice.rhombohedral(a, alpha)
   rhombohedral = lattice_3d(l)
-  transform = vtk.vtkTransform()
-  transform.Translate(6.5,6.5,0)
-  rhombohedral.SetUserTransform(transform)
+  apply_translation_to_actor(rhombohedral, (6.5, 6.5, 0.0))
 
   l = Lattice.monoclinic(a, b, c, alpha)
   monoclinic = lattice_3d(l)
-  transform = vtk.vtkTransform()
-  transform.Translate(8.0,8.0,0)
-  monoclinic.SetUserTransform(transform)
+  apply_translation_to_actor(monoclinic, (8.0, 8.0, 0.0))
 
   l = Lattice.triclinic(a, b, c, alpha, beta, gamma)
   triclinic = lattice_3d(l)
-  transform = vtk.vtkTransform()
-  transform.Translate(9.5,9.5,0)
-  triclinic.SetUserTransform(transform)
+  apply_translation_to_actor(triclinic, (9.5, 9.5, 0.0))
 
   # add actors to the 3d scene
   s3d.add(cubic)
@@ -86,7 +72,7 @@ if __name__ == '__main__':
   cam.SetViewUp(0, 0, 1)
   cam.SetPosition(7, 4, 3)
   cam.SetFocalPoint(5.5, 5.5, 0)
-  cam.SetClippingRange(-20,20)
+  cam.SetClippingRange(-20, 20)
   cam.Dolly(0.2)
   s3d.set_camera(cam)
   s3d.render()

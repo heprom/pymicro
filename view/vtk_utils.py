@@ -1691,7 +1691,25 @@ def show_grains(data, num_colors=2048):
   grains = show_array(data, map_scalars=True, lut=grain_lut)
   return grains
 
-def show_boundaries(grid, array_name, array_id=0):
+def show_boundaries(grid, array_id=0, array_name=None):
+  '''Create an actor representing the boundaries separating different 
+  values of a given array.
+
+  :param vtkUnstructuredGrid grid: the unstructured grid referencing the data array.
+  :param int array_id: the index of the array to process (default 0).
+  :param str array_name: the name of the array to process.
+  :return: a VTK actor containing the boundaries.
+  '''
+  # if array_name is specified, find the corresponding array
+  if array_name:
+    array_id = -1
+    for i in range(grid.GetCellData().GetNumberOfArrays()):
+      if grid.GetCellData().GetArray(i).GetName() == array_name:
+        array_id = i
+        break
+  if array_id < 0:
+    print('warning, array %s not found in CellData arrays' % array_name)
+    return
   array = grid.GetCellData().GetArray(array_id)
   assert array.GetName() == array_name
   assert array.GetDataType() == vtk.VTK_UNSIGNED_SHORT or array.GetDataType() == vtk.VTK_UNSIGNED_CHAR or array.GetDataType() == vtk.VTK_INT

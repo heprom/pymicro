@@ -12,9 +12,16 @@ class Detector2d:
   2D detectors produce array like images and may have different geometries.
   This abstract class regroup the generic method for those kind of detectors.
   '''
-  def __init__(self):
-    self.xcen = 0.
-    self.ycen = 0.
+
+  def __init__(self, size=(2048, 2048), data_type=np.uint16):
+    '''Initialization of a Detector2d instance with a given image size 
+    (2048 pixels square array by default).'''
+    self.size = size
+    self.data_type = data_type
+    self.ucen = self.size[0] // 2
+    self.vcen = self.size[1] // 2
+    self.pixel_size = 1. # mm
+    self.calib = 1. # pixel by degree
     self.mask_flag = 0 # use a mask
     self.mask_size_increase = 0
     self.image_path = None
@@ -176,25 +183,29 @@ class Detector2d:
           fmt='%.6e')
     return psi_values, intensityResult, counts
 
-class Varian2520(Detector2d):
+class RegArrayDetector2d(Detector2d):
   '''Class to handle a Varian Paxscan 2520 detector.
   
   The flat panel detector produce 16 unsigned (1840, 1456) images.
   '''
-  def __init__(self):
-    Detector2d.__init__(self)
-    self.xcen = 920.
-    self.ycen = 728.
-    self.pixel_size = 0.127 # mm
-    self.calib = 1. # pixel by degree
-    self.ref = np.ones((1840, 1456), dtype=np.uint16)
-    self.dark = np.zeros((1840, 1456), dtype=np.uint16)
-    self.bg = np.zeros((1840, 1456), dtype=np.uint16)
+
+  def __init__(self, size=(2048, 2048), data_type=np.uint16):
+    Detector2d.__init__(self, size=size, data_type=data_type)
+    self.ref = np.ones(self.size, dtype=self.data_type)
+    self.dark = np.zeros(self.size, dtype=self.data_type)
+    self.bg = np.zeros(self.size, dtype=self.data_type)
 
   def load_image(self, image_path):
     print('loading image %s' % image_path)
     self.image_path = image_path
-    self.data = TiffFile(image_path).asarray().T.astype(np.float32)
+    if image_path.endswith('.tif'):
+      self.data = TiffFile(image_path).asarray().T.astype(np.float32)
+    elif image_path.endswith('.raw'):
+      self.data = HST_read(self.image_path, data_type=self.data_type, dims=(self.size[0], self.size[1], 1))[:,:,0].astype(np.float32)
+    else:
+      print('unrecognized file format: %s' % image_path)
+      return None
+    assert self.data.shape == self.size
     self.compute_corrected_image()
     
   def compute_corrected_image(self):
@@ -217,81 +228,52 @@ class Varian2520(Detector2d):
     inv_deg2rad = 1. / deg2rad
     # distance xpad to sample, in pixel units
     distance = self.calib / np.tan(1.0 * deg2rad)
-    x = np.linspace(0, 1839, 1840)
-    y = np.linspace(0, 1455, 1456)
-    yy, xx = np.meshgrid(y, x)
-    #xx, yy = np.meshgrid(x, y)
-    r = np.sqrt((xx - self.xcen)**2 + (yy - self.ycen)**2)
+    u = np.linspace(0, self.size[0]-1, self.size[0])
+    v = np.linspace(0, self.size[1]-1, self.size[1])
+    vv, uu = np.meshgrid(v, u)
+    #uu, vv = np.meshgrid(u, v)
+    r = np.sqrt((uu - self.ucen)**2 + (vv - self.vcen)**2)
     self.two_thetas = np.arctan(r/distance) * inv_deg2rad
-    self.psis = np.arccos((xx - self.xcen) / r) * inv_deg2rad
+    self.psis = np.arccos((uu - self.ucen) / r) * inv_deg2rad
 
   def angles_to_pixels(self, two_theta, psi):
     '''given two values 2theta and psi (that could be arrays), compute the corresponding pixel on the detector.'''
     distance = self.calib / np.tan(np.pi / 180.)
     r = distance * np.tan(two_theta * np.pi / 180.)
     print(psi, np.sign((psi > 90) - 0.5))
-    x = self.xcen + r*np.cos(psi * np.pi / 180.)
-    y = self.ycen - np.sign(psi)*np.sqrt(r**2 - (x - self.xcen)**2)
-    return (x, y)
+    u = self.ucen + r*np.cos(psi * np.pi / 180.)
+    v = self.vcen - np.sign(psi)*np.sqrt(r**2 - (u - self.ucen)**2)
+    return (u, v)
 
-class Mar165(Detector2d):
+class Varian2520(RegArrayDetector2d):
+  '''Class to handle a Varian Paxscan 2520 detector.
+  
+  The flat panel detector produces 16 bit unsigned (1840, 1456) images when setup in horizontal mode.
+  '''
+
+  def __init__(self):
+    RegArrayDetector2d.__init__(self, size=(1840, 1456), data_type=np.uint16)
+    self.pixel_size = 0.127 # mm
+
+class Mar165(RegArrayDetector2d):
   '''Class to handle a rayonix marccd165.
   
-  The image plate marccd 165 detector produce 16 unsigned (2048, 2048) images.
+  The image plate marccd 165 detector produces 16 bits unsigned (2048, 2048) square images.
   '''
+  
   def __init__(self):
-    Detector2d.__init__(self)
-    self.xcen = 1024.
-    self.ycen = 1024.
+    RegArrayDetector2d.__init__(self, size=(2048, 2048), data_type=np.uint16)
     self.pixel_size = 0.08 # mm
-    self.calib = 1. # pixel by degree
-    self.ref = np.ones((2048, 2048), dtype=np.uint16)
-    self.dark = np.zeros((2048, 2048), dtype=np.uint16)
-    self.bg = np.zeros((2048, 2048), dtype=np.uint16)
 
-  def load_image(self, image_path):
-    print('loading image %s' % image_path)
-    self.image_path = image_path
-    self.data = HST_read(self.image_path, data_type=np.uint16, dims=(2048, 2048, 1))[:,:,0].astype(np.float32)
-    self.compute_corrected_image()
-    
-  def compute_corrected_image(self):
-    '''Compute a corrected image either via background substraction or flat field correction.'''
-    if self.correction == 'none':
-      self.corr_data = self.data
-    elif self.correction == 'bg':
-      self.corr_data = self.data - self.bg
-    elif self.correction == 'flat':
-      self.corr_data = (self.data - self.dark).astype(np.float32) / (self.ref - self.dark).astype(np.float32)
-
-  def compute_geometry(self):
-    '''Calculate an array of the image size with the (2theta, psi) for each pixel.'''
-    self.compute_TwoTh_Psi_arrays()
-
-  def compute_TwoTh_Psi_arrays(self):
-    '''Calculate two arrays (2theta, psi) TwoTheta and Psi angles arrays corresponding to repectively 
-    the vertical and the horizontal pixels.
-    '''
-    deg2rad = np.pi / 180.
-    inv_deg2rad = 1. / deg2rad 
-    # distance xpad to sample, in pixel units
-    distance = self.calib / np.tan(1.0 * deg2rad)
-    x = np.linspace(0, 2047, 2048)
-    y = np.linspace(0, 2047, 2048)
-    yy, xx = np.meshgrid(y, x)
-    #xx, yy = np.meshgrid(x, y)
-    r = np.sqrt((xx - self.xcen)**2 + (yy - self.ycen)**2)
-    self.two_thetas = np.arctan(r/distance) * inv_deg2rad
-    self.psis = np.arccos((xx - self.xcen) / r) * inv_deg2rad
-
-  def angles_to_pixels(self, two_theta, psi):
-    '''given two values 2theta and psi (that could be arrays), compute the corresponding pixel on the detector.'''
-    distance = self.calib / np.tan(np.pi / 180.)
-    r = distance * np.tan(two_theta * np.pi / 180.)
-    print(psi, np.sign((psi > 90) - 0.5))
-    x = self.xcen + r*np.cos(psi * np.pi / 180.)
-    y = self.ycen - np.sign(psi)*np.sqrt(r**2 - (x - self.xcen)**2)
-    return (x, y)
+class PerkinElmer1620(RegArrayDetector2d):
+  '''Class to handle a PErkin Elmer 1620 detector.
+  
+  The flat panel detector produces 16 bits unsigned (2000, 2000) square images.
+  '''
+  
+  def __init__(self):
+    RegArrayDetector2d.__init__(self, size=(2000, 2000), data_type=np.uint16)
+    self.pixel_size = 0.2 # mm
 
 class Xpad(Detector2d):
   '''Class to handle Xpad like detectors.

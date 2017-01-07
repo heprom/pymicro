@@ -6,8 +6,8 @@ from matplotlib import pyplot as plt, cm
 if __name__ == '__main__':
   
   mar = Mar165() # create a mar object
-  mar.xcen = 981 # position of the direct beam on the x axis
-  mar.xcen = 1060 # position of the direct beam on the y axis
+  mar.ucen = 981 # position of the direct beam on the x axis
+  mar.vcen = 1060 # position of the direct beam on the y axis
   mar.calib = 495./15. # identified on (111) ring of CeO2 powder
   mar.correction = 'bg'
   mar.compute_TwoTh_Psi_arrays()

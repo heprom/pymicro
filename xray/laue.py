@@ -45,7 +45,7 @@ def build_list(lattice=None, max_miller=3):
   return hklplanes
 
 def compute_ellpisis(orientation, detector, det_distance, uvw):
-  det_size_pixel = np.array([1950, 1456])
+  #det_size_pixel = np.array(det.size)
   Bt = orientation.orientation_matrix().transpose()
   ZA = Bt.dot(uvw.direction())
   if ZA[0] < 0:
@@ -56,7 +56,7 @@ def compute_ellpisis(orientation, detector, det_distance, uvw):
   print('angle psi (deg) is', psi*180/np.pi)
   print('angle eta (deg) is', eta*180/np.pi)
   print('ZA cross the det plane at', ZAD)
-  (uc, vc) = (0.5*det_size_pixel[0] - ZAD[1]/detector.pixel_size, 0.5*det_size_pixel[1] - ZAD[2]/detector.pixel_size)
+  (uc, vc) = (detector.ucen - ZAD[1]/detector.pixel_size, detector.vcen - ZAD[2]/detector.pixel_size)
   print('ZA crosses the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (ZAD[1], ZAD[2], uc, vc))
   e = np.tan(psi) # this assume the incident beam is normal to the detector
   print('ellipse eccentricity is %f' % e)
@@ -69,7 +69,7 @@ def compute_ellpisis(orientation, detector, det_distance, uvw):
   a = 0.5*det_distance*np.tan(2*psi)/detector.pixel_size
   b = 0.5*det_distance*np.tan(2*psi)*np.sqrt(1 - np.tan(psi)**2)/detector.pixel_size
   print('ellipsis major and minor half axes are a=%.1f and b=%.1f' % (a, b))
-  # use a parametrc curve to plot the ellipsis
+  # use a parametric curve to plot the ellipsis
   t = np.linspace(0., 2*np.pi, 101)
   print(t)
   print(t[50], np.pi)
@@ -78,8 +78,8 @@ def compute_ellpisis(orientation, detector, det_distance, uvw):
   data = np.array([x,y])
   R = np.array([[np.cos(eta), -np.sin(eta)], [np.sin(eta), np.cos(eta)]])
   data = np.dot(R, data) # rotate our ellipse
-  data[0] += 0.5*det_size_pixel[0] - a*np.cos(eta)
-  data[1] += 0.5*det_size_pixel[1] - a*np.sin(eta)
+  data[0] += 0.5*detector.size[0] - a*np.cos(eta)
+  data[1] += 0.5*detector.size[1] - a*np.sin(eta)
   return data
   
 def diffracted_vector(hkl, orientation, min_theta=0.1):
@@ -100,8 +100,7 @@ def diffracted_vector(hkl, orientation, min_theta=0.1):
   
 def compute_Laue_pattern(orientation, detector, det_distance, hklplanes=None, inverted=False):
   r_spot = 10 # pixels
-  det_size_pixel = np.array([1840, 1456])
-  #det_size_pixel = np.array([1950, 1456])
+  det_size_pixel = np.array(detector.size)
   det_size_mm = det_size_pixel * detector.pixel_size # mm
   detector.data = np.zeros(det_size_pixel, dtype=np.uint8)
   val = np.iinfo(detector.data.dtype.type).max # 255 here
@@ -114,7 +113,7 @@ def compute_Laue_pattern(orientation, detector, det_distance, hklplanes=None, in
       continue
     Ku = K/np.linalg.norm(K)
     (u, v) = (det_distance*K[1]/K[0], det_distance*K[2]/K[0]) # unit is mm
-    (up, vp) = (0.5*det_size_pixel[0] - u/detector.pixel_size, 0.5*det_size_pixel[1] - v/detector.pixel_size) # unit is pixel on the detector
+    (up, vp) = (detector.ucen - u/detector.pixel_size, detector.vcen - v/detector.pixel_size) # unit is pixel on the detector
     if abs(up) > 1e6 or abs(vp) > 1e6:
       continue
     print('diffracted beam will hit the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (u, v, up, vp))

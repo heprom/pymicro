@@ -39,9 +39,10 @@ def build_list(lattice=None, max_miller=3):
       for l in indices:
         if h == k == l == 0: # skip (0, 0, 0)
           continue
-        if (h % 2 == 0 & k % 2 == 0 and l % 2 == 0) or (h % 2 == 1 & k % 2 == 1 and l % 2 == 1):
-          # take only all odd or all even hkl indices
-          hklplanes.append(HklPlane(h, k, l, lattice))
+        hklplanes.append(HklPlane(h, k, l, lattice))
+        #if (h % 2 == 0 & k % 2 == 0 and l % 2 == 0) or (h % 2 == 1 & k % 2 == 1 and l % 2 == 1):
+        #  # take only all odd or all even hkl indices
+        #  hklplanes.append(HklPlane(h, k, l, lattice))
   return hklplanes
 
 def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
@@ -61,13 +62,8 @@ def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
   ZAD = det_distance*ZA/ZA[0] # ZAD is pointing towards X>0
   psi = np.arccos(np.dot(ZAD/np.linalg.norm(ZAD), np.array([1., 0., 0.])))
   eta = np.pi/2 - np.arctan(ZAD[1]/ZAD[2])
-  print('angle psi (deg) is', psi*180/np.pi)
-  print('angle eta (deg) is', eta*180/np.pi)
-  print('ZA cross the det plane at', ZAD)
   (uc, vc) = (detector.ucen - ZAD[1]/detector.pixel_size, detector.vcen - ZAD[2]/detector.pixel_size)
-  print('ZA crosses the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (ZAD[1], ZAD[2], uc, vc))
   e = np.tan(psi) # this assume the incident beam is normal to the detector
-  print('ellipse eccentricity is %f' % e)
   '''
   # wrong formulae from Amoros (The Laue Method)...
   a = det_distance*np.tan(psi)/detector.pixel_size
@@ -76,11 +72,15 @@ def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
   # the proper equation is:
   a = 0.5*det_distance*np.tan(2*psi)/detector.pixel_size
   b = 0.5*det_distance*np.tan(2*psi)*np.sqrt(1 - np.tan(psi)**2)/detector.pixel_size
-  print('ellipsis major and minor half axes are a=%.1f and b=%.1f' % (a, b))
+  if verbose:
+    print('angle psi (deg) is', psi*180/np.pi)
+    print('angle eta (deg) is', eta*180/np.pi)
+    print('ZA cross the det plane at', ZAD)
+    print('ZA crosses the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (ZAD[1], ZAD[2], uc, vc))
+    print('ellipse eccentricity is %f' % e)
+    print('ellipsis major and minor half axes are a=%.1f and b=%.1f' % (a, b))
   # use a parametric curve to plot the ellipsis
   t = np.linspace(0., 2*np.pi, 101)
-  print(t)
-  print(t[50], np.pi)
   x = a*np.cos(t)
   y = b*np.sin(t)
   data = np.array([x, y])
@@ -90,7 +90,8 @@ def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
   # move one end of the great axis to the direct beam position
   u_sign = ZAD[1]/abs(ZAD[1]) # sign of ZAD[1]
   v_sign = ZAD[2]/abs(ZAD[2]) # sign of ZAD[2]
-  data[0] += detector.ucen + u_sign*a*np.cos(eta)
+  print('signs', u_sign, v_sign)
+  data[0] += detector.ucen - u_sign*a*np.cos(eta)
   data[1] += detector.vcen - v_sign*a*np.sin(eta)
   return data
   
@@ -112,25 +113,24 @@ def diffracted_vector(hkl, orientation, min_theta=0.1):
   
 def compute_Laue_pattern(orientation, detector, det_distance, hklplanes=None, inverted=False):
   r_spot = 10 # pixels
-  det_size_pixel = np.array(detector.size)
-  det_size_mm = det_size_pixel * detector.pixel_size # mm
+  #det_size_mm = np.array(detector.size) * detector.pixel_size # mm
   detector.data = np.zeros(det_size_pixel, dtype=np.uint8)
   val = np.iinfo(detector.data.dtype.type).max # 255 here
   # show direct beam
-  detector.data[0.5*det_size_pixel[0] - 2*r_spot:0.5*det_size_pixel[0] + 2*r_spot, 0.5*det_size_pixel[1] - 2*r_spot:0.5*det_size_pixel[1] + 2*r_spot] = val
+  detector.data[detector.ucen - 2*r_spot:detector.ucen + 2*r_spot, detector.vcen - 2*r_spot:detector.vcen + 2*r_spot] = val
 
   for hkl in hklplanes:
     K = diffracted_vector(hkl, orientation)
     if K is None:
       continue
     Ku = K/np.linalg.norm(K)
-    (u, v) = (det_distance*K[1]/K[0], det_distance*K[2]/K[0]) # unit is mm
-    (up, vp) = (detector.ucen - u/detector.pixel_size, detector.vcen - v/detector.pixel_size) # unit is pixel on the detector
+    (u, v) = (-det_distance*K[1]/K[0], -det_distance*K[2]/K[0]) # unit is mm, (u, v) detector coordinate system
+    (up, vp) = (detector.ucen + u/detector.pixel_size, detector.vcen + v/detector.pixel_size) # unit is pixel on the detector
     if abs(up) > 1e6 or abs(vp) > 1e6:
       continue
     print('diffracted beam will hit the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (u, v, up, vp))
     # mark corresponding pixels on the image detector
-    if up >= 0 and vp >= 0 and up < det_size_pixel[0] and vp < det_size_pixel[1]:
+    if up >= 0 and vp >= 0 and up < detector.size[0] and vp < detector.size[1]:
       detector.data[up-r_spot:up+r_spot, vp-r_spot:vp+r_spot] = val
   if inverted:
     print('inverting image')

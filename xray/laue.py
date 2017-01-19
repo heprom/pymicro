@@ -44,14 +44,22 @@ def build_list(lattice=None, max_miller=3):
           hklplanes.append(HklPlane(h, k, l, lattice))
   return hklplanes
 
-def compute_ellpisis(orientation, detector, det_distance, uvw):
-  #det_size_pixel = np.array(det.size)
+def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
+  '''
+  Compute the ellipsis associated with the given zone axis. All lattice 
+  planes sharing this zone axis will diffract along that ellipse.
+  
+  :param orientation: The crystal orientation.
+  :param detector: An instance of the Detector2D class.
+  :param float det_distance: the object - detector distance (along the X-axis).
+  :param uvw: An instance of the HklDirection representing the zone axis.
+  :param bool verbose: activate verbose mode (default False).
+  :returns data: the (u, v) data (in pixel unit) representing the ellipsis.
+  '''
   Bt = orientation.orientation_matrix().transpose()
   ZA = Bt.dot(uvw.direction())
-  if ZA[0] < 0:
-    ZA *= -1 # make sur the ZA vector is going forward
-  psi = np.arccos(np.dot(ZA, np.array([1., 0., 0.])))
-  ZAD = det_distance*ZA/ZA[0]
+  ZAD = det_distance*ZA/ZA[0] # ZAD is pointing towards X>0
+  psi = np.arccos(np.dot(ZAD/np.linalg.norm(ZAD), np.array([1., 0., 0.])))
   eta = np.pi/2 - np.arctan(ZAD[1]/ZAD[2])
   print('angle psi (deg) is', psi*180/np.pi)
   print('angle eta (deg) is', eta*180/np.pi)
@@ -75,11 +83,15 @@ def compute_ellpisis(orientation, detector, det_distance, uvw):
   print(t[50], np.pi)
   x = a*np.cos(t)
   y = b*np.sin(t)
-  data = np.array([x,y])
+  data = np.array([x, y])
+  # rotate the ellipse
   R = np.array([[np.cos(eta), -np.sin(eta)], [np.sin(eta), np.cos(eta)]])
   data = np.dot(R, data) # rotate our ellipse
-  data[0] += 0.5*detector.size[0] - a*np.cos(eta)
-  data[1] += 0.5*detector.size[1] - a*np.sin(eta)
+  # move one end of the great axis to the direct beam position
+  u_sign = ZAD[1]/abs(ZAD[1]) # sign of ZAD[1]
+  v_sign = ZAD[2]/abs(ZAD[2]) # sign of ZAD[2]
+  data[0] += detector.ucen + u_sign*a*np.cos(eta)
+  data[1] += detector.vcen - v_sign*a*np.sin(eta)
   return data
   
 def diffracted_vector(hkl, orientation, min_theta=0.1):

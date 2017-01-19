@@ -221,8 +221,8 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
       data_type = np.uint16
     s_size = scan_name[:-4].split('_')[-2].split('x')
     dims = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
-    if verbose: print 'autoparsing filename: data type is set to', type
-  if verbose: print 'data type is',type
+    if verbose: print('autoparsing filename: data type is set to', data_type)
+  if verbose: print('data type is', data_type)
   if dims == None:
     [nx, ny, nz] = HST_info(scan_name + '.info')
   else:
@@ -231,7 +231,7 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
       zrange = range(0, nz)
   if verbose: print 'volume size is ', nx, 'x', ny, 'x', len(zrange)
   f = open(scan_name, 'rb')
-  data = np.empty((ny, nx, len(zrange)), dtype=type)
+  data = np.empty((ny, nx, len(zrange)), dtype=data_type)
   f.seek(header_size + np.dtype(data_type).itemsize * nx * ny * zrange[0])
   if verbose: print('reading volume... from byte %d' % f.tell())
   data = np.reshape(np.fromstring( \

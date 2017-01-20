@@ -1,9 +1,6 @@
 crystal Package
 ===============
 
-:mod:`crystal` Package
-----------------------
-
 .. automodule:: pymicro.crystal
     :members:
     :special-members: __init__

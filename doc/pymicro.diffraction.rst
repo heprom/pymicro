@@ -1,9 +1,6 @@
 diffraction Package
 ===================
 
-:mod:`diffraction` Package
---------------------------
-
 .. automodule:: pymicro.diffraction
     :members:
     :undoc-members:

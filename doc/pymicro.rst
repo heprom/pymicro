@@ -20,4 +20,5 @@ Subpackages
     pymicro.file
     pymicro.math
     pymicro.view
+    pymicro.xray
 

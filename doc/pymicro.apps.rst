@@ -1,8 +1,6 @@
 apps Package
 ============
 
-:mod:`apps` Package
--------------------
 
 .. automodule:: pymicro.apps
     :members:

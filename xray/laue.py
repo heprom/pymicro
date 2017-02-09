@@ -60,8 +60,11 @@ def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
   Bt = orientation.orientation_matrix().transpose()
   ZA = Bt.dot(uvw.direction())
   ZAD = det_distance*ZA/ZA[0] # ZAD is pointing towards X>0
-  psi = np.arccos(np.dot(ZAD/np.linalg.norm(ZAD), np.array([1., 0., 0.])))
-  eta = np.pi/2 - np.arctan(ZAD[1]/ZAD[2])
+  X = np.array([1., 0., 0.])
+  #psi = np.arccos(np.dot(ZAD/np.linalg.norm(ZAD), X))
+  from math import atan2, pi
+  psi = atan2(np.linalg.norm(np.cross(ZA, X)), np.dot(ZA, X))  # use cross product
+  eta = pi/2 - atan2(ZAD[1], ZAD[2]) # atan2(y, x) compute the arc tangent of y/x considering the sign of both y and x
   (uc, vc) = (detector.ucen - ZAD[1]/detector.pixel_size, detector.vcen - ZAD[2]/detector.pixel_size)
   e = np.tan(psi) # this assume the incident beam is normal to the detector
   '''
@@ -70,8 +73,8 @@ def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
   b = det_distance*np.sin(psi)/detector.pixel_size
   '''
   # the proper equation is:
-  a = 0.5*det_distance*np.tan(2*psi)/detector.pixel_size
-  b = 0.5*det_distance*np.tan(2*psi)*np.sqrt(1 - np.tan(psi)**2)/detector.pixel_size
+  a = abs(0.5*det_distance*np.tan(2*psi)/detector.pixel_size)
+  b = abs(0.5*det_distance*np.tan(2*psi)*np.sqrt(1 - np.tan(psi)**2)/detector.pixel_size)
   if verbose:
     print('angle psi (deg) is', psi*180/np.pi)
     print('angle eta (deg) is', eta*180/np.pi)
@@ -88,11 +91,8 @@ def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
   R = np.array([[np.cos(eta), -np.sin(eta)], [np.sin(eta), np.cos(eta)]])
   data = np.dot(R, data) # rotate our ellipse
   # move one end of the great axis to the direct beam position
-  u_sign = ZAD[1]/abs(ZAD[1]) # sign of ZAD[1]
-  v_sign = ZAD[2]/abs(ZAD[2]) # sign of ZAD[2]
-  print('signs', u_sign, v_sign)
-  data[0] += detector.ucen - u_sign*a*np.cos(eta)
-  data[1] += detector.vcen - v_sign*a*np.sin(eta)
+  data[0] += detector.ucen - a*np.cos(eta)
+  data[1] += detector.vcen - a*np.sin(eta)
   return data
   
 def diffracted_vector(hkl, orientation, min_theta=0.1):

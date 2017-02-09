@@ -1691,13 +1691,14 @@ def show_grains(data, num_colors=2048):
   grains = show_array(data, map_scalars=True, lut=grain_lut)
   return grains
 
-def show_boundaries(grid, array_id=0, array_name=None):
+def show_boundaries(grid, array_id=0, array_name=None, write=False):
   '''Create an actor representing the boundaries separating different 
-  values of a given array.
+  values of a given array. The values have to be one of the integer type.
 
   :param vtkUnstructuredGrid grid: the unstructured grid referencing the data array.
   :param int array_id: the index of the array to process (default 0).
   :param str array_name: the name of the array to process.
+  :param bool write: flag to write the boundary polydata to the disk.
   :return: a VTK actor containing the boundaries.
   '''
   # if array_name is specified, find the corresponding array
@@ -1734,15 +1735,26 @@ def show_boundaries(grid, array_id=0, array_name=None):
   clean = vtk.vtkCleanPolyData()
   clean.SetInputConnection(append.GetOutputPort())
   clean.Update()
-  boundariesMapper = vtk.vtkPolyDataMapper()
-  boundariesMapper.SetInputConnection(clean.GetOutputPort())
-  boundariesMapper.ScalarVisibilityOff()
-  boundariesMapper.Update()
-  boundariesActor = vtk.vtkActor()
-  boundariesActor.SetMapper(boundariesMapper)
-  boundariesActor.GetProperty().EdgeVisibilityOn()
-  boundariesActor.GetProperty().SetLineWidth(4.0)
+  if write:
+    writer = vtk.vtkXMLPolyDataWriter()
+    writer.SetFileName('gb.vtp')
+    writer.SetInputConnection(clean.GetOutputPort())
+    writer.Write()
+    print('writting gb.vtp')
+  boundariesActor = edges_actor(clean.GetOutput(), linewidth=4.0, linecolor=black)
   return boundariesActor
+
+def edges_actor(polydata, linewidth=1.0, linecolor=black):
+  mapper = vtk.vtkPolyDataMapper()
+  mapper.SetInputData(polydata)
+  mapper.ScalarVisibilityOff()
+  mapper.Update()
+  actor = vtk.vtkActor()
+  actor.SetMapper(mapper)
+  actor.GetProperty().EdgeVisibilityOn()
+  actor.GetProperty().SetColor(linecolor)
+  actor.GetProperty().SetLineWidth(linewidth)
+  return actor
 
 def xray_arrow():
   xrays_arrow = vtk.vtkArrowSource()

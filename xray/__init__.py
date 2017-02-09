@@ -8,7 +8,8 @@
 
    .. warning::
 
-        The documentation of this package is still very poor, use with care... and add some love to the docs if you have time!
+        The documentation of this package is still very poor, use with care...
+        and add some love to the docs if you have time!
 
    .. moduleauthor:: Henry Proudhon <henry.proudhon@mines-paristech.fr>
 

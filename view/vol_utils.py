@@ -69,7 +69,7 @@ def hist(data, nb_bins=256, data_range=(0,255), show=True, save=False, prefix='d
   print 'computing gray level histogram'
   hist, bin_edges = np.histogram(data, bins=nb_bins, range=data_range, density=density)
   bin_centers = 0.5*(bin_edges[:-1] + bin_edges[1:])
-  plt.figure(1, figsize=(6,4))
+  plt.figure(figsize=(6,4))
   if density:
     plt.bar(bin_centers, 100*hist, width=1, fill=True, color='g', edgecolor='g')
     plt.ylabel('Probability (%)')

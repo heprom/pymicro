@@ -768,11 +768,11 @@ class HklPlane(HklObject):
                                              k ** 2 * a ** 2 * c ** 2 * np.sin(
                                                  beta) ** 2 + l ** 2 * a ** 2 * b ** 2 * np.sin(gamma) ** 2 + \
                                              2 * h * l * a * b ** 2 * c * (
-                                             np.cos(alpha) * np.cos(gamma) - np.cos(beta)) + \
+                                                 np.cos(alpha) * np.cos(gamma) - np.cos(beta)) + \
                                              2 * h * k * a * b * c ** 2 * (
-                                             np.cos(alpha) * np.cos(beta) - np.cos(gamma)) + \
+                                                 np.cos(alpha) * np.cos(beta) - np.cos(gamma)) + \
                                              2 * k * l * a ** 2 * b * c * (
-                                             np.cos(beta) * np.cos(gamma) - np.cos(alpha)))
+                                                 np.cos(beta) * np.cos(gamma) - np.cos(alpha)))
         return d
 
     def bragg_angle(self, lambda_keV, verbose=False):

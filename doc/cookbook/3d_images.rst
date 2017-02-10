@@ -25,4 +25,4 @@ load it into memory, print some of the grain values and display it in
 2d and 3d to chack the consistency.
 
 .. image:: ../_static/3d_image.png
-       :align: center
+:align: center

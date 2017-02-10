@@ -5,8 +5,8 @@ densities = {'Li': 0.533,  # Z = 3
              'Be': 1.8450,  # Z = 4
              'C': 2.26,  # Z = 6
              'Al': 2.6941,  # Z = 13
-             'Ti': 4.530, # Z = 22
-             'V': 6.100, # Z = 23
+             'Ti': 4.530,  # Z = 22
+             'V': 6.100,  # Z = 23
              'Cr': 7.180,  # Z = 24
              'Mn': 7.430,  # Z = 25
              'Fe': 7.874,  # Z = 26
@@ -20,83 +20,88 @@ densities = {'Li': 0.533,  # Z = 3
              'Pb': 11.330,  # Z = 82
              }
 
-def lambda_keV_to_nm(lambda_keV):
-  '''Change the unit of wavelength from keV to nm.
 
-  :param float lambda_keV: the wavelength in keV unit.
-  :returns: the wavelength in nm unit.
-  '''
-  return 1.2398 / lambda_keV
+def lambda_keV_to_nm(lambda_keV):
+    '''Change the unit of wavelength from keV to nm.
+
+    :param float lambda_keV: the wavelength in keV unit.
+    :returns: the wavelength in nm unit.
+    '''
+    return 1.2398 / lambda_keV
+
 
 def lambda_keV_to_angstrom(lambda_keV):
-  '''Change the unit of wavelength from keV to angstrom.
+    '''Change the unit of wavelength from keV to angstrom.
 
-  :param float lambda_keV: the wavelength in keV unit.
-  :returns: the wavelength in angstrom unit.
-  '''
-  return 12.398 / lambda_keV
+    :param float lambda_keV: the wavelength in keV unit.
+    :returns: the wavelength in angstrom unit.
+    '''
+    return 12.398 / lambda_keV
+
 
 def lambda_nm_to_keV(lambda_nm):
-  '''Change the unit of wavelength from nm to keV.
+    '''Change the unit of wavelength from nm to keV.
 
-  :param float lambda_nm: the wavelength in nm unit.
-  :returns: the wavelength in keV unit.
-  '''
-  return 1.2398 / lambda_nm
+    :param float lambda_nm: the wavelength in nm unit.
+    :returns: the wavelength in keV unit.
+    '''
+    return 1.2398 / lambda_nm
+
 
 def lambda_angstrom_to_keV(lambda_angstrom):
-  '''Change the unit of wavelength from angstrom to keV.
+    '''Change the unit of wavelength from angstrom to keV.
 
-  :param float lambda_angstrom: the wavelength in angstrom unit.
-  :returns: the wavelength in keV unit.
-  '''
-  return 12.398 / lambda_angstrom
+    :param float lambda_angstrom: the wavelength in angstrom unit.
+    :returns: the wavelength in keV unit.
+    '''
+    return 12.398 / lambda_angstrom
+
 
 def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=(1, 100), legfmt='%.1f', display=True):
-  '''Plot the transmitted intensity of a X-ray beam through a given material.
+    '''Plot the transmitted intensity of a X-ray beam through a given material.
 
-  This function compute the transmitted intensity from tabulated data of
-  the mass attenuation coefficient \mu_\rho (between 1 and 100 keV) and
-  applying Beer's Lambert law:
+    This function compute the transmitted intensity from tabulated data of
+    the mass attenuation coefficient \mu_\rho (between 1 and 100 keV) and
+    applying Beer's Lambert law:
 
-    .. math::
+      .. math::
 
-      I/I_0 = \exp(-\mu_\rho*\rho*t)
+        I/I_0 = \exp(-\mu_\rho*\rho*t)
 
-  The tabulated data is stored in ascii files in the data folder. It has been retreived
-  from NIST http://physics.nist.gov/cgi-bin/ffast/ffast.pl
-  The density is also tabulated and can be left blanked unless a specific value is to be used.
+    The tabulated data is stored in ascii files in the data folder. It has been retreived
+    from NIST http://physics.nist.gov/cgi-bin/ffast/ffast.pl
+    The density is also tabulated and can be left blanked unless a specific value is to be used.
 
-  :param string mat: A string representing the material (e.g. 'Al')
-  :param list ts: a list of thickness values of the material in mm ([1.0] by default)
-  :param float rho: density of the material in g/cm^3 (None by default)
-  :param tuple energy_lim: energy bounds in keV for the plot (1, 100 by default)
-  :param string legfmt: string to format the legend plot
-  :param bool display: display or save an image of the plot (False by default)
-  '''
-  path = os.path.dirname(__file__)
-  print path
-  mu_rho = np.genfromtxt(os.path.join(path, 'data', mat + '.txt'), usecols = (0, 1), comments='#')
-  energy = mu_rho[:,0]
-  # look up density
-  if rho == None:
-      rho = densities[mat]
-  legstr = '%%s %s mm' % legfmt
-  for t in ts:
-    # apply Beer-Lambert
-    trans = 100*np.exp(-mu_rho[:, 1]*rho*t/10)
-    plt.plot(energy, trans, '-', linewidth=3, markersize=10, label=legstr % (mat, t))
-  # bound the energy to (1, 100)
-  if energy_lim[0] < 1:
-      energy_lim[0] = 1
-  if energy_lim[1] > 100:
-      energy_lim[1] = 100
-  plt.xlim(energy_lim)
-  plt.grid()
-  plt.legend(loc='upper left')
-  plt.xlabel('Photon Energy (keV)')
-  plt.ylabel(r'Transmission $I/I_0$ (%)')
-  if display:
-    plt.show()
-  else:
-    plt.savefig('xray_trans_' + mat + '.png')
+    :param string mat: A string representing the material (e.g. 'Al')
+    :param list ts: a list of thickness values of the material in mm ([1.0] by default)
+    :param float rho: density of the material in g/cm^3 (None by default)
+    :param tuple energy_lim: energy bounds in keV for the plot (1, 100 by default)
+    :param string legfmt: string to format the legend plot
+    :param bool display: display or save an image of the plot (False by default)
+    '''
+    path = os.path.dirname(__file__)
+    print path
+    mu_rho = np.genfromtxt(os.path.join(path, 'data', mat + '.txt'), usecols=(0, 1), comments='#')
+    energy = mu_rho[:, 0]
+    # look up density
+    if rho == None:
+        rho = densities[mat]
+    legstr = '%%s %s mm' % legfmt
+    for t in ts:
+        # apply Beer-Lambert
+        trans = 100 * np.exp(-mu_rho[:, 1] * rho * t / 10)
+        plt.plot(energy, trans, '-', linewidth=3, markersize=10, label=legstr % (mat, t))
+    # bound the energy to (1, 100)
+    if energy_lim[0] < 1:
+        energy_lim[0] = 1
+    if energy_lim[1] > 100:
+        energy_lim[1] = 100
+    plt.xlim(energy_lim)
+    plt.grid()
+    plt.legend(loc='upper left')
+    plt.xlabel('Photon Energy (keV)')
+    plt.ylabel(r'Transmission $I/I_0$ (%)')
+    if display:
+        plt.show()
+    else:
+        plt.savefig('xray_trans_' + mat + '.png')

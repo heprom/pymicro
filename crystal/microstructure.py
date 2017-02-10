@@ -122,7 +122,7 @@ class Orientation:
             uvw = np.array([Vc[2] - Vc[1], Vc[1] - Vc[0], Vc[0]])
             uvw /= np.linalg.norm(uvw)
             if (uvw[0] >= 0. and uvw[0] <= 1.0) and (uvw[1] >= 0. and uvw[1] <= 1.0) and (
-                    uvw[2] >= 0. and uvw[2] <= 1.0):
+                            uvw[2] >= 0. and uvw[2] <= 1.0):
                 print('found sym for sst')
                 break
         return uvw
@@ -149,9 +149,9 @@ class Orientation:
             Y = (sqrt(2) - 1) ** 2 / ((3 - 1 / tan(0.5 * psi) ** 2) ** 0.5)
             p = (2. / 15) * ((3 * (sqrt(2) - 1) + 4 / sqrt(3)) * sin(psi) - 6 * (1 - cos(psi))) \
                 - 8. / (5 * pi) * (
-            2 * (sqrt(2) - 1) * acos(X / tan(0.5 * psi)) + 1. / sqrt(3) * acos(Y / tan(0.5 * psi))) * sin(psi) \
+                2 * (sqrt(2) - 1) * acos(X / tan(0.5 * psi)) + 1. / sqrt(3) * acos(Y / tan(0.5 * psi))) * sin(psi) \
                 + 8. / (5 * pi) * (2 * acos((sqrt(2) + 1) * X / sqrt(2)) + acos((sqrt(2) + 1) * Y / sqrt(2))) * (
-            1 - cos(psi))
+                1 - cos(psi))
         else:
             p = 0.
         return p
@@ -1160,7 +1160,7 @@ class Microstructure:
             o = g.orientation
             f.write(
                 '  **elset %s%d *file %s *integration theta_method_a 1.0 1.e-9 150 *rotation %7.3f %7.3f %7.3f\n' % (
-                grain_prefix, g.id, mat_file, o.phi1(), o.Phi(), o.phi2()))
+                    grain_prefix, g.id, mat_file, o.phi1(), o.Phi(), o.phi2()))
         f.close()
 
     def to_xml(self, doc):

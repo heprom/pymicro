@@ -5,9 +5,9 @@ pymicro Package
 ----------------------
 
 .. automodule:: pymicro.__init__
-    :members:
-    :undoc-members:
-    :show-inheritance:
+:members:
+        :undoc-members:
+        :show-inheritance:
 
 Subpackages
 -----------

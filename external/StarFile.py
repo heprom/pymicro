@@ -960,7 +960,7 @@ class StarBlock(object):
         if len(instring) > (self.maxoutlength - 2) or '\n' in instring:
             allowed_delimiters.intersection_update(["\n;", "'''", '"""'])
         if ' ' in instring or '\t' in instring or '\v' in instring or (
-                len(instring) > 0 and instring[0] in '_$#;([{') or ',' in instring:
+                        len(instring) > 0 and instring[0] in '_$#;([{') or ',' in instring:
             allowed_delimiters.difference_update([None])
         if '"' in instring: allowed_delimiters.difference_update(['"', None])
         if "'" in instring: allowed_delimiters.difference_update(["'", None])
@@ -2131,7 +2131,7 @@ def process_template(template_file):
             testname = testnames[0]
             # find the loop spec line in the file
             loop_regex = "(^[ \t]*(?P<loop>loop_)[ \t\n\r]+(?P<name>" + testname + ")([ \t\n\r]+_[\S]+){%d}[ \t]*$(?P<packet>(.(?!_loop|_[\S]+))*))" % (
-            total_items - 1)
+                total_items - 1)
             loop_line = re.search(loop_regex, template_string, re.I | re.M | re.S)
             loop_so_far = loop_line.end()
             packet_text = loop_line.group('packet')

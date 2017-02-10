@@ -33,5 +33,6 @@ s3d.render()
 
 # thumbnail for the image gallery
 from matplotlib import image
+
 image_name = base_name + '.png'
 image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

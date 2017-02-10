@@ -17,9 +17,9 @@ orientation = Orientation.from_rodrigues(np.array([0.3889, -0.0885, 0.3268]))
 grain = Grain(1, orientation)
 grain_data = HST_read(im_file, autoparse_filename=True, verbose=True)
 grain.position = ndimage.measurements.center_of_mass(grain_data, grain_data)
-grain.volume = ndimage.measurements.sum(grain_data) # label is 1.0 here
+grain.volume = ndimage.measurements.sum(grain_data)  # label is 1.0 here
 grain.add_vtk_mesh(grain_data, contour=False)
-#grain.save_vtk_repr() # save the grain mesh in vtk format
+# grain.save_vtk_repr() # save the grain mesh in vtk format
 
 print('adding bounding box')
 grain_bbox = box_3d(size=np.shape(grain_data), line_color=white)

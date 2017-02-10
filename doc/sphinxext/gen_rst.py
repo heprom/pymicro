@@ -61,6 +61,7 @@ SINGLE_IMAGE = """
     :align: center
 """
 
+
 def extract_docstring(filename):
     """ Extract a module-level docstring, if any
     """
@@ -82,11 +83,11 @@ def extract_docstring(filename):
             # If the docstring is formatted with several paragraphs, extract
             # the first one:
             paragraphs = '\n'.join(line.rstrip()
-                                for line in docstring.split('\n')).split('\n\n')
+                                   for line in docstring.split('\n')).split('\n\n')
             if len(paragraphs) > 0:
                 first_par = paragraphs[0]
         break
-    return docstring, first_par, erow+1+start_row
+    return docstring, first_par, erow + 1 + start_row
 
 
 def generate_all_example_rst(app):
@@ -98,13 +99,13 @@ def generate_all_example_rst(app):
     # Walk all our source tree to find examples and generate them
     for dir_path, dir_names, file_names in os.walk(input_dir):
         if ('build' in dir_path.split(os.sep)
-                    or 'auto_examples' in dir_path.split(os.sep)):
+            or 'auto_examples' in dir_path.split(os.sep)):
             continue
         if 'examples' in dir_names:
             print ('*** found examples')
             generate_example_rst(
-                            os.path.join(dir_path, 'examples'),
-                            os.path.join(dir_path, 'auto_examples'))
+                os.path.join(dir_path, 'examples'),
+                os.path.join(dir_path, 'auto_examples'))
 
 
 def generate_example_rst(example_dir, out_dir):
@@ -166,7 +167,7 @@ def generate_dir_rst(dir, fhindex, example_dir, out_dir, plot_anim):
             print('*** this is a directory, going in...')
             # recursively treat this folder
             fhindex.write('\n' + fname + '\n')
-            fhindex.write(len(fname)*'-' + '\n\n')
+            fhindex.write(len(fname) * '-' + '\n\n')
             if fname.endswith('animation'):
                 generate_dir_rst(fname, fhindex, example_dir, out_dir, True)
             else:
@@ -187,7 +188,7 @@ def generate_dir_rst(dir, fhindex, example_dir, out_dir, plot_anim):
 .. raw:: html
 
     <div style="clear: both"></div>
-    """) # clear at the end of the section
+    """)  # clear at the end of the section
 
 
 def generate_file_rst(fname, target_dir, src_dir, plot_anim):
@@ -210,24 +211,24 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
 
     image_dir = os.path.join(target_dir, 'images')
     thumb_dir = os.path.join(image_dir, 'thumb')
-    print 'image_dir: ',image_dir
-    print 'thumb_dir: ',thumb_dir
+    print 'image_dir: ', image_dir
+    print 'thumb_dir: ', thumb_dir
     if not os.path.exists(image_dir):
         os.makedirs(image_dir)
     if not os.path.exists(thumb_dir):
         os.makedirs(thumb_dir)
     image_path = os.path.join(image_dir, image_fname)
     image_thumb_path = os.path.join(src_dir, 'thumb_' + image_fname)
-    print 'image_thumb_path: ',image_thumb_path
+    print 'image_thumb_path: ', image_thumb_path
     # copy image to the images folder
     shutil.copy(os.path.join(src_dir, image_fname), image_path)
 
     this_template = plot_rst_template
     # code moved to the actual examples not to depend on matplotlib
     # generate thumb file
-    #thumb_file = os.path.join(thumb_dir, fname[:-3] + '.png')
-    #from matplotlib import image
-    #if os.path.exists(image_path):
+    # thumb_file = os.path.join(thumb_dir, fname[:-3] + '.png')
+    # from matplotlib import image
+    # if os.path.exists(image_path):
     #    image.thumbnail(image_path, thumb_file, 0.2)
 
     thumb_file = os.path.join(thumb_dir, fname[:-3] + '.png')
@@ -246,7 +247,7 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
 
     image_list = SINGLE_IMAGE % image_fname.lstrip('/')
 
-    f = open(os.path.join(target_dir, fname[:-2] + 'rst'),'w')
+    f = open(os.path.join(target_dir, fname[:-2] + 'rst'), 'w')
     f.write(this_template % locals())
     f.flush()
 

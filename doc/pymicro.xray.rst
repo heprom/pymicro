@@ -1,5 +1,5 @@
 xray Package
-===============
+============
 
 .. automodule:: pymicro.xray
     :members:
@@ -8,7 +8,7 @@ xray Package
     :show-inheritance:
 
 :mod:`detectors` Module
----------------------
+-----------------------
 
 .. automodule:: pymicro.xray.detectors
     :members:
@@ -17,7 +17,7 @@ xray Package
     :show-inheritance:
 
 :mod:`laue` Module
-----------------------------
+------------------
 
 .. automodule:: pymicro.xray.laue
     :members:
@@ -26,7 +26,7 @@ xray Package
     :show-inheritance:
 
 :mod:`xray_utils` Module
-----------------------------
+------------------------
 
 .. automodule:: pymicro.xray.xray_utils
     :members:

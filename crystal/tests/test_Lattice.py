@@ -73,6 +73,18 @@ class HklDirectionTests(unittest.TestCase):
         self.assertAlmostEqual(d.direction()[1], target[1], 4)
         self.assertAlmostEqual(d.direction()[2], target[2], 4)
 
+    def test_angle_with_directions(self):
+        (a, b, c) = (1.022, 0.596, 0.481)
+        olivine = Lattice.orthorombic(a, b, c)
+        (h1, k1, l1) = (1., 1., 1.)
+        (h2, k2, l2) = (3., 3., 2.)
+        d1 = HklDirection(h1, k1, l1, olivine)
+        d2 = HklDirection(h2, k2, l2, olivine)
+        # compare with formula in orthorombic lattice, angle must be 6.589 degrees
+        angle = np.arccos(((h1 * h2 * a ** 2) + (k1 * k2 * b ** 2) + (l1 * l2 * c ** 2)) /
+                    (np.sqrt(a ** 2 * h1 ** 2 + b ** 2 * k1 ** 2 + c ** 2 * l1 ** 2) *
+                     np.sqrt(a ** 2 * h2 ** 2 + b ** 2 * k2 ** 2 + c ** 2 * l2 ** 2)))
+        self.assertAlmostEqual(d1.angle_with_direction(d2), angle)
 
 class HklPlaneTests(unittest.TestCase):
     def setUp(self):

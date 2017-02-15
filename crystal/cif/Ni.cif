@@ -1,216 +1,69 @@
-data_Ni
-_audit_creation_date              2011-06-17
-_audit_creation_method            'Materials Studio'
-_symmetry_space_group_name_H-M    'FM-3M'
-_symmetry_Int_Tables_number       225
-_symmetry_cell_setting            cubic
+#------------------------------------------------------------------------------
+#$Date: 2010-01-30 13:59:17 +0000 (Sat, 30 Jan 2010) $
+#$Revision: 966 $
+#$URL: svn://cod.ibt.lt/cod/cif/9/9008509.cif $
+#------------------------------------------------------------------------------
+#
+# This file is available in the Crystallography Open Database (COD),
+# http://www.crystallography.net/
+#
+# All data on this site have been placed in the public domain by the
+# contributors.
+#
+data_9008509
+loop_
+_publ_author_name
+'Wyckoff R W G'
+_publ_section_title
+;
+ Second edition. Interscience Publishers, New York, New York
+ Hexagonal closest packed, hcp, structure
+;
+_journal_name_full               'Crystal Structures'
+_journal_page_first              7
+_journal_page_last               83
+_journal_volume                  1
+_journal_year                    1963
+_chemical_formula_sum            Ni
+_chemical_name_mineral           Nickel
+_symmetry_space_group_name_H-M   'P 63/m m c'
+_cell_angle_alpha                90
+_cell_angle_beta                 90
+_cell_angle_gamma                120
+_cell_length_a                   2.65
+_cell_length_b                   2.65
+_cell_length_c                   4.33
+_cell_volume                     26.334
 loop_
 _symmetry_equiv_pos_as_xyz
-  x,y,z
-  -x,-y,z
-  -x,y,-z
-  x,-y,-z
-  z,x,y
-  z,-x,-y
-  -z,-x,y
-  -z,x,-y
-  y,z,x
-  -y,z,-x
-  y,-z,-x
-  -y,-z,x
-  y,x,-z
-  -y,-x,-z
-  y,-x,z
-  -y,x,z
-  x,z,-y
-  -x,z,y
-  -x,-z,-y
-  x,-z,y
-  z,y,-x
-  z,-y,x
-  -z,y,x
-  -z,-y,-x
-  -x,-y,-z
-  x,y,-z
-  x,-y,z
-  -x,y,z
-  -z,-x,-y
-  -z,x,y
-  z,x,-y
-  z,-x,y
-  -y,-z,-x
-  y,-z,x
-  -y,z,x
-  y,z,-x
-  -y,-x,z
-  y,x,z
-  -y,x,-z
-  y,-x,-z
-  -x,-z,y
-  x,-z,-y
-  x,z,y
-  -x,z,-y
-  -z,-y,x
-  -z,y,-x
-  z,-y,-x
-  z,y,x
-  x,y+1/2,z+1/2
-  -x,-y+1/2,z+1/2
-  -x,y+1/2,-z+1/2
-  x,-y+1/2,-z+1/2
-  z,x+1/2,y+1/2
-  z,-x+1/2,-y+1/2
-  -z,-x+1/2,y+1/2
-  -z,x+1/2,-y+1/2
-  y,z+1/2,x+1/2
-  -y,z+1/2,-x+1/2
-  y,-z+1/2,-x+1/2
-  -y,-z+1/2,x+1/2
-  y,x+1/2,-z+1/2
-  -y,-x+1/2,-z+1/2
-  y,-x+1/2,z+1/2
-  -y,x+1/2,z+1/2
-  x,z+1/2,-y+1/2
-  -x,z+1/2,y+1/2
-  -x,-z+1/2,-y+1/2
-  x,-z+1/2,y+1/2
-  z,y+1/2,-x+1/2
-  z,-y+1/2,x+1/2
-  -z,y+1/2,x+1/2
-  -z,-y+1/2,-x+1/2
-  -x,-y+1/2,-z+1/2
-  x,y+1/2,-z+1/2
-  x,-y+1/2,z+1/2
-  -x,y+1/2,z+1/2
-  -z,-x+1/2,-y+1/2
-  -z,x+1/2,y+1/2
-  z,x+1/2,-y+1/2
-  z,-x+1/2,y+1/2
-  -y,-z+1/2,-x+1/2
-  y,-z+1/2,x+1/2
-  -y,z+1/2,x+1/2
-  y,z+1/2,-x+1/2
-  -y,-x+1/2,z+1/2
-  y,x+1/2,z+1/2
-  -y,x+1/2,-z+1/2
-  y,-x+1/2,-z+1/2
-  -x,-z+1/2,y+1/2
-  x,-z+1/2,-y+1/2
-  x,z+1/2,y+1/2
-  -x,z+1/2,-y+1/2
-  -z,-y+1/2,x+1/2
-  -z,y+1/2,-x+1/2
-  z,-y+1/2,-x+1/2
-  z,y+1/2,x+1/2
-  x+1/2,y,z+1/2
-  -x+1/2,-y,z+1/2
-  -x+1/2,y,-z+1/2
-  x+1/2,-y,-z+1/2
-  z+1/2,x,y+1/2
-  z+1/2,-x,-y+1/2
-  -z+1/2,-x,y+1/2
-  -z+1/2,x,-y+1/2
-  y+1/2,z,x+1/2
-  -y+1/2,z,-x+1/2
-  y+1/2,-z,-x+1/2
-  -y+1/2,-z,x+1/2
-  y+1/2,x,-z+1/2
-  -y+1/2,-x,-z+1/2
-  y+1/2,-x,z+1/2
-  -y+1/2,x,z+1/2
-  x+1/2,z,-y+1/2
-  -x+1/2,z,y+1/2
-  -x+1/2,-z,-y+1/2
-  x+1/2,-z,y+1/2
-  z+1/2,y,-x+1/2
-  z+1/2,-y,x+1/2
-  -z+1/2,y,x+1/2
-  -z+1/2,-y,-x+1/2
-  -x+1/2,-y,-z+1/2
-  x+1/2,y,-z+1/2
-  x+1/2,-y,z+1/2
-  -x+1/2,y,z+1/2
-  -z+1/2,-x,-y+1/2
-  -z+1/2,x,y+1/2
-  z+1/2,x,-y+1/2
-  z+1/2,-x,y+1/2
-  -y+1/2,-z,-x+1/2
-  y+1/2,-z,x+1/2
-  -y+1/2,z,x+1/2
-  y+1/2,z,-x+1/2
-  -y+1/2,-x,z+1/2
-  y+1/2,x,z+1/2
-  -y+1/2,x,-z+1/2
-  y+1/2,-x,-z+1/2
-  -x+1/2,-z,y+1/2
-  x+1/2,-z,-y+1/2
-  x+1/2,z,y+1/2
-  -x+1/2,z,-y+1/2
-  -z+1/2,-y,x+1/2
-  -z+1/2,y,-x+1/2
-  z+1/2,-y,-x+1/2
-  z+1/2,y,x+1/2
-  x+1/2,y+1/2,z
-  -x+1/2,-y+1/2,z
-  -x+1/2,y+1/2,-z
-  x+1/2,-y+1/2,-z
-  z+1/2,x+1/2,y
-  z+1/2,-x+1/2,-y
-  -z+1/2,-x+1/2,y
-  -z+1/2,x+1/2,-y
-  y+1/2,z+1/2,x
-  -y+1/2,z+1/2,-x
-  y+1/2,-z+1/2,-x
-  -y+1/2,-z+1/2,x
-  y+1/2,x+1/2,-z
-  -y+1/2,-x+1/2,-z
-  y+1/2,-x+1/2,z
-  -y+1/2,x+1/2,z
-  x+1/2,z+1/2,-y
-  -x+1/2,z+1/2,y
-  -x+1/2,-z+1/2,-y
-  x+1/2,-z+1/2,y
-  z+1/2,y+1/2,-x
-  z+1/2,-y+1/2,x
-  -z+1/2,y+1/2,x
-  -z+1/2,-y+1/2,-x
-  -x+1/2,-y+1/2,-z
-  x+1/2,y+1/2,-z
-  x+1/2,-y+1/2,z
-  -x+1/2,y+1/2,z
-  -z+1/2,-x+1/2,-y
-  -z+1/2,x+1/2,y
-  z+1/2,x+1/2,-y
-  z+1/2,-x+1/2,y
-  -y+1/2,-z+1/2,-x
-  y+1/2,-z+1/2,x
-  -y+1/2,z+1/2,x
-  y+1/2,z+1/2,-x
-  -y+1/2,-x+1/2,z
-  y+1/2,x+1/2,z
-  -y+1/2,x+1/2,-z
-  y+1/2,-x+1/2,-z
-  -x+1/2,-z+1/2,y
-  x+1/2,-z+1/2,-y
-  x+1/2,z+1/2,y
-  -x+1/2,z+1/2,-y
-  -z+1/2,-y+1/2,x
-  -z+1/2,y+1/2,-x
-  z+1/2,-y+1/2,-x
-  z+1/2,y+1/2,x
-_cell_length_a                    3.5240
-_cell_length_b                    3.5240
-_cell_length_c                    3.5240
-_cell_angle_alpha                 90.0000
-_cell_angle_beta                  90.0000
-_cell_angle_gamma                 90.0000
+x,y,z
+-x,-x+y,1/2+z
+x,x-y,1/2-z
+-x+y,-x,1/2-z
+x-y,x,1/2+z
+-y,-x,z
+y,x,-z
+y,-x+y,-z
+-y,x-y,z
+x-y,-y,1/2+z
+-x+y,y,1/2-z
+x,y,1/2-z
+-x,-y,1/2+z
+x,x-y,z
+-x,-x+y,-z
+x-y,x,-z
+-x+y,-x,z
+y,x,1/2+z
+-y,-x,1/2-z
+-y,x-y,1/2-z
+y,-x+y,1/2+z
+-x+y,y,z
+x-y,-y,-z
+-x,-y,-z
 loop_
 _atom_site_label
-_atom_site_type_symbol
 _atom_site_fract_x
 _atom_site_fract_y
 _atom_site_fract_z
-_atom_site_U_iso_or_equiv
-_atom_site_adp_type
-_atom_site_occupancy
-NI1    Ni    0.00000   0.00000   0.00000   0.00000  Uiso   1.00
+Ni 0.33333 0.66667 0.25000
+_cod_database_code 9008509

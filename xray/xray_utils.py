@@ -3,7 +3,8 @@ from matplotlib import pyplot as plt
 
 densities = {'Li': 0.533,  # Z = 3
              'Be': 1.8450,  # Z = 4
-             'C': 2.26,  # Z = 6
+             'C': 2.26,  # Z = 6, strongly depends on crystal structure
+             'Mg': 1.738,  # Z = 12
              'Al': 2.6941,  # Z = 13
              'Ti': 4.530,  # Z = 22
              'V': 6.100,  # Z = 23

@@ -13,3 +13,4 @@ from pymicro.view.vtk_utils import *
 from pymicro.view.vtk_anim import *
 from pymicro.xray.detectors import *
 from pymicro.xray.xray_utils import *
+from pymicro.xray.laue import *

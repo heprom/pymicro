@@ -197,8 +197,8 @@ def HST_info(info_file):
     return [x_dim, y_dim, z_dim]
 
 
-def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
-             header_size=0, autoparse_filename=False, dims=None):
+def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
+             header_size=0, autoparse_filename=False, dims=None, mmap=False):
     '''Read a volume file stored as a concatenated stack of binary images.
 
     The volume size must be specified by dims=(nx,ny,nz) unless an associated
@@ -221,7 +221,7 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
       use: np.swapaxes(HST_read('file.edf', ...), 0, 1)
 
     '''
-    if autoparse_filename == True:
+    if autoparse_filename:
         s_type = scan_name[:-4].split('_')[-1]
         if s_type == 'uint8':
             data_type = np.uint8
@@ -229,23 +229,27 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False, \
             data_type = np.uint16
         s_size = scan_name[:-4].split('_')[-2].split('x')
         dims = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
-        if verbose: print('autoparsing filename: data type is set to', data_type)
+        if verbose: print('auto parsing filename: data type is set to', data_type)
     if verbose: print('data type is', data_type)
-    if dims == None:
+    if dims is None:
         [nx, ny, nz] = HST_info(scan_name + '.info')
     else:
         (nx, ny, nz) = dims
-    if zrange == None:
+    if zrange is None:
         zrange = range(0, nz)
-    if verbose: print 'volume size is ', nx, 'x', ny, 'x', len(zrange)
-    f = open(scan_name, 'rb')
-    data = np.empty((ny, nx, len(zrange)), dtype=data_type)
-    f.seek(header_size + np.dtype(data_type).itemsize * nx * ny * zrange[0])
-    if verbose: print('reading volume... from byte %d' % f.tell())
-    data = np.reshape(np.fromstring( \
-        f.read(np.dtype(data_type).itemsize * len(zrange) * ny * nx), \
-        data_type).astype(data_type), (len(zrange), ny, nx), order='C')
-    f.close()
+    if verbose:
+        print 'volume size is ', nx, 'x', ny, 'x', len(zrange)
+    if mmap:
+        data = np.memmap(scan_name, dtype=data_type, mode='c', shape=(len(zrange), ny, nx))
+    else:
+        f = open(scan_name, 'rb')
+        # data = np.empty((ny, nx, len(zrange)), dtype=data_type)
+        f.seek(header_size + np.dtype(data_type).itemsize * nx * ny * zrange[0])
+        if verbose: print('reading volume... from byte %d' % f.tell())
+        data = np.reshape(np.fromstring(
+            f.read(np.dtype(data_type).itemsize * len(zrange) * ny * nx),
+            data_type).astype(data_type), (len(zrange), ny, nx), order='C')
+        f.close()
     # HP 10/2013 start using proper [x,y,z] data ordering
     data_xyz = data.transpose(2, 1, 0)
     return data_xyz
@@ -260,7 +264,7 @@ def rawmar_read(image_name, size, verbose=False):
 
        This method assume Big endian byte order.
     '''
-    data = HST_read(image_name, dims=(1, size, size), header=4600, \
+    data = HST_read(image_name, dims=(1, size, size), header=4600,
                     data_type=np.uint16, verbose=verbose)[:, :, 0]
     return data
 

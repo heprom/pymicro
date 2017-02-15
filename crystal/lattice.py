@@ -652,15 +652,22 @@ class HklDirection(HklObject):
 
     def angle_with_direction(self, hkl):
         '''Computes the angle between this crystallographic direction and
-        the given direction (in radians).'''
+        the given direction (in radian).'''
         return np.arccos(np.dot(self.direction(), hkl.direction()))
 
     @staticmethod
-    def angle_between_directions((h1, k1, l1), (h2, k2, l2)):
-        '''Computes the angle between two crystallographic directions (in degrees).'''
-        d1 = HklDirection(h1, k1, l1)
-        d2 = HklDirection(h2, k2, l2)
-        return d1.angle_with_direction(d2) * 180 / np.pi
+    def angle_between_directions((h1, k1, l1), (h2, k2, l2), lattice=None):
+        '''Computes the angle between two crystallographic directions (in radian).
+
+        :param tuple (h1, k1, l1): The triplet of the miller indices of the first direction.
+        :param tuple (h2, k2, l2): The triplet of the miller indices of the second direction.
+        :param Lattice lattice: The crystal lattice, will default to cubic if not specified.
+
+        :returns float: The angle in radian.
+        '''
+        d1 = HklDirection(h1, k1, l1, lattice)
+        d2 = HklDirection(h2, k2, l2, lattice)
+        return d1.angle_with_direction(d2)
 
     def find_planes_in_zone(self, max_miller=5):
         '''

@@ -1,6 +1,44 @@
 Change log history
 ==================
 
+pymicro version 0.4.0
+---------------------
+
+* updated version number to 0.4.0 (Henry Proudhon)
+* added license file (Henry Proudhon)
+* prefer the use of is instead of == testing for None (Henry Proudhon)
+* adjust assertion after updating Al cif file (Henry Proudhon)
+* new fil_utils tests (Henry Proudhon)
+* added memory mapping option to HST_read function (Henry Proudhon)
+* use the proper fcc Ni cif file (Henry Proudhon)
+* added Ga and Mn cif files (Henry Proudhon)
+* cleaening up cif files and minor tweaks (Henry Proudhon)
+* added lattice arg to angle_between_directions to prevent forcing it to cubic (Henry Proudhon)
+* added new test for angle between two hkl directions (Henry Proudhon)
+* reformated all code with a consisten style (Henry Proudhon)
+* doc changes to reflect new file organisation (Henry Proudhon)
+* moving a bunch of file for a better organisation, created external folder (Henry Proudhon)
+* cleaning old stuff, moving tifffile out (Henry Proudhon)
+* new edge_actor method and updated show_boundaries (Henry Proudhon)
+* hist now plot in a new figure (Henry Proudhon)
+* updated xray_trans function, added table for densities (Henry Proudhon)
+* moved all mass attenuation coefficients to the data folder (Henry Proudhon)
+* fixed all docstrings (Henry Proudhon)
+* fixed bug in compute_ellipsis method (Henry Proudhon)
+* fixed dupplicate link for packages and added xray package (Henry Proudhon)
+* added a4 paper option (Henry Proudhon)
+* new example laue_ellipse (Henry Proudhon)
+* more fixes to the compute_ellpisis method (Henry Proudhon)
+* new test for select_lambda method (Henry Proudhon)
+* added docstring + bugfix in compute_ellpisis (Henry Proudhon)
+* fix small typo with the data_type variable (Henry Proudhon)
+* make full use of the detector variable in compute_ellpisis (Henry Proudhon)
+* modified detector classes, added new class PerkinElmer1620 (Henry Proudhon)
+* added initial code for Laue diffraction calculation and one first unit test (Henry Proudhon)
+* added a vtkCleanPolyData step for the show_boundaries method (Henry Proudhon)
+* added docstring for function show_boundaries (Henry Proudhon)
+* updated changelog (Henry Proudhon)
+
 pymicro version 0.3.3
 ---------------------
 

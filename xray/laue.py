@@ -117,14 +117,27 @@ def diffracted_vector(hkl, orientation, min_theta=0.1):
     return K
 
 
-def compute_Laue_pattern(orientation, detector, det_distance, hklplanes=None, inverted=False):
-    r_spot = 10  # pixels
+def compute_Laue_pattern(orientation, detector, det_distance, hklplanes=None,
+                         r_spot=5, inverted=False, show_direct_beam=False):
+    '''
+    Compute a transmission Laue pattern. The data array of the given
+    detector2d instance is initialized with the result.
+
+    :param orientation: The crystal orientation.
+    :param detector: An instance of the Detector2d class.
+    :param float det_distance: The sample-to-detector distance.
+    :param list hklplanes: A list of the lattice planes to include in the pattern.
+    :param int r_spot: Size of the spots on the detector in pixel (5 by default)
+    :param bool inverted: A flag to control if the pattern needs to be inverted.
+    :param bool show_direct_beam: A flag to control if the direct beam is shown.
+    :returns: the computed pattern as a numpy array.
+    '''
     # det_size_mm = np.array(detector.size) * detector.pixel_size # mm
-    detector.data = np.zeros(det_size_pixel, dtype=np.uint8)
+    detector.data = np.zeros(detector.size, dtype=np.uint8)
     val = np.iinfo(detector.data.dtype.type).max  # 255 here
-    # show direct beam
-    detector.data[detector.ucen - 2 * r_spot:detector.ucen + 2 * r_spot,
-    detector.vcen - 2 * r_spot:detector.vcen + 2 * r_spot] = val
+    if show_direct_beam:
+        detector.data[detector.ucen - 2 * r_spot:detector.ucen + 2 * r_spot,
+            detector.vcen - 2 * r_spot:detector.vcen + 2 * r_spot] = val
 
     for hkl in hklplanes:
         K = diffracted_vector(hkl, orientation)

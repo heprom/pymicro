@@ -85,7 +85,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=(1, 100), legfmt='%
     mu_rho = np.genfromtxt(os.path.join(path, 'data', mat + '.txt'), usecols=(0, 1), comments='#')
     energy = mu_rho[:, 0]
     # look up density
-    if rho == None:
+    if rho is None:
         rho = densities[mat]
     legstr = '%%s %s mm' % legfmt
     for t in ts:

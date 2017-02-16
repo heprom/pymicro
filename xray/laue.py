@@ -8,7 +8,8 @@ def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
     Compute the wavelength corresponding to the first order reflection
     of a given lattice plane.
 
-    :param hkl: The given latice plane.
+    :param hkl: The given lattice plane.
+    :param orientation: The orientation of the crystal lattice.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param bool verbose: activate verbose mode (default False).
     :returns tuple: A tuple of the wavelength value and the corresponding Bragg angle.

@@ -1856,7 +1856,6 @@ def slits(size, x_slits=0):
     corner_points[:, 0, 3] = [x_slits, 0.6 * size[1] / 2, size[2] / 2]
     corner_points[:, 1, 3] = [x_slits, size[1] / 2, size[2] / 2]
     corner_points[:, 2, 3] = [x_slits, size[1] / 2, 0.6 * size[2] / 2]
-    print corner_points
     for c in range(4):
         linePoints = vtk.vtkPoints()
         linePoints.SetNumberOfPoints(3)

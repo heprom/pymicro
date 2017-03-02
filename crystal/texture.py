@@ -96,6 +96,8 @@ class PoleFigure:
         self.lut = lut
         if field_name == 'grain_id':
             self.field = [g.id for g in self.microstructure.grains]
+        elif field_name == 'ipf':
+            self.field = [g.id for g in self.microstructure.grains]
         else:
             if len(field) < len(self.microstructure.grains):
                 raise ValueError('The field must contain a record for each grain in the microstructure')
@@ -276,6 +278,8 @@ class PoleFigure:
                         if self.pflegend and i == 0:
                             # only add grain legend for its first pole
                             label = 'grain ' + str(grain.id)
+                    if self.map_field == 'ipf':
+                        col = grain.orientation.get_ipf_colour()
                     else:  # use the field value for this grain
                         color = int(255 * (self.field[grain.id] - self.field_min_level) / float(
                             self.field_max_level - self.field_min_level))
@@ -372,6 +376,8 @@ class PoleFigure:
         if self.map_field:
             if self.map_field == 'grain_id':
                 col = Microstructure.rand_cmap().colors[grain.id]
+            elif self.map_field == 'ipf':
+                col = grain.orientation.get_ipf_colour()
             else:  # use the field value for this grain
                 color = int(255 * (self.field[grain.id] - self.field_min_level) / float(
                     self.field_max_level - self.field_min_level))
@@ -452,6 +458,8 @@ class PoleFigure:
             if self.map_field == 'grain_id':
                 col = Microstructure.rand_cmap().colors[grain.id]
             self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
+            if self.map_field == 'ipf':
+                col = grain.orientation.get_ipf_colour()
             if self.verbose: print 'plotting ', self.axis, ' in crystal CS:', axis_rot
         ax.axis([-1.1, 1.1, -1.1, 1.1])
         ax.axis('off')

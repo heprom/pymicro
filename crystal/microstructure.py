@@ -121,6 +121,7 @@ class Orientation:
                 Vc *= -1.  # using the upward direction
             uvw = np.array([Vc[2] - Vc[1], Vc[1] - Vc[0], Vc[0]])
             uvw /= np.linalg.norm(uvw)
+            uvw /= max(uvw)
             if (uvw[0] >= 0. and uvw[0] <= 1.0) and (uvw[1] >= 0. and uvw[1] <= 1.0) and (
                             uvw[2] >= 0. and uvw[2] <= 1.0):
                 #print('found sym for sst')

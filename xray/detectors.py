@@ -206,6 +206,10 @@ class RegArrayDetector2d(Detector2d):
         self.dark = np.zeros(self.size, dtype=self.data_type)
         self.bg = np.zeros(self.size, dtype=self.data_type)
 
+    def get_size_mm(self):
+        '''Return the size of the detector in millimeters.'''
+        return self.pixel_size * np.array(self.size)
+
     def load_image(self, image_path):
         print('loading image %s' % image_path)
         self.image_path = image_path

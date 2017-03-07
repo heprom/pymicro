@@ -121,9 +121,10 @@ class Orientation:
                 Vc *= -1.  # using the upward direction
             uvw = np.array([Vc[2] - Vc[1], Vc[1] - Vc[0], Vc[0]])
             uvw /= np.linalg.norm(uvw)
+            uvw /= max(uvw)
             if (uvw[0] >= 0. and uvw[0] <= 1.0) and (uvw[1] >= 0. and uvw[1] <= 1.0) and (
                             uvw[2] >= 0. and uvw[2] <= 1.0):
-                print('found sym for sst')
+                #print('found sym for sst')
                 break
         return uvw
 
@@ -1095,6 +1096,17 @@ class Microstructure:
         if first_is_black:
             rand_colors[0] = [0., 0., 0.]  # enforce black background (value 0)
         return colors.ListedColormap(rand_colors)
+
+    def ipf_cmap(self):
+        '''
+        Return a colormap with ipf colors.
+        '''
+
+        N = len(self.grains)
+        ipf_colors = np.zeros((4096, 3))
+        for g in self.grains:
+            ipf_colors[g.id,:] = g.orientation.get_ipf_colour()
+        return colors.ListedColormap(ipf_colors)
 
     @staticmethod
     def from_xml(xml_file_name, grain_ids=None, verbose=False):

@@ -629,6 +629,49 @@ class HklObject:
         '''
         return (self._h, self._k, self._l)
 
+    @staticmethod
+    def skip_higher_order(hkl_list, verbose=False):
+        """Create a copy of a list of some hkl object retaining only the first order.
+
+        :param list hkl_list: The list of HklObject`
+        :returns list: A new list of :py:class:`~pymicro.crystal.lattice.HklObject` without any multiple reflection.
+        """
+        # create array with all the miller indices
+        hkl_array = np.empty((len(hkl_list), 3), dtype=int)
+        for i in range(len(hkl_list)):
+            hkl = hkl_list[i]
+            hkl_array[i] = np.array(hkl.miller_indices())
+        # first start by ordering the HklObjects by ascending miller indices sum
+        hkl_sum = np.sum(np.abs(hkl_array), axis=1)
+        hkl_sum_sort = np.argsort(hkl_sum)
+        first_order_list = [hkl_list[hkl_sum_sort[0]]]
+        for i in range(1, len(hkl_sum_sort)):
+            hkl_next = hkl_sum_sort[i]
+            hkl = hkl_list[hkl_next]
+            (h, k, l) = hkl.miller_indices()
+            if verbose:
+                print('trying hkl object (%d, %d, %d)' % (h, k, l))
+            lower = False
+            # check if a hkl object already exist in the list
+            for uvw in first_order_list:
+                # try to assess the multiple from the sum of miller indices
+                (u, v, w) = uvw.miller_indices()
+                if verbose:
+                    print('looking at: (%d, %d, %d)' % (u, v, w))
+                n = hkl_sum[hkl_next] / np.sum(np.abs(np.array((u, v, w))), axis=0)
+                for order in [-n, n]:
+                    if (u * order == h) and (v * order == k) and (w * order) == l:
+                        if verbose:
+                            print('lower order reflexion was found: (%d, %d, %d) with n=%d' % (u, v, w, order))
+                        lower = True
+                        break
+            # if no lower order reflexion was found, add the hkl object to the list
+            if not lower:
+                if verbose:
+                    print('adding hkl object (%d, %d, %d) to the list' % (h, k, l))
+                first_order_list.append(hkl)
+        return first_order_list
+
 
 class HklDirection(HklObject):
     def __repr__(self):

@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from pymicro.crystal.lattice import Lattice, HklDirection, HklPlane, SlipSystem
+from pymicro.crystal.lattice import Lattice, HklObject, HklDirection, HklPlane, SlipSystem
 
 
 class LatticeTests(unittest.TestCase):
@@ -82,9 +82,17 @@ class HklDirectionTests(unittest.TestCase):
         d2 = HklDirection(h2, k2, l2, olivine)
         # compare with formula in orthorombic lattice, angle must be 6.589 degrees
         angle = np.arccos(((h1 * h2 * a ** 2) + (k1 * k2 * b ** 2) + (l1 * l2 * c ** 2)) /
-                    (np.sqrt(a ** 2 * h1 ** 2 + b ** 2 * k1 ** 2 + c ** 2 * l1 ** 2) *
-                     np.sqrt(a ** 2 * h2 ** 2 + b ** 2 * k2 ** 2 + c ** 2 * l2 ** 2)))
+                          (np.sqrt(a ** 2 * h1 ** 2 + b ** 2 * k1 ** 2 + c ** 2 * l1 ** 2) *
+                           np.sqrt(a ** 2 * h2 ** 2 + b ** 2 * k2 ** 2 + c ** 2 * l2 ** 2)))
         self.assertAlmostEqual(d1.angle_with_direction(d2), angle)
+
+    def test_skip_higher_order(self):
+        uvw = HklDirection(3, 3, 1)
+        hkl_planes = uvw.find_planes_in_zone(max_miller=3)
+        self.assertEqual(len(hkl_planes), 18)
+        hkl_planes2 = HklObject.skip_higher_order(hkl_planes)
+        self.assertEqual(len(hkl_planes2), 7)
+
 
 class HklPlaneTests(unittest.TestCase):
     def setUp(self):
@@ -104,10 +112,11 @@ class HklPlaneTests(unittest.TestCase):
         self.assertAlmostEqual(n[2], 0.439, 3)
 
     def test_110_normal_monoclinic(self):
-        '''This test comes from
+        """Testing (110) plane normal in monoclinic crystal structure.
+        This test comes from
         http://www.mse.mtu.edu/~drjohn/my3200/stereo/sg5.html
         corrected for a few errors in the html page.
-        '''
+        """
         Mg2Si = Lattice.from_parameters(1.534, 0.405, 0.683, 90., 106., 90.)
         a = Mg2Si.matrix[0]
         b = Mg2Si.matrix[1]

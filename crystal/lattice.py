@@ -633,7 +633,8 @@ class HklObject:
     def skip_higher_order(hkl_list, verbose=False):
         """Create a copy of a list of some hkl object retaining only the first order.
 
-        :param list hkl_list: The list of HklObject`
+        :param list hkl_list: The list of `HklObject`.
+        :param bool verbose: activate verbose mode.
         :returns list: A new list of :py:class:`~pymicro.crystal.lattice.HklObject` without any multiple reflection.
         """
         # create array with all the miller indices

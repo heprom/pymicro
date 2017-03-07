@@ -227,6 +227,8 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
             data_type = np.uint8
         elif s_type == 'uint16':
             data_type = np.uint16
+        elif s_type == 'float32':
+            data_type = np.float32
         s_size = scan_name[:-4].split('_')[-2].split('x')
         dims = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
         if verbose: print('auto parsing filename: data type is set to', data_type)

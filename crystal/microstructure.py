@@ -1004,7 +1004,7 @@ class Grain:
         xg = float(grain_position.childNodes[0].childNodes[0].nodeValue)
         yg = float(grain_position.childNodes[1].childNodes[0].nodeValue)
         zg = float(grain_position.childNodes[2].childNodes[0].nodeValue)
-        grain.position = (xg, yg, zg)
+        grain.position = np.array([xg, yg, zg])
         grain_mesh = grain_node.childNodes[3]
         grain_mesh_file = grain_mesh.childNodes[0].nodeValue
         if verbose: print grain_mesh_file

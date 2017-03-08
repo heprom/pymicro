@@ -56,17 +56,10 @@ def hist(data, nb_bins=256, data_range=(0, 255), show=True, save=False, prefix='
 def flat(img, ref, dark):
     '''Apply flat field correction to an image.
 
-    *Parameters*
-
-    **img**: the image to correct.
-
-    **ref**: the reference image (without sample).
-
-    **dark**: the dark image (thermal noise of the camera).
-
-    *Returns*
-
-    **flat**: the flat field corrected image (between 0 and 1).
+    :param np.array img: A 2D array representing the image to correct.
+    :param np.array ref: The reference image (without the sample), same shape as the image to correct.
+    :param np.array dark: A 2D numpy array representing the dark image (thermal noise of the camera).
+    :returns np.array float: the flat field corrected image (between 0 and 1) as a float32 numpy array.
     '''
     flat = (img - dark).astype(np.float32) / (ref - dark).astype(np.float32)
     return flat

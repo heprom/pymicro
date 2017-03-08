@@ -4,38 +4,6 @@ from matplotlib.colors import colorConverter
 import matplotlib as mpl
 
 
-def show_and_save(image, name, dpi=100, colormap=cm.gray, verbose=False):
-    '''Save a 2D image with pyplot.
-
-    This function displays a 2D numpy array (or a slice of a 3D array)
-    using pyplot and save it to the disk as a png image. The interpolation
-    is disabled and the vertical origin is set to the bottom of the image.
-
-    *Parameters*
-
-    **image**: the 2d data array to show and save.
-
-    **name**: a string to use as the file name (without the extension)
-
-    **dpi**: image resolution (default 100).
-
-    **colormap**: the colormap tp use in matplotlib format (default gray).
-
-    **verbose**: boolean to enable verbose mode (default False).
-    '''
-    (im_size_y, im_size_x) = image.shape
-    plt.figure(figsize=(im_size_x / float(dpi), im_size_y / float(dpi)))
-    if verbose:
-        print('image size is', image.shape)
-        print('figure size is:', np.array(image.shape) / float(dpi))
-    plt.axis('off')
-    plt.hold('off')
-    plt.subplots_adjust(top=1, bottom=0, left=0, right=1)
-    plt.imshow(image, cmap=colormap, interpolation='nearest', origin='lower')
-    plt.savefig(name + '.png', format='png')
-    plt.close()
-
-
 def hist(data, nb_bins=256, data_range=(0, 255), show=True, save=False, prefix='data', density=False):
     '''Histogram of a data array.
 

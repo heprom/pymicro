@@ -5,7 +5,7 @@ from pymicro.crystal.lattice import Lattice, HklObject, HklDirection, HklPlane, 
 
 class LatticeTests(unittest.TestCase):
     def setUp(self):
-        print 'testing the Lattice class'
+        print('testing the Lattice class')
 
     def test_cubic(self):
         a = np.array([[0.5, 0., 0.],

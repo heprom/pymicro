@@ -49,7 +49,7 @@ class View():
         bounds = actor.GetBounds()
         size = (bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])  # bounds[1::2]
         print(size)
-        axes = axes_actor(np.mean(size), fontSize=60)
+        axes = axes_actor(length=np.mean(size), fontSize=60)
         s3d.add(axes)
         s3d.add(actor)
         cam = setup_camera(size)

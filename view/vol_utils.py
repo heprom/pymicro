@@ -188,14 +188,3 @@ class AxShowPixelValue:
             return 'x=%1.1f, y=%1.1f, z=%1.1f' % (x, y, z)
         else:
             return 'x=%1.1f, y=%1.1f' % (x, y)
-
-
-if __name__ == '__main__':
-    import matplotlib
-
-    img = np.diag(np.linspace(1, 10, 10))
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    myax = AxShowPixelValue(ax)
-    myax.imshow(img, interpolation='nearest')
-    plt.show()

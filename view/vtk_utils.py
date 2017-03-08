@@ -360,22 +360,17 @@ def add_plane_to_grid_with_normal(plane, grid, origin, opacity=0.3, normal_lengt
 def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20):
     '''Build an actor for the cartesian axes.
 
-    *Parameters:*
-
-    **length**: The arrow length of the axes (1.0 by default)
-
-    **axisLabels**: Specify the axes labels (xyz by default), use axisLabels = None to hide the axis labels
-
-    **fontSize**: Font size for the axes labels (20 by default)
-
-    *Returns*
-
-    A VTK assembly representing the cartesian axes.
+    :params length: The arrow length of the axes (1.0 by default).
+    :type length: float or triple of float to specify the length of each axis individually.
+    :param list axisLabels: Specify the axes labels (xyz by default), use axisLabels = None to hide the axis labels
+    :param int fontSize: Font size for the axes labels (20 by default).
+    :returns: A VTK assembly representing the cartesian axes.
     '''
     axes = vtk.vtkAxesActor()
-    if type(length) == float or type(length) == int or type(length) == np.int64:
+    if isinstance(length, (float, int, np.int64, np.float64)):
         axes.SetTotalLength(length, length, length)
     else:
+        assert(len(length) == 3)
         axes.SetTotalLength(length)
     axes.SetShaftTypeToCylinder()
     axes.SetCylinderRadius(0.02)

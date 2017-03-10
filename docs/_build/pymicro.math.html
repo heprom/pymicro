@@ -1,0 +1,528 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    <title>math Package &mdash; pymicro 0.3.3 documentation</title>
+
+    <link rel="stylesheet" href="_static/proBlue.css" type="text/css"/>
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css"/>
+
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.3.3',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="pymicro 0.3.3 documentation" href="index.html"/>
+    <link rel="up" title="pymicro Package" href="pymicro.html"/>
+    <link rel="next" title="view Package" href="pymicro.view.html"/>
+    <link rel="prev" title="file Package" href="pymicro.file.html"/>
+</head>
+<body>
+<div class="related">
+    <h3>Navigation</h3>
+    <ul>
+        <li class="right" style="margin-right: 10px">
+            <a href="genindex.html" title="General Index"
+               accesskey="I">index</a></li>
+        <li class="right">
+            <a href="py-modindex.html" title="Python Module Index"
+            >modules</a> |
+        </li>
+        <li class="right">
+            <a href="pymicro.view.html" title="view Package"
+               accesskey="N">next</a> |
+        </li>
+        <li class="right">
+            <a href="pymicro.file.html" title="file Package"
+               accesskey="P">previous</a> |
+        </li>
+        <li><a href="index.html">pymicro 0.3.3 documentation</a> &raquo;</li>
+        <li><a href="pymicro.html" accesskey="U">pymicro Package</a> &raquo;</li>
+    </ul>
+</div>
+
+<div class="document">
+    <div class="documentwrapper">
+        <div class="bodywrapper">
+            <div class="body">
+
+                <div class="section" id="math-package">
+                    <h1>math Package<a class="headerlink" href="#math-package" title="Permalink to this headline">¶</a>
+                    </h1>
+                    <div class="section" id="module-pymicro.math.fitting">
+                        <span id="fitting-module"></span>
+                        <h2><tt class="xref py py-mod docutils literal"><span class="pre">fitting</span></tt> Module<a
+                                class="headerlink" href="#module-pymicro.math.fitting"
+                                title="Permalink to this headline">¶</a></h2>
+                        <dl class="docutils">
+                            <dt>The fitting module define some classes to easily perform 1D curve</dt>
+                            <dd><p class="first">fitting. This module supports fitting (x, y) data with a general
+                                mechanism. Any fitting function can be provided to the fit method
+                                and a few general purpose fuctions are predefined:</p>
+                                <blockquote class="last">
+                                    <div>
+                                        <ul class="simple">
+                                            <li>Gaussian</li>
+                                            <li>Lorentzian</li>
+                                            <li>Cosine</li>
+                                            <li>Voigt</li>
+                                        </ul>
+                                    </div>
+                                </blockquote>
+                            </dd>
+                        </dl>
+                        <div class="figure align-center">
+                            <img alt="lattice_3d" src="_images/fitting_functions.png"
+                                 style="width: 400px; height: 300px;"/>
+                            <p class="caption">Plot of the main predefined fitting function in the fitting module.</p>
+                        </div>
+                        <dl class="class">
+                            <dt id="pymicro.math.fitting.Cosine">
+                                <em class="property">class </em><tt class="descclassname">pymicro.math.fitting.</tt><tt
+                                    class="descname">Cosine</tt><big>(</big><em>position=0.0</em>,
+                                <em>width=1.0</em><big>)</big><a class="headerlink" href="#pymicro.math.fitting.Cosine"
+                                                                 title="Permalink to this definition">¶</a></dt>
+                            <dd><p>Bases: <a class="reference internal" href="#pymicro.math.fitting.FitFunction"
+                                             title="pymicro.math.fitting.FitFunction"><tt
+                                    class="xref py py-class docutils literal"><span class="pre">pymicro.math.fitting.FitFunction</span></tt></a>
+                            </p>
+                                <p>first parameter is position, second is width</p>
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Cosine.fwhm">
+                                        <tt class="descname">fwhm</tt><big>(</big><big>)</big><a class="headerlink"
+                                                                                                 href="#pymicro.math.fitting.Cosine.fwhm"
+                                                                                                 title="Permalink to this definition">¶</a>
+                                    </dt>
+                                    <dd></dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Cosine.set_position">
+                                        <tt class="descname">set_position</tt><big>(</big><em>position</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Cosine.set_position"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd></dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Cosine.set_width">
+                                        <tt class="descname">set_width</tt><big>(</big><em>a</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Cosine.set_width"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd></dd>
+                                </dl>
+
+                            </dd>
+                        </dl>
+
+                        <dl class="class">
+                            <dt id="pymicro.math.fitting.FitFunction">
+                                <em class="property">class </em><tt class="descclassname">pymicro.math.fitting.</tt><tt
+                                    class="descname">FitFunction</tt><a class="headerlink"
+                                                                        href="#pymicro.math.fitting.FitFunction"
+                                                                        title="Permalink to this definition">¶</a></dt>
+                            <dd><p>This class provides a basic canvas to define a fit function.</p>
+                                <p>You may subclass it to create your own fitting function just as the
+                                    predfined fit function do (see <cite>Gaussian</cite> for instance).</p>
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.FitFunction.add_parameter">
+                                        <tt class="descname">add_parameter</tt><big>(</big><em>value</em>, <em>name</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.FitFunction.add_parameter"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd></dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.FitFunction.compute">
+                                        <tt class="descname">compute</tt><big>(</big><em>x</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.FitFunction.compute"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Evaluate the fit function at coordinates x.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.FitFunction.fit">
+                                        <tt class="descname">fit</tt><big>(</big><em>y</em>, <em>x=None</em>, <em>verbose=False</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.FitFunction.fit"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Perform fitting on the given data.</p>
+                                        <p>This will adjust the parameters of this fit function to match as
+                                            well as possible the given data using a least square minimisation.</p>
+                                        <p><em>Parameters</em></p>
+                                        <p><strong>y</strong>: the data to match (a 1d numpy array)</p>
+                                        <p><strong>x</strong>: the corresponding x coordinates (optional, None by
+                                            default)</p>
+                                        <p><strong>verbose</strong>: boolean, activate verbose mode</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.FitFunction.get_parameter_names">
+                                        <tt class="descname">get_parameter_names</tt><big>(</big><big>)</big><a
+                                            class="headerlink"
+                                            href="#pymicro.math.fitting.FitFunction.get_parameter_names"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Return the list os parameter names of this fit function.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.FitFunction.get_parameters">
+                                        <tt class="descname">get_parameters</tt><big>(</big><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.FitFunction.get_parameters"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Return the list of parameters of this fit function.</p>
+                                    </dd>
+                                </dl>
+
+                            </dd>
+                        </dl>
+
+                        <dl class="class">
+                            <dt id="pymicro.math.fitting.Gaussian">
+                                <em class="property">class </em><tt class="descclassname">pymicro.math.fitting.</tt><tt
+                                    class="descname">Gaussian</tt><big>(</big><em>position=0.0</em>, <em>sigma=1.0</em>,
+                                <em>height=1.0</em><big>)</big><a class="headerlink"
+                                                                  href="#pymicro.math.fitting.Gaussian"
+                                                                  title="Permalink to this definition">¶</a></dt>
+                            <dd><p>Bases: <a class="reference internal" href="#pymicro.math.fitting.FitFunction"
+                                             title="pymicro.math.fitting.FitFunction"><tt
+                                    class="xref py py-class docutils literal"><span class="pre">pymicro.math.fitting.FitFunction</span></tt></a>
+                            </p>
+                                <p>first parameter is position, second is sigma, third is height</p>
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Gaussian.fwhm">
+                                        <tt class="descname">fwhm</tt><big>(</big><big>)</big><a class="headerlink"
+                                                                                                 href="#pymicro.math.fitting.Gaussian.fwhm"
+                                                                                                 title="Permalink to this definition">¶</a>
+                                    </dt>
+                                    <dd><p>Compute the full width at half maximum of the gauss function.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Gaussian.set_height">
+                                        <tt class="descname">set_height</tt><big>(</big><em>height</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Gaussian.set_height"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the maximum (height) of the gauss function.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Gaussian.set_position">
+                                        <tt class="descname">set_position</tt><big>(</big><em>position</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Gaussian.set_position"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the position (center) of the gauss function.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Gaussian.set_sigma">
+                                        <tt class="descname">set_sigma</tt><big>(</big><em>sigma</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Gaussian.set_sigma"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the width (variance) of the gauss function.</p>
+                                    </dd>
+                                </dl>
+
+                            </dd>
+                        </dl>
+
+                        <dl class="class">
+                            <dt id="pymicro.math.fitting.Lorentzian">
+                                <em class="property">class </em><tt class="descclassname">pymicro.math.fitting.</tt><tt
+                                    class="descname">Lorentzian</tt><big>(</big><em>position=0.0</em>,
+                                <em>gamma=1.0</em>, <em>height_factor=1.0</em><big>)</big><a class="headerlink"
+                                                                                             href="#pymicro.math.fitting.Lorentzian"
+                                                                                             title="Permalink to this definition">¶</a>
+                            </dt>
+                            <dd><p>Bases: <a class="reference internal" href="#pymicro.math.fitting.FitFunction"
+                                             title="pymicro.math.fitting.FitFunction"><tt
+                                    class="xref py py-class docutils literal"><span class="pre">pymicro.math.fitting.FitFunction</span></tt></a>
+                            </p>
+                                <p>Lorentzian funtion.</p>
+                                <p>The first parameter is the position, the second is gamma. The maximum
+                                    of the function is given by height_factor/(pi*gamma). The FWHM is just 2*gamma.</p>
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Lorentzian.fwhm">
+                                        <tt class="descname">fwhm</tt><big>(</big><big>)</big><a class="headerlink"
+                                                                                                 href="#pymicro.math.fitting.Lorentzian.fwhm"
+                                                                                                 title="Permalink to this definition">¶</a>
+                                    </dt>
+                                    <dd></dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Lorentzian.set_gamma">
+                                        <tt class="descname">set_gamma</tt><big>(</big><em>gamma</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Lorentzian.set_gamma"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd></dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Lorentzian.set_height">
+                                        <tt class="descname">set_height</tt><big>(</big><em>height</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Lorentzian.set_height"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the maximum (height) of the Lorentzian function. This
+                                        actually set the height factor to the value height*pi*gamma.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Lorentzian.set_position">
+                                        <tt class="descname">set_position</tt><big>(</big><em>position</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Lorentzian.set_position"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd></dd>
+                                </dl>
+
+                            </dd>
+                        </dl>
+
+                        <dl class="class">
+                            <dt id="pymicro.math.fitting.Parameter">
+                                <em class="property">class </em><tt class="descclassname">pymicro.math.fitting.</tt><tt
+                                    class="descname">Parameter</tt><big>(</big><em>value</em>,
+                                <em>name=None</em><big>)</big><a class="headerlink"
+                                                                 href="#pymicro.math.fitting.Parameter"
+                                                                 title="Permalink to this definition">¶</a></dt>
+                            <dd><p>A class to handle modiable parameters.</p>
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Parameter.set">
+                                        <tt class="descname">set</tt><big>(</big><em>value</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Parameter.set"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the value of the parameter.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Parameter.set_name">
+                                        <tt class="descname">set_name</tt><big>(</big><em>name</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Parameter.set_name"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the name of the parameter.</p>
+                                    </dd>
+                                </dl>
+
+                            </dd>
+                        </dl>
+
+                        <dl class="class">
+                            <dt id="pymicro.math.fitting.Voigt">
+                                <em class="property">class </em><tt class="descclassname">pymicro.math.fitting.</tt><tt
+                                    class="descname">Voigt</tt><big>(</big><em>position=0.0</em>, <em>sigma=1.0</em>,
+                                <em>gamma=1.0</em>, <em>height_factor=1.0</em><big>)</big><a class="headerlink"
+                                                                                             href="#pymicro.math.fitting.Voigt"
+                                                                                             title="Permalink to this definition">¶</a>
+                            </dt>
+                            <dd><p>Bases: <a class="reference internal" href="#pymicro.math.fitting.FitFunction"
+                                             title="pymicro.math.fitting.FitFunction"><tt
+                                    class="xref py py-class docutils literal"><span class="pre">pymicro.math.fitting.FitFunction</span></tt></a>
+                            </p>
+                                <p>The Voigt function is also the real part of
+                                    w(x) = exp(-x**2) erfc(ix), the Faddeeva function.</p>
+                                <p>Here we use one of the popular implementation which is available
+                                    in scipy with the wofz function.</p>
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Voigt.fwhm">
+                                        <tt class="descname">fwhm</tt><big>(</big><big>)</big><a class="headerlink"
+                                                                                                 href="#pymicro.math.fitting.Voigt.fwhm"
+                                                                                                 title="Permalink to this definition">¶</a>
+                                    </dt>
+                                    <dd><p>Compute the full width at half maximum of the Voigt function.</p>
+                                        <p>The height factor does not change the fwhm. The fwhm can be evaluated
+                                            by the width of the associated Gaussian and Lorentzian functions.
+                                            The fwhm is approximated by the equation from J. Olivero and R. Longbothum
+                                            [1977]</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Voigt.set_height">
+                                        <tt class="descname">set_height</tt><big>(</big><em>height</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Voigt.set_height"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the maximum (height) of the Voigt function. This
+                                        actually set the height factor to the proper value. Be careful that
+                                        if you change the other parameters (sigma, gamma) the maximum height
+                                        will be changed.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Voigt.set_position">
+                                        <tt class="descname">set_position</tt><big>(</big><em>position</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Voigt.set_position"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the position (center) of the Voigt function.</p>
+                                    </dd>
+                                </dl>
+
+                                <dl class="method">
+                                    <dt id="pymicro.math.fitting.Voigt.set_sigma">
+                                        <tt class="descname">set_sigma</tt><big>(</big><em>sigma</em><big>)</big><a
+                                            class="headerlink" href="#pymicro.math.fitting.Voigt.set_sigma"
+                                            title="Permalink to this definition">¶</a></dt>
+                                    <dd><p>Set the sigma of the Voigt function.</p>
+                                    </dd>
+                                </dl>
+
+                            </dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.math.fitting.fit">
+                                <tt class="descclassname">pymicro.math.fitting.</tt><tt
+                                    class="descname">fit</tt><big>(</big><em>y</em>, <em>x=None</em>, <em>expression=None</em>,
+                                <em>nb_params=None</em>, <em>init=None</em><big>)</big><a class="headerlink"
+                                                                                          href="#pymicro.math.fitting.fit"
+                                                                                          title="Permalink to this definition">¶</a>
+                            </dt>
+                            <dd><p>Static method to perform curve fitting directly.</p>
+                                <p><em>Parameters</em></p>
+                                <p><strong>y</strong>: the data to match (a 1d numpy array)</p>
+                                <p><strong>x</strong>: the corresponding x coordinates (optional, None by default)</p>
+                                <p><strong>expression</strong>: can be either a string to select a predefined
+                                    function or alternatively a user defined function with the signature
+                                    f(x, p) (in this case you must specify the length of the parameters
+                                    array p via setting nb_params).</p>
+                                <p><strong>nb_params</strong>: the number of parameters of the user defined fitting
+                                    function (only needed when a custom fitting function is provided,
+                                    None by default)</p>
+                                <p><strong>init</strong>: a sequence (the length must be equal to the number of
+                                    parameters of the fitting function) used to initialise the fitting
+                                    function.</p>
+                                <dl class="docutils">
+                                    <dt>For instance, to fit some (x,y) data with a gaussian function, simply use:</dt>
+                                    <dd>
+                                        <div class="first highlight-python">
+                                            <div class="highlight"><pre><span class="n">F</span> <span
+                                                    class="o">=</span> <span class="n">fit</span><span
+                                                    class="p">(</span><span class="n">y</span><span
+                                                    class="p">,</span> <span class="n">x</span><span class="p">,</span> <span
+                                                    class="n">expression</span><span class="o">=</span><span class="s">&#39;Gaussian&#39;</span><span
+                                                    class="p">)</span>
+</pre>
+                                            </div>
+                                        </div>
+                                        <p>Alternatively you may specify you own function directly defined with Python,
+                                            like:</p>
+                                        <div class="last highlight-python">
+                                            <div class="highlight"><pre><span class="k">def</span> <span
+                                                    class="nf">myf</span><span class="p">(</span><span
+                                                    class="n">x</span><span class="p">,</span> <span
+                                                    class="n">p</span><span class="p">):</span>
+  <span class="k">return</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span
+                                                        class="p">]</span><span class="o">*</span><span
+                                                        class="n">x</span> <span class="o">+</span> <span
+                                                        class="n">p</span><span class="p">[</span><span
+                                                        class="mi">1</span><span class="p">]</span>
+
+<span class="n">F</span> <span class="o">=</span> <span class="n">fit</span><span class="p">(</span><span
+                                                        class="n">y</span><span class="p">,</span> <span
+                                                        class="n">x</span><span class="p">,</span> <span class="n">expression</span><span
+                                                        class="o">=</span><span class="n">myf</span><span
+                                                        class="p">,</span> <span class="n">nb_params</span><span
+                                                        class="o">=</span><span class="mi">2</span><span
+                                                        class="p">)</span>
+</pre>
+                                            </div>
+                                        </div>
+                                    </dd>
+                                </dl>
+                            </dd>
+                        </dl>
+
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+    <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+                <li><a class="reference internal" href="#">math Package</a>
+                    <ul>
+                        <li><a class="reference internal" href="#module-pymicro.math.fitting"><tt
+                                class="docutils literal"><span class="pre">fitting</span></tt> Module</a></li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="pymicro.file.html"
+                                  title="previous chapter">file Package</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="pymicro.view.html"
+                                  title="next chapter">view Package</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+                <li><a href="_sources/pymicro.math.txt"
+                       rel="nofollow">Show Source</a></li>
+            </ul>
+            <div id="searchbox" style="display: none">
+                <h3>Quick search</h3>
+                <form class="search" action="search.html" method="get">
+                    <input type="text" name="q"/>
+                    <input type="submit" value="Go"/>
+                    <input type="hidden" name="check_keywords" value="yes"/>
+                    <input type="hidden" name="area" value="default"/>
+                </form>
+                <p class="searchtip" style="font-size: 90%">
+                    Enter search terms or a module, class or function name.
+                </p>
+            </div>
+            <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+    </div>
+    <div class="clearer"></div>
+</div>
+<div class="related">
+    <h3>Navigation</h3>
+    <ul>
+        <li class="right" style="margin-right: 10px">
+            <a href="genindex.html" title="General Index"
+            >index</a></li>
+        <li class="right">
+            <a href="py-modindex.html" title="Python Module Index"
+            >modules</a> |
+        </li>
+        <li class="right">
+            <a href="pymicro.view.html" title="view Package"
+            >next</a> |
+        </li>
+        <li class="right">
+            <a href="pymicro.file.html" title="file Package"
+            >previous</a> |
+        </li>
+        <li><a href="index.html">pymicro 0.3.3 documentation</a> &raquo;</li>
+        <li><a href="pymicro.html">pymicro Package</a> &raquo;</li>
+    </ul>
+</div>
+<div class="footer">
+    &copy; Copyright 2013-2016, Henry Proudhon.
+    Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+</div>
+</body>
+</html>

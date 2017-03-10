@@ -1,0 +1,498 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Convention to read and write 2d images with pyplot &mdash; pymicro 0.4.0 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/proBlue.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.4.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="pymicro 0.4.0 documentation" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">pymicro 0.4.0 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="convention-to-read-and-write-2d-images-with-pyplot">
+<h1>Convention to read and write 2d images with pyplot<a class="headerlink" href="#convention-to-read-and-write-2d-images-with-pyplot" title="Permalink to this headline">¶</a></h1>
+<dl class="docutils">
+<dt>When dealing with 3d images, pymicro uses the following convention:</dt>
+<dd><ul class="first last simple">
+<li>the array in memory represents (x,y,z) data.</li>
+<li>the data is written to the disk as a succession of (x,y) slices, x being the fastest moving index.</li>
+</ul>
+</dd>
+</dl>
+<p>This matches ImageJ convention when looking at the data. For instance
+looking at the 100th slice of the foam data set:</p>
+<img alt="../_images/mousse_250x250x250_uint8_slice100_ij.png" src="../_images/mousse_250x250x250_uint8_slice100_ij.png" />
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">align:</th><td class="field-body">center</td>
+</tr>
+</tbody>
+</table>
+<p>When writting 2d images such as tif, jpg or png, out of a numpy array
+one may use existing function from matplotlib.pyplot, scipy.misc, etc...
+but careful checking needs to be done to remain consistent since pyplot
+assume a (y,x) array when plotting, writting, reading images..
+This recipe demonstrate how to use the pyplot module to write / read 2d
+images. For other format than PNG, pyplot uses PIL under the hood so
+this should work with PIL as well.</p>
+<p><strong>Get the complete Python source code:</strong> <a class="reference download internal" href="../_downloads/convention_read_write_2d_images.py"><tt class="xref download docutils literal"><span class="pre">convention_read_write_2d_images.py</span></tt></a></p>
+<p>In this example we use the foam 3d dataset with size 250x250x250.
+First you need to define the path to the 3d volume:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pymicro.file.file_utils</span> <span class="kn">import</span> <span class="n">HST_read</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span><span class="p">,</span> <span class="n">cm</span>
+
+<span class="n">data_dir</span> <span class="o">=</span> <span class="s">&#39;../../examples/data&#39;</span>
+<span class="n">scan_name</span> <span class="o">=</span> <span class="s">&#39;mousse_250x250x250_uint8&#39;</span>
+<span class="n">scan_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">scan_name</span> <span class="o">+</span> <span class="s">&#39;.raw&#39;</span><span class="p">)</span>
+
+<span class="n">vol</span> <span class="o">=</span> <span class="n">HST_read</span><span class="p">(</span><span class="n">scan_path</span><span class="p">,</span> <span class="n">autoparse_filename</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">zrange</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">101</span><span class="p">))</span>
+<span class="k">print</span> <span class="s">&#39;shape vol:&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
+<span class="n">ext</span> <span class="o">=</span> <span class="s">&#39;png&#39;</span>  <span class="c"># choose here png or jpg for instance</span>
+<span class="k">print</span> <span class="s">&#39;saving slice 100 as a </span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+
+<span class="k">print</span> <span class="s">&#39;now reading the 2d image&#39;</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">))[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">im_uint8</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span> <span class="o">*</span> <span class="n">im</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&#39;size of 2d image is:&#39;</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span>
+<span class="k">print</span> <span class="s">&#39;in raw data: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">vol</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">vol</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="k">print</span> <span class="s">&#39;in 2d image: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">im_uint8</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">im_uint8</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">])</span>
+
+<span class="k">print</span> <span class="s">&#39;plotting&#39;</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">131</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;100th slice of 3d volume (transposed)&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">132</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;2d </span><span class="si">%s</span><span class="s"> image plotted (transposed)&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">133</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;raw data&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">im_uint8</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;x coordinate&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s">&#39;data value&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;profile along y=108&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">left</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">_2d_slices.png&#39;</span> <span class="o">%</span> <span class="n">scan_name</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">lines:</th><td class="field-body"><p class="first">5-7</p>
+<p class="last">Then load the volume in memory thanks to the <cite>:pymicro:file:file_utils:HST_read</cite> function. The zrange option is used here to load only the 100th slice.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pymicro.file.file_utils</span> <span class="kn">import</span> <span class="n">HST_read</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span><span class="p">,</span> <span class="n">cm</span>
+
+<span class="n">data_dir</span> <span class="o">=</span> <span class="s">&#39;../../examples/data&#39;</span>
+<span class="n">scan_name</span> <span class="o">=</span> <span class="s">&#39;mousse_250x250x250_uint8&#39;</span>
+<span class="n">scan_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">scan_name</span> <span class="o">+</span> <span class="s">&#39;.raw&#39;</span><span class="p">)</span>
+
+<span class="n">vol</span> <span class="o">=</span> <span class="n">HST_read</span><span class="p">(</span><span class="n">scan_path</span><span class="p">,</span> <span class="n">autoparse_filename</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">zrange</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">101</span><span class="p">))</span>
+<span class="k">print</span> <span class="s">&#39;shape vol:&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
+<span class="n">ext</span> <span class="o">=</span> <span class="s">&#39;png&#39;</span>  <span class="c"># choose here png or jpg for instance</span>
+<span class="k">print</span> <span class="s">&#39;saving slice 100 as a </span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+
+<span class="k">print</span> <span class="s">&#39;now reading the 2d image&#39;</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">))[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">im_uint8</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span> <span class="o">*</span> <span class="n">im</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&#39;size of 2d image is:&#39;</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span>
+<span class="k">print</span> <span class="s">&#39;in raw data: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">vol</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">vol</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="k">print</span> <span class="s">&#39;in 2d image: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">im_uint8</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">im_uint8</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">])</span>
+
+<span class="k">print</span> <span class="s">&#39;plotting&#39;</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">131</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;100th slice of 3d volume (transposed)&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">132</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;2d </span><span class="si">%s</span><span class="s"> image plotted (transposed)&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">133</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;raw data&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">im_uint8</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;x coordinate&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s">&#39;data value&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;profile along y=108&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">left</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">_2d_slices.png&#39;</span> <span class="o">%</span> <span class="n">scan_name</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">lines:</th><td class="field-body"><p class="first">9</p>
+<p class="last">The slice is saved as a raster image (eg. png or jpg) using pyplot
+imsave function:</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pymicro.file.file_utils</span> <span class="kn">import</span> <span class="n">HST_read</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span><span class="p">,</span> <span class="n">cm</span>
+
+<span class="n">data_dir</span> <span class="o">=</span> <span class="s">&#39;../../examples/data&#39;</span>
+<span class="n">scan_name</span> <span class="o">=</span> <span class="s">&#39;mousse_250x250x250_uint8&#39;</span>
+<span class="n">scan_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">scan_name</span> <span class="o">+</span> <span class="s">&#39;.raw&#39;</span><span class="p">)</span>
+
+<span class="n">vol</span> <span class="o">=</span> <span class="n">HST_read</span><span class="p">(</span><span class="n">scan_path</span><span class="p">,</span> <span class="n">autoparse_filename</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">zrange</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">101</span><span class="p">))</span>
+<span class="k">print</span> <span class="s">&#39;shape vol:&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
+<span class="n">ext</span> <span class="o">=</span> <span class="s">&#39;png&#39;</span>  <span class="c"># choose here png or jpg for instance</span>
+<span class="k">print</span> <span class="s">&#39;saving slice 100 as a </span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+
+<span class="k">print</span> <span class="s">&#39;now reading the 2d image&#39;</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">))[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">im_uint8</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span> <span class="o">*</span> <span class="n">im</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&#39;size of 2d image is:&#39;</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span>
+<span class="k">print</span> <span class="s">&#39;in raw data: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">vol</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">vol</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="k">print</span> <span class="s">&#39;in 2d image: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">im_uint8</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">im_uint8</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">])</span>
+
+<span class="k">print</span> <span class="s">&#39;plotting&#39;</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">131</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;100th slice of 3d volume (transposed)&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">132</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;2d </span><span class="si">%s</span><span class="s"> image plotted (transposed)&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">133</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;raw data&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">im_uint8</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;x coordinate&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s">&#39;data value&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;profile along y=108&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">left</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">_2d_slices.png&#39;</span> <span class="o">%</span> <span class="n">scan_name</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">lines:</th><td class="field-body"><p class="first">13</p>
+<p class="last">The 2d image can now be loaded into memory as a numpy array using pyplot
+imread function:</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pymicro.file.file_utils</span> <span class="kn">import</span> <span class="n">HST_read</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span><span class="p">,</span> <span class="n">cm</span>
+
+<span class="n">data_dir</span> <span class="o">=</span> <span class="s">&#39;../../examples/data&#39;</span>
+<span class="n">scan_name</span> <span class="o">=</span> <span class="s">&#39;mousse_250x250x250_uint8&#39;</span>
+<span class="n">scan_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">scan_name</span> <span class="o">+</span> <span class="s">&#39;.raw&#39;</span><span class="p">)</span>
+
+<span class="n">vol</span> <span class="o">=</span> <span class="n">HST_read</span><span class="p">(</span><span class="n">scan_path</span><span class="p">,</span> <span class="n">autoparse_filename</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">zrange</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">101</span><span class="p">))</span>
+<span class="k">print</span> <span class="s">&#39;shape vol:&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
+<span class="n">ext</span> <span class="o">=</span> <span class="s">&#39;png&#39;</span>  <span class="c"># choose here png or jpg for instance</span>
+<span class="k">print</span> <span class="s">&#39;saving slice 100 as a </span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+
+<span class="k">print</span> <span class="s">&#39;now reading the 2d image&#39;</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">))[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">im_uint8</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span> <span class="o">*</span> <span class="n">im</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&#39;size of 2d image is:&#39;</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span>
+<span class="k">print</span> <span class="s">&#39;in raw data: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">vol</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">vol</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="k">print</span> <span class="s">&#39;in 2d image: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">im_uint8</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">im_uint8</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">])</span>
+
+<span class="k">print</span> <span class="s">&#39;plotting&#39;</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">131</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;100th slice of 3d volume (transposed)&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">132</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;2d </span><span class="si">%s</span><span class="s"> image plotted (transposed)&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">133</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;raw data&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">im_uint8</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;x coordinate&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s">&#39;data value&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;profile along y=108&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">left</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">_2d_slices.png&#39;</span> <span class="o">%</span> <span class="n">scan_name</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">lines:</th><td class="field-body"><p class="first">16</p>
+<p class="last">Note that imsave write png image as 4 RGBA (red, green, blue, alpha)
+using floatting point numbers between 0 and 1. Here we have selected
+only the first channel (R) since in gray level images R=G=B. To compare
+with our initial raw image we may just re-transforming it to 8 bits
+(between 0 and 255):</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pymicro.file.file_utils</span> <span class="kn">import</span> <span class="n">HST_read</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span><span class="p">,</span> <span class="n">cm</span>
+
+<span class="n">data_dir</span> <span class="o">=</span> <span class="s">&#39;../../examples/data&#39;</span>
+<span class="n">scan_name</span> <span class="o">=</span> <span class="s">&#39;mousse_250x250x250_uint8&#39;</span>
+<span class="n">scan_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">scan_name</span> <span class="o">+</span> <span class="s">&#39;.raw&#39;</span><span class="p">)</span>
+
+<span class="n">vol</span> <span class="o">=</span> <span class="n">HST_read</span><span class="p">(</span><span class="n">scan_path</span><span class="p">,</span> <span class="n">autoparse_filename</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">zrange</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">101</span><span class="p">))</span>
+<span class="k">print</span> <span class="s">&#39;shape vol:&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
+<span class="n">ext</span> <span class="o">=</span> <span class="s">&#39;png&#39;</span>  <span class="c"># choose here png or jpg for instance</span>
+<span class="k">print</span> <span class="s">&#39;saving slice 100 as a </span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+
+<span class="k">print</span> <span class="s">&#39;now reading the 2d image&#39;</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">))[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">im_uint8</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span> <span class="o">*</span> <span class="n">im</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&#39;size of 2d image is:&#39;</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span>
+<span class="k">print</span> <span class="s">&#39;in raw data: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">vol</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">vol</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="k">print</span> <span class="s">&#39;in 2d image: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">im_uint8</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">im_uint8</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">])</span>
+
+<span class="k">print</span> <span class="s">&#39;plotting&#39;</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">131</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;100th slice of 3d volume (transposed)&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">132</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;2d </span><span class="si">%s</span><span class="s"> image plotted (transposed)&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">133</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;raw data&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">im_uint8</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;x coordinate&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s">&#39;data value&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;profile along y=108&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">left</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">_2d_slices.png&#39;</span> <span class="o">%</span> <span class="n">scan_name</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">lines:</th><td class="field-body"><p class="first">17</p>
+<p class="last">We can print some of the pixel value to verify the data is well ordered
+in memory:</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pymicro.file.file_utils</span> <span class="kn">import</span> <span class="n">HST_read</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span><span class="p">,</span> <span class="n">cm</span>
+
+<span class="n">data_dir</span> <span class="o">=</span> <span class="s">&#39;../../examples/data&#39;</span>
+<span class="n">scan_name</span> <span class="o">=</span> <span class="s">&#39;mousse_250x250x250_uint8&#39;</span>
+<span class="n">scan_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">scan_name</span> <span class="o">+</span> <span class="s">&#39;.raw&#39;</span><span class="p">)</span>
+
+<span class="n">vol</span> <span class="o">=</span> <span class="n">HST_read</span><span class="p">(</span><span class="n">scan_path</span><span class="p">,</span> <span class="n">autoparse_filename</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">zrange</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">101</span><span class="p">))</span>
+<span class="k">print</span> <span class="s">&#39;shape vol:&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
+<span class="n">ext</span> <span class="o">=</span> <span class="s">&#39;png&#39;</span>  <span class="c"># choose here png or jpg for instance</span>
+<span class="k">print</span> <span class="s">&#39;saving slice 100 as a </span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+
+<span class="k">print</span> <span class="s">&#39;now reading the 2d image&#39;</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">))[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">im_uint8</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span> <span class="o">*</span> <span class="n">im</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&#39;size of 2d image is:&#39;</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span>
+<span class="k">print</span> <span class="s">&#39;in raw data: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">vol</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">vol</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="k">print</span> <span class="s">&#39;in 2d image: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">im_uint8</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">im_uint8</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">])</span>
+
+<span class="k">print</span> <span class="s">&#39;plotting&#39;</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">131</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;100th slice of 3d volume (transposed)&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">132</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;2d </span><span class="si">%s</span><span class="s"> image plotted (transposed)&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">133</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;raw data&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">im_uint8</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;x coordinate&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s">&#39;data value&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;profile along y=108&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">left</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">_2d_slices.png&#39;</span> <span class="o">%</span> <span class="n">scan_name</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">lines:</th><td class="field-body"><p class="first">19-20</p>
+<p class="last">Finally the data is compared using imshow both on the raw data and the
+numpy array read from the 2d image and plotting a profile along x:</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pymicro.file.file_utils</span> <span class="kn">import</span> <span class="n">HST_read</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span><span class="p">,</span> <span class="n">cm</span>
+
+<span class="n">data_dir</span> <span class="o">=</span> <span class="s">&#39;../../examples/data&#39;</span>
+<span class="n">scan_name</span> <span class="o">=</span> <span class="s">&#39;mousse_250x250x250_uint8&#39;</span>
+<span class="n">scan_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">scan_name</span> <span class="o">+</span> <span class="s">&#39;.raw&#39;</span><span class="p">)</span>
+
+<span class="n">vol</span> <span class="o">=</span> <span class="n">HST_read</span><span class="p">(</span><span class="n">scan_path</span><span class="p">,</span> <span class="n">autoparse_filename</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">zrange</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">101</span><span class="p">))</span>
+<span class="k">print</span> <span class="s">&#39;shape vol:&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">vol</span><span class="p">)</span>
+<span class="n">ext</span> <span class="o">=</span> <span class="s">&#39;png&#39;</span>  <span class="c"># choose here png or jpg for instance</span>
+<span class="k">print</span> <span class="s">&#39;saving slice 100 as a </span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imsave</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+
+<span class="k">print</span> <span class="s">&#39;now reading the 2d image&#39;</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">.</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">scan_name</span><span class="p">,</span> <span class="n">ext</span><span class="p">))[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">im_uint8</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span> <span class="o">*</span> <span class="n">im</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&#39;size of 2d image is:&#39;</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">shape</span>
+<span class="k">print</span> <span class="s">&#39;in raw data: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">vol</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">vol</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="k">print</span> <span class="s">&#39;in 2d image: pixel value at [124,108] is </span><span class="si">%d</span><span class="s">, at [157,214] is </span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">im_uint8</span><span class="p">[</span><span class="mi">124</span><span class="p">,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">im_uint8</span><span class="p">[</span><span class="mi">157</span><span class="p">,</span> <span class="mi">214</span><span class="p">])</span>
+
+<span class="k">print</span> <span class="s">&#39;plotting&#39;</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">131</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;100th slice of 3d volume (transposed)&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">132</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">gray</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;2d </span><span class="si">%s</span><span class="s"> image plotted (transposed)&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">133</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vol</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;raw data&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">im_uint8</span><span class="p">[:,</span> <span class="mi">108</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> image&#39;</span> <span class="o">%</span> <span class="n">ext</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;x coordinate&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s">&#39;data value&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&#39;profile along y=108&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">left</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mf">0.95</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s">_2d_slices.png&#39;</span> <span class="o">%</span> <span class="n">scan_name</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">lines:</th><td class="field-body">25,28,31-32</td>
+</tr>
+</tbody>
+</table>
+<img alt="../_images/mousse_250x250x250_uint8_2d_slices.png" src="../_images/mousse_250x250x250_uint8_2d_slices.png" />
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">align:</th><td class="field-body">center</td>
+</tr>
+</tbody>
+</table>
+<p>Everythings lloks in order, the changes in terms of values along x are
+normal since pyplot renormalize the data between 0 and 1 to write the
+png image (to minimize the loss of information).</p>
+<p>In summary, 3d volumes are handled via (x,y,z) 3d numpy arrays in
+pymicro, pyplot assume a (y,x) array when plotting, writting, reading
+images. So if you care about having everything consistent you must
+transpose the arrays passed to pyplot.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../_sources/cookbook/convention_read_write_2d_images.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">pymicro 0.4.0 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013-2016, Henry Proudhon.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

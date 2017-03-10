@@ -1,0 +1,336 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    <title>xray Package &mdash; pymicro 0.3.3 documentation</title>
+
+    <link rel="stylesheet" href="_static/proBlue.css" type="text/css"/>
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css"/>
+
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.3.3',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="pymicro 0.3.3 documentation" href="index.html"/>
+    <link rel="up" title="pymicro Package" href="pymicro.html"/>
+    <link rel="next" title="Change log history" href="changelog.html"/>
+    <link rel="prev" title="view Package" href="pymicro.view.html"/>
+</head>
+<body>
+<div class="related">
+    <h3>Navigation</h3>
+    <ul>
+        <li class="right" style="margin-right: 10px">
+            <a href="genindex.html" title="General Index"
+               accesskey="I">index</a></li>
+        <li class="right">
+            <a href="py-modindex.html" title="Python Module Index"
+            >modules</a> |
+        </li>
+        <li class="right">
+            <a href="changelog.html" title="Change log history"
+               accesskey="N">next</a> |
+        </li>
+        <li class="right">
+            <a href="pymicro.view.html" title="view Package"
+               accesskey="P">previous</a> |
+        </li>
+        <li><a href="index.html">pymicro 0.3.3 documentation</a> &raquo;</li>
+        <li><a href="pymicro.html" accesskey="U">pymicro Package</a> &raquo;</li>
+    </ul>
+</div>
+
+<div class="document">
+    <div class="documentwrapper">
+        <div class="bodywrapper">
+            <div class="body">
+
+                <div class="section" id="module-pymicro.xray">
+                    <span id="xray-package"></span>
+                    <h1>xray Package<a class="headerlink" href="#module-pymicro.xray"
+                                       title="Permalink to this headline">¶</a></h1>
+                    <p>A package to play with X-rays</p>
+                    <p>The xray package currently has three modules:</p>
+                    <ul class="simple">
+                        <li>detectors</li>
+                        <li>laue</li>
+                        <li>xray_utils</li>
+                    </ul>
+                    <div class="admonition warning">
+                        <p class="first admonition-title">Warning</p>
+                        <p class="last">The documentation of this package is still very poor, use with care... and add
+                            some love to the docs if you have time.</p>
+                    </div>
+                    <div class="section" id="detectors-module">
+                        <h2><tt class="xref py py-mod docutils literal"><span class="pre">detectors</span></tt> Module<a
+                                class="headerlink" href="#detectors-module" title="Permalink to this headline">¶</a>
+                        </h2>
+                    </div>
+                    <div class="section" id="module-pymicro.xray.laue">
+                        <span id="laue-module"></span>
+                        <h2><tt class="xref py py-mod docutils literal"><span class="pre">laue</span></tt> Module<a
+                                class="headerlink" href="#module-pymicro.xray.laue"
+                                title="Permalink to this headline">¶</a></h2>
+                        <dl class="function">
+                            <dt id="pymicro.xray.laue.build_list">
+                                <tt class="descclassname">pymicro.xray.laue.</tt><tt
+                                    class="descname">build_list</tt><big>(</big><em>lattice=None</em>,
+                                <em>max_miller=3</em><big>)</big><a class="headerlink"
+                                                                    href="#pymicro.xray.laue.build_list"
+                                                                    title="Permalink to this definition">¶</a></dt>
+                            <dd><p>Create a list of all HklPlanes.
+                                This should move to the HklPlane class as a static method.</p>
+                            </dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.xray.laue.compute_Laue_pattern">
+                                <tt class="descclassname">pymicro.xray.laue.</tt><tt class="descname">compute_Laue_pattern</tt><big>(</big><em>orientation</em>,
+                                <em>detector</em>, <em>det_distance</em>, <em>hklplanes=None</em>,
+                                <em>inverted=False</em><big>)</big><a class="headerlink"
+                                                                      href="#pymicro.xray.laue.compute_Laue_pattern"
+                                                                      title="Permalink to this definition">¶</a></dt>
+                            <dd></dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.xray.laue.compute_ellpisis">
+                                <tt class="descclassname">pymicro.xray.laue.</tt><tt
+                                    class="descname">compute_ellpisis</tt><big>(</big><em>orientation</em>,
+                                <em>detector</em>, <em>det_distance</em>, <em>uvw</em>,
+                                <em>verbose=False</em><big>)</big><a class="headerlink"
+                                                                     href="#pymicro.xray.laue.compute_ellpisis"
+                                                                     title="Permalink to this definition">¶</a></dt>
+                            <dd><p>Compute the ellipsis associated with the given zone axis. All lattice
+                                planes sharing this zone axis will diffract along that ellipse.</p>
+                                <table class="docutils field-list" frame="void" rules="none">
+                                    <col class="field-name"/>
+                                    <col class="field-body"/>
+                                    <tbody valign="top">
+                                    <tr class="field-odd field">
+                                        <th class="field-name">Parameters:</th>
+                                        <td class="field-body">
+                                            <ul class="first simple">
+                                                <li><strong>orientation</strong> &#8211; The crystal orientation.</li>
+                                                <li><strong>detector</strong> &#8211; An instance of the Detector2D
+                                                    class.
+                                                </li>
+                                                <li><strong>det_distance</strong> (<em>float</em>) &#8211; the object -
+                                                    detector distance (along the X-axis).
+                                                </li>
+                                                <li><strong>uvw</strong> &#8211; An instance of the HklDirection
+                                                    representing the zone axis.
+                                                </li>
+                                                <li><strong>verbose</strong> (<em>bool</em>) &#8211; activate verbose
+                                                    mode (default False).
+                                                </li>
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                    <tr class="field-even field">
+                                        <th class="field-name">Returns data:</th>
+                                        <td class="field-body"><p class="first last">the (u, v) data (in pixel unit)
+                                            representing the ellipsis.</p>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.xray.laue.diffracted_vector">
+                                <tt class="descclassname">pymicro.xray.laue.</tt><tt
+                                    class="descname">diffracted_vector</tt><big>(</big><em>hkl</em>,
+                                <em>orientation</em>, <em>min_theta=0.1</em><big>)</big><a class="headerlink"
+                                                                                           href="#pymicro.xray.laue.diffracted_vector"
+                                                                                           title="Permalink to this definition">¶</a>
+                            </dt>
+                            <dd></dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.xray.laue.select_lambda">
+                                <tt class="descclassname">pymicro.xray.laue.</tt><tt class="descname">select_lambda</tt><big>(</big><em>hkl</em>,
+                                <em>orientation</em>, <em>Xu=&lt;Mock name='mock.array()' id='61282192'&gt;</em>, <em>verbose=False</em><big>)</big><a
+                                    class="headerlink" href="#pymicro.xray.laue.select_lambda"
+                                    title="Permalink to this definition">¶</a></dt>
+                            <dd><p>Compute the wavelength corresponding to the first order reflection
+                                of a given lattice plane.</p>
+                                <table class="docutils field-list" frame="void" rules="none">
+                                    <col class="field-name"/>
+                                    <col class="field-body"/>
+                                    <tbody valign="top">
+                                    <tr class="field-odd field">
+                                        <th class="field-name">Parameters:</th>
+                                        <td class="field-body">
+                                            <ul class="first simple">
+                                                <li><strong>hkl</strong> &#8211; The given latice plane.</li>
+                                                <li><strong>Xu</strong> &#8211; The unit vector of the incident X-ray
+                                                    beam (default along the X-axis).
+                                                </li>
+                                                <li><strong>verbose</strong> (<em>bool</em>) &#8211; activate verbose
+                                                    mode (default False).
+                                                </li>
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                    <tr class="field-even field">
+                                        <th class="field-name">Returns tuple:</th>
+                                        <td class="field-body"><p class="first last">A tuple of the wavelength value and
+                                            the corresponding Bragg angle.</p>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </dd>
+                        </dl>
+
+                    </div>
+                    <div class="section" id="module-pymicro.xray.xray_utils">
+                        <span id="xray-utils-module"></span>
+                        <h2><tt class="xref py py-mod docutils literal"><span class="pre">xray_utils</span></tt>
+                            Module<a class="headerlink" href="#module-pymicro.xray.xray_utils"
+                                     title="Permalink to this headline">¶</a></h2>
+                        <dl class="function">
+                            <dt id="pymicro.xray.xray_utils.lambda_angstrom_to_keV">
+                                <tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">lambda_angstrom_to_keV</tt><big>(</big><em>lambda_angstrom</em><big>)</big><a
+                                    class="headerlink" href="#pymicro.xray.xray_utils.lambda_angstrom_to_keV"
+                                    title="Permalink to this definition">¶</a></dt>
+                            <dd></dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.xray.xray_utils.lambda_keV_to_angstrom">
+                                <tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">lambda_keV_to_angstrom</tt><big>(</big><em>lambda_keV</em><big>)</big><a
+                                    class="headerlink" href="#pymicro.xray.xray_utils.lambda_keV_to_angstrom"
+                                    title="Permalink to this definition">¶</a></dt>
+                            <dd></dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.xray.xray_utils.lambda_keV_to_nm">
+                                <tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">lambda_keV_to_nm</tt><big>(</big><em>lambda_keV</em><big>)</big><a
+                                    class="headerlink" href="#pymicro.xray.xray_utils.lambda_keV_to_nm"
+                                    title="Permalink to this definition">¶</a></dt>
+                            <dd></dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.xray.xray_utils.lambda_nm_to_keV">
+                                <tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">lambda_nm_to_keV</tt><big>(</big><em>lambda_nm</em><big>)</big><a
+                                    class="headerlink" href="#pymicro.xray.xray_utils.lambda_nm_to_keV"
+                                    title="Permalink to this definition">¶</a></dt>
+                            <dd></dd>
+                        </dl>
+
+                        <dl class="function">
+                            <dt id="pymicro.xray.xray_utils.plot_xray_trans">
+                                <tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">plot_xray_trans</tt><big>(</big><em>mat='Al',
+                                ts=[1.0], rho=1.0, unit='keV', energy_lim=(1, 100), legfmt='%.1f',
+                                display=False</em><big>)</big><a class="headerlink"
+                                                                 href="#pymicro.xray.xray_utils.plot_xray_trans"
+                                                                 title="Permalink to this definition">¶</a></dt>
+                            <dd><p>Plot the transmitted intensity of a X-ray beam through a given material.</p>
+                                <p><strong>Parameters:</strong></p>
+                                <p><em>mat</em> The material (Chemical composition, eg. &#8216;Al&#8217;)</p>
+                                <p><em>ts</em> a list of thickness values of the material in mm (1.0 by default)</p>
+                                <p><em>rho</em> density of the material in g/cm^3 (1.0 by default)</p>
+                                <p><em>unit</em> unit for the energy column (keV by default)</p>
+                                <p><em>energy_lim</em> energy bounds in the plot (1, 100 by default)</p>
+                                <p><em>display</em> display the plot or save an image of the plot (False by default)</p>
+                            </dd>
+                        </dl>
+
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+    <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+                <li><a class="reference internal" href="#">xray Package</a>
+                    <ul>
+                        <li><a class="reference internal" href="#detectors-module"><tt class="docutils literal"><span
+                                class="pre">detectors</span></tt> Module</a></li>
+                        <li><a class="reference internal" href="#module-pymicro.xray.laue"><tt class="docutils literal"><span
+                                class="pre">laue</span></tt> Module</a></li>
+                        <li><a class="reference internal" href="#module-pymicro.xray.xray_utils"><tt
+                                class="docutils literal"><span class="pre">xray_utils</span></tt> Module</a></li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="pymicro.view.html"
+                                  title="previous chapter">view Package</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="changelog.html"
+                                  title="next chapter">Change log history</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+                <li><a href="_sources/pymicro.xray.txt"
+                       rel="nofollow">Show Source</a></li>
+            </ul>
+            <div id="searchbox" style="display: none">
+                <h3>Quick search</h3>
+                <form class="search" action="search.html" method="get">
+                    <input type="text" name="q"/>
+                    <input type="submit" value="Go"/>
+                    <input type="hidden" name="check_keywords" value="yes"/>
+                    <input type="hidden" name="area" value="default"/>
+                </form>
+                <p class="searchtip" style="font-size: 90%">
+                    Enter search terms or a module, class or function name.
+                </p>
+            </div>
+            <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+    </div>
+    <div class="clearer"></div>
+</div>
+<div class="related">
+    <h3>Navigation</h3>
+    <ul>
+        <li class="right" style="margin-right: 10px">
+            <a href="genindex.html" title="General Index"
+            >index</a></li>
+        <li class="right">
+            <a href="py-modindex.html" title="Python Module Index"
+            >modules</a> |
+        </li>
+        <li class="right">
+            <a href="changelog.html" title="Change log history"
+            >next</a> |
+        </li>
+        <li class="right">
+            <a href="pymicro.view.html" title="view Package"
+            >previous</a> |
+        </li>
+        <li><a href="index.html">pymicro 0.3.3 documentation</a> &raquo;</li>
+        <li><a href="pymicro.html">pymicro Package</a> &raquo;</li>
+    </ul>
+</div>
+<div class="footer">
+    &copy; Copyright 2013-2016, Henry Proudhon.
+    Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+</div>
+</body>
+</html>

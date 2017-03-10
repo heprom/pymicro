@@ -1,0 +1,315 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    <title>3d analysis and rendering of damage in a steel tension sample &mdash; pymicro 0.3.3 documentation</title>
+
+    <link rel="stylesheet" href="../_static/proBlue.css" type="text/css"/>
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css"/>
+
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.3.3',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="pymicro 0.3.3 documentation" href="../index.html"/>
+    <link rel="up" title="Cookbook" href="../cookbook.html"/>
+    <link rel="next" title="Convention to read and write 2d images with pyplot"
+          href="convention_read_write_2d_images.html"/>
+    <link rel="prev" title="How to read 3d files properly and ensure consistency of the coordinate system?"
+          href="3d_images.html"/>
+</head>
+<body>
+<div class="related">
+    <h3>Navigation</h3>
+    <ul>
+        <li class="right" style="margin-right: 10px">
+            <a href="../genindex.html" title="General Index"
+               accesskey="I">index</a></li>
+        <li class="right">
+            <a href="../py-modindex.html" title="Python Module Index"
+            >modules</a> |
+        </li>
+        <li class="right">
+            <a href="convention_read_write_2d_images.html" title="Convention to read and write 2d images with pyplot"
+               accesskey="N">next</a> |
+        </li>
+        <li class="right">
+            <a href="3d_images.html"
+               title="How to read 3d files properly and ensure consistency of the coordinate system?"
+               accesskey="P">previous</a> |
+        </li>
+        <li><a href="../index.html">pymicro 0.3.3 documentation</a> &raquo;</li>
+        <li><a href="../cookbook.html" accesskey="U">Cookbook</a> &raquo;</li>
+    </ul>
+</div>
+
+<div class="document">
+    <div class="documentwrapper">
+        <div class="bodywrapper">
+            <div class="body">
+
+                <div class="section" id="d-analysis-and-rendering-of-damage-in-a-steel-tension-sample">
+                    <h1>3d analysis and rendering of damage in a steel tension sample<a class="headerlink"
+                                                                                        href="#d-analysis-and-rendering-of-damage-in-a-steel-tension-sample"
+                                                                                        title="Permalink to this headline">¶</a>
+                    </h1>
+                    <p>This recipe demonstrate how to analyze the cavities in a steel sample deformed under tension
+                        loading.</p>
+                    <p><strong>Get the complete Python source code:</strong> <a class="reference download internal"
+                                                                                href="../_downloads/steel_damage_analysis.py"><tt
+                            class="xref download docutils literal"><span
+                            class="pre">steel_damage_analysis.py</span></tt></a></p>
+                    <p>The 3d data set is a 8 bits binary file with size 341x341x246.
+                        First you need to define the path to the 3d volume:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="n">data_dir</span> <span class="o">=</span> <span
+                                class="s">&#39;../../examples/data&#39;</span>
+<span class="n">scan_name</span> <span class="o">=</span> <span class="s">&#39;steel_431x431x246_uint8&#39;</span>
+<span class="n">scan_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span
+                                    class="n">path</span><span class="o">.</span><span class="n">join</span><span
+                                    class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span
+                                    class="n">scan_name</span> <span class="o">+</span> <span
+                                    class="s">&#39;.raw&#39;</span><span class="p">)</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>Then load the volume in memory thanks to the <cite>:pymicro:file:file_utils:HST_read</cite>
+                        function:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="n">data</span> <span class="o">=</span> <span
+                                class="n">HST_read</span><span class="p">(</span><span class="n">scan_path</span><span
+                                class="p">,</span> <span class="n">header_size</span><span class="o">=</span><span
+                                class="mi">0</span><span class="p">)</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>The reconstructed tomographic volume is not align with the cartesian axes, so rotate the volume
+                        by 15 degrees:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="n">data</span> <span class="o">=</span> <span
+                                class="n">ndimage</span><span class="o">.</span><span class="n">rotate</span><span
+                                class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mf">15.5</span><span
+                                class="p">,</span> <span class="n">axes</span><span class="o">=</span><span
+                                class="p">(</span><span class="mi">1</span><span class="p">,</span> <span
+                                class="mi">0</span><span class="p">),</span> <span class="n">reshape</span><span
+                                class="o">=</span><span class="bp">False</span><span class="p">)</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>The result of these operations can be quickly observed using regular pyplot functions such as
+                        imshow. Here we look at slice number 87 where a ring artifact is present. We will take care of
+                        those later.</p>
+                    <img alt="../_images/steel_431x431x246_uint8_data.png" class="align-center"
+                         src="../_images/steel_431x431x246_uint8_data.png"/>
+                    <p>The entire volume is binarized using a simple threshold with the value 100:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="n">data_bin</span> <span class="o">=</span> <span
+                                class="n">np</span><span class="o">.</span><span class="n">where</span><span
+                                class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">greater</span><span
+                                class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">100</span><span
+                                class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span
+                                class="p">)</span><span class="o">.</span><span class="n">astype</span><span
+                                class="p">(</span><span class="n">np</span><span class="o">.</span><span
+                                class="n">uint8</span><span class="p">)</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>And cavities are labeled using standard scipy tools:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="n">label_im</span><span class="p">,</span> <span
+                                class="n">nb_labels</span> <span class="o">=</span> <span class="n">ndimage</span><span
+                                class="o">.</span><span class="n">label</span><span class="p">(</span><span class="n">data_bin</span><span
+                                class="p">)</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>3465 labels have been found, the result can be observed on slice 87 using pyplot:</p>
+                    <img alt="../_images/steel_431x431x246_uint8_label.png" class="align-center"
+                         src="../_images/steel_431x431x246_uint8_label.png"/>
+                    <p>We use a simple algorithm to remove ring articfacts (assuming the cavities are convex): the
+                        center of mass of each label is compute and if it does not lie inside the label, the
+                        corresponding voxels are set to 0. Here 11 rings were removed.</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="c"># simple ring removal artifact</span>
+<span class="n">coms</span> <span class="o">=</span> <span class="n">ndimage</span><span class="o">.</span><span
+                                    class="n">measurements</span><span class="o">.</span><span
+                                    class="n">center_of_mass</span><span class="p">(</span><span
+                                    class="n">data_bin</span> <span class="o">/</span> <span class="mi">255</span><span
+                                    class="p">,</span> <span class="n">labels</span><span class="o">=</span><span
+                                    class="n">label_im</span><span class="p">,</span> \
+  <span class="n">index</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span
+                                    class="mi">1</span><span class="p">,</span> <span class="n">nb_labels</span> <span
+                                    class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+<span class="n">rings</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span
+                                    class="p">(</span><span class="n">nb_labels</span><span class="p">):</span>
+  <span class="n">com_x</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span
+                                    class="n">coms</span><span class="p">[</span><span class="n">i</span><span
+                                    class="p">][</span><span class="mi">0</span><span class="p">])</span>
+  <span class="n">com_y</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span
+                                    class="n">coms</span><span class="p">[</span><span class="n">i</span><span
+                                    class="p">][</span><span class="mi">1</span><span class="p">])</span>
+  <span class="n">com_z</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span
+                                    class="n">coms</span><span class="p">[</span><span class="n">i</span><span
+                                    class="p">][</span><span class="mi">2</span><span class="p">])</span>
+  <span class="k">if</span> <span class="ow">not</span> <span class="n">label_im</span><span class="p">[</span><span
+                                    class="n">com_x</span><span class="p">,</span> <span class="n">com_y</span><span
+                                    class="p">,</span> <span class="n">com_z</span><span class="p">]</span> <span
+                                    class="o">==</span> <span class="n">i</span> <span class="o">+</span> <span
+                                    class="mi">1</span><span class="p">:</span>
+    <span class="k">print</span> <span class="s">&#39;likely found a ring artifact at (</span><span class="si">%d</span><span
+                                    class="s">, </span><span class="si">%d</span><span class="s">, </span><span
+                                    class="si">%d</span><span class="s">) for label = </span><span
+                                    class="si">%d</span><span class="s">, value is </span><span
+                                    class="si">%d</span><span class="s">&#39;</span> \
+      <span class="o">%</span> <span class="p">(</span><span class="n">com_x</span><span class="p">,</span> <span
+                                    class="n">com_y</span><span class="p">,</span> <span class="n">com_z</span><span
+                                    class="p">,</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span
+                                    class="mi">1</span><span class="p">),</span> <span class="n">label_im</span><span
+                                    class="p">[</span><span class="n">com_x</span><span class="p">,</span> <span
+                                    class="n">com_y</span><span class="p">,</span> <span class="n">com_z</span><span
+                                    class="p">])</span>
+    <span class="n">data_bin</span><span class="p">[</span><span class="n">label_im</span> <span
+                                    class="o">==</span> <span class="p">(</span><span class="n">i</span> <span
+                                    class="o">+</span> <span class="mi">1</span><span class="p">)]</span> <span
+                                    class="o">=</span> <span class="mi">0</span>
+    <span class="n">rings</span> <span class="o">+=</span> <span class="mi">1</span>
+<span class="k">print</span> <span class="s">&#39;removed </span><span class="si">%d</span><span class="s"> rings artifacts&#39;</span> <span
+                                    class="o">%</span> <span class="n">rings</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>The outside of the sample needs a little love, it is by far the largest label here so after
+                        inverting the labeled image and running a binary closing it can be set to a fixed value (155
+                        here) in the data_bin array.</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="k">print</span><span class="p">(</span><span class="s">&#39;labeling and using a fixed color around the specimen&#39;</span><span
+                                class="p">)</span>
+<span class="c"># the outside is by far the largest label here</span>
+<span class="n">mask_outside</span> <span class="o">=</span> <span class="p">(</span><span class="n">sizes</span> <span
+                                    class="o">&gt;=</span> <span class="n">ndimage</span><span class="o">.</span><span
+                                    class="n">maximum</span><span class="p">(</span><span class="n">sizes</span><span
+                                    class="p">))</span>
+<span class="k">print</span><span class="p">(</span><span class="s">&#39;inverting the image so that outside is now 1&#39;</span><span
+                                    class="p">)</span>
+<span class="n">data_inv</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span
+                                    class="n">label_im</span>
+<span class="n">outside</span> <span class="o">=</span> <span class="n">mask_outside</span><span class="p">[</span><span
+                                    class="n">data_inv</span><span class="p">]</span>
+<span class="n">outside</span> <span class="o">=</span> <span class="n">ndimage</span><span class="o">.</span><span
+                                    class="n">binary_closing</span><span class="p">(</span><span
+                                    class="n">outside</span><span class="p">,</span> <span
+                                    class="n">iterations</span> <span class="o">=</span> <span class="mi">3</span><span
+                                    class="p">)</span>
+<span class="c"># fix the image border</span>
+<span class="n">outside</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span
+                                    class="p">,:,:]</span> <span class="o">=</span> <span class="mi">1</span> <span
+                                    class="p">;</span> <span class="n">outside</span><span class="p">[</span><span
+                                    class="o">-</span><span class="mi">3</span><span class="p">:,:,:]</span> <span
+                                    class="o">=</span> <span class="mi">1</span> <span class="p">;</span> <span
+                                    class="n">outside</span><span class="p">[:,</span><span class="mi">0</span><span
+                                    class="p">:</span><span class="mi">3</span><span class="p">,:]</span> <span
+                                    class="o">=</span> <span class="mi">1</span> <span class="p">;</span>
+<span class="n">outside</span><span class="p">[:,</span><span class="o">-</span><span class="mi">3</span><span
+                                    class="p">:,:]</span> <span class="o">=</span> <span class="mi">1</span> <span
+                                    class="p">;</span> <span class="n">outside</span><span class="p">[:,:,</span><span
+                                    class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span
+                                    class="o">=</span> <span class="mi">1</span> <span class="p">;</span> <span
+                                    class="n">outside</span><span class="p">[:,:,</span><span class="o">-</span><span
+                                    class="mi">3</span><span class="p">:]</span> <span class="o">=</span> <span
+                                    class="mi">1</span>
+<span class="n">data_bin</span><span class="p">[</span><span class="n">outside</span><span class="p">]</span> <span
+                                    class="o">=</span> <span class="mi">155</span>
+</pre>
+                        </div>
+                    </div>
+                    <img alt="../_images/steel_431x431x246_uint8_outside.png" class="align-center"
+                         src="../_images/steel_431x431x246_uint8_outside.png"/>
+                    <p>At this point the segmented volume can be written to the disk for later use using the <cite>HST_write</cite>
+                        function:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="n">HST_write</span><span class="p">(</span><span
+                                class="n">data_bin</span><span class="p">,</span> <span class="n">scan_name</span> <span
+                                class="o">+</span> <span class="s">&#39;_bin.raw&#39;</span><span class="p">)</span>
+</pre>
+                        </div>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+    <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="3d_images.html"
+                                  title="previous chapter">How to read 3d files properly and ensure consistency of the
+                coordinate system?</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="convention_read_write_2d_images.html"
+                                  title="next chapter">Convention to read and write 2d images with pyplot</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+                <li><a href="../_sources/cookbook/steel_damage_analysis.txt"
+                       rel="nofollow">Show Source</a></li>
+            </ul>
+            <div id="searchbox" style="display: none">
+                <h3>Quick search</h3>
+                <form class="search" action="../search.html" method="get">
+                    <input type="text" name="q"/>
+                    <input type="submit" value="Go"/>
+                    <input type="hidden" name="check_keywords" value="yes"/>
+                    <input type="hidden" name="area" value="default"/>
+                </form>
+                <p class="searchtip" style="font-size: 90%">
+                    Enter search terms or a module, class or function name.
+                </p>
+            </div>
+            <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+    </div>
+    <div class="clearer"></div>
+</div>
+<div class="related">
+    <h3>Navigation</h3>
+    <ul>
+        <li class="right" style="margin-right: 10px">
+            <a href="../genindex.html" title="General Index"
+            >index</a></li>
+        <li class="right">
+            <a href="../py-modindex.html" title="Python Module Index"
+            >modules</a> |
+        </li>
+        <li class="right">
+            <a href="convention_read_write_2d_images.html" title="Convention to read and write 2d images with pyplot"
+            >next</a> |
+        </li>
+        <li class="right">
+            <a href="3d_images.html"
+               title="How to read 3d files properly and ensure consistency of the coordinate system?"
+            >previous</a> |
+        </li>
+        <li><a href="../index.html">pymicro 0.3.3 documentation</a> &raquo;</li>
+        <li><a href="../cookbook.html">Cookbook</a> &raquo;</li>
+    </ul>
+</div>
+<div class="footer">
+    &copy; Copyright 2013-2016, Henry Proudhon.
+    Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+</div>
+</body>
+</html>

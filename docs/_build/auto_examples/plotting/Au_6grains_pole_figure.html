@@ -1,0 +1,129 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>&lt;no title&gt; &mdash; pymicro 0.3.3 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/proBlue.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.3.3',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="pymicro 0.3.3 documentation" href="../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">pymicro 0.3.3 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <img alt="../../_images/Au_6grains_pole_figure1.png" class="align-center" id="example-plotting-au-6grains-pole-figure-py" src="../../_images/Au_6grains_pole_figure1.png" />
+<p><strong>Python source code:</strong> <a class="reference download internal" href="../../_downloads/Au_6grains_pole_figure.py"><tt class="xref download docutils literal"><span class="pre">Au_6grains_pole_figure.py</span></tt></a></p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">pymicro.crystal.microstructure</span> <span class="kn">import</span> <span class="n">Microstructure</span><span class="p">,</span> <span class="n">Grain</span><span class="p">,</span> <span class="n">Orientation</span>
+<span class="kn">from</span> <span class="nn">pymicro.crystal.texture</span> <span class="kn">import</span> <span class="n">PoleFigure</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span><span class="p">,</span> <span class="n">colors</span><span class="p">,</span> <span class="n">cm</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+  <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">  Pole figure of a gold sample containing 6 grains with a strong &lt;111&gt; fiber texture.</span>
+<span class="sd">  A Microstructure object is first created with the 6 grains of interest.</span>
+<span class="sd">  The grain ids corerespond to the actual grain number (in an EBSD scan for instance).</span>
+<span class="sd">  A PoleFigure object is then created using this microstructure and the pole figures</span>
+<span class="sd">  (both direct and inverse) are drawn by calling the plot_pole_figures() method.</span>
+<span class="sd">  &#39;&#39;&#39;</span>
+  <span class="n">micro</span> <span class="o">=</span> <span class="n">Microstructure</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&#39;Au_6grains&#39;</span><span class="p">)</span>
+  <span class="n">micro</span><span class="o">.</span><span class="n">grains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Grain</span><span class="p">(</span><span class="mi">1158</span><span class="p">,</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">from_euler</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">344.776</span><span class="p">,</span><span class="mf">52.2589</span><span class="p">,</span><span class="mf">53.9933</span><span class="p">]))))</span>
+  <span class="n">micro</span><span class="o">.</span><span class="n">grains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Grain</span><span class="p">(</span><span class="mi">1349</span><span class="p">,</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">from_euler</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">344.899</span><span class="p">,</span><span class="mf">125.961</span><span class="p">,</span><span class="mf">217.330</span><span class="p">]))))</span>
+  <span class="n">micro</span><span class="o">.</span><span class="n">grains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Grain</span><span class="p">(</span><span class="mi">1585</span><span class="p">,</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">from_euler</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">228.039</span><span class="p">,</span><span class="mf">57.4791</span><span class="p">,</span><span class="mf">143.171</span><span class="p">]))))</span>
+  <span class="n">micro</span><span class="o">.</span><span class="n">grains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Grain</span><span class="p">(</span><span class="mi">1805</span><span class="p">,</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">from_euler</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">186.741</span><span class="p">,</span><span class="mf">60.333</span><span class="p">,</span><span class="mf">43.311</span><span class="p">]))))</span>
+  <span class="n">micro</span><span class="o">.</span><span class="n">grains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Grain</span><span class="p">(</span><span class="mi">1833</span><span class="p">,</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">from_euler</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">151.709</span><span class="p">,</span><span class="mf">55.0406</span><span class="p">,</span><span class="mf">44.1051</span><span class="p">]))))</span>
+  <span class="n">micro</span><span class="o">.</span><span class="n">grains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Grain</span><span class="p">(</span><span class="mi">2268</span><span class="p">,</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">from_euler</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">237.262</span><span class="p">,</span><span class="mf">125.149</span><span class="p">,</span><span class="mf">225.615</span><span class="p">]))))</span>
+
+  <span class="c"># create pole figure (both direct and inverse)</span>
+  <span class="n">pf</span> <span class="o">=</span> <span class="n">PoleFigure</span><span class="p">(</span><span class="n">hkl</span><span class="o">=</span><span class="s">&#39;111&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s">&#39;Z&#39;</span><span class="p">,</span> <span class="n">proj</span><span class="o">=</span><span class="s">&#39;stereo&#39;</span><span class="p">,</span> <span class="n">microstructure</span><span class="o">=</span><span class="n">micro</span><span class="p">)</span>
+  <span class="n">pf</span><span class="o">.</span><span class="n">set_map_field</span><span class="p">(</span><span class="s">&#39;grain_id&#39;</span><span class="p">)</span>
+  <span class="n">pf</span><span class="o">.</span><span class="n">pflegend</span> <span class="o">=</span> <span class="bp">True</span> <span class="c"># this works well for a few grains</span>
+  <span class="n">pf</span><span class="o">.</span><span class="n">plot_pole_figures</span><span class="p">(</span><span class="n">plot_sst</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">save_as</span><span class="o">=</span><span class="s">&#39;png&#39;</span><span class="p">)</span>
+
+  <span class="n">image_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">__file__</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s">&#39;.png&#39;</span>
+  <span class="k">print</span> <span class="s">&#39;writting </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">image_name</span>
+
+  <span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">image</span>
+  <span class="n">image</span><span class="o">.</span><span class="n">thumbnail</span><span class="p">(</span><span class="n">image_name</span><span class="p">,</span> <span class="s">&#39;thumb_&#39;</span> <span class="o">+</span> <span class="n">image_name</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
+</pre></div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="../../_sources/auto_examples/plotting/Au_6grains_pole_figure.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">pymicro 0.3.3 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013-2016, Henry Proudhon.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

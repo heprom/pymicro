@@ -1,0 +1,217 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    <title>Using pymicro interactively &mdash; pymicro 0.3.3 documentation</title>
+
+    <link rel="stylesheet" href="../_static/proBlue.css" type="text/css"/>
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css"/>
+
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.3.3',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="pymicro 0.3.3 documentation" href="../index.html"/>
+    <link rel="up" title="Cookbook" href="../cookbook.html"/>
+    <link rel="next" title="How to read 3d files properly and ensure consistency of the coordinate system?"
+          href="3d_images.html"/>
+    <link rel="prev" title="Cookbook" href="../cookbook.html"/>
+</head>
+<body>
+<div class="related">
+    <h3>Navigation</h3>
+    <ul>
+        <li class="right" style="margin-right: 10px">
+            <a href="../genindex.html" title="General Index"
+               accesskey="I">index</a></li>
+        <li class="right">
+            <a href="../py-modindex.html" title="Python Module Index"
+            >modules</a> |
+        </li>
+        <li class="right">
+            <a href="3d_images.html"
+               title="How to read 3d files properly and ensure consistency of the coordinate system?"
+               accesskey="N">next</a> |
+        </li>
+        <li class="right">
+            <a href="../cookbook.html" title="Cookbook"
+               accesskey="P">previous</a> |
+        </li>
+        <li><a href="../index.html">pymicro 0.3.3 documentation</a> &raquo;</li>
+        <li><a href="../cookbook.html" accesskey="U">Cookbook</a> &raquo;</li>
+    </ul>
+</div>
+
+<div class="document">
+    <div class="documentwrapper">
+        <div class="bodywrapper">
+            <div class="body">
+
+                <div class="section" id="using-pymicro-interactively">
+                    <h1>Using pymicro interactively<a class="headerlink" href="#using-pymicro-interactively"
+                                                      title="Permalink to this headline">¶</a></h1>
+                    <p>pymicro can be used interactively within the ipython framework without any change to your system.
+                        Just type some code in !</p>
+                    <p>Example:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span
+                                class="kn">from</span> <span class="nn">pymicro.crystal.lattice</span> <span class="kn">import</span> <span
+                                class="n">Lattice</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">al</span> <span class="o">=</span> <span
+                                    class="n">Lattice</span><span class="o">.</span><span
+                                    class="n">from_symbol</span><span class="p">(</span><span
+                                    class="s">&#39;Al&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">pymicro.crystal.lattice</span> <span
+                                    class="kn">import</span> <span class="n">HklPlane</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p111</span> <span class="o">=</span> <span
+                                    class="n">HklPlane</span><span class="p">(</span><span class="mi">1</span><span
+                                    class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span
+                                    class="mi">1</span><span class="p">,</span> <span class="n">al</span><span
+                                    class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p111</span><span class="o">.</span><span
+                                    class="n">bragg_angle</span><span class="p">(</span><span class="mi">20</span><span
+                                    class="p">)</span><span class="o">*</span><span class="mi">180</span><span
+                                    class="o">/</span><span class="n">pi</span>
+<span class="go">7.618</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>As seen it can quick become boring to import all the required modules. To use pymicro seamlessly
+                        within ipython, it is recommended to tweak the ipython config in the following way:</p>
+                    <p>you can add the import_modules.py file to the ipython startup directory. This way all the pymicro
+                        modules will be imported into the namespace at startup. You can copy it there but the best way
+                        is to use a hardlink. This way if pymicro is updated and this file changes, you will have
+                        nothing special to do:</p>
+                    <div class="highlight-bash">
+                        <div class="highlight"><pre><span class="nv">$ </span><span class="nb">cd</span> .ipython/profile_default/startup
+<span class="nv">$ </span>ln -s /path/to/pymicro/import_modules.py
+</pre>
+                        </div>
+                    </div>
+                    <p>That&#8217;s it, now you may just type:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">al</span> <span
+                                class="o">=</span> <span class="n">Lattice</span><span class="o">.</span><span
+                                class="n">from_symbol</span><span class="p">(</span><span
+                                class="s">&#39;Al&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p111</span> <span class="o">=</span> <span
+                                    class="n">HklPlane</span><span class="p">(</span><span class="mi">1</span><span
+                                    class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span
+                                    class="mi">1</span><span class="p">,</span> <span class="n">al</span><span
+                                    class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">p111</span><span class="o">.</span><span
+                                    class="n">bragg_angle</span><span class="p">(</span><span class="mi">20</span><span
+                                    class="p">)</span><span class="o">*</span><span class="mi">180</span><span
+                                    class="o">/</span><span class="n">pi</span>
+<span class="go">7.618</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>pymicro features several static methods to directly compute or plot with one liners, for instance
+                        to plot a pole figure for a single orientation without creating a Grain instance and so on you
+                        may just type:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span
+                                class="n">PoleFigure</span><span class="o">.</span><span class="n">plot</span><span
+                                class="p">(</span><span class="n">Orientation</span><span class="o">.</span><span
+                                class="n">from_rodrigues</span><span class="p">([</span><span
+                                class="mf">0.0885</span><span class="p">,</span> <span class="mf">0.3889</span><span
+                                class="p">,</span> <span class="mf">0.3268</span><span class="p">]))</span>
+</pre>
+                        </div>
+                    </div>
+                    <p>To compute all Schmid factor for this orientation and the {111}[110] slip systems, you can
+                        use:</p>
+                    <div class="highlight-python">
+                        <div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">o</span> <span
+                                class="o">=</span> <span class="n">Orientation</span><span class="o">.</span><span
+                                class="n">from_rodrigues</span><span class="p">([</span><span
+                                class="mf">0.0885</span><span class="p">,</span> <span class="mf">0.3889</span><span
+                                class="p">,</span> <span class="mf">0.3268</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">o</span><span class="o">.</span><span class="n">compute_all_schmid_factors</span><span
+                                    class="p">(</span><span class="n">SlipSystem</span><span class="o">.</span><span
+                                    class="n">get_slip_systems</span><span class="p">(</span><span
+                                    class="n">plane_type</span><span class="o">=</span><span
+                                    class="s">&#39;111&#39;</span><span class="p">))</span>
+</pre>
+                        </div>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+    <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="../cookbook.html"
+                                  title="previous chapter">Cookbook</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="3d_images.html"
+                                  title="next chapter">How to read 3d files properly and ensure consistency of the
+                coordinate system?</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+                <li><a href="../_sources/cookbook/pymicro_and_ipython.txt"
+                       rel="nofollow">Show Source</a></li>
+            </ul>
+            <div id="searchbox" style="display: none">
+                <h3>Quick search</h3>
+                <form class="search" action="../search.html" method="get">
+                    <input type="text" name="q"/>
+                    <input type="submit" value="Go"/>
+                    <input type="hidden" name="check_keywords" value="yes"/>
+                    <input type="hidden" name="area" value="default"/>
+                </form>
+                <p class="searchtip" style="font-size: 90%">
+                    Enter search terms or a module, class or function name.
+                </p>
+            </div>
+            <script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+    </div>
+    <div class="clearer"></div>
+</div>
+<div class="related">
+    <h3>Navigation</h3>
+    <ul>
+        <li class="right" style="margin-right: 10px">
+            <a href="../genindex.html" title="General Index"
+            >index</a></li>
+        <li class="right">
+            <a href="../py-modindex.html" title="Python Module Index"
+            >modules</a> |
+        </li>
+        <li class="right">
+            <a href="3d_images.html"
+               title="How to read 3d files properly and ensure consistency of the coordinate system?"
+            >next</a> |
+        </li>
+        <li class="right">
+            <a href="../cookbook.html" title="Cookbook"
+            >previous</a> |
+        </li>
+        <li><a href="../index.html">pymicro 0.3.3 documentation</a> &raquo;</li>
+        <li><a href="../cookbook.html">Cookbook</a> &raquo;</li>
+    </ul>
+</div>
+<div class="footer">
+    &copy; Copyright 2013-2016, Henry Proudhon.
+    Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+</div>
+</body>
+</html>

@@ -1,9 +1,9 @@
 .. pymicro documentation master file, created by sphinx-quickstart on Tue Oct 22 11:17:23 2013.
 
 .. image:: _static/pymicro_logo_600.png
-:width: 300 px
-   :alt: pymicro
-       :align: center
+    :width: 300 px
+    :alt: pymicro
+    :align: center
 
 Introduction
 ============
@@ -19,13 +19,13 @@ needed for in situ data analysis.
 Contents:
 
 .. toctree::
-:maxdepth: 2
+    :maxdepth: 2
 
-       welcome
-       auto_examples/index.rst
-       cookbook
-       pymicro
-       changelog
+    welcome
+    auto_examples/index.rst
+    cookbook
+    pymicro
+    changelog
 
 Indices and tables
 ==================

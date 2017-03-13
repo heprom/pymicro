@@ -4,8 +4,8 @@
 */tests/*.py[cod]
 
 # Sphinx documentation
-doc/_build/
-doc/auto_examples/
+docs/_build/
+docs/auto_examples/
 
 # pycharm stuff
 .idea

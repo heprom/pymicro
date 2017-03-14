@@ -23,9 +23,13 @@ for mod_name in MOCK_MODULES:
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('../..'))
-sys.path.insert(0, os.path.abspath('../crystal'))
-sys.path.insert(0, os.path.abspath('../file'))
 sys.path.insert(0, os.path.abspath('../apps'))
+sys.path.insert(0, os.path.abspath('../crystal'))
+sys.path.insert(0, os.path.abspath('../external'))
+sys.path.insert(0, os.path.abspath('../fe'))
+sys.path.insert(0, os.path.abspath('../file'))
+sys.path.insert(0, os.path.abspath('../math'))
+sys.path.insert(0, os.path.abspath('../xray'))
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.append(os.path.abspath('sphinxext'))
@@ -33,23 +37,28 @@ sys.path.append(os.path.abspath('sphinxext'))
 try:
     import gen_rst
 
-    print '** successfully imported gen_rst'
+    print('** successfully imported gen_rst')
 except:
     pass
 
 # -- General configuration -----------------------------------------------------
 
+# Add any paths that contain templates here, relative to this directory.
+templates_path = ['_templates']
+
 # If your documentation needs a minimal Sphinx version, state it here.
 needs_sphinx = '1.1'
-
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'gen_rst']  # , 'sphinx.ext.mathjax']
+extensions = ['sphinx.ext.autodoc',
+              'sphinx.ext.autosummary',
+              'gen_rst']  # , 'sphinx.ext.mathjax']
 # mathjax_path = 'MathJax/MathJax.js'
 # jsmath_path = 'jsMath/easy/load.js'
 
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+autodoc_member_order = 'bysource'
+autodoc_default_flags = ['members', 'special-members', 'undoc-members', 'show-inheritance']
+autosummary_generate = True
 
 # The suffix of source filenames.
 source_suffix = '.rst'
@@ -62,13 +71,13 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'pymicro'
-copyright = u'2013-2016, Henry Proudhon'
+copyright = u'2013-2017, Henry Proudhon'
 
 
 # The project version is extracted from the main __init__.py
 def extract_version():
     """
-    Extracts version values from the main matplotlib __init__.py and
+    Extracts version values from the main __init__.py and
     returns them as a dictionary.
     """
     with open('../__init__.py') as fd:

@@ -17,17 +17,21 @@ import token, tokenize
 
 rst_template = """
 
+:orphan:
+
 .. _example_%(short_fname)s:
 
 %(docstring)s
 
-**Python source code:** :download:`%(fname)s <%(fname)s>`
+**Pythonnn source code:** :download:`%(fname)s <%(fname)s>`
 
 .. literalinclude:: %(fname)s
-    :lines: %(end_row)s-
-    """
+   :lines: %(end_row)s-
+   """
 
 plot_rst_template = """
+
+:orphan:
 
 .. _example_%(short_fname)s:
 
@@ -38,8 +42,8 @@ plot_rst_template = """
 **Python source code:** :download:`%(fname)s <%(fname)s>`
 
 .. literalinclude:: %(fname)s
-    :lines: %(end_row)s-
-    """
+   :lines: %(end_row)s-
+   """
 
 # The following strings are used when we have several pictures: we use
 # an html div tag that our CSS uses to turn the lists into horizontal
@@ -58,7 +62,7 @@ HLIST_IMAGE_TEMPLATE = """
 
 SINGLE_IMAGE = """
 .. image:: images/%s
-    :align: center
+   :align: center
 """
 
 
@@ -98,8 +102,7 @@ def generate_all_example_rst(app):
     print('*** input_dir = ', input_dir)
     # Walk all our source tree to find examples and generate them
     for dir_path, dir_names, file_names in os.walk(input_dir):
-        if ('build' in dir_path.split(os.sep)
-            or 'auto_examples' in dir_path.split(os.sep)):
+        if 'build' in dir_path.split(os.sep) or 'auto_examples' in dir_path.split(os.sep):
             continue
         if 'examples' in dir_names:
             print ('*** found examples')

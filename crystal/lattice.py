@@ -1,6 +1,5 @@
-'''The lattice module define the class to handle 
-   3D crystal lattices (the 14 Bravais lattices).
-'''
+"""The lattice module define the class to handle 3D crystal lattices (the 14 Bravais lattices).
+"""
 import os
 from pymicro.external import CifFile
 import itertools
@@ -148,7 +147,7 @@ class Lattice:
          * 6 possible 180 degrees rotations around <110> axes
          * 8 possible 120 degrees rotations around <111> axes
 
-        :params str crystal_structure: a string describing the crystal structure.
+        :param str crystal_structure: a string describing the crystal structure.
         :raise ValueError: if the given crystal structure is not cubic or none.
         :returns array: A numpy array of shape (n, 3, 3) where n is the \
         number of symmetries of the given crystal structure.
@@ -213,13 +212,8 @@ class Lattice:
            Lattice constants are given in Angstrom in CIF files and so
            converted to nanometer.
 
-        *Parameters*
-
-        **file_path**: The path to the CIF file representing the crystal structure.
-
-        *Returns*
-
-        A `Lattice` instance corresponding to the given CIF file.
+        :param str file_path: The path to the CIF file representing the crystal structure.
+        :returns: A `Lattice` instance corresponding to the given CIF file.
         '''
         cf = CifFile.ReadCif(file_path)
         # crystal = eval('cf[\'%s\']' % symbol)
@@ -454,9 +448,9 @@ class Lattice:
 
         ..note::
 
-          This method is here for the sake of completeness since one can
-          create the triclinic cell directly using the `from_parameters`
-          method.
+           This method is here for the sake of completeness since one can
+           create the triclinic cell directly using the `from_parameters`
+           method.
         '''
         return Lattice.from_parameters(a, b, c, alpha, beta, gamma)
 
@@ -720,8 +714,8 @@ class HklDirection(HklObject):
         hkl planes which verify :math:`h.u + k.v + l.w = 0`.
 
         :param max_miller: The maximum miller index to limt the search`
-        :returns list: A list of :py:class:`~pymicro.crystal.lattice.HklPlane`
-        objects describing all the planes in zone with the direction.
+        :returns list: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` objects \
+        describing all the planes in zone with the direction.
         '''
         (u, v, w) = self.miller_indices()
         indices = range(-max_miller, max_miller + 1)
@@ -733,7 +727,7 @@ class HklDirection(HklObject):
                         continue
                     if np.dot(np.array([h, k, l]), np.array([u, v, w])) == 0:
                         hklplanes_in_zone.append(HklPlane(h, k, l, self._lattice))
-        return (hklplanes_in_zone)
+        return hklplanes_in_zone
 
 
 class HklPlane(HklObject):
@@ -779,8 +773,7 @@ class HklPlane(HklObject):
 
           G_c = h.a^* + k.b^* + l.c^*
 
-        :return: a numpy vector expressed in the cartesian coordinate system
-        of the crystal.
+        :returns: a numpy vector expressed in the cartesian coordinate system of the crystal.
         '''
         [astar, bstar, cstar] = self._lattice.reciprocal_lattice()
         (h, k, l) = self.miller_indices()

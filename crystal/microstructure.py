@@ -1,4 +1,4 @@
-'''
+"""
 The microstructure module provide elementary classes to describe a 
 crystallographic granular microstructure such as mostly present in 
 metallic materials.
@@ -10,7 +10,7 @@ orientation:
  * :py:class:`~pymicro.crystal.microstructure.Microstructure`
  * :py:class:`~pymicro.crystal.microstructure.Grain`
  * :py:class:`~pymicro.crystal.microstructure.Orientation`
-'''
+"""
 import numpy as np
 import os, vtk
 from matplotlib import pyplot as plt, colors, cm

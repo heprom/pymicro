@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+"""The texture module provide some utilities to generate, analyse and plot crystallographic textures.
+"""
 import numpy as np
 from pymicro.crystal.lattice import Lattice, SlipSystem
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure

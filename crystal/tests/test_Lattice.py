@@ -7,6 +7,14 @@ class LatticeTests(unittest.TestCase):
     def setUp(self):
         print('testing the Lattice class')
 
+    def test_equality(self):
+        l1 = Lattice.cubic(0.5)
+        a = np.array([[0.5, 0., 0.],
+                      [0., 0.5, 0.],
+                      [0., 0., 0.5]])
+        l2 = Lattice(a)
+        self.assertEqual(l1, l2)
+
     def test_cubic(self):
         a = np.array([[0.5, 0., 0.],
                       [0., 0.5, 0.],
@@ -98,10 +106,30 @@ class HklPlaneTests(unittest.TestCase):
     def setUp(self):
         print 'testing the HklPlane class'
 
+    def test_equality(self):
+        p1 = HklPlane(1, 1, 1)
+        p2 = HklPlane(1, 1, 1)
+        p3 = HklPlane(-1, 1, 1)
+        self.assertEqual(p1, p2)
+        self.assertTrue(p1 == p2)
+        self.assertTrue(p1 != p3)
+
     def test_HklPlane(self):
         p = HklPlane(1, 1, 1)
         n = p.normal()
         self.assertEqual(np.linalg.norm(n), 1)
+
+    def test_auto_family(self):
+        self.assertEqual(len(HklPlane.auto_family('001')), 3)
+        self.assertEqual(len(HklPlane.auto_family('001', include_friedel_pair=True)), 6)
+        self.assertEqual(len(HklPlane.auto_family('111')), 4)
+        self.assertEqual(len(HklPlane.auto_family('111', include_friedel_pair=True)), 8)
+        self.assertEqual(len(HklPlane.auto_family('011')), 6)
+        self.assertEqual(len(HklPlane.auto_family('011', include_friedel_pair=True)), 12)
+        self.assertEqual(len(HklPlane.auto_family('112')), 12)
+        self.assertEqual(len(HklPlane.auto_family('112', include_friedel_pair=True)), 24)
+        self.assertEqual(len(HklPlane.auto_family('123')), 24)
+        self.assertEqual(len(HklPlane.auto_family('123', include_friedel_pair=True)), 48)
 
     def test_HklPlane_normal(self):
         ZrO2 = Lattice.tetragonal(3.64, 5.27)

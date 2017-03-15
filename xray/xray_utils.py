@@ -65,12 +65,12 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=(1, 100), legfmt='%
     the mass attenuation coefficient \mu_\rho (between 1 and 100 keV) and
     applying Beer's Lambert law:
 
-      .. math::
+    .. math::
 
-        I/I_0 = \exp(-\mu_\rho*\rho*t)
+      I/I_0 = \exp(-\mu_\rho*\rho*t)
 
-    The tabulated data is stored in ascii files in the data folder. It has been retreived
-    from NIST http://physics.nist.gov/cgi-bin/ffast/ffast.pl
+    The tabulated data is stored in ascii files in the data folder. It has been retrieved
+    from NIST `http://physics.nist.gov/cgi-bin/ffast/ffast.pl`
     The density is also tabulated and can be left blanked unless a specific value is to be used.
 
     :param string mat: A string representing the material (e.g. 'Al')

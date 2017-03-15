@@ -27,40 +27,40 @@ First you need to define the path to the 3d volume:
 .. literalinclude:: convention_read_write_2d_images.py
    :lines: 5-7
 
-   Then load the volume in memory thanks to the `:pymicro:file:file_utils:HST_read` function. The zrange option is used here to load only the 100th slice.
+Then load the volume in memory thanks to the `:pymicro:file:file_utils:HST_read` function. The zrange option is used here to load only the 100th slice.
 
 .. literalinclude:: convention_read_write_2d_images.py
    :lines: 9
 
-   The slice is saved as a raster image (eg. png or jpg) using pyplot
-   imsave function:
+The slice is saved as a raster image (eg. png or jpg) using pyplot
+imsave function:
 
 .. literalinclude:: convention_read_write_2d_images.py
    :lines: 13
 
-   The 2d image can now be loaded into memory as a numpy array using pyplot
-   imread function:
+The 2d image can now be loaded into memory as a numpy array using pyplot
+imread function:
 
 .. literalinclude:: convention_read_write_2d_images.py
    :lines: 16
 
-   Note that imsave write png image as 4 RGBA (red, green, blue, alpha)
-   using floatting point numbers between 0 and 1. Here we have selected
-   only the first channel (R) since in gray level images R=G=B. To compare
-   with our initial raw image we may just re-transforming it to 8 bits
-   (between 0 and 255):
+Note that imsave write png image as 4 RGBA (red, green, blue, alpha)
+using floatting point numbers between 0 and 1. Here we have selected
+only the first channel (R) since in gray level images R=G=B. To compare
+with our initial raw image we may just re-transforming it to 8 bits
+(between 0 and 255):
 
 .. literalinclude:: convention_read_write_2d_images.py
    :lines: 17
 
-   We can print some of the pixel value to verify the data is well ordered
-   in memory:
+We can print some of the pixel value to verify the data is well ordered
+in memory:
 
 .. literalinclude:: convention_read_write_2d_images.py
    :lines: 19-20
 
-   Finally the data is compared using imshow both on the raw data and the
-   numpy array read from the 2d image and plotting a profile along x:
+Finally the data is compared using imshow both on the raw data and the
+numpy array read from the 2d image and plotting a profile along x:
 
 .. literalinclude:: convention_read_write_2d_images.py
    :lines: 25,28,31-32

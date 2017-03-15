@@ -11,17 +11,17 @@ First you need to define the path to the 3d volume:
 .. literalinclude:: steel_damage_analysis.py
     :lines: 6-8
 
-    Then load the volume in memory thanks to the `:pymicro:file:file_utils:HST_read` function:
+Then load the volume in memory thanks to the `:pymicro:file:file_utils:HST_read` function:
 
 .. literalinclude:: steel_damage_analysis.py
     :lines: 11
 
-    The reconstructed tomographic volume is not align with the cartesian axes, so rotate the volume by 15 degrees:
+The reconstructed tomographic volume is not align with the cartesian axes, so rotate the volume by 15 degrees:
 
 .. literalinclude:: steel_damage_analysis.py
    :lines: 16
 
-   The result of these operations can be quickly observed using regular pyplot functions such as imshow. Here we look at slice number 87 where a ring artifact is present. We will take care of those later.
+The result of these operations can be quickly observed using regular pyplot functions such as imshow. Here we look at slice number 87 where a ring artifact is present. We will take care of those later.
 
 .. image:: steel_431x431x246_uint8_data.png
    :align: center

@@ -101,17 +101,18 @@ def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
     return data
 
 
-def diffracted_vector(hkl, orientation, min_theta=0.1):
+def diffracted_vector(hkl, orientation, min_theta=0.1, verbose=False):
     Bt = orientation.orientation_matrix().transpose()
     (h, k, l) = hkl.miller_indices()
     # this hkl plane will select a particular lambda
-    (the_lambda, theta) = select_lambda(hkl, orientation, verbose=True)
+    (the_lambda, theta) = select_lambda(hkl, orientation, verbose=verbose)
     if abs(theta) < min_theta * np.pi / 180:  # skip angles < min_theta deg
         return None
     lambda_nm = 1.2398 / the_lambda
     X = np.array([1., 0., 0.]) / lambda_nm
     Gs = Bt.dot(hkl.scattering_vector())
-    print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, hkl.bragg_angle(the_lambda) * 180 / np.pi))
+    if verbose:
+        print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, hkl.bragg_angle(the_lambda) * 180 / np.pi))
     assert (abs(theta - hkl.bragg_angle(the_lambda)) < 1e-6)  # verify than theta_bragg is equal to the glancing angle
     # compute diffracted direction
     K = X + Gs

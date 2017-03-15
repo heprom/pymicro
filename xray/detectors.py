@@ -1,11 +1,13 @@
+"""The detectors module define classes to manipulate X-ray detectors.
+"""
 import os, numpy as np
 from matplotlib import pyplot as plt, cm, rcParams
-
-rcParams.update({'font.size': 12})
-rcParams['text.latex.preamble'] = [r"\usepackage{amsmath}"]
-rcParams['image.interpolation'] = 'nearest'
 from pymicro.file.file_utils import HST_read, HST_write
 from pymicro.external.tifffile import TiffFile
+
+#rcParams.update({'font.size': 12})
+#rcParams['text.latex.preamble'] = [r"\usepackage{amsmath}"]
+#rcParams['image.interpolation'] = 'nearest'
 
 
 class Detector2d:

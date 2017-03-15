@@ -323,10 +323,9 @@ class Orientation:
         theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
         lambda_nm = 1.2398 / lambda_keV
 
-        # TODO check this as it seems B is just equal to g
-        gt = self.orientation_matrix()  # our B (here called gt) corresponds to g^{-1} in Poulsen 2004
-        A = h * gt[0, 0] + k * gt[1, 0] + l * gt[2, 0]
-        B = -h * gt[0, 1] - k * gt[1, 1] - l * gt[2, 1]
+        gt = self.orientation_matrix().T  # our Bt (here called gt) corresponds to g^{-1} in Poulsen 2004
+        A = h * gt[0, 0] + k * gt[0, 1] + l * gt[0, 2]  # could write A = np.dot(np.array([h, k, l]), gt[0])
+        B = -h * gt[1, 0] - k * gt[1, 1] - l * gt[1, 2]  # could write B = - np.dot(np.array([h, k, l]), gt[1])
         C = -2 * a * np.sin(theta) ** 2 / lambda_nm  # the minus sign comes from the main equation
         Delta = 4 * (A ** 2 + B ** 2 - C ** 2)
         if Delta < 0:

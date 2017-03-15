@@ -885,7 +885,7 @@ class HklPlane(HklObject):
             family.append(HklPlane(-1, 1, 1))
             family.append(HklPlane(1, -1, 1))
             family.append(HklPlane(1, 1, -1))
-        elif hkl == '112' or hkl == '211':
+        elif hkl in ['112', '121', '211']:
             family.append(HklPlane(1, 1, 2))
             family.append(HklPlane(-1, 1, 2))
             family.append(HklPlane(1, -1, 2))
@@ -898,6 +898,19 @@ class HklPlane(HklObject):
             family.append(HklPlane(-2, 1, 1))
             family.append(HklPlane(2, -1, 1))
             family.append(HklPlane(2, 1, -1))
+        elif hkl in ['113', '131', '311']:
+            family.append(HklPlane(1, 1, 3))
+            family.append(HklPlane(-1, 1, 3))
+            family.append(HklPlane(1, -1, 3))
+            family.append(HklPlane(1, 1, -3))
+            family.append(HklPlane(1, 3, 1))
+            family.append(HklPlane(-1, 3, 1))
+            family.append(HklPlane(1, -3, 1))
+            family.append(HklPlane(1, 3, -1))
+            family.append(HklPlane(3, 1, 1))
+            family.append(HklPlane(-3, 1, 1))
+            family.append(HklPlane(3, -1, 1))
+            family.append(HklPlane(3, 1, -1))
         elif hkl == '002':
             family.append(HklPlane(2, 0, 0))
             family.append(HklPlane(0, 2, 0))

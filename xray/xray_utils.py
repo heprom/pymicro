@@ -1,5 +1,6 @@
 import os, numpy as np
 from matplotlib import pyplot as plt
+from skimage.transform import radon
 
 densities = {'Li': 0.533,  # Z = 3
              'Be': 1.8450,  # Z = 4
@@ -106,3 +107,32 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=(1, 100), legfmt='%
         plt.show()
     else:
         plt.savefig('xray_trans_' + mat + '.png')
+
+def radiograph(data, omega):
+    """Compute a single radiograph of a 3D object using the radon transform.
+
+    :param np.array data: an array representing the 3D object in (XYZ) form.
+    :param omega: the rotation angle value in degrees.
+    :returns projections: a 3D array in (Y, Z, omega) form.
+    """
+    projection = radiographs(data, [omega])
+    return projection[:, :, 0]
+
+def radiographs(data, omegas):
+    """Compute the radiographs of a 3D object using the radon transform.
+
+    The object is represented by a 3D numpy array in (XYZ) form and a series of projection at each omega angle
+    are computed assuming the rotation is along Z in the middle of the data set. Internally this function uses
+    the radon transform from the skimage package.
+
+    :param np.array data: an array representing the 3D object in (XYZ) form.
+    :param omegas: an array of the rotation values in degrees.
+    :returns projections: a 3D array in (Y, Z, omega) form.
+    """
+    assert data.ndim == 3
+    width = np.ceil(max(data.shape[0], data.shape[1]) * 2 ** 0.5)
+    projections = np.zeros((width, np.shape(data)[2], len(omegas)), dtype=np.float)
+    for z in range(np.shape(data)[2]):
+        a = radon(data[:, :, z], omegas - 90)  # the 90 seems to come from the radon function itself
+        projections[:, z, :] = a[:, :]
+    return projections

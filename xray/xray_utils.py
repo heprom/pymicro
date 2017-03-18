@@ -130,6 +130,8 @@ def radiographs(data, omegas):
     :returns projections: a 3D array in (Y, Z, omega) form.
     """
     assert data.ndim == 3
+    if type(omegas) is list:
+        omegas = np.array(omegas)
     width = np.ceil(max(data.shape[0], data.shape[1]) * 2 ** 0.5)
     projections = np.zeros((width, np.shape(data)[2], len(omegas)), dtype=np.float)
     for z in range(np.shape(data)[2]):

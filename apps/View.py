@@ -46,6 +46,10 @@ class View():
             actor = lattice_3d(args)
             actor.SetOrigin(a / 2, b / 2, c / 2)
             actor.AddPosition(-a / 2, -b / 2, -c / 2)
+        elif isinstance(args, np.ndarray):
+            actor = show_array(args)
+        else:
+            raise ValueError('unsupported object type: {0}'.format(type(args)))
         bounds = actor.GetBounds()
         size = (bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])  # bounds[1::2]
         print(size)

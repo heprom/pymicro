@@ -60,7 +60,15 @@ class vtkAnimationScene:
     def render(self):
         if self.save_image and not os.path.exists(self.prefix):
             os.mkdir(self.prefix)  # create a folder to store the images
-        timerId = self.iren.CreateRepeatingTimer(100);  # time in ms
+        timerId = self.iren.CreateRepeatingTimer(100)  # time in ms
+        self.iren.AddObserver('TimerEvent', self.execute)
+        self.iren.Start()
+
+    def render_at(self, time=0.):
+        if self.save_image and not os.path.exists(self.prefix):
+            os.mkdir(self.prefix)  # create a folder to store the images
+        self.timer_count = time
+        self.iren.CreateOneShotTimer(100)  # time in ms
         self.iren.AddObserver('TimerEvent', self.execute)
         self.iren.Start()
 

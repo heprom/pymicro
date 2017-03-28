@@ -161,35 +161,6 @@ def jet_cmap(N=64, table_range=(0, 255)):
     return lut
 
 
-def hot(N=64, table_range=(0, 255)):
-    '''from scitools/easyviz/vtk_new_.html'''
-    lut = vtk.vtkLookupTable()
-    inc = 0.01175
-    lut.SetNumberOfColors(256)
-    i = 0
-    r = 0.0;
-    g = 0.0;
-    b = 0.0
-    while r <= 1.:
-        lut.SetTableValue(i, r, g, b, 1)
-        r += inc;
-        i += 1
-    r = 1.
-    while g <= 1.:
-        lut.SetTableValue(i, r, g, b, 1)
-        g += inc;
-        i += 1
-    g = 1.
-    while b <= 1:
-        if i == 256: break
-        lut.SetTableValue(i, r, g, b, 1)
-        b += inc;
-        i += 1
-    lut.Build()
-    lut.SetRange(table_range)
-    return lut
-
-
 def hot_cmap(table_range=(0, 255)):
     '''Create a VTK look up table similar to matlab's hot.
 
@@ -973,8 +944,10 @@ def lattice_3d_with_planes(lattice, hklplanes, show_normal=True, \
                            plane_opacity=1.0, **kwargs):
     '''
     Create the 3D representation of a crystal lattice.
+
     HklPlanes can be displayed within the lattice cell with their normals.
-    A single vtk actor in form of an assembly is returned. Additional parameters are passed to the `lattice_3d` method to control how the lattice is pictured.
+    A single vtk actor in form of an assembly is returned.
+    Additional parameters are passed to the `lattice_3d` method to control how the lattice is pictured.
 
     .. code-block:: python
 
@@ -998,7 +971,7 @@ def lattice_3d_with_planes(lattice, hklplanes, show_normal=True, \
     :param bool show_normal: Control if the slip plane normals are shown (default: True).
     :param float plane_opacity: A float number in the [0.,1.0] range controlling the slip plane opacity.
     :param **kwargs: additional parameters are passed to the `lattice_3d` method.
-    :return: The method return a vtkAssembly that can be directly added to a renderer.
+    :returns: The method return a vtkAssembly that can be directly added to a renderer.
     '''
     grid = lattice_grid(lattice)
     (a, b, c) = lattice._lengths

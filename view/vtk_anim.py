@@ -36,7 +36,7 @@ class vtkAnimationScene:
         # capture the display and write a png image
         w2i = vtk.vtkWindowToImageFilter()
         w2i.SetInput(self.iren.GetRenderWindow())
-        # the next two liines fix some opacity problems but slow things down...
+        # the next two lines fix some opacity problems but slow things down...
         # self.renWin.Render()
         # self.iren.Render()
         writer = vtk.vtkPNGWriter()
@@ -79,10 +79,10 @@ Abstract class for all vtk animation stuff.
 
 
 class vtkAnimation:
-    def __init__(self, t):
+    def __init__(self, t, duration=10):
         self.scene = None
         self.time_anim_starts = t
-        self.time_anim_ends = t + 10
+        self.time_anim_ends = t + duration
         self.verbose = False
 
     def pre_execute(self):
@@ -139,44 +139,54 @@ class vtkAnimCameraAroundZ(vtkAnimation):
         vtkAnimation.post_execute(self, iren, event)
 
 
-class vtkRotateActorAroundZAxis(vtkAnimation):
-    def __init__(self, t=0):
-        vtkAnimation.__init__(self, t)
-        self.time_anim_ends = t + 360
+class vtkRotateActorAroundAxis(vtkAnimation):
+
+    def __init__(self, t=0, duration=10, axis=(0., 0., 1.), angle=360):
+        vtkAnimation.__init__(self, t, duration)
         self.actor = None
-        self.actor_position = (0., 0., 0.)
+        self.axis = axis
+        self.angle = angle
+
+    def set_actor(self, actor):
+        self.actor = actor
+        # keep track of the initial user transform matrix
+        transform = actor.GetUserTransform()
+        if not transform:
+            transform = vtk.vtkTransform()
+            transform.Identity()
+            actor.SetUserTransform(transform)
+        self.user_transform_matrix = actor.GetUserTransform().GetMatrix()
 
     def execute(self, iren, event):
-        '''instruction block exectued when a TimerEvent is captured by the vtkRotateActorAroundZAxis.
+        '''instruction block exectued when a TimerEvent is captured by the vtkRotateActorAroundAxis.
 
-        If the time is not in [start, end] it just returns. Otherwise the
-        transform matrix corresponding to the rotation around the Z-axis is
-        computed and applied to the actor.
+        If the time is not in [start, end] nothing is done. Otherwise the
+        transform matrix corresponding to the 3D rotation is applied to the actor.
         '''
         do = vtkAnimation.pre_execute(self)
-        if not do: return
+        if not do:
+            return
         t1 = self.time_anim_starts
         t2 = self.time_anim_ends
-        # t = (self.scene.timer_count - self.time_anim_starts) * np.pi / 180.
-        angle = (self.scene.timer_count - t1) / float(t2 - t1) * 2 * np.pi
-        X = ([np.cos(angle), np.sin(angle), 0])
-        print self.scene.timer_count, X, angle * 180 / np.pi
-        Z = np.array([0, 0, 1])
-        Y = np.cross(Z, X)
-        m = vtk.vtkMatrix4x4()
+        angle = (self.scene.timer_count - t1) / float(t2 - t1) * self.angle
+        from pymicro.crystal.microstructure import Orientation
+        om = Orientation.Axis2OrientationMatrix(self.axis, angle)
+        m = vtk.vtkMatrix4x4()  # row major order, 16 elements matrix
         m.Identity()
-        # Create the direction cosine matrix
-        for i in range(3):
-            m.SetElement(i, 0, X[i]);
-            m.SetElement(i, 1, Y[i]);
-            m.SetElement(i, 2, Z[i]);
+        for j in range(3):
+            for i in range(3):
+                m.SetElement(j, i, om[i, j])
         t = vtk.vtkTransform()
-        t.Identity()
+        t.SetMatrix(self.user_transform_matrix)
         t.Concatenate(m)
-        t.PostMultiply()
-        t.Translate(self.actor_position)
         self.actor.SetUserTransform(t)
         vtkAnimation.post_execute(self, iren, event)
+
+
+class vtkRotateActorAroundZAxis(vtkRotateActorAroundAxis):
+
+    def __init__(self, t=0):
+        vtkRotateActorAroundAxis.__init__(self, t, duration=360, axis=(0., 0., 1.), angle=360)
 
 
 class vtkAnimCameraToZ(vtkAnimation):
@@ -292,6 +302,23 @@ class vtkAnimLine(vtkAnimation):
         self.grid.Modified()
         vtkAnimation.post_execute(self, iren, event)
 
+
+class vtkUpdateText(vtkAnimation):
+
+    def __init__(self, text_actor, str_method, t=0, duration=10):
+        vtkAnimation.__init__(self, t, duration)
+        self.actor = text_actor
+        self.str_method = str_method
+
+    def execute(self, iren, event):
+        do = vtkAnimation.pre_execute(self)
+        if not do:
+            return
+        t1 = self.time_anim_starts
+        t2 = self.time_anim_ends
+        updated_text = self.str_method()  #self.scene.timer_count, t1, t2)
+        self.actor.GetMapper().SetInput(updated_text)
+        vtkAnimation.post_execute(self, iren, event)
 
 if __name__ == '__main__':
     cam = vtk.vtkCamera()

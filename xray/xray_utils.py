@@ -113,7 +113,7 @@ def radiograph(data, omega):
 
     :param np.array data: an array representing the 3D object in (XYZ) form.
     :param omega: the rotation angle value in degrees.
-    :returns projections: a 3D array in (Y, Z, omega) form.
+    :returns projection: a 2D array in (Y, Z) form.
     """
     projection = radiographs(data, [omega])
     return projection[:, :, 0]
@@ -135,6 +135,6 @@ def radiographs(data, omegas):
     width = np.ceil(max(data.shape[0], data.shape[1]) * 2 ** 0.5)
     projections = np.zeros((width, np.shape(data)[2], len(omegas)), dtype=np.float)
     for z in range(np.shape(data)[2]):
-        a = radon(data[:, :, z], omegas - 90)  # the 90 seems to come from the radon function itself
+        a = radon(data[:, :, z], -omegas)  # - 90  # the 90 seems to come from the radon function itself
         projections[:, z, :] = a[:, :]
     return projections

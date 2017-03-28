@@ -665,6 +665,40 @@ class Orientation:
             return I + np.sin(theta) * omega + (1 - np.cos(theta)) * omega.dot(omega)
 
     @staticmethod
+    def Axis2OrientationMatrix(axis, angle):
+        '''
+        Compute the (passive) orientation matrix associated the rotation defined by the given (axis, angle) pair.
+
+        :param axis: the rotation axis.
+        :param angle: the rotation angle (degrees).
+        :returns: the 3x3 orientation matrix.
+        '''
+        omega = np.radians(angle)
+        c = np.cos(omega)
+        s = np.sin(omega)
+        g = np.array([[c + (1 - c) * axis[0]**2, (1 - c) * axis[0] * axis[1] + s * axis[2], (1 - c) * axis[0] * axis[2] - s * axis[1]],
+                      [(1 - c) * axis[0] * axis[1] - s * axis[2], c + (1 - c) * axis[1]**2, (1 - c) * axis[1] * axis[2] + s * axis[0]],
+                      [(1 - c) * axis[0] * axis[2] + s * axis[1], (1 - c) * axis[1] * axis[2] - s * axis[0], c + (1 - c) * axis[2]**2]])
+        return g
+
+    @staticmethod
+    def Euler2Axis(euler):
+        '''
+        Compute the (axis, angle) representation associated to this (passive) rotation expressed by the Euler angles.
+
+        :param euler: 3 euler angles (in degrees)
+        :returns: a tuple containing the axis (a vector) and the angle (in radians).
+        '''
+        (phi1, Phi, phi2) = np.radians(euler)
+        t = np.tan(0.5 * Phi)
+        s = 0.5 * (phi1 + phi2)
+        d = 0.5 * (phi1 - phi2)
+        tau = np.sqrt(t**2 + np.sin(s)**2)
+        axis = np.array([t / tau * np.cos(d), t / tau * np.sin(d), 1 / tau * np.sin(s)])
+        angle = 2 * np.arctan2(tau, np.cos(s))
+        return axis, angle
+
+    @staticmethod
     def Euler2Quaternion(euler):
         '''
         Compute the quaternion from the 3 euler angles (in degrees)

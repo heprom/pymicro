@@ -165,7 +165,8 @@ def generate_dir_rst(dir, fhindex, example_dir, out_dir, plot_anim):
 
     for fname in sorted(os.listdir(src_dir)):
         print('***found file', fname)
-        if fname.endswith('data'): continue
+        if fname.endswith('data'):
+            continue
         if os.path.isdir(os.path.join(src_dir, fname)):
             print('*** this is a directory, going in...')
             # recursively treat this folder
@@ -176,6 +177,7 @@ def generate_dir_rst(dir, fhindex, example_dir, out_dir, plot_anim):
             else:
                 generate_dir_rst(fname, fhindex, example_dir, out_dir, False)
         if fname.endswith('.py'):
+            print('generate_file_rst, plot_anim=%g' % plot_anim)
             generate_file_rst(fname, target_dir, src_dir, plot_anim)
             thumb = os.path.join(dir, 'images', 'thumb', fname[:-3] + '.png')
             link_name = fname
@@ -244,9 +246,11 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
     docstring, short_desc, end_row = extract_docstring(example_file)
 
     if plot_anim:
-        image_fname = image_fname[:-4] + '.gif'
+        gif_fname = image_fname[:-4] + '.gif'
+        gif_path = os.path.join(image_dir, gif_fname)
+        print('copying gif file to %s' % gif_path)
         # also copy animation file
-        shutil.copy(os.path.join(src_dir, image_fname), image_path)
+        shutil.copy(os.path.join(src_dir, gif_fname), gif_path)
 
     image_list = SINGLE_IMAGE % image_fname.lstrip('/')
 

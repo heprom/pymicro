@@ -246,13 +246,14 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
     docstring, short_desc, end_row = extract_docstring(example_file)
 
     if plot_anim:
-        gif_fname = image_fname[:-4] + '.gif'
-        gif_path = os.path.join(image_dir, gif_fname)
+        image_fname = image_fname[:-4] + '.gif'
+        gif_path = os.path.join(image_dir, image_fname)
         print('copying gif file to %s' % gif_path)
         # also copy animation file
-        shutil.copy(os.path.join(src_dir, gif_fname), gif_path)
+        shutil.copy(os.path.join(src_dir, image_fname), gif_path)
 
     image_list = SINGLE_IMAGE % image_fname.lstrip('/')
+    print('image_list is currently: %s' % image_list)
 
     f = open(os.path.join(target_dir, fname[:-2] + 'rst'), 'w')
     f.write(this_template % locals())

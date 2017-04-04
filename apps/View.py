@@ -1,16 +1,18 @@
 import os
 import sys
 import numpy as np
+import vtk
+
 from pymicro.view.scene3d import Scene3D
 from pymicro.view.vtk_utils import *
 from pymicro.crystal.microstructure import Grain, Orientation
 from pymicro.crystal.lattice import Lattice
 
 
-class View():
+class View:
     def __init__(self, args):
         '''Init a View window.'''
-        print(args)
+        #print(args)
         # create the 3D scene
         s3d = Scene3D(display=True, ren_size=(800, 800))
         args_type = type(args)
@@ -48,6 +50,8 @@ class View():
             actor.AddPosition(-a / 2, -b / 2, -c / 2)
         elif isinstance(args, np.ndarray):
             actor = show_array(args)
+        elif isinstance(args, vtk.vtkActor):
+            actor = args
         else:
             raise ValueError('unsupported object type: {0}'.format(type(args)))
         bounds = actor.GetBounds()

@@ -54,8 +54,7 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.autosummary',
               'sphinx.ext.mathjax',
               'gen_rst']
-# mathjax_path = 'MathJax/MathJax.js'
-# jsmath_path = 'jsMath/easy/load.js'
+mathjax_path = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js'
 
 autodoc_member_order = 'bysource'
 autodoc_default_flags = ['members', 'special-members', 'undoc-members', 'show-inheritance']
@@ -131,11 +130,9 @@ pygments_style = 'sphinx'
 # -- Options for HTML output ---------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.
-if not os.environ['READTHEDOCS']:  # if building locally
-    #html_theme = 'default'
-    #html_theme = 'proBlue'
+if not os.environ.has_key('READTHEDOCS'):  # if building locally
     html_theme = 'sphinx_rtd_theme'
-    html_theme_path = ["."]
+    html_theme_path = ["../../sphinx_rtd_theme"] # the theme should be installed aside the pymicro folder
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

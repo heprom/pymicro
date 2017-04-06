@@ -288,8 +288,8 @@ class Orientation:
         '''Compute the two omega angles which satisfy the Bragg condition.
 
         For a given crystal orientation sitting on a vertical rotation axis,
-        there is exactly two omega positions in :math:`[0, 2\pi]` for which
-        a particular hkl reflexion will fulfil Bragg's law.
+        there is exactly two :math:`\omega` positions in :math:`[0, 2\pi]` for which
+        a particular :math:`(hkl)` reflexion will fulfil Bragg's law.
 
         According to the Bragg's law, a crystallographic plane of a given
         grain will be in diffracting condition if:
@@ -303,11 +303,11 @@ class Orientation:
 
         .. math::
 
-           \mathbf{\Omega}=\\begin{array}
-                           \cos\omega & -\sin\omega & 0 \\\
-                           \sin\omega & \cos\omega  & 0 \\\
-                           0          & 0           & 1 \\\
-                           \\end{array}
+           \mathbf{\Omega}=\\begin{pmatrix}
+                           \cos\omega & -\sin\omega & 0 \\\\
+                           \sin\omega & \cos\omega  & 0 \\\\
+                           0          & 0           & 1 \\\\
+                           \end{pmatrix}
 
         This method solves the associated second order equation to return
         the two corresponding omega angles.

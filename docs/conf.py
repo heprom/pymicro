@@ -52,7 +52,8 @@ needs_sphinx = '1.1'
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.autosummary',
-              'gen_rst']  # , 'sphinx.ext.mathjax']
+              'sphinx.ext.mathjax',
+              'gen_rst']
 # mathjax_path = 'MathJax/MathJax.js'
 # jsmath_path = 'jsMath/easy/load.js'
 

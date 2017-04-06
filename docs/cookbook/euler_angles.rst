@@ -37,7 +37,7 @@ This instance of `Orientation` can be used to display a crystal lattice in a 3D 
    A 3D view of a cubic lattice with a given orientation.
 
 Now by applying successively the 3 rotation, we show that the laboratory frame is made coincident with the crystal
-frame. The first rotation of angle :math:`\phi_1` is around Z, the second rotation of angle :math:`\Phi`is around the
+frame. The first rotation of angle :math:`\phi_1` is around Z, the second rotation of angle :math:`\Phi` is around the
 new X and the third rotation angle :math:`\phi_2` is around the new Z.
 
 .. image:: ../_static/euler_angles_anim_071.png
@@ -46,3 +46,49 @@ new X and the third rotation angle :math:`\phi_2` is around the new Z.
    :width: 30%
 .. image:: ../_static/euler_angles_anim_171.png
    :width: 30%
+
+The expression of the orientation matrix is obtained by composing the three rotations :math:`\mathbf{R}_{\phi_1}`,
+:math:`\mathbf{R}_{\Phi}` and :math:`\mathbf{R}_{\phi_2}`:
+
+.. math::
+
+   \mathbf{g}(\phi_1,\Phi,\phi_2)=
+   \begin{pmatrix}
+   \cos\phi_1\cos\phi_2 - \sin\phi_1\sin\phi_2\cos\Phi & \sin\phi_1\cos\phi_2 + \cos\phi_1\sin\phi_2\cos\Phi & \sin\phi_2\sin\Phi \\
+   -\cos\phi_1\sin\phi_2 - \sin\phi_1\cos\phi_2\cos\Phi & -\sin\phi_1\sin\phi_2 + \cos\phi_1\cos\phi_2\cos\Phi & \cos\phi_2\sin\Phi \\
+   \sin\phi_1\sin\Phi & -\cos\phi_1\sin\Phi & \cos\Phi
+   \end{pmatrix}
+
+Using the given Euler angle yield the following orientation matrix:
+
+.. math::
+
+   \mathbf{g}(142.8, 32.0, 214.4)=
+   \begin{pmatrix}
+    0.946 & -0.117 & -0.299 \\
+   -0.026 &  0.898 & -0.437 \\
+    0.320 &  0.422 &  0.848
+   \end{pmatrix}
+
+With the orientation matrix it is the possible to express any vector :math:`V_c` from the cartesian crystal frame to the sample frame by:
+
+.. math::
+
+   V_s = \mathbf{g}^{-1}.V_c \quad\textrm{with}\quad \mathbf{g}^{-1}=\mathbf{g}^T
+
+For instance, using the same Euler angles and considering the vector :math:`V_c = (1, 1, 1)` gives :math:`V_s=(1.240, 1.203, 0.111)`. This can be verified using pymicro:
+
+.. code-block:: python
+
+  >>> g = orientation.orientation_matrix()
+  >>> Vc = np.array([1, 1, 1])
+  >>> print(np.dot(g.T, Vc))
+  [ 1.24033795  1.20380558  0.11141766]
+
+Finally, looking at the 3d representation shows the values seem correct.
+
+.. figure:: euler_angles_and_orientation_matrix.png
+   :align: center
+   :width: 50%
+
+   3D view showing the [111] lattice vector in the sample frame XYZ.

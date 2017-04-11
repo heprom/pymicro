@@ -5,19 +5,31 @@ from skimage.transform import radon
 from matplotlib import pyplot as plt, cm
 from pymicro.crystal.microstructure import Grain
 from pymicro.crystal.lattice import HklPlane
-from pymicro.xray.xray_utils import lambda_keV_to_nm
+from pymicro.xray.xray_utils import lambda_keV_to_nm, radiograph
 
 
-def dct_projection(micro, data, dif_grains, omega, lambda_keV, det_npx, det_distance, ps, lattice, verbose=True):
+def dct_projection(micro, data, dif_grains, omega, lambda_keV, det_npx, det_distance, ps, lattice, att=5, verbose=True):
     '''Work in progress, will replace function in the microstructure module.'''
     full_proj = np.zeros(det_npx, dtype=np.float)
     lambda_nm = lambda_keV_to_nm(lambda_keV)
     omegar = omega * np.pi / 180
     R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
-    X = np.array([1., 0., 0.]) / lambda_nm
+
+    # add the direct beam part by computing the radiograph of the sample without the diffracting grains
+    data_abs = np.where(data > 0, 1, 0)
+    for (gid, (h, k, l)) in dif_grains:
+        mask_dif = (data == gid)
+        data_abs[mask_dif] = 0  # remove this grain from the absorption
+    proj = radiograph(data_abs, omega)
+    add_to_image(full_proj, proj[::-1, ::-1] / att, np.array(full_proj.shape) // 2)
+
     # add diffraction spots
+    X = np.array([1., 0., 0.]) / lambda_nm
     for (gid, (h, k, l)) in dif_grains:
         grain_data = np.where(data == gid, 1, 0)
+        if np.sum(grain_data) < 1:
+            print('skipping grain %d' % gid)
+            continue
         local_com = np.array(ndimage.measurements.center_of_mass(grain_data, data))
         print('local center of mass (voxel): {0}'.format(local_com))
         g_center_mm = ps * (local_com - 0.5 * np.array(data.shape))
@@ -41,15 +53,8 @@ def dct_projection(micro, data, dif_grains, omega, lambda_keV, det_npx, det_dist
             print(u, v)
             print('up=%d, vp=%d for plane (%d,%d,%d)' % (up, vp, h, k, l))
         data_dif = grain_data[ndimage.find_objects(data == gid)[0]]
-        x_max = np.ceil(max(data_dif.shape[0], data_dif.shape[1]) * 2 ** 0.5)
-        proj_dif = np.zeros((x_max, np.shape(data_dif)[2]), dtype=np.float)
-        for i in range(np.shape(data_dif)[2]):  # Z correspond to v on the detector
-            a = radon(data_dif[:, :, i], [omega + 90])  # the 90 seems to come from the radon function itself
-            proj_dif[:, data_dif.shape[2] - i - 1] = a[:, 0]
-        #plt.figure()
-        #plt.imshow(proj_dif.T, cmap=cm.gray)
-        #plt.show()
-        add_to_image(full_proj, proj_dif, (up, vp), verbose)
+        proj_dif = radiograph(data_dif, omega)  # (Y, Z) coordinate system
+        add_to_image(full_proj, proj_dif[::-1, ::-1], (up, vp), verbose)  # (u, v) axes correspond to (-Y, -Z)
     return full_proj
 
 def add_to_image(image, inset, (u, v), verbose=False):
@@ -84,7 +89,7 @@ def add_to_image(image, inset, (u, v), verbose=False):
         v_end = int(image.shape[1] - (v - spot_size[1] // 2))
     # now add spot to the image
     image[u - spot_size[0] // 2 + u_start: u - spot_size[0] // 2 + u_end,
-    v - spot_size[1] // 2 + v_start: v - spot_size[1] // 2 + v_end] \
+        v - spot_size[1] // 2 + v_start: v - spot_size[1] // 2 + v_end] \
         += inset[u_start:u_end, v_start:v_end]
 
 
@@ -102,6 +107,7 @@ def all_dif_spots(g_proj, g_uv, verbose=False):
     """
     # TODO add a detector object to account for the image size and the position of the direct beam
     image = np.zeros((2048, 2048), dtype=g_proj.dtype)
+    print(g_proj.shape[0], len(g_uv))
     assert g_proj.shape[0] == len(g_uv)
     for i in range(g_proj.shape[0]):
         spot = g_proj[i]
@@ -120,7 +126,7 @@ def plot_all_dif_spots(gid, det_npx, det_distance, ps, hkl_miller=None, uv=None,
         plt.imshow(dif_spots_image.T, cmap=cm.gray)
     families = []
     indices = []
-    colors = 'krbgmy'  # use a cycler here
+    colors = 'krbgmykrbgmy'  # use a cycler here
     t = np.linspace(0.0, 2 * np.pi, num=37)
     if positions or debye_rings:
         if hkl_miller is None:
@@ -172,11 +178,11 @@ def output_tikzpicture(proj_dif, omegas, gid=1, d_uv=[0, 0], suffix=''):
     N = proj_dif.shape[0]
     for i in range(N):
         proj_path = os.path.join('proj_dif', 'g%d_proj%s_%02d.png' % (gid, suffix, i))
-        # proj_dif is in (u, v) form so we need to save the transposed array with imsave
+        # proj_dif is in (u, v) form so as usual, we need to save the transposed array with imsave
         plt.imsave(proj_path,
                    proj_dif[i, (proj_dif.shape[1] - d_uv[0]) // 2:(proj_dif.shape[1] + d_uv[0]) // 2,
                    (proj_dif.shape[2] - d_uv[1]) // 2:(proj_dif.shape[2] + d_uv[1]) // 2].T,
-                   cmap=cm.gray, origin='lower')
+                   cmap=cm.gray, origin='upper')
     # HST_write(proj_dif, 'g4_proj_stack.raw')
 
     # image ratio is 4/3 so we will use a n x m matrix with
@@ -195,14 +201,17 @@ def output_tikzpicture(proj_dif, omegas, gid=1, d_uv=[0, 0], suffix=''):
     f.write('\\usepackage[latin1]{inputenc}\n')
     f.write('\\usepackage{tikz}\n')
     f.write('\\usetikzlibrary{shapes,arrows}\n')
+    f.write('\\usepackage{xcolor}\n')
+    f.write('\\pagecolor{black}\n')
     f.write('\\usepackage[active,tightpage]{preview}\n')
     f.write('\\PreviewEnvironment{tikzpicture}\n')
-    f.write('\\setlength\PreviewBorder{2pt}\n')
+    f.write('\\setlength\PreviewBorder{0pt}\n')
     f.write('\\begin{document}\n')
     f.write('\\pagestyle{empty}\n')
-    f.write('\\begin{tikzpicture}[font=\\tiny]\n')
-    f.write(
-        '\\filldraw[black] (%.3f,%.3f) rectangle (%.3f,%.3f);\n' % (-0.5 * l, 0.5 * l, L - 0.5 * l, -m * l + 0.5 * l))
+    f.write('\\sffamily\n')
+    f.write('\\begin{tikzpicture}[font=\\tiny, white]\n')
+    #f.write(
+    #    '\\filldraw[black] (%.3f,%.3f) rectangle (%.3f,%.3f);\n' % (-0.5 * l, 0.5 * l, L - 0.5 * l, -m * l + 0.5 * l))
     for j in range(m):
         Y = -j * l
         for i in range(n):

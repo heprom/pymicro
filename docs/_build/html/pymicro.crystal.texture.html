@@ -1,119 +1,675 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
 
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
-    <title>texture Module &mdash; pymicro 0.4.0 documentation</title>
-    
-    <link rel="stylesheet" href="_static/proBlue.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
-    <script type="text/javascript">
-      var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    '',
-        VERSION:     '0.4.0',
-        COLLAPSE_INDEX: false,
-        FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
-      };
-    </script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="pymicro 0.4.0 documentation" href="index.html" /> 
-  </head>
-  <body>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="genindex.html" title="General Index"
-             accesskey="I">index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li><a href="index.html">pymicro 0.4.0 documentation</a> &raquo;</li> 
-      </ul>
-    </div>  
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>pymicro.crystal.texture &mdash; pymicro 0.4.0 documentation</title>
+  
 
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          <div class="body">
+  
+  
+  
+  
+    <link rel="canonical" href="http://pymicro.readthedocs.io/en/latest/pymicro.crystal.texture.html"/>
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="pymicro 0.4.0 documentation" href="index.html"/>
+        <link rel="up" title="crystal Package" href="pymicro.crystal.html"/>
+        <link rel="next" title="file Package" href="pymicro.file.html"/>
+        <link rel="prev" title="pymicro.crystal.microstructure" href="pymicro.crystal.microstructure.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> pymicro
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.4.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="welcome.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#dependencies">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#external">External</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#api-documentation">API documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cookbook.html">Cookbook</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="pymicro.html">pymicro Package</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="pymicro.html#id1"><tt class="docutils literal"><span class="pre">pymicro</span></tt> Package</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="pymicro.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="pymicro.apps.html">apps Package</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="pymicro.crystal.html">crystal Package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="pymicro.crystal.lattice.html">pymicro.crystal.lattice</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pymicro.crystal.microstructure.html">pymicro.crystal.microstructure</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="">pymicro.crystal.texture</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.file.html">file Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.math.html">math Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.view.html">view Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.xray.html">xray Package</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log history</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">pymicro</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="pymicro.html">pymicro Package</a> &raquo;</li>
+        
+          <li><a href="pymicro.crystal.html">crystal Package</a> &raquo;</li>
+        
+      <li>pymicro.crystal.texture</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/pymicro.crystal.texture.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
             
   <div class="section" id="module-pymicro.crystal.texture">
-<span id="texture-module"></span><h1><tt class="xref py py-mod docutils literal"><span class="pre">texture</span></tt> Module<a class="headerlink" href="#module-pymicro.crystal.texture" title="Permalink to this headline">¶</a></h1>
+<span id="pymicro-crystal-texture"></span><h1>pymicro.crystal.texture<a class="headerlink" href="#module-pymicro.crystal.texture" title="Permalink to this headline">¶</a></h1>
+<p>The texture module provide some utilities to generate, analyse and plot crystallographic textures.</p>
+<p class="rubric">Classes</p>
+<table border="1" class="longtable docutils">
+<colgroup>
+<col width="10%" />
+<col width="90%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><tt class="xref py py-obj docutils literal"><span class="pre">Grain</span></tt>(grain_id,&nbsp;grain_orientation)</td>
+<td>Class defining a crystallographic grain.</td>
+</tr>
+<tr class="row-even"><td><tt class="xref py py-obj docutils literal"><span class="pre">Lattice</span></tt>(matrix[,&nbsp;centering])</td>
+<td>The Lattice class to create one of the 14 Bravais lattices.</td>
+</tr>
+<tr class="row-odd"><td><tt class="xref py py-obj docutils literal"><span class="pre">Microstructure</span></tt>([name])</td>
+<td>Class used to manipulate a full microstructure.</td>
+</tr>
+<tr class="row-even"><td><tt class="xref py py-obj docutils literal"><span class="pre">Orientation</span></tt>(matrix)</td>
+<td>Crystallographic orientation class.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#pymicro.crystal.texture.PoleFigure" title="pymicro.crystal.texture.PoleFigure"><tt class="xref py py-obj docutils literal"><span class="pre">PoleFigure</span></tt></a>([microstructure,&nbsp;lattice,&nbsp;axis,&nbsp;...])</td>
+<td>A class to handle pole figures.</td>
+</tr>
+<tr class="row-even"><td><tt class="xref py py-obj docutils literal"><span class="pre">SlipSystem</span></tt>(plane,&nbsp;direction)</td>
+<td>A class to represent a crystallographic slip system.</td>
+</tr>
+<tr class="row-odd"><td><a class="reference internal" href="#pymicro.crystal.texture.TaylorModel" title="pymicro.crystal.texture.TaylorModel"><tt class="xref py py-obj docutils literal"><span class="pre">TaylorModel</span></tt></a>(microstructure)</td>
+<td>A class to carry out texture evolution with the Taylor model.</td>
+</tr>
+</tbody>
+</table>
+<dl class="class">
+<dt id="pymicro.crystal.texture.PoleFigure">
+<em class="property">class </em><tt class="descclassname">pymicro.crystal.texture.</tt><tt class="descname">PoleFigure</tt><big>(</big><em>microstructure=None</em>, <em>lattice=None</em>, <em>axis='Z'</em>, <em>hkl='111'</em>, <em>proj='stereo'</em>, <em>verbose=False</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure" title="Permalink to this definition">¶</a></dt>
+<dd><p>A class to handle pole figures.</p>
+<p>A pole figure is a popular tool to plot multiple crystal orientations,
+either in the sample coordinate system (direct pole figure) or
+alternatively plotting a particular direction in the crystal
+coordinate system (inverse pole figure).</p>
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.__init__">
+<tt class="descname">__init__</tt><big>(</big><em>microstructure=None</em>, <em>lattice=None</em>, <em>axis='Z'</em>, <em>hkl='111'</em>, <em>proj='stereo'</em>, <em>verbose=False</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create an empty PoleFigure object associated with an empty Microstructure.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">members:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">special-members:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">__init__</td>
-</tr>
-<tr class="field-even field"><th class="field-name">undoc-members:</th><td class="field-body"></td>
-</tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">show-inheritance:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>microstructure</strong> &#8211; the <a class="reference internal" href="pymicro.crystal.microstructure.html#pymicro.crystal.microstructure.Microstructure" title="pymicro.crystal.microstructure.Microstructure"><tt class="xref py py-class docutils literal"><span class="pre">Microstructure</span></tt></a> containing the collection of orientations to plot (None by default).</li>
+<li><strong>lattice</strong> &#8211; the crystal <a class="reference internal" href="pymicro.crystal.lattice.html#pymicro.crystal.lattice.Lattice" title="pymicro.crystal.lattice.Lattice"><tt class="xref py py-class docutils literal"><span class="pre">Lattice</span></tt></a>.</li>
+<li><strong>axis</strong> (<em>str</em>) &#8211; the pole figure axis (&#8216;Z&#8217; by default), vertical axis in the direct pole figure and direction plotted on the inverse pole figure.</li>
+</ul>
 </td>
 </tr>
 </tbody>
 </table>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Any crystal structure is now supported (you have to set the proper
+crystal lattice) but it has only really be tested for cubic.</p>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>hkl</strong> (<em>str</em>) &#8211; slip plane family (&#8216;111&#8217; by default)</li>
+<li><strong>proj</strong> (<em>str</em>) &#8211; projection type, can be either &#8216;stereo&#8217; (default) or &#8216;flat&#8217;</li>
+<li><strong>verbose</strong> (<em>bool</em>) &#8211; verbose mode (False by default)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.set_hkl_poles">
+<tt class="descname">set_hkl_poles</tt><big>(</big><em>hkl</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.set_hkl_poles" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the pole list to plot.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Params str hkl:</th><td class="field-body">slip plane family (&#8216;111&#8217; by default)</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.set_map_field">
+<tt class="descname">set_map_field</tt><big>(</big><em>field_name</em>, <em>field=None</em>, <em>field_min_level=None</em>, <em>field_max_level=None</em>, <em>lut='hot'</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.set_map_field" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the PoleFigure to color poles with the given field.</p>
+<p>This method activates a mode where each symbol in the pole figure
+is color coded with respect to a field, which can be either the
+grain id, or a given field given in form of a list. If the grain
+volume or strain. For the grain id, the color is set according the
+each grain id in the <a class="reference internal" href="pymicro.crystal.microstructure.html#pymicro.crystal.microstructure.Microstructure" title="pymicro.crystal.microstructure.Microstructure"><tt class="xref py py-class docutils literal"><span class="pre">Microstructure</span></tt></a>
+and the <tt class="xref py py-meth docutils literal"><span class="pre">rand_cmap()</span></tt> function.
+For a given field, the color is set from the lookup table and
+according to the value in the given list. The list must contain a
+record for each grain. Minimum and maximum value to map the field
+values and the colors can be specify, if not they are directly taken
+as the min() and max() of the field.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>field_name</strong> (<em>str</em>) &#8211; The field name, could be &#8216;grain_id&#8217;, or any other name describing the field.</li>
+<li><strong>field</strong> (<em>list</em>) &#8211; A list containing a record for each grain.</li>
+<li><strong>field_min_level</strong> (<em>float</em>) &#8211; The minimum value to use for this field.</li>
+<li><strong>field_max_level</strong> (<em>float</em>) &#8211; The maximum value to use for this field.</li>
+<li><strong>lut</strong> (<em>str</em>) &#8211; A string describing the colormap to use (among matplotlib ones available).</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Raises ValueError:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><p class="first last">If the given field does not contain enough values.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_pole_figures">
+<tt class="descname">plot_pole_figures</tt><big>(</big><em>plot_sst=True</em>, <em>display=True</em>, <em>save_as='pdf'</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_pole_figures" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot and save a picture with both direct and inverse pole figures.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>plot_sst</strong> (<em>bool</em>) &#8211; controls wether to plot the full inverse pole         figure or only the standard stereographic triangle (True by default).</li>
+<li><strong>display</strong> (<em>bool</em>) &#8211; display the plot if True, else save a picture         of the pole figures (True by default)</li>
+<li><strong>save_as</strong> (<em>str</em>) &#8211; File format used to save the image such as pdf         or png (&#8216;pdf&#8217; by default)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">micro</span> <span class="o">=</span> <span class="n">Microstructure</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">&#39;AlLi_sam8&#39;</span><span class="p">)</span>
+<span class="n">micro</span><span class="o">.</span><span class="n">grains</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Grain</span><span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">from_euler</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">262.364</span><span class="p">,</span> <span class="mf">16.836</span><span class="p">,</span> <span class="mf">104.691</span><span class="p">]))))</span>
+<span class="n">Al_fcc</span> <span class="o">=</span> <span class="n">Lattice</span><span class="o">.</span><span class="n">face_centered_cubic</span><span class="p">(</span><span class="mf">0.405</span><span class="p">)</span> <span class="c"># not really necessary since default lattice is cubic</span>
+<span class="n">pf</span> <span class="o">=</span> <span class="n">PoleFigure</span><span class="p">(</span><span class="n">microstructure</span><span class="o">=</span><span class="n">micro</span><span class="p">,</span> <span class="n">proj</span><span class="o">=</span><span class="s">&#39;stereo&#39;</span><span class="p">,</span> <span class="n">lattice</span><span class="o">=</span><span class="n">Al_fcc</span><span class="p">,</span> <span class="n">hkl</span><span class="o">=</span><span class="s">&#39;111&#39;</span><span class="p">)</span>
+<span class="n">pf</span><span class="o">.</span><span class="n">mksize</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">pf</span><span class="o">.</span><span class="n">set_map_field</span><span class="p">(</span><span class="s">&#39;grain_id&#39;</span><span class="p">)</span>
+<span class="n">pf</span><span class="o">.</span><span class="n">pflegend</span> <span class="o">=</span> <span class="bp">True</span> <span class="c"># this works well for a few grains</span>
+<span class="n">pf</span><span class="o">.</span><span class="n">plot_pole_figures</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="figure align-center">
+<img alt="AlLi_sam8_pole_figure" src="_images/AlLi_sam8_pole_figure.png" style="width: 750px; height: 375px;" />
+<p class="caption">A 111 pole figure plotted for a single crystal orientation.</p>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_crystal_dir">
+<tt class="descname">plot_crystal_dir</tt><big>(</big><em>c_dir</em>, <em>mk='o'</em>, <em>col='k'</em>, <em>ax=None</em>, <em>ann=False</em>, <em>lab=''</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_crystal_dir" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function to plot a crystal direction on a pole figure.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>c_dir</strong> &#8211; A vector describing the crystal direction.</li>
+<li><strong>mk</strong> &#8211; marker used to plot the pole (disc by default).</li>
+<li><strong>col</strong> &#8211; color used to plot the pole (black by default).</li>
+<li><strong>ax</strong> &#8211; a reference to a pyplot ax to draw the pole.</li>
+<li><strong>ann</strong> (<em>bool</em>) &#8211; Annotate the pole with the coordinates of the vector if True (False by default).</li>
+<li><strong>lab</strong> (<em>str</em>) &#8211; Label to use in the legend of the plot (&#8216;&#8217; by default).</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Raises ValueError:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><p class="first last">if the projection type is not supported</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_line_between_crystal_dir">
+<tt class="descname">plot_line_between_crystal_dir</tt><big>(</big><em>c1</em>, <em>c2</em>, <em>ax=None</em>, <em>steps=11</em>, <em>col='k'</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_line_between_crystal_dir" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot a curve between two crystal directions.</p>
+<p>The curve is actually composed of several straight lines segments to
+draw from direction 1 to direction 2.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>c1</strong> &#8211; vector describing crystal direction 1</li>
+<li><strong>c2</strong> &#8211; vector describing crystal direction 2</li>
+<li><strong>ax</strong> &#8211; a reference to a pyplot ax to draw the line</li>
+<li><strong>int</strong> &#8211; steps: number of straight lines composing the curve (11 by default)</li>
+<li><strong>col</strong> &#8211; line color (black by default)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_pf_background">
+<tt class="descname">plot_pf_background</tt><big>(</big><em>ax</em>, <em>labels=True</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_pf_background" title="Permalink to this definition">¶</a></dt>
+<dd><p>Function to plot the background of the pole figure.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ax</strong> &#8211; a reference to a pyplot ax to draw the backgroud.</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Params bool labels:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body">add lables to axes (True by default).</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_pf_dir">
+<tt class="descname">plot_pf_dir</tt><big>(</big><em>c_dir</em>, <em>ax=None</em>, <em>mk='o'</em>, <em>col='k'</em>, <em>ann=False</em>, <em>lab=''</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_pf_dir" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot a crystal direction in a direct pole figure.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_pf">
+<tt class="descname">plot_pf</tt><big>(</big><em>ax=None</em>, <em>mk='o'</em>, <em>col='k'</em>, <em>ann=False</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_pf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create the direct pole figure.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ax</strong> &#8211; a reference to a pyplot ax to draw the poles.</li>
+<li><strong>mk</strong> &#8211; marker used to plot the poles (disc by default).</li>
+<li><strong>col</strong> &#8211; symbol color (black by default)</li>
+<li><strong>ann</strong> (<em>bool</em>) &#8211; Annotate the pole with the coordinates of the vector if True (False by default).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.create_pf_contour">
+<tt class="descname">create_pf_contour</tt><big>(</big><em>ax=None</em>, <em>ang_step=10</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.create_pf_contour" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the distribution of orientation and plot it using contouring.</p>
+<p>This plot the distribution of orientation in the microstructure
+associated with this PoleFigure instance, as a continuous
+distribution using angular bining with the specified step.
+the distribution is constructed at runtime by discretizing the
+angular space and counting the number of poles in each bin.
+Then the plot_pf_contour method is called to actually plot the data.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ax</strong> &#8211; a reference to a pyplot ax to draw the contours.</li>
+<li><strong>ang_step</strong> (<em>int</em>) &#8211; angular step in degrees to use for constructing the orientation distribution data (10 degrees by default)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_pf_contour">
+<tt class="descname">plot_pf_contour</tt><big>(</big><em>ax</em>, <em>x</em>, <em>y</em>, <em>values</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_pf_contour" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the direct pole figure using contours.</p>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="pymicro.crystal.texture.PoleFigure.sst_symmetry_cubic">
+<em class="property">static </em><tt class="descname">sst_symmetry_cubic</tt><big>(</big><em>z_rot</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.sst_symmetry_cubic" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transform a given vector according to the cubic symmetry.</p>
+<p>This function transform a vector so that it lies in the unit SST triangle.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>z_rot</strong> &#8211; vector to transform.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the transformed vector.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.get_color_from_field">
+<tt class="descname">get_color_from_field</tt><big>(</big><em>grain</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.get_color_from_field" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_sst">
+<tt class="descname">plot_sst</tt><big>(</big><em>ax=None</em>, <em>mk='s'</em>, <em>col='k'</em>, <em>ann=False</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_sst" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create the inverse pole figure in the unit standard triangle.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ax</strong> &#8211; a reference to a pyplot ax to draw the poles.</li>
+<li><strong>mk</strong> &#8211; marker used to plot the poles (square by default).</li>
+<li><strong>col</strong> &#8211; symbol color (black by default)</li>
+<li><strong>ann</strong> (<em>bool</em>) &#8211; Annotate the pole with the coordinates of the vector if True (False by default).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_ipf">
+<tt class="descname">plot_ipf</tt><big>(</big><em>ax=None</em>, <em>mk='s'</em>, <em>col='k'</em>, <em>ann=False</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_ipf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create the inverse pole figure for direction Z.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ax</strong> &#8211; a reference to a pyplot ax to draw the poles.</li>
+<li><strong>mk</strong> &#8211; marker used to plot the poles (square by default).</li>
+<li><strong>col</strong> &#8211; symbol color (black by default)</li>
+<li><strong>ann</strong> (<em>bool</em>) &#8211; Annotate the pole with the coordinates of the vector if True (False by default).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="pymicro.crystal.texture.PoleFigure.plot">
+<em class="property">static </em><tt class="descname">plot</tt><big>(</big><em>orientations</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot a pole figure (both direct and inverse) for a list of orientations.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>orientations</strong> &#8211; the list of crystalline <a class="reference internal" href="pymicro.crystal.microstructure.html#pymicro.crystal.microstructure.Orientation" title="pymicro.crystal.microstructure.Orientation"><tt class="xref py py-class docutils literal"><span class="pre">Orientation</span></tt></a> to plot.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="pymicro.crystal.texture.PoleFigure.plot_euler">
+<em class="property">static </em><tt class="descname">plot_euler</tt><big>(</big><em>phi1</em>, <em>Phi</em>, <em>phi2</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.plot_euler" title="Permalink to this definition">¶</a></dt>
+<dd><p>Directly plot a pole figure for a single orientation given its
+three Euler angles.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">PoleFigure</span><span class="o">.</span><span class="n">plot_euler</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>phi1</strong> (<em>float</em>) &#8211; first Euler angle (in degree).</li>
+<li><strong>Phi</strong> (<em>float</em>) &#8211; second Euler angle (in degree).</li>
+<li><strong>phi2</strong> (<em>float</em>) &#8211; third Euler angle (in degree).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pymicro.crystal.texture.PoleFigure.__module__">
+<tt class="descname">__module__</tt><em class="property"> = 'pymicro.crystal.texture'</em><a class="headerlink" href="#pymicro.crystal.texture.PoleFigure.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pymicro.crystal.texture.TaylorModel">
+<em class="property">class </em><tt class="descclassname">pymicro.crystal.texture.</tt><tt class="descname">TaylorModel</tt><big>(</big><em>microstructure</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.TaylorModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>A class to carry out texture evolution with the Taylor model.</p>
+<p>Briefly explain the full constrained Taylor model [ref 1938].</p>
+<dl class="method">
+<dt id="pymicro.crystal.texture.TaylorModel.__init__">
+<tt class="descname">__init__</tt><big>(</big><em>microstructure</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.TaylorModel.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="pymicro.crystal.texture.TaylorModel.__module__">
+<tt class="descname">__module__</tt><em class="property"> = 'pymicro.crystal.texture'</em><a class="headerlink" href="#pymicro.crystal.texture.TaylorModel.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="pymicro.crystal.texture.TaylorModel.compute_step">
+<tt class="descname">compute_step</tt><big>(</big><em>g</em>, <em>check=True</em><big>)</big><a class="headerlink" href="#pymicro.crystal.texture.TaylorModel.compute_step" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
 </div>
 
 
+           </div>
+           <div class="articleComments">
+            
+           </div>
           </div>
-        </div>
-      </div>
-      <div class="sphinxsidebar">
-        <div class="sphinxsidebarwrapper">
-  <h3>This Page</h3>
-  <ul class="this-page-menu">
-    <li><a href="_sources/pymicro.crystal.texture.txt"
-           rel="nofollow">Show Source</a></li>
-  </ul>
-<div id="searchbox" style="display: none">
-  <h3>Quick search</h3>
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
-    </form>
-    <p class="searchtip" style="font-size: 90%">
-    Enter search terms or a module, class or function name.
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="pymicro.file.html" class="btn btn-neutral float-right" title="file Package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="pymicro.crystal.microstructure.html" class="btn btn-neutral" title="pymicro.crystal.microstructure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2013-2017, Henry Proudhon.
+
     </p>
-</div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
         </div>
       </div>
-      <div class="clearer"></div>
-    </div>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="genindex.html" title="General Index"
-             >index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li><a href="index.html">pymicro 0.4.0 documentation</a> &raquo;</li> 
-      </ul>
-    </div>
-    <div class="footer">
-        &copy; Copyright 2013-2016, Henry Proudhon.
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
-    </div>
-  </body>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'',
+            VERSION:'0.4.0',
+            LANGUAGE:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: ''
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
 </html>

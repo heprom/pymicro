@@ -5,19 +5,19 @@ pymicro Package
 ----------------------
 
 .. automodule:: pymicro.__init__
-:members:
-        :undoc-members:
-        :show-inheritance:
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Subpackages
 -----------
 
 .. toctree::
 
-    pymicro.apps
-    pymicro.crystal
-    pymicro.file
-    pymicro.math
-    pymicro.view
-    pymicro.xray
+   pymicro.apps
+   pymicro.crystal
+   pymicro.file
+   pymicro.math
+   pymicro.view
+   pymicro.xray
 

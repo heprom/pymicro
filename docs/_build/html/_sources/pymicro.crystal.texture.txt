@@ -1,9 +1,28 @@
-:mod:`texture` Module
----------------------
+pymicro.crystal.texture
+=======================
 
 .. automodule:: pymicro.crystal.texture
-:members:
-        :special-members: __init__
-        :undoc-members:
-        :show-inheritance:
 
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      Grain
+      Lattice
+      Microstructure
+      Orientation
+      PoleFigure
+      SlipSystem
+      TaylorModel
+   
+   
+
+   
+   
+   

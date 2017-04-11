@@ -13,7 +13,7 @@ if __name__ == '__main__':
     '''
     # create the 3D scene
     base_name = os.path.splitext(__file__)[0]
-    s3d = Scene3D(display=True, ren_size=(1000, 800), name=base_name)
+    s3d = Scene3D(display=False, ren_size=(1000, 800), name=base_name)
 
     # reading volume
     data_dir = '../data/'
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     grid = read_image_data(scan_path + '.raw', volsize, header_size=0, data_type='uint8')
 
     # create 3d actors
-    crack = elevationFilter(grid, 1, (80, volsize[2] - 50))
+    crack = elevationFilter(grid, 1, (40, volsize[2] - 25))
     skin = contourFilter(grid, 2, opacity=0.5, discrete=True)
     outline = data_outline(grid)
 

@@ -1,49 +1,187 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
 
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
-    <title>xray Package &mdash; pymicro 0.4.0 documentation</title>
-    
-    <link rel="stylesheet" href="_static/proBlue.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
-    <script type="text/javascript">
-      var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    '',
-        VERSION:     '0.4.0',
-        COLLAPSE_INDEX: false,
-        FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
-      };
-    </script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="pymicro 0.4.0 documentation" href="index.html" /> 
-  </head>
-  <body>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="genindex.html" title="General Index"
-             accesskey="I">index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li><a href="index.html">pymicro 0.4.0 documentation</a> &raquo;</li> 
-      </ul>
-    </div>  
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>xray Package &mdash; pymicro 0.4.0 documentation</title>
+  
 
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          <div class="body">
+  
+  
+  
+  
+    <link rel="canonical" href="http://pymicro.readthedocs.io/en/latest/pymicro.xray.html"/>
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="pymicro 0.4.0 documentation" href="index.html"/>
+        <link rel="up" title="pymicro Package" href="pymicro.html"/>
+        <link rel="next" title="Change log history" href="changelog.html"/>
+        <link rel="prev" title="view Package" href="pymicro.view.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> pymicro
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.4.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="welcome.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#dependencies">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#external">External</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#api-documentation">API documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cookbook.html">Cookbook</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="pymicro.html">pymicro Package</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="pymicro.html#id1"><tt class="docutils literal"><span class="pre">pymicro</span></tt> Package</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="pymicro.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="pymicro.apps.html">apps Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.crystal.html">crystal Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.file.html">file Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.math.html">math Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.view.html">view Package</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="">xray Package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#module-pymicro.xray.detectors"><tt class="docutils literal"><span class="pre">detectors</span></tt> Module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-pymicro.xray.laue"><tt class="docutils literal"><span class="pre">laue</span></tt> Module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-pymicro.xray.xray_utils"><tt class="docutils literal"><span class="pre">xray_utils</span></tt> Module</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log history</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">pymicro</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="pymicro.html">pymicro Package</a> &raquo;</li>
+        
+      <li>xray Package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/pymicro.xray.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
             
   <div class="section" id="module-pymicro.xray">
 <span id="xray-package"></span><h1>xray Package<a class="headerlink" href="#module-pymicro.xray" title="Permalink to this headline">¶</a></h1>
@@ -59,158 +197,547 @@
 <p class="last">The documentation of this package is still very poor, use with care...
 and add some love to the docs if you have time!</p>
 </div>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">members:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">special-members:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">__init__</td>
-</tr>
-<tr class="field-even field"><th class="field-name">undoc-members:</th><td class="field-body"></td>
-</tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">show-inheritance:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</td>
-</tr>
-</tbody>
-</table>
-<div class="section" id="detectors-module">
-<h2><tt class="xref py py-mod docutils literal"><span class="pre">detectors</span></tt> Module<a class="headerlink" href="#detectors-module" title="Permalink to this headline">¶</a></h2>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">members:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">special-members:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">__init__</td>
-</tr>
-<tr class="field-even field"><th class="field-name">undoc-members:</th><td class="field-body"></td>
-</tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">show-inheritance:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</td>
-</tr>
-</tbody>
-</table>
+<div class="section" id="module-pymicro.xray.detectors">
+<span id="detectors-module"></span><h2><tt class="xref py py-mod docutils literal"><span class="pre">detectors</span></tt> Module<a class="headerlink" href="#module-pymicro.xray.detectors" title="Permalink to this headline">¶</a></h2>
+<p>The detectors module define classes to manipulate X-ray detectors.</p>
+<dl class="class">
+<dt id="pymicro.xray.detectors.Detector2d">
+<em class="property">class </em><tt class="descclassname">pymicro.xray.detectors.</tt><tt class="descname">Detector2d</tt><big>(</big><em>size=(2048</em>, <em>2048)</em>, <em>data_type=&lt;Mock name='mock.uint16' id='50060560'&gt;</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Detector2d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class to handle 2D detectors.</p>
+<p>2D detectors produce array like images and may have different geometries.
+This abstract class regroup the generic method for those kind of detectors.</p>
+<dl class="method">
+<dt id="pymicro.xray.detectors.Detector2d.__init__">
+<tt class="descname">__init__</tt><big>(</big><em>size=(2048</em>, <em>2048)</em>, <em>data_type=&lt;Mock name='mock.uint16' id='50060560'&gt;</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Detector2d.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialization of a Detector2d instance with a given image size
+(2048 pixels square array by default).</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.Detector2d.azimuthal_regroup">
+<tt class="descname">azimuthal_regroup</tt><big>(</big><em>two_theta_mini=None</em>, <em>two_theta_maxi=None</em>, <em>two_theta_step=None</em>, <em>psi_min=None</em>, <em>psi_max=None</em>, <em>write_txt=False</em>, <em>output_image=False</em>, <em>debug=False</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Detector2d.azimuthal_regroup" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.Detector2d.sagital_regroup">
+<tt class="descname">sagital_regroup</tt><big>(</big><em>two_theta_mini=None</em>, <em>two_theta_maxi=None</em>, <em>psi_min=None</em>, <em>psi_max=None</em>, <em>psi_step=None</em>, <em>write_txt=False</em>, <em>output_image=False</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Detector2d.sagital_regroup" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="pymicro.xray.detectors.Detector2d.__module__">
+<tt class="descname">__module__</tt><em class="property"> = 'pymicro.xray.detectors'</em><a class="headerlink" href="#pymicro.xray.detectors.Detector2d.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d">
+<em class="property">class </em><tt class="descclassname">pymicro.xray.detectors.</tt><tt class="descname">RegArrayDetector2d</tt><big>(</big><em>size=(2048</em>, <em>2048)</em>, <em>data_type=&lt;Mock name='mock.uint16' id='50060560'&gt;</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pymicro.xray.detectors.Detector2d" title="pymicro.xray.detectors.Detector2d"><tt class="xref py py-class docutils literal"><span class="pre">pymicro.xray.detectors.Detector2d</span></tt></a></p>
+<p>Class to handle a Varian Paxscan 2520 detector.</p>
+<p>The flat panel detector produce 16 unsigned (1840, 1456) images.</p>
+<dl class="method">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d.__init__">
+<tt class="descname">__init__</tt><big>(</big><em>size=(2048</em>, <em>2048)</em>, <em>data_type=&lt;Mock name='mock.uint16' id='50060560'&gt;</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d.get_size_mm">
+<tt class="descname">get_size_mm</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d.get_size_mm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the size of the detector in millimeters.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d.load_image">
+<tt class="descname">load_image</tt><big>(</big><em>image_path</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d.load_image" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d.compute_corrected_image">
+<tt class="descname">compute_corrected_image</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d.compute_corrected_image" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d.compute_geometry">
+<tt class="descname">compute_geometry</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d.compute_geometry" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate an array of the image size with the (2theta, psi) for each pixel.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d.compute_TwoTh_Psi_arrays">
+<tt class="descname">compute_TwoTh_Psi_arrays</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d.compute_TwoTh_Psi_arrays" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate two arrays (2theta, psi) TwoTheta and Psi angles arrays corresponding to repectively
+the vertical and the horizontal pixels.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d.angles_to_pixels">
+<tt class="descname">angles_to_pixels</tt><big>(</big><em>two_theta</em>, <em>psi</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d.angles_to_pixels" title="Permalink to this definition">¶</a></dt>
+<dd><p>given two values 2theta and psi (that could be arrays), compute the corresponding pixel on the detector.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pymicro.xray.detectors.RegArrayDetector2d.__module__">
+<tt class="descname">__module__</tt><em class="property"> = 'pymicro.xray.detectors'</em><a class="headerlink" href="#pymicro.xray.detectors.RegArrayDetector2d.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pymicro.xray.detectors.Varian2520">
+<em class="property">class </em><tt class="descclassname">pymicro.xray.detectors.</tt><tt class="descname">Varian2520</tt><a class="headerlink" href="#pymicro.xray.detectors.Varian2520" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pymicro.xray.detectors.RegArrayDetector2d" title="pymicro.xray.detectors.RegArrayDetector2d"><tt class="xref py py-class docutils literal"><span class="pre">pymicro.xray.detectors.RegArrayDetector2d</span></tt></a></p>
+<p>Class to handle a Varian Paxscan 2520 detector.</p>
+<p>The flat panel detector produces 16 bit unsigned (1840, 1456) images when setup in horizontal mode.</p>
+<dl class="method">
+<dt id="pymicro.xray.detectors.Varian2520.__init__">
+<tt class="descname">__init__</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Varian2520.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="pymicro.xray.detectors.Varian2520.__module__">
+<tt class="descname">__module__</tt><em class="property"> = 'pymicro.xray.detectors'</em><a class="headerlink" href="#pymicro.xray.detectors.Varian2520.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pymicro.xray.detectors.Mar165">
+<em class="property">class </em><tt class="descclassname">pymicro.xray.detectors.</tt><tt class="descname">Mar165</tt><a class="headerlink" href="#pymicro.xray.detectors.Mar165" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pymicro.xray.detectors.RegArrayDetector2d" title="pymicro.xray.detectors.RegArrayDetector2d"><tt class="xref py py-class docutils literal"><span class="pre">pymicro.xray.detectors.RegArrayDetector2d</span></tt></a></p>
+<p>Class to handle a rayonix marccd165.</p>
+<p>The image plate marccd 165 detector produces 16 bits unsigned (2048, 2048) square images.</p>
+<dl class="method">
+<dt id="pymicro.xray.detectors.Mar165.__init__">
+<tt class="descname">__init__</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Mar165.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="pymicro.xray.detectors.Mar165.__module__">
+<tt class="descname">__module__</tt><em class="property"> = 'pymicro.xray.detectors'</em><a class="headerlink" href="#pymicro.xray.detectors.Mar165.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pymicro.xray.detectors.PerkinElmer1620">
+<em class="property">class </em><tt class="descclassname">pymicro.xray.detectors.</tt><tt class="descname">PerkinElmer1620</tt><a class="headerlink" href="#pymicro.xray.detectors.PerkinElmer1620" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pymicro.xray.detectors.RegArrayDetector2d" title="pymicro.xray.detectors.RegArrayDetector2d"><tt class="xref py py-class docutils literal"><span class="pre">pymicro.xray.detectors.RegArrayDetector2d</span></tt></a></p>
+<p>Class to handle a PErkin Elmer 1620 detector.</p>
+<p>The flat panel detector produces 16 bits unsigned (2000, 2000) square images.</p>
+<dl class="method">
+<dt id="pymicro.xray.detectors.PerkinElmer1620.__init__">
+<tt class="descname">__init__</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.PerkinElmer1620.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="pymicro.xray.detectors.PerkinElmer1620.__module__">
+<tt class="descname">__module__</tt><em class="property"> = 'pymicro.xray.detectors'</em><a class="headerlink" href="#pymicro.xray.detectors.PerkinElmer1620.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pymicro.xray.detectors.Xpad">
+<em class="property">class </em><tt class="descclassname">pymicro.xray.detectors.</tt><tt class="descname">Xpad</tt><a class="headerlink" href="#pymicro.xray.detectors.Xpad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#pymicro.xray.detectors.Detector2d" title="pymicro.xray.detectors.Detector2d"><tt class="xref py py-class docutils literal"><span class="pre">pymicro.xray.detectors.Detector2d</span></tt></a></p>
+<p>Class to handle Xpad like detectors.</p>
+<p>Xpad are pixel detectors made with stacked array of silicon chips.
+Between each chip are 2 double pixels with a 2.5 times bigger size
+and which need to be taken into account.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This code is heavily inspired by the early version of C. Mocuta,
+scientist on the DiffAbs beamline at Soleil synchrotron.</p>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">only tested with Xpad S140 for now...</p>
+</div>
+<dl class="method">
+<dt id="pymicro.xray.detectors.Xpad.__init__">
+<tt class="descname">__init__</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Xpad.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.Xpad.load_image">
+<tt class="descname">load_image</tt><big>(</big><em>image_path</em>, <em>nxs_prefix=None</em>, <em>nxs_dataset=None</em>, <em>nxs_index=None</em>, <em>nxs_update_geometry=False</em>, <em>stack='first'</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Xpad.load_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>load an image from a file.</p>
+<p>The image can be stored as a uint16 binary file (.raw) or in a nexus
+file (.nxs). With the nexus format, several arguments must be
+specified such as the prefix, the index and the dataset number (as str).
+:param str image_path: relative or absolute path to the file containing the image.
+:param str nxs_prefix: the nexus prefix hardcoded into the xml tree.
+:param str nxs_dataset: the dataset number.
+:param int nxs_index: the nexus index.
+:param bool nxs_update_geometry: if True the compute_TwoTh_Psi_arrays method is called after loading the image.
+:params str stack: indicates what to do if many images are present,         &#8216;first&#8217; (default) to keep only the first one, &#8216;median&#8217; to compute         the median over the third dimension.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.Xpad.compute_geometry">
+<tt class="descname">compute_geometry</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Xpad.compute_geometry" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the array with the corrected geometry (double pixels).</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.Xpad.compute_corrected_image">
+<tt class="descname">compute_corrected_image</tt><big>(</big><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Xpad.compute_corrected_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute a corrected image.</p>
+<p>First the intensity is corrected either via background substraction
+or flat field correction. Then tiling and double pixels are accounted
+for to obtain a proper geometry where each pixel of the image
+represent the same physical zone.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pymicro.xray.detectors.Xpad.compute_TwoTh_Psi_arrays">
+<tt class="descname">compute_TwoTh_Psi_arrays</tt><big>(</big><em>diffracto_delta</em>, <em>diffracto_gamma</em><big>)</big><a class="headerlink" href="#pymicro.xray.detectors.Xpad.compute_TwoTh_Psi_arrays" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes TwoTheta and Psi angles arrays corresponding to repectively
+the vertical and the horizontal pixels.</p>
+<p><em>Parameters</em></p>
+<p><strong>diffracto_delta</strong>: diffractometer value of the delta axis</p>
+<p><strong>diffracto_gamma</strong>: diffractometer value of the gamma axis</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This assume the detector is perfectly aligned with the delta and
+gamma axes (which should be the case).</p>
+</div>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pymicro.xray.detectors.Xpad.__module__">
+<tt class="descname">__module__</tt><em class="property"> = 'pymicro.xray.detectors'</em><a class="headerlink" href="#pymicro.xray.detectors.Xpad.__module__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="module-pymicro.xray.laue">
 <span id="laue-module"></span><h2><tt class="xref py py-mod docutils literal"><span class="pre">laue</span></tt> Module<a class="headerlink" href="#module-pymicro.xray.laue" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="pymicro.xray.laue.select_lambda">
+<tt class="descclassname">pymicro.xray.laue.</tt><tt class="descname">select_lambda</tt><big>(</big><em>hkl</em>, <em>orientation</em>, <em>Xu=&lt;Mock name='mock.array()' id='50866384'&gt;</em>, <em>verbose=False</em><big>)</big><a class="headerlink" href="#pymicro.xray.laue.select_lambda" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the wavelength corresponding to the first order reflection
+of a given lattice plane.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">members:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">special-members:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">__init__</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>hkl</strong> &#8211; The given lattice plane.</li>
+<li><strong>orientation</strong> &#8211; The orientation of the crystal lattice.</li>
+<li><strong>Xu</strong> &#8211; The unit vector of the incident X-ray beam (default along the X-axis).</li>
+<li><strong>verbose</strong> (<em>bool</em>) &#8211; activate verbose mode (default False).</li>
+</ul>
+</td>
 </tr>
-<tr class="field-even field"><th class="field-name">undoc-members:</th><td class="field-body"></td>
-</tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">show-inheritance:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
+<tr class="field-even field"><th class="field-name">Returns tuple:</th><td class="field-body"><p class="first last">A tuple of the wavelength value and the corresponding Bragg angle.</p>
 </td>
 </tr>
 </tbody>
 </table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.laue.build_list">
+<tt class="descclassname">pymicro.xray.laue.</tt><tt class="descname">build_list</tt><big>(</big><em>lattice=None</em>, <em>max_miller=3</em><big>)</big><a class="headerlink" href="#pymicro.xray.laue.build_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a list of all HklPlanes.
+This should move to the HklPlane class as a static method.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.laue.compute_ellpisis">
+<tt class="descclassname">pymicro.xray.laue.</tt><tt class="descname">compute_ellpisis</tt><big>(</big><em>orientation</em>, <em>detector</em>, <em>det_distance</em>, <em>uvw</em>, <em>verbose=False</em><big>)</big><a class="headerlink" href="#pymicro.xray.laue.compute_ellpisis" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the ellipsis associated with the given zone axis. All lattice
+planes sharing this zone axis will diffract along that ellipse.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>orientation</strong> &#8211; The crystal orientation.</li>
+<li><strong>detector</strong> &#8211; An instance of the Detector2D class.</li>
+<li><strong>det_distance</strong> (<em>float</em>) &#8211; the object - detector distance (along the X-axis).</li>
+<li><strong>uvw</strong> &#8211; An instance of the HklDirection representing the zone axis.</li>
+<li><strong>verbose</strong> (<em>bool</em>) &#8211; activate verbose mode (default False).</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns data:</th><td class="field-body"><p class="first last">the (u, v) data (in pixel unit) representing the ellipsis.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.laue.diffracted_vector">
+<tt class="descclassname">pymicro.xray.laue.</tt><tt class="descname">diffracted_vector</tt><big>(</big><em>hkl</em>, <em>orientation</em>, <em>min_theta=0.1</em>, <em>verbose=False</em><big>)</big><a class="headerlink" href="#pymicro.xray.laue.diffracted_vector" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.laue.compute_Laue_pattern">
+<tt class="descclassname">pymicro.xray.laue.</tt><tt class="descname">compute_Laue_pattern</tt><big>(</big><em>orientation</em>, <em>detector</em>, <em>det_distance</em>, <em>hklplanes=None</em>, <em>r_spot=5</em>, <em>inverted=False</em>, <em>show_direct_beam=False</em><big>)</big><a class="headerlink" href="#pymicro.xray.laue.compute_Laue_pattern" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute a transmission Laue pattern. The data array of the given
+detector2d instance is initialized with the result.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>orientation</strong> &#8211; The crystal orientation.</li>
+<li><strong>detector</strong> &#8211; An instance of the Detector2d class.</li>
+<li><strong>det_distance</strong> (<em>float</em>) &#8211; The sample-to-detector distance.</li>
+<li><strong>hklplanes</strong> (<em>list</em>) &#8211; A list of the lattice planes to include in the pattern.</li>
+<li><strong>r_spot</strong> (<em>int</em>) &#8211; Size of the spots on the detector in pixel (5 by default)</li>
+<li><strong>inverted</strong> (<em>bool</em>) &#8211; A flag to control if the pattern needs to be inverted.</li>
+<li><strong>show_direct_beam</strong> (<em>bool</em>) &#8211; A flag to control if the direct beam is shown.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">the computed pattern as a numpy array.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </div>
 <div class="section" id="module-pymicro.xray.xray_utils">
 <span id="xray-utils-module"></span><h2><tt class="xref py py-mod docutils literal"><span class="pre">xray_utils</span></tt> Module<a class="headerlink" href="#module-pymicro.xray.xray_utils" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="pymicro.xray.xray_utils.lambda_keV_to_nm">
+<tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">lambda_keV_to_nm</tt><big>(</big><em>lambda_keV</em><big>)</big><a class="headerlink" href="#pymicro.xray.xray_utils.lambda_keV_to_nm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Change the unit of wavelength from keV to nm.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">members:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">special-members:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">__init__</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>lambda_keV</strong> (<em>float</em>) &#8211; the wavelength in keV unit.</td>
 </tr>
-<tr class="field-even field"><th class="field-name">undoc-members:</th><td class="field-body"></td>
-</tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">show-inheritance:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"></td>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the wavelength in nm unit.</td>
 </tr>
 </tbody>
 </table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.xray_utils.lambda_keV_to_angstrom">
+<tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">lambda_keV_to_angstrom</tt><big>(</big><em>lambda_keV</em><big>)</big><a class="headerlink" href="#pymicro.xray.xray_utils.lambda_keV_to_angstrom" title="Permalink to this definition">¶</a></dt>
+<dd><p>Change the unit of wavelength from keV to angstrom.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>lambda_keV</strong> (<em>float</em>) &#8211; the wavelength in keV unit.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the wavelength in angstrom unit.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.xray_utils.lambda_nm_to_keV">
+<tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">lambda_nm_to_keV</tt><big>(</big><em>lambda_nm</em><big>)</big><a class="headerlink" href="#pymicro.xray.xray_utils.lambda_nm_to_keV" title="Permalink to this definition">¶</a></dt>
+<dd><p>Change the unit of wavelength from nm to keV.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>lambda_nm</strong> (<em>float</em>) &#8211; the wavelength in nm unit.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the wavelength in keV unit.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.xray_utils.lambda_angstrom_to_keV">
+<tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">lambda_angstrom_to_keV</tt><big>(</big><em>lambda_angstrom</em><big>)</big><a class="headerlink" href="#pymicro.xray.xray_utils.lambda_angstrom_to_keV" title="Permalink to this definition">¶</a></dt>
+<dd><p>Change the unit of wavelength from angstrom to keV.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>lambda_angstrom</strong> (<em>float</em>) &#8211; the wavelength in angstrom unit.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the wavelength in keV unit.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.xray_utils.plot_xray_trans">
+<tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">plot_xray_trans</tt><big>(</big><em>mat='Al', ts=[1.0], rho=None, energy_lim=(1, 100), legfmt='%.1f', display=True</em><big>)</big><a class="headerlink" href="#pymicro.xray.xray_utils.plot_xray_trans" title="Permalink to this definition">¶</a></dt>
+<dd><p>Plot the transmitted intensity of a X-ray beam through a given material.</p>
+<blockquote>
+<div>This function compute the transmitted intensity from tabulated data of
+the mass attenuation coefficient mu_</div></blockquote>
+<dl class="docutils">
+<dt>ho (between 1 and 100 keV) and</dt>
+<dd><p class="first">applying Beer&#8217;s Lambert law:</p>
+<div class="last math">
+\[I/I_0 = \exp(-\mu_\]</div>
+</dd>
+</dl>
+<p>ho*
+ho*t)</p>
+<blockquote>
+<div><p>The tabulated data is stored in ascii files in the data folder. It has been retrieved
+from NIST <cite>http://physics.nist.gov/cgi-bin/ffast/ffast.pl</cite>
+The density is also tabulated and can be left blanked unless a specific value is to be used.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">param string mat:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">A string representing the material (e.g. &#8216;Al&#8217;)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">param list ts:</th><td class="field-body">a list of thickness values of the material in mm ([1.0] by default)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name" colspan="2">param float rho:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">density of the material in g/cm^3 (None by default)</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">param tuple energy_lim:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body">energy bounds in keV for the plot (1, 100 by default)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name" colspan="2">param string legfmt:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">string to format the legend plot</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">param bool display:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body">display or save an image of the plot (False by default)</td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.xray_utils.radiograph">
+<tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">radiograph</tt><big>(</big><em>data</em>, <em>omega</em><big>)</big><a class="headerlink" href="#pymicro.xray.xray_utils.radiograph" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute a single radiograph of a 3D object using the radon transform.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>data</strong> (<em>np.array</em>) &#8211; an array representing the 3D object in (XYZ) form.</li>
+<li><strong>omega</strong> &#8211; the rotation angle value in degrees.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Returns projection:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><p class="first last">a 2D array in (Y, Z) form.</p>
 </td>
 </tr>
 </tbody>
 </table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.xray.xray_utils.radiographs">
+<tt class="descclassname">pymicro.xray.xray_utils.</tt><tt class="descname">radiographs</tt><big>(</big><em>data</em>, <em>omegas</em><big>)</big><a class="headerlink" href="#pymicro.xray.xray_utils.radiographs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the radiographs of a 3D object using the radon transform.</p>
+<p>The object is represented by a 3D numpy array in (XYZ) form and a series of projection at each omega angle
+are computed assuming the rotation is along Z in the middle of the data set. Internally this function uses
+the radon transform from the skimage package.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>data</strong> (<em>np.array</em>) &#8211; an array representing the 3D object in (XYZ) form.</li>
+<li><strong>omegas</strong> &#8211; an array of the rotation values in degrees.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Returns projections:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><p class="first last">a 3D array in (Y, Z, omega) form.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </div>
 </div>
 
 
+           </div>
+           <div class="articleComments">
+            
+           </div>
           </div>
-        </div>
-      </div>
-      <div class="sphinxsidebar">
-        <div class="sphinxsidebarwrapper">
-  <h3><a href="index.html">Table Of Contents</a></h3>
-  <ul>
-<li><a class="reference internal" href="#">xray Package</a><ul>
-<li><a class="reference internal" href="#detectors-module"><tt class="docutils literal"><span class="pre">detectors</span></tt> Module</a></li>
-<li><a class="reference internal" href="#module-pymicro.xray.laue"><tt class="docutils literal"><span class="pre">laue</span></tt> Module</a></li>
-<li><a class="reference internal" href="#module-pymicro.xray.xray_utils"><tt class="docutils literal"><span class="pre">xray_utils</span></tt> Module</a></li>
-</ul>
-</li>
-</ul>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="changelog.html" class="btn btn-neutral float-right" title="Change log history" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="pymicro.view.html" class="btn btn-neutral" title="view Package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
 
-  <h3>This Page</h3>
-  <ul class="this-page-menu">
-    <li><a href="_sources/pymicro.xray.txt"
-           rel="nofollow">Show Source</a></li>
-  </ul>
-<div id="searchbox" style="display: none">
-  <h3>Quick search</h3>
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
-    </form>
-    <p class="searchtip" style="font-size: 90%">
-    Enter search terms or a module, class or function name.
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2013-2017, Henry Proudhon.
+
     </p>
-</div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
         </div>
       </div>
-      <div class="clearer"></div>
-    </div>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="genindex.html" title="General Index"
-             >index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li><a href="index.html">pymicro 0.4.0 documentation</a> &raquo;</li> 
-      </ul>
-    </div>
-    <div class="footer">
-        &copy; Copyright 2013-2016, Henry Proudhon.
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
-    </div>
-  </body>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'',
+            VERSION:'0.4.0',
+            LANGUAGE:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: ''
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
 </html>

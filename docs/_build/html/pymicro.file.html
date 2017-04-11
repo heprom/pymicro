@@ -1,127 +1,425 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
 
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    
-    <title>file Package &mdash; pymicro 0.4.0 documentation</title>
-    
-    <link rel="stylesheet" href="_static/proBlue.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
-    <script type="text/javascript">
-      var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    '',
-        VERSION:     '0.4.0',
-        COLLAPSE_INDEX: false,
-        FILE_SUFFIX: '.html',
-        HAS_SOURCE:  true
-      };
-    </script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="pymicro 0.4.0 documentation" href="index.html" /> 
-  </head>
-  <body>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="genindex.html" title="General Index"
-             accesskey="I">index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li><a href="index.html">pymicro 0.4.0 documentation</a> &raquo;</li> 
-      </ul>
-    </div>  
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>file Package &mdash; pymicro 0.4.0 documentation</title>
+  
 
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          <div class="body">
+  
+  
+  
+  
+    <link rel="canonical" href="http://pymicro.readthedocs.io/en/latest/pymicro.file.html"/>
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="pymicro 0.4.0 documentation" href="index.html"/>
+        <link rel="up" title="pymicro Package" href="pymicro.html"/>
+        <link rel="next" title="math Package" href="pymicro.math.html"/>
+        <link rel="prev" title="pymicro.crystal.texture" href="pymicro.crystal.texture.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> pymicro
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.4.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="welcome.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#installation">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#dependencies">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#external">External</a></li>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html#api-documentation">API documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cookbook.html">Cookbook</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="pymicro.html">pymicro Package</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="pymicro.html#id1"><tt class="docutils literal"><span class="pre">pymicro</span></tt> Package</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="pymicro.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="pymicro.apps.html">apps Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.crystal.html">crystal Package</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="">file Package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#module-pymicro.file.file_utils"><tt class="docutils literal"><span class="pre">file_utils</span></tt> Module</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.math.html">math Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.view.html">view Package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pymicro.xray.html">xray Package</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Change log history</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">pymicro</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="pymicro.html">pymicro Package</a> &raquo;</li>
+        
+      <li>file Package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/pymicro.file.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
             
   <div class="section" id="file-package">
 <h1>file Package<a class="headerlink" href="#file-package" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="module-pymicro.file.file_utils">
 <span id="file-utils-module"></span><h2><tt class="xref py py-mod docutils literal"><span class="pre">file_utils</span></tt> Module<a class="headerlink" href="#module-pymicro.file.file_utils" title="Permalink to this headline">¶</a></h2>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">members:</th><td class="field-body"><table class="first last docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">undoc-members:</th><td class="field-body"></td>
-</tr>
-<tr class="field-even field"><th class="field-name" colspan="2">show-inheritance:</th></tr>
-<tr class="field-even field"><td>&nbsp;</td><td class="field-body"></td>
-</tr>
-</tbody>
-</table>
-</td>
-</tr>
-</tbody>
-</table>
+<dl class="function">
+<dt id="pymicro.file.file_utils.unpack_header">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">unpack_header</tt><big>(</big><em>h</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.unpack_header" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unpack an ascii header.</p>
+<p>Form a string with the read binary data and then split it into string
+tokens which are put in a dictionnary.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.edf_info">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">edf_info</tt><big>(</big><em>file_name</em>, <em>header_size=None</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.edf_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read and return informations contained in the header of a .edf file.</p>
+<p>Edf files always start with a header (of variable length) containing
+informations about the file such as acquisition conditions, image
+dimensions... This function reads a certain amount of bytes of a given
+file as ascii data and unpack it.
+If not specified, the header size is determined automatically by
+substracting the data size (read as ascii at the begining of the file)
+to the total file size.</p>
+<p><em>Parameters</em></p>
+<p><strong>header_size</strong>: number of bytes to read (None by default).</p>
+<p>Returns a dictionnary containing the file informations.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.edf_read">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">edf_read</tt><big>(</big><em>file_name</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.edf_read" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read an edf file.</p>
+<p>edf stands for ESRF data file. It has a variable header size which is
+a multiple of 512 bytes and contains the image meta in ASCII format
+(eg. image size, data type, motor positions).</p>
+<p>The ascii header is parsed automatically by <cite>edf_info</cite> to retreive the
+image size and data type. Depending on the information enclosed in the
+header, this function may return a 1d, 2d or 3d array.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">im</span> <span class="o">=</span> <span class="n">edf_read</span><span class="p">(</span><span class="s">&#39;radio.edf&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">im</span><span class="o">.</span><span class="n">shape</span>
+<span class="go">(2048, 2048)</span>
+</pre></div>
+</div>
+<p><em>Parameters</em></p>
+<p><strong>file_name</strong>: the name of the edf file to read.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.esrf_to_numpy_datatype">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">esrf_to_numpy_datatype</tt><big>(</big><em>data_type</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.esrf_to_numpy_datatype" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.numpy_to_esrf_datatype">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">numpy_to_esrf_datatype</tt><big>(</big><em>data_type</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.numpy_to_esrf_datatype" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.edf_write">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">edf_write</tt><big>(</big><em>data</em>, <em>fname</em>, <em>type=&lt;Mock name='mock.uint16' id='50060560'&gt;</em>, <em>header_size=1024</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.edf_write" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write a binary edf file with the appropriate header.</p>
+<p>This function write a (x,y,z) 3D dataset to the disk.
+The file is written as a Z-stack. It means that the first nx*ny bytes
+represent the first slice and so on...</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.HST_info">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">HST_info</tt><big>(</big><em>info_file</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.HST_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read the given info file and returns the volume size.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The first line of the file must begin by ! PyHST or directly 
+by NUM_X.</p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.HST_read">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">HST_read</tt><big>(</big><em>scan_name</em>, <em>zrange=None</em>, <em>data_type=&lt;Mock name='mock.uint8' id='50060624'&gt;</em>, <em>verbose=False</em>, <em>header_size=0</em>, <em>autoparse_filename=False</em>, <em>dims=None</em>, <em>mmap=False</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.HST_read" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a volume file stored as a concatenated stack of binary images.</p>
+<p>The volume size must be specified by dims=(nx,ny,nz) unless an associated
+.info file is present in the same location to determine the volume
+size. The data type is unsigned short (8 bits) by default but can be set
+to any numpy type (32 bits float for example).</p>
+<p>The autoparse_filename can be activated to retreive image type and
+size:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">HST_read</span><span class="p">(</span><span class="n">myvol_100x200x50_uint16</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span> <span class="n">autoparse_filename</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>will read the 3d image as unsigned 16 bits with size 100 x 200 x 50.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If you use this function to read a .edf file written by
+matlab in +y+x+z convention (column major order), you may want to
+use: np.swapaxes(HST_read(&#8216;file.edf&#8217;, ...), 0, 1)</p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.rawmar_read">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">rawmar_read</tt><big>(</big><em>image_name</em>, <em>size</em>, <em>verbose=False</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.rawmar_read" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a square 2D image plate MAR image.</p>
+<p>These binary images are typically obtained from the marcvt utility.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This method assume Big endian byte order.</p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.HST_write">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">HST_write</tt><big>(</big><em>data</em>, <em>file_name</em>, <em>verbose=True</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.HST_write" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write binary raw file.</p>
+<p>This function write a (x,y,z) 3D dataset to the disk.
+The file is written as a Z-stack. It means that the first nx*ny bytes
+represent the first slice and so on...</p>
+<p>A .info file containing the volume size is also written.</p>
+<p><em>Parameters</em></p>
+<p><strong>data</strong>: the 3d array to write to the disk.</p>
+<p><strong>file_name</strong>: the name of file to write.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.recad_vol">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">recad_vol</tt><big>(</big><em>vol_filename</em>, <em>min</em>, <em>max</em>, <em>verbose=False</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.recad_vol" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recad a 32 bit vol file into 8 bit raw file.</p>
+<p>This function reads a 3D volume file into a numpy float32 array and
+applies the <cite>recad</cite> function with the [min, max] range. The result is
+saved into a .raw file with the same name as the input file.</p>
+<p>In verbose mode, a piture to compare mid slices in the two volumes
+and another one to compare the histograms are saved.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">To read the vol file, the presence of a .info file is
+assumed, see <cite>HST_read</cite>.</p>
+</div>
+<p><em>Parameters</em></p>
+<p><strong>vol_filename</strong>: the path to the binary vol file.</p>
+<p><strong>min</strong>: value to use as the minimum (will be 0 in the casted array).</p>
+<p><strong>max</strong>: value to use as the maximum (will be 255 in the casted array).</p>
+<p><strong>verbose</strong>: activate verbose mode (False by default).</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.Vtk_write">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">Vtk_write</tt><big>(</big><em>data</em>, <em>fname</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.Vtk_write" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write a data array into old style (V3.0) VTK format.</p>
+<p>An ascii header is written to which the binary data is appended.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The header assumes uint8 data type.</p>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="pymicro.file.file_utils.read_dif">
+<tt class="descclassname">pymicro.file.file_utils.</tt><tt class="descname">read_dif</tt><big>(</big><em>Nx</em>, <em>Ny</em>, <em>file</em>, <em>shift=False</em><big>)</big><a class="headerlink" href="#pymicro.file.file_utils.read_dif" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read the result of an FFT computation in a csv format.</p>
+<p>These fiels are basically produced by **process diffraction
+within a z-set post_processing.</p>
+<p>Returns an image array containing the data.</p>
+</dd></dl>
+
 </div>
 </div>
 
 
+           </div>
+           <div class="articleComments">
+            
+           </div>
           </div>
-        </div>
-      </div>
-      <div class="sphinxsidebar">
-        <div class="sphinxsidebarwrapper">
-  <h3><a href="index.html">Table Of Contents</a></h3>
-  <ul>
-<li><a class="reference internal" href="#">file Package</a><ul>
-<li><a class="reference internal" href="#module-pymicro.file.file_utils"><tt class="docutils literal"><span class="pre">file_utils</span></tt> Module</a></li>
-</ul>
-</li>
-</ul>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="pymicro.math.html" class="btn btn-neutral float-right" title="math Package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="pymicro.crystal.texture.html" class="btn btn-neutral" title="pymicro.crystal.texture" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
 
-  <h3>This Page</h3>
-  <ul class="this-page-menu">
-    <li><a href="_sources/pymicro.file.txt"
-           rel="nofollow">Show Source</a></li>
-  </ul>
-<div id="searchbox" style="display: none">
-  <h3>Quick search</h3>
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
-    </form>
-    <p class="searchtip" style="font-size: 90%">
-    Enter search terms or a module, class or function name.
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2013-2017, Henry Proudhon.
+
     </p>
-</div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
         </div>
       </div>
-      <div class="clearer"></div>
-    </div>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="genindex.html" title="General Index"
-             >index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li><a href="index.html">pymicro 0.4.0 documentation</a> &raquo;</li> 
-      </ul>
-    </div>
-    <div class="footer">
-        &copy; Copyright 2013-2016, Henry Proudhon.
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
-    </div>
-  </body>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'',
+            VERSION:'0.4.0',
+            LANGUAGE:'',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: ''
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
 </html>

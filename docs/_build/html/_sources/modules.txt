@@ -1,7 +1,13 @@
+:orphan:
+
 pymicro
 =======
 
-.. toctree::
-:maxdepth: 4
+.. autosummary::
+   :toctree: _autosummary
 
-       pymicro
+
+.. toctree::
+   :maxdepth: 4
+
+   pymicro

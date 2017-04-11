@@ -106,6 +106,11 @@ Examples
 animation
 ---------
 
+.. figure:: animation/images/thumb/euler_angles_anim.png
+   :target: ./animation/euler_angles_anim.html
+
+   euler_angles_anim.py
+
 .. figure:: animation/images/thumb/grain_hkl_anim_3d.png
    :target: ./animation/grain_hkl_anim_3d.html
 

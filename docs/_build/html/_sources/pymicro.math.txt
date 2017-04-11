@@ -5,7 +5,7 @@ math Package
 ------------------------
 
 .. automodule:: pymicro.math.fitting
-:members:
-        :undoc-members:
-        :show-inheritance:
+   :members:
+   :undoc-members:
+   :show-inheritance:
 

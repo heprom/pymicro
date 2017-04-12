@@ -328,13 +328,14 @@ def add_plane_to_grid_with_normal(plane, grid, origin, opacity=0.3, normal_lengt
     return assembly
 
 
-def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20):
+def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20, color=None):
     '''Build an actor for the cartesian axes.
 
-    :params length: The arrow length of the axes (1.0 by default).
+    :param length: The arrow length of the axes (1.0 by default).
     :type length: float or triple of float to specify the length of each axis individually.
     :param list axisLabels: Specify the axes labels (xyz by default), use axisLabels = None to hide the axis labels
     :param int fontSize: Font size for the axes labels (20 by default).
+    :param tuple color: A single color defined by its rgb components (not set by default which keep the red, green, blue colors).
     :returns: A VTK assembly representing the cartesian axes.
     '''
     axes = vtk.vtkAxesActor()
@@ -358,6 +359,12 @@ def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20):
         axes.GetZAxisCaptionActor2D().SetCaptionTextProperty(axprop)
     else:
         axes.SetAxisLabels(0)
+    if color:
+        # set the color of the whole triad
+        collection = vtk.vtkPropCollection()
+        axes.GetActors(collection)
+        for i in range(collection.GetNumberOfItems()):
+            collection.GetItemAsObject(i).GetProperty().SetColor(color)
     return axes
 
 

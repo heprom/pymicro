@@ -947,7 +947,7 @@ def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
     return assembly
 
 
-def lattice_3d_with_planes(lattice, hklplanes, show_normal=True, \
+def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, show_normal=True,
                            plane_opacity=1.0, **kwargs):
     '''
     Create the 3D representation of a crystal lattice.
@@ -974,7 +974,9 @@ def lattice_3d_with_planes(lattice, hklplanes, show_normal=True, \
 
        A 3D view of a cubic lattice with all four 111 planes displayed.
 
+    :param lattice: An instance of :py:class:`~pymicro.crystal.lattice.Lattice` corresponding to the crystal lattice to be displayed.
     :param hklplanes: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` instances to add to the lattice.
+    :param plane_origins: A list of tuples describing the plane origins (must be the same length as `hklplanes`), if None, the planes are created to pass through the middle of the lattice (default).
     :param bool show_normal: Control if the slip plane normals are shown (default: True).
     :param float plane_opacity: A float number in the [0.,1.0] range controlling the slip plane opacity.
     :param **kwargs: additional parameters are passed to the `lattice_3d` method.
@@ -982,22 +984,72 @@ def lattice_3d_with_planes(lattice, hklplanes, show_normal=True, \
     '''
     grid = lattice_grid(lattice)
     (a, b, c) = lattice._lengths
+    if plane_origins:
+        assert len(plane_origins) == len(hklplanes)
     # get the atoms+edges assembly corresponding to the crystal lattice
     assembly = lattice_3d(lattice, **kwargs)
-    parts = assembly.GetParts()
-    # display all the hkl planes
-    for hklplane in hklplanes:
-        origin = (a / 2, b / 2, c / 2)
+    # display all the hkl planes within the lattice
+    for i, hklplane in enumerate(hklplanes):
+        mid = np.array([a / 2, b / 2, c / 2])
         plane = vtk.vtkPlane()
-        plane.SetOrigin(origin)
+        plane.SetOrigin(mid)
         plane.SetNormal(hklplane.normal())
-        hklplaneActor = add_plane_to_grid(plane, grid, origin, opacity=plane_opacity)
+        hklplaneActor = add_plane_to_grid(plane, grid, mid, opacity=plane_opacity)
+        if plane_origins:
+            origin = plane_origins[i] * np.array([a, b, c]) - mid
+            print('using origin', origin)
+            hklplaneActor.AddPosition(origin)
+            hklplaneActor.SetOrigin(-origin)
         assembly.AddPart(hklplaneActor)
         if show_normal:
             # add an arrow to display the normal to the plane
             arrowActor = unit_arrow_3d(origin, a * hklplane.normal(), make_unit=False)
             assembly.AddPart(arrowActor)
     return assembly
+
+
+def lattice_3d_with_plane_series(lattice, hkl, nps=1, **kwargs):
+    '''
+    Create the 3D representation of a crystal lattice with a series of hkl planes.
+
+    HklPlanes can be displayed within the lattice cell with their normals.
+    A single vtk actor in form of an assembly is returned.
+    Additional parameters are passed to the `lattice_3d` method to control how the lattice is pictured.
+
+    .. code-block:: python
+
+        l = Lattice.cubic(1.0)
+        orientation = Orientation.from_euler([0, 54.74, 135])  # correspond to 111 fiber texture
+        copper = (1.000000, 0.780392, 0.494117)  # nice copper color
+        copper_lattice = lattice_3d_with_plane_series(l, (1, -1, 1), nps=4, crystal_orientation=orientation, \\
+            origin='mid', show_atoms=True, sphereColor=copper, sphereRadius=0.1)
+        s3d = Scene3D()
+        s3d.add(cubic)
+        s3d.render()
+
+    .. figure:: _static/Cu111_with_planes.png
+       :width: 400 px
+       :alt: Cu111_with_planes
+       :align: center
+
+       A 3D view of a copper lattice with a series of successive (111) planes displayed.
+
+    :param lattice: An instance of :py:class:`~pymicro.crystal.lattice.Lattice` corresponding to the crystal lattice to be displayed.
+    :param hkl: A tuple of the 3 miller indices.
+    :param int nps: The number of planes to display in the series (1 by default).
+    :param **kwargs: additional parameters are passed to the `lattice_3d_with_planes` method.
+    :returns: The method return a vtkAssembly that can be directly added to a renderer.
+    '''
+    p = HklPlane(hkl[0], hkl[1], hkl[2], lattice)
+    d_hkl = p.interplanar_spacing()
+    (a, b, c) = lattice._lengths
+    mid = np.array([0.5 * a, 0.5 * b, 0.5 * c])
+    hkl_planes = []
+    plane_origins = []
+    for i in range(nps):
+        hkl_planes.append(p)
+        plane_origins.append(mid - (nps / 2. - 0.5 - i) * d_hkl * p.normal())
+    return lattice_3d_with_planes(lattice, hkl_planes, plane_origins=plane_origins, **kwargs)
 
 
 def apply_translation_to_actor(actor, trans):

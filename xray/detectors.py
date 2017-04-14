@@ -13,15 +13,19 @@ from pymicro.external.tifffile import TiffFile
 class Detector2d:
     '''Class to handle 2D detectors.
 
-    2D detectors produce array like images and may have different geometries.
+    2D detectors produce array like images and may have different geometries. In particular the pixel arangement may
+    not necessarily be flat or regular.
     This abstract class regroup the generic method for those kind of detectors.
     '''
 
     def __init__(self, size=(2048, 2048), data_type=np.uint16):
-        '''Initialization of a Detector2d instance with a given image size
-        (2048 pixels square array by default).'''
+        '''
+        Initialization of a Detector2d instance with a given image size (2048 pixels square array by default).
+        The instance can be positioned in the laboratory frame using the ref_pos attribute.
+        '''
         self.size = size
         self.data_type = data_type
+        self.ref_pos = np.array([0., 0., 0.])  # mm
         self.ucen = self.size[0] // 2
         self.vcen = self.size[1] // 2
         self.pixel_size = 1.  # mm
@@ -197,20 +201,66 @@ class Detector2d:
 
 
 class RegArrayDetector2d(Detector2d):
-    '''Class to handle a Varian Paxscan 2520 detector.
+    '''Generic class to handle a flat detector with a regular grid of pixels.
 
-    The flat panel detector produce 16 unsigned (1840, 1456) images.
+    The two dimensions of the pixel grid are reffered by u and v. Usually u is the horizontal direction and v the
+    vertical one, but both can be controlled by the u_dir and v_dir attributes. This allows to control the detector
+    flips and tilts.
     '''
 
-    def __init__(self, size=(2048, 2048), data_type=np.uint16):
+    def __init__(self, size=(2048, 2048), data_type=np.uint16, u_dir=[0, -1, 0], v_dir=[0, 0, -1]):
         Detector2d.__init__(self, size=size, data_type=data_type)
         self.ref = np.ones(self.size, dtype=self.data_type)
         self.dark = np.zeros(self.size, dtype=self.data_type)
         self.bg = np.zeros(self.size, dtype=self.data_type)
+        self.u_dir = np.array(u_dir)
+        self.set_v_dir(v_dir)
+
+    def set_u_dir(self, u_dir):
+        '''Set the coordinates of the vector describing the first (horizontal) direction of the pixels.'''
+        self.u_dir = np.array(u_dir)
+        self.w_dir = np.cross(self.u_dir, self.v_dir)
+
+    def set_v_dir(self, v_dir):
+        '''Set the coordinates of the vector describing the second (vertical) direction of the pixels.'''
+        self.v_dir = np.array(v_dir)
+        self.w_dir = np.cross(self.u_dir, self.v_dir)
 
     def get_size_mm(self):
         '''Return the size of the detector in millimeters.'''
         return self.pixel_size * np.array(self.size)
+
+    def project_along_direction(self, origin, direction):
+        '''
+        Return the intersection point of a line and the detector plane, in laboratory coordinates.
+
+        If :math:`\l` is a vector in the direction of the line, :math:`l_0` a point of the line, :math:`p_0`
+        a point of the plane (here the reference position), and :math:`n` the normal to the plane,
+        the intersection point can be written as :math:`p = d.l + l_0` where the distance :math:`d` can
+        be computed as:
+
+        .. math::
+
+           d=\dfrac{(p_0 - l_0).n}{l.n}
+
+        '''
+        assert np.dot(self.w_dir, direction) != 0
+        d = np.dot((self.ref_pos - origin), self.w_dir) / np.dot(direction, self.w_dir)
+        p = origin + d * direction
+        return p
+
+    def lab_to_pixel(self, p):
+        '''Compute the pixel number corresponding to a physical point in space.
+
+        :param tuple p: the coordinate of the point in the laboratory frame.
+        :return tuple (u, v): the detector coordinates of the given point.
+        '''
+        # check if the point is on the detector plane
+        vec = np.array(p) - np.array(self.ref_pos)
+        assert np.dot(self.w_dir, vec) < 1.e-6
+        u = self.ucen + np.dot(self.u_dir, vec) / self.pixel_size
+        v = self.vcen + np.dot(self.v_dir, vec) / self.pixel_size
+        return u, v
 
     def load_image(self, image_path):
         print('loading image %s' % image_path)
@@ -249,7 +299,6 @@ class RegArrayDetector2d(Detector2d):
         u = np.linspace(0, self.size[0] - 1, self.size[0])
         v = np.linspace(0, self.size[1] - 1, self.size[1])
         vv, uu = np.meshgrid(v, u)
-        # uu, vv = np.meshgrid(u, v)
         r = np.sqrt((uu - self.ucen) ** 2 + (vv - self.vcen) ** 2)
         self.two_thetas = np.arctan(r / distance) * inv_deg2rad
         self.psis = np.arccos((uu - self.ucen) / r) * inv_deg2rad

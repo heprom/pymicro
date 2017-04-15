@@ -322,14 +322,16 @@ class Orientation:
         (a, b, c) = hkl._lattice._lengths
         theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
         lambda_nm = 1.2398 / lambda_keV
-
         gt = self.orientation_matrix().T  # our Bt (here called gt) corresponds to g^{-1} in Poulsen 2004
-        A = h * gt[0, 0] + k * gt[0, 1] + l * gt[0, 2]  # could write A = np.dot(np.array([h, k, l]), gt[0])
-        B = -h * gt[1, 0] - k * gt[1, 1] - l * gt[1, 2]  # could write B = - np.dot(np.array([h, k, l]), gt[1])
-        C = -2 * a * np.sin(theta) ** 2 / lambda_nm  # the minus sign comes from the main equation
+        Gc = hkl.scattering_vector()
+        A = np.dot(Gc, gt[0])
+        B = - np.dot(Gc, gt[1])
+        #A = h / a * gt[0, 0] + k / b * gt[0, 1] + l / c * gt[0, 2]
+        #B = -h / a * gt[1, 0] - k / b * gt[1, 1] - l / c * gt[1, 2]
+        C = -2 * np.sin(theta) ** 2 / lambda_nm  # the minus sign comes from the main equation
         Delta = 4 * (A ** 2 + B ** 2 - C ** 2)
         if Delta < 0:
-            raise ValueError('Delta < 0')
+            raise ValueError('Delta < 0 (%f) for reflexion (%d%d%d)' % (Delta, h, k, l))
         t1 = (B - 0.5 * np.sqrt(Delta)) / (A + C)
         t2 = (B + 0.5 * np.sqrt(Delta)) / (A + C)
         w1 = 2 * np.arctan(t1) * 180. / np.pi
@@ -337,8 +339,9 @@ class Orientation:
         if w1 < 0: w1 += 360.
         if w2 < 0: w2 += 360.
         if verbose:
+            print('A={0:.3f}, B={1:.3f}, C={2:.3f}, Delta={3:.1f}'.format(A, B, C, Delta))
             print('the two omega values in degrees fulfilling the Bragg condition are (%.1f, %.1f)' % (w1, w2))
-        return (w1, w2)
+        return w1, w2
 
     def rotating_crystal(self, hkl, lambda_keV, omega_step=0.5, display=True, verbose=False):
         from pymicro.xray.xray_utils import lambda_keV_to_nm

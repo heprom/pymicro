@@ -727,13 +727,22 @@ class Orientation:
         return np.array([r1, r2, r3])
 
     @staticmethod
-    def read_euler_txt(txt_path, data_type='euler'):
+    def read_euler_txt(txt_path):
+        '''
+        Read a set of euler angles from an ascii file.
+
+        :param str txt_path: path to the text file containing the euler angles.
+        :returns dict: a dictionary with the line number and the corresponding orientation.
+        '''
+        return Orientation.read_orientations(txt_path)
+
+    @staticmethod
+    def read_orientations(txt_path, data_type='euler'):
         '''
         Read a set of grain orientations from a text file.
 
-        The text file must be organised in columns, the three euler angles
-        (or the three rodrigues components) must correspond to the first
-        three columns (the other are ignored).
+        The text file must be organised in 3 columns (the other are ignored), corresponding to either the three euler angles
+        or the three rodrigues veotor components, depending on the data_type).
 
         :param str txt_path: path to the text file containing the orientations.
         :param str data_type: 'euler' (default) or 'rodrigues'
@@ -743,10 +752,7 @@ class Orientation:
         size = len(data)
         orientations = []
         for i in range(size):
-            phi1 = data[i, 0]
-            Phi = data[i, 1]
-            phi2 = data[i, 2]
-            angles = np.array([float(phi1), float(Phi), float(phi2)])
+            angles = np.array([float(data[i, 0]), float(data[i, 1]), float(data[i, 2])])
             if data_type == 'euler':
                 orientations.append([i + 1, Orientation.from_euler(angles)])
             elif data_type == 'rodrigues':

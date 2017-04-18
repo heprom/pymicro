@@ -737,18 +737,21 @@ class Orientation:
         return Orientation.read_orientations(txt_path)
 
     @staticmethod
-    def read_orientations(txt_path, data_type='euler'):
+    def read_orientations(txt_path, data_type='euler', **kwargs):
         '''
         Read a set of grain orientations from a text file.
 
-        The text file must be organised in 3 columns (the other are ignored), corresponding to either the three euler angles
-        or the three rodrigues veotor components, depending on the data_type).
+        The text file must be organised in 3 columns (the other are ignored), corresponding to either the three euler
+        angles or the three rodrigues veotor components, depending on the data_type). Internally the ascii file is read
+        by the genfromtxt function of numpy, additional keyworks (such as the delimiter) can be passed to via the
+        kwargs dictionnary.
 
         :param str txt_path: path to the text file containing the orientations.
-        :param str data_type: 'euler' (default) or 'rodrigues'
+        :param str data_type: 'euler' (default) or 'rodrigues'.
+        :param dict kwargs: additional parameters passed to genfromtxt.
         :returns dict: a dictionary with the line number and the corresponding orientation.
         '''
-        data = np.genfromtxt(txt_path)
+        data = np.genfromtxt(txt_path, **kwargs)
         size = len(data)
         orientations = []
         for i in range(size):

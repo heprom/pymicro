@@ -21,7 +21,8 @@ class Detector2d:
     def __init__(self, size=(2048, 2048), data_type=np.uint16):
         '''
         Initialization of a Detector2d instance with a given image size (2048 pixels square array by default).
-        The instance can be positioned in the laboratory frame using the ref_pos attribute.
+        The instance can be positioned in the laboratory frame using the ref_pos attribute which is the position in
+        the laboratory frame of the middle of the detector..
         '''
         self.size = size
         self.data_type = data_type
@@ -230,6 +231,10 @@ class RegArrayDetector2d(Detector2d):
         '''Return the size of the detector in millimeters.'''
         return self.pixel_size * np.array(self.size)
 
+    def get_origin(self):
+        '''Return the detector origin in laboratory coordinates.'''
+        return self.pixel_to_lab(0, 0)
+
     def project_along_direction(self, origin, direction):
         '''
         Return the intersection point of a line and the detector plane, in laboratory coordinates.
@@ -261,6 +266,17 @@ class RegArrayDetector2d(Detector2d):
         u = self.ucen + np.dot(self.u_dir, vec) / self.pixel_size
         v = self.vcen + np.dot(self.v_dir, vec) / self.pixel_size
         return u, v
+
+    def pixel_to_lab(self, u, v):
+        '''Compute the laboratory coordinates of a given pixel.
+
+        :param int u: the given pixel number along the first direction.
+        :param int v: the given pixel number along the second direction.
+        :return tuple (x, y, z): the laboratory coordinates.
+        '''
+        r = (u - self.ucen) * self.u_dir + (v - self.vcen) * self.v_dir
+        p = self.ref_pos + r * self.pixel_size
+        return p
 
     def load_image(self, image_path):
         print('loading image %s' % image_path)

@@ -8,20 +8,22 @@ from pymicro.crystal.lattice import HklPlane
 from pymicro.xray.xray_utils import lambda_keV_to_nm, radiograph
 
 
-def dct_projection(micro, data, dif_grains, omega, lambda_keV, det_npx, det_distance, ps, lattice, att=5, verbose=True):
+def dct_projection(orientations, data, dif_grains, omega, lambda_keV, detector, lattice, include_direct_beam=True,
+                   att=5, verbose=True):
     '''Work in progress, will replace function in the microstructure module.'''
-    full_proj = np.zeros(det_npx, dtype=np.float)
+    full_proj = np.zeros(detector.size, dtype=np.float)
     lambda_nm = lambda_keV_to_nm(lambda_keV)
     omegar = omega * np.pi / 180
     R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
 
-    # add the direct beam part by computing the radiograph of the sample without the diffracting grains
-    data_abs = np.where(data > 0, 1, 0)
-    for (gid, (h, k, l)) in dif_grains:
-        mask_dif = (data == gid)
-        data_abs[mask_dif] = 0  # remove this grain from the absorption
-    proj = radiograph(data_abs, omega)
-    add_to_image(full_proj, proj[::-1, ::-1] / att, np.array(full_proj.shape) // 2)
+    if include_direct_beam:
+        # add the direct beam part by computing the radiograph of the sample without the diffracting grains
+        data_abs = np.where(data > 0, 1, 0)
+        for (gid, (h, k, l)) in dif_grains:
+            mask_dif = (data == gid)
+            data_abs[mask_dif] = 0  # remove this grain from the absorption
+        proj = radiograph(data_abs, omega)
+        add_to_image(full_proj, proj[::-1, ::-1] / att, np.array(full_proj.shape) // 2)
 
     # add diffraction spots
     X = np.array([1., 0., 0.]) / lambda_nm
@@ -32,30 +34,29 @@ def dct_projection(micro, data, dif_grains, omega, lambda_keV, det_npx, det_dist
             continue
         local_com = np.array(ndimage.measurements.center_of_mass(grain_data, data))
         print('local center of mass (voxel): {0}'.format(local_com))
-        g_center_mm = ps * (local_com - 0.5 * np.array(data.shape))
+        g_center_mm = detector.pixel_size * (local_com - 0.5 * np.array(data.shape))
         print('center of mass (voxel): {0}'.format(local_com - 0.5 * np.array(data.shape)))
         print('center of mass (mm): {0}'.format(g_center_mm))
         # compute scattering vector
-        Bt = micro.get_grain(gid).orientation_matrix().transpose()
+        gt = orientations[gid].orientation_matrix().transpose()
+        # gt = micro.get_grain(gid).orientation_matrix().transpose()
         p = HklPlane(h, k, l, lattice)
-        G = np.dot(R, np.dot(Bt, p.scattering_vector()))
+        G = np.dot(R, np.dot(gt, p.scattering_vector()))
         K = X + G
         # position of the grain at this rotation
         g_pos_rot = np.dot(R, g_center_mm)
-        (u, v) = (-g_pos_rot[1] - (det_distance - g_pos_rot[0]) * K[1] / K[0],
-                  -g_pos_rot[2] - (det_distance - g_pos_rot[0]) * K[2] / K[0])  # unit is mm
-        (up, vp) = (int(0.5 * det_npx[0] + u / ps),
-                    int(0.5 * det_npx[1] + v / ps))  # unit is pixel on the detector
+        pg = detector.project_along_direction(g_pos_rot, K)
+        (up, vp) = detector.lab_to_pixel(pg)
         if verbose:
             print('\n* gid=%d, (%d,%d,%d) plane, angle=%.1f' % (gid, h, k, l, omega))
             print('diffraction vector:', K)
             print('postion of the grain at omega=%.1f is ' % omega, g_pos_rot)
-            print(u, v)
             print('up=%d, vp=%d for plane (%d,%d,%d)' % (up, vp, h, k, l))
         data_dif = grain_data[ndimage.find_objects(data == gid)[0]]
         proj_dif = radiograph(data_dif, omega)  # (Y, Z) coordinate system
         add_to_image(full_proj, proj_dif[::-1, ::-1], (up, vp), verbose)  # (u, v) axes correspond to (-Y, -Z)
     return full_proj
+
 
 def add_to_image(image, inset, (u, v), verbose=False):
     """Add an image to another image at a specified position.
@@ -89,7 +90,7 @@ def add_to_image(image, inset, (u, v), verbose=False):
         v_end = int(image.shape[1] - (v - spot_size[1] // 2))
     # now add spot to the image
     image[u - spot_size[0] // 2 + u_start: u - spot_size[0] // 2 + u_end,
-        v - spot_size[1] // 2 + v_start: v - spot_size[1] // 2 + v_end] \
+    v - spot_size[1] // 2 + v_start: v - spot_size[1] // 2 + v_end] \
         += inset[u_start:u_end, v_start:v_end]
 
 
@@ -118,15 +119,17 @@ def all_dif_spots(g_proj, g_uv, verbose=False):
     return image
 
 
-def plot_all_dif_spots(gid, det_npx, det_distance, ps, hkl_miller=None, uv=None, lattice=None, lambda_keV=None,
-                       spots=True, dif_spots_image=None, positions=True, debye_rings=True, suffix=''):
-    # plt.figure(figsize=(8, 8))
-    plt.figure()
+def plot_all_dif_spots(gid, detector, hkl_miller=None, uv=None, lattice=None, lambda_keV=None,
+                       spots=True, dif_spots_image=None, max_value=None, positions=True, debye_rings=True, suffix=''):
+    plt.figure(figsize=(13, 8))
+    # plt.figure()
     if spots and dif_spots_image is not None:
-        plt.imshow(dif_spots_image.T, cmap=cm.gray)
+        if not max_value:
+            max_value = dif_spots_image.max()
+        plt.imshow(dif_spots_image.T, cmap=cm.gray, vmin=0, vmax=max_value)
     families = []
     indices = []
-    colors = 'krbgmykrbgmy'  # use a cycler here
+    colors = 'crbgmy'  # crbgmycrbgmycrbgmycrbgmy'  # use a cycler here
     t = np.linspace(0.0, 2 * np.pi, num=37)
     if positions or debye_rings:
         if hkl_miller is None:
@@ -134,7 +137,7 @@ def plot_all_dif_spots(gid, det_npx, det_distance, ps, hkl_miller=None, uv=None,
                 'The list of miller indices of each reflection must be provided using variable g_hkl_miller')
         for i, (h, k, l) in enumerate(hkl_miller):
             l = [abs(h), abs(k), abs(l)]
-            l.sort()  # miller indices are now sorted
+            # l.sort()  # miller indices are now sorted, should use the lattice symmetry here
             family_name = '%d%d%d' % (l[0], l[1], l[2])
             if families.count(family_name) == 0:
                 families.append(family_name)
@@ -144,18 +147,19 @@ def plot_all_dif_spots(gid, det_npx, det_distance, ps, hkl_miller=None, uv=None,
         # now plot each family
         for i in range(len(families)):
             family = families[i]
-            c = colors[i]
+            c = colors[i % len(colors)]
             if positions and uv is not None:
                 plt.plot(uv[indices[i]:indices[i + 1], 0], uv[indices[i]:indices[i + 1], 1],
                          's', color=c, label=family)
             if debye_rings and lattice is not None and lambda_keV:
                 theta = HklPlane(int(family[0]), int(family[1]), int(family[2]), lattice).bragg_angle(lambda_keV)
-                L = det_distance / ps * np.tan(2 * theta)  # 2 theta distance on the detector
+                L = detector.ref_pos[0] / detector.pixel_size * np.tan(2 * theta)  # 2 theta distance on the detector
                 print('2theta = %g, L = %g' % (2 * theta * 180 / np.pi, L))
-                plt.plot(0.5 * det_npx[0] + L * np.cos(t), 0.5 * det_npx[1] + L * np.sin(t), '--', color=c)
+                plt.plot(0.5 * detector.size[0] + L * np.cos(t), 0.5 * detector.size[1] + L * np.sin(t), '--', color=c)
     plt.title('grain %d diffraction spot locations on the detector' % gid)
-    plt.legend(numpoints=1, loc='center')
-    plt.axis('equal')
+    # plt.legend(numpoints=1, loc='center')
+    plt.legend(numpoints=1, ncol=2, bbox_to_anchor=(1.02, 1), loc=2)
+    # plt.axis('equal')
     plt.axis([0, 2047, 2047, 0])
     plt.savefig('g%d%s_difspot_positions.pdf' % (gid, suffix))
 
@@ -209,8 +213,9 @@ def output_tikzpicture(proj_dif, omegas, gid=1, d_uv=[0, 0], suffix=''):
     f.write('\\begin{document}\n')
     f.write('\\pagestyle{empty}\n')
     f.write('\\sffamily\n')
-    f.write('\\begin{tikzpicture}[font=\\tiny, white]\n')
-    #f.write(
+    f.write('\\fontsize{5}{6}\n')
+    f.write('\\begin{tikzpicture}[white]\n')
+    # f.write(
     #    '\\filldraw[black] (%.3f,%.3f) rectangle (%.3f,%.3f);\n' % (-0.5 * l, 0.5 * l, L - 0.5 * l, -m * l + 0.5 * l))
     for j in range(m):
         Y = -j * l
@@ -220,8 +225,9 @@ def output_tikzpicture(proj_dif, omegas, gid=1, d_uv=[0, 0], suffix=''):
             if index >= N:
                 continue  # skip last incomplete line
             f.write('\\node at (%.2f,%.2f) {\includegraphics[width=%.2fcm]{g%d_proj%s_%02d.png}};\n' % (
-            X, Y, l, gid, suffix, index))
-            f.write('\\node[white] at (%.2f,%.2f) {$\omega=%.1f^\circ$};\n' % (X, Y - 0.5 * l, omegas[index]))
+                X, Y, l, gid, suffix, index))
+            # f.write('\\node at (%.2f,%.2f) {$\omega=%.1f^\circ$};\n' % (X, Y - 0.5 * l, omegas[index]))
+            f.write('\\node at (%.2f,%.2f) {$%.1f^\circ$};\n' % (X, Y - 0.5 * l, omegas[index]))
     f.write('\\end{tikzpicture}\n')
     f.write('\\end{document}\n')
     f.close()

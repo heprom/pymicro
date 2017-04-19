@@ -235,6 +235,30 @@ class RegArrayDetector2d(Detector2d):
         '''Return the detector origin in laboratory coordinates.'''
         return self.pixel_to_lab(0, 0)
 
+    def get_edges(self, num_points=21, verbose=False):
+        '''Return an array describing the detector edges in pixel units.
+        
+        :param int num_points: number of points to describe an edge (minimum 2)
+        :param bool verbose: activate verbose mode.
+        '''
+        assert num_points > 1
+        corners = np.empty((5, 2), dtype=int)
+        corners[0] = [0, 0]
+        corners[1] = [0, self.size[1] - 1]
+        corners[2] = [self.size[0] - 1, self.size[1] - 1]
+        corners[3] = [self.size[0] - 1, 0]
+        corners[4] = [0, 0]
+        detector_edges = np.empty((4 * num_points, 2), dtype=float)
+        grad = np.linspace(0, 1, num_points, endpoint=True)
+        for i in range(4):
+            if verbose:
+                print('i=%d' % i)
+                print(corners[i])
+                print(type(corners[i]))
+            for j in range(num_points):
+                detector_edges[i * num_points + j] = corners[i] + grad[j] * (corners[i + 1] - corners[i])
+        return detector_edges
+
     def project_along_direction(self, origin, direction):
         '''
         Return the intersection point of a line and the detector plane, in laboratory coordinates.

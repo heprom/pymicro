@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-import numpy as np, os
+import numpy as np
+import os
 from matplotlib import pyplot as plt
-from pymicro.math.fitting import fit
+from pymicro.xray.fitting import fit
 
 if __name__ == '__main__':
     '''Basic curve fitting example with a cosine function. The data is

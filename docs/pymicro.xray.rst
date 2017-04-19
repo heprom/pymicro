@@ -16,6 +16,15 @@ xray Package
    :undoc-members:
    :show-inheritance:
 
+:mod:`fitting` Module
+------------------------
+
+.. automodule:: pymicro.xray.fitting
+   :members:
+   :special-members: __init__
+   :undoc-members:
+   :show-inheritance:
+
 :mod:`laue` Module
 ------------------
 

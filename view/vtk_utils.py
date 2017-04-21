@@ -1397,25 +1397,29 @@ def elevationFilter(data, value, (low, high), low_point=None, high_point=None):
 
 
 def numpy_array_to_vtk_grid(data, cell_data=True):
-    '''Transform a 3d numpy data array into a vtk uniform grid with scalar
-    data.
+    '''Transform a 3d numpy data array into a vtk uniform grid with scalar data.
 
-    *Parameters*
-
-    **data**: the 3d numpy data array.
-
-    **cell_data**: boolean to assign cell data or point data ito the grid (True by default)
-
-    *Returns*
-
-    The method return a vtkUniformGrid with scalar data initialized from
+    :param data: the 3d numpy data array, possibly with 3 components using a 4th dimension.
+    :param bool cell_data: boolean to assign cell data or point data ito the grid (True by default).
+    :return vtkUniformGrid: The method return a vtkUniformGrid with scalar data initialized from
     the provided numpy array.
     '''
-    if not data.ndim == 3:
-        print('warning, data array dimension must be 3')
+    if not data.ndim in [3, 4]:
+        print('warning, data array dimension must be 3 or 4 (for multi-component)')
         return None
-    size = np.shape(data)
-    vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(data, order='F'), deep=1)
+    if data.ndim == 3:
+        size = np.shape(data)
+        vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(data, order='F'), deep=1)
+    elif data.ndim == 4:
+        print('treating the 4th dimension as 3 different components')
+        assert data.shape[3] == 3
+        size = np.shape(data)[:3]
+        vtk_data_array = vtk.vtkUnsignedCharArray()
+        vtk_data_array.SetNumberOfComponents(data.shape[3])
+        n = np.prod(size)
+        vtk_data_array.SetNumberOfTuples(n)
+        for i in range(3):
+            vtk_data_array.CopyComponent(i, numpy_support.numpy_to_vtk(np.ravel(data[:, :, :, i], order='F'), deep=1), 0)
     grid = vtk.vtkUniformGrid()
     if cell_data:
         grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
@@ -1719,8 +1723,8 @@ def show_mesh(grid, map_scalars=False, lut=None, show_edges=False, edge_color=(0
     if map_scalars:
         mapper.ScalarVisibilityOn()
         mapper.UseLookupTableScalarRangeOn()
-        mapper.SetScalarModeToUseCellData();
-        mapper.SetColorModeToMapScalars();
+        mapper.SetScalarModeToUseCellData()
+        mapper.SetColorModeToMapScalars()
         if not lut:
             # default to the usual gray colormap
             lut = gray_cmap()

@@ -1,7 +1,7 @@
 import numpy as np
 from pymicro.crystal.lattice import HklPlane
 from pymicro.xray.xray_utils import *
-
+from pymicro.xray.dct import add_to_image
 
 def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
     '''
@@ -119,43 +119,42 @@ def diffracted_vector(hkl, orientation, min_theta=0.1, verbose=False):
     return K
 
 
-def compute_Laue_pattern(orientation, detector, det_distance, hklplanes=None,
+def compute_Laue_pattern(orientation, detector, hklplanes=None,
                          r_spot=5, inverted=False, show_direct_beam=False):
     '''
     Compute a transmission Laue pattern. The data array of the given
-    detector2d instance is initialized with the result.
+    `Detector2d` instance is initialized with the result.
+    
+    The incident beam is assumed to be along the X axis: (1, 0, 0). The crystal can have any orientation and uses 
+    an instance of the `Orientation` class. The `Detector2d` instance holds all the geometry (detector size and 
+    position).
 
     :param orientation: The crystal orientation.
     :param detector: An instance of the Detector2d class.
-    :param float det_distance: The sample-to-detector distance.
     :param list hklplanes: A list of the lattice planes to include in the pattern.
     :param int r_spot: Size of the spots on the detector in pixel (5 by default)
     :param bool inverted: A flag to control if the pattern needs to be inverted.
     :param bool show_direct_beam: A flag to control if the direct beam is shown.
     :returns: the computed pattern as a numpy array.
     '''
-    # det_size_mm = np.array(detector.size) * detector.pixel_size # mm
     detector.data = np.zeros(detector.size, dtype=np.uint8)
     val = np.iinfo(detector.data.dtype.type).max  # 255 here
+    # create a small image for one spot
+    spot = val * np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=detector.data.dtype)
     if show_direct_beam:
-        detector.data[detector.ucen - 2 * r_spot:detector.ucen + 2 * r_spot,
-            detector.vcen - 2 * r_spot:detector.vcen + 2 * r_spot] = val
+        add_to_image(detector.data, spot, (detector.ucen, detector.vcen))
 
     for hkl in hklplanes:
         K = diffracted_vector(hkl, orientation)
-        if K is None:
-            continue
-        Ku = K / np.linalg.norm(K)
-        (u, v) = (
-            -det_distance * K[1] / K[0], -det_distance * K[2] / K[0])  # unit is mm, (u, v) detector coordinate system
-        (up, vp) = (detector.ucen + u / detector.pixel_size,
-                    detector.vcen + v / detector.pixel_size)  # unit is pixel on the detector
+        if K is None or np.dot([1., 0., 0.], K) == 0:
+            continue  # skip diffraction // to the detector
+        R = detector.project_along_direction((0., 0., 0.), K)
+        (up, vp) = detector.lab_to_pixel(R)
         if abs(up) > 1e6 or abs(vp) > 1e6:
             continue
-        print('diffracted beam will hit the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (u, v, up, vp))
+        print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], up, vp))
         # mark corresponding pixels on the image detector
-        if up >= 0 and vp >= 0 and up < detector.size[0] and vp < detector.size[1]:
-            detector.data[up - r_spot:up + r_spot, vp - r_spot:vp + r_spot] = val
+        add_to_image(detector.data, spot, (up, vp))
     if inverted:
         print('inverting image')
         detector.data = np.invert(detector.data)

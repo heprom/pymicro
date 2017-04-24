@@ -22,13 +22,13 @@ def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
     # compute the theta angle between X and the scattering vector which is theta + pi/2
     theta = np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
     # find the lambda selected by this hkl plane
-    the_lambda = lambda_nm_to_keV(2 * dhkl * np.sin(theta))
+    the_energy = lambda_nm_to_keV(2 * dhkl * np.sin(theta))
     if verbose:
         print('\n** Looking at plane %d%d%d **' % (h, k, l))
         print('scattering vector in laboratory CS', Gs)
         print('glancing angle between incident beam and the hkl plane is %.1f deg' % (theta * 180 / np.pi))
-        print('corresponding lambda is %.1f' % the_lambda)
-    return (the_lambda, theta)
+        print('corresponding energy is %.1f' % the_energy)
+    return (the_energy, theta)
 
 
 def build_list(lattice=None, max_miller=3):
@@ -105,22 +105,22 @@ def diffracted_vector(hkl, orientation, min_theta=0.1, verbose=False):
     Bt = orientation.orientation_matrix().transpose()
     (h, k, l) = hkl.miller_indices()
     # this hkl plane will select a particular lambda
-    (the_lambda, theta) = select_lambda(hkl, orientation, verbose=verbose)
+    (the_energy, theta) = select_lambda(hkl, orientation, verbose=verbose)
     if abs(theta) < min_theta * np.pi / 180:  # skip angles < min_theta deg
         return None
-    lambda_nm = 1.2398 / the_lambda
+    lambda_nm = 1.2398 / the_energy
     X = np.array([1., 0., 0.]) / lambda_nm
     Gs = Bt.dot(hkl.scattering_vector())
     if verbose:
-        print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, hkl.bragg_angle(the_lambda) * 180 / np.pi))
-    assert (abs(theta - hkl.bragg_angle(the_lambda)) < 1e-6)  # verify than theta_bragg is equal to the glancing angle
+        print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, hkl.bragg_angle(the_energy) * 180 / np.pi))
+    assert (abs(theta - hkl.bragg_angle(the_energy)) < 1e-6)  # verify than theta_bragg is equal to the glancing angle
     # compute diffracted direction
     K = X + Gs
     return K
 
 
-def compute_Laue_pattern(orientation, detector, hklplanes=None,
-                         r_spot=5, inverted=False, show_direct_beam=False):
+def compute_Laue_pattern(orientation, detector, hklplanes=None, spectrum=None, spectrum_thr=0.,
+                         r_spot=5, color_spots_by_energy=False, inverted=False, show_direct_beam=False):
     '''
     Compute a transmission Laue pattern. The data array of the given
     `Detector2d` instance is initialized with the result.
@@ -132,29 +132,50 @@ def compute_Laue_pattern(orientation, detector, hklplanes=None,
     :param orientation: The crystal orientation.
     :param detector: An instance of the Detector2d class.
     :param list hklplanes: A list of the lattice planes to include in the pattern.
+    :param spectrum: A two columns array of the spectrum to use for the calculation.
+    :param float spectrum_thr: The threshold to use to determine if a wave length is contributing or not.
     :param int r_spot: Size of the spots on the detector in pixel (5 by default)
+    :param bool color_spots_by_energy: Flag to color the diffraction spots in the image by the diffracted beam energy (in keV).
     :param bool inverted: A flag to control if the pattern needs to be inverted.
     :param bool show_direct_beam: A flag to control if the direct beam is shown.
     :returns: the computed pattern as a numpy array.
     '''
     detector.data = np.zeros(detector.size, dtype=np.uint8)
-    val = np.iinfo(detector.data.dtype.type).max  # 255 here
-    # create a small image for one spot
-    spot = val * np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=detector.data.dtype)
+    # create a small square image for one spot
+    spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=detector.data.dtype)
+    max_val = np.iinfo(detector.data.dtype.type).max  # 255 here
     if show_direct_beam:
-        add_to_image(detector.data, spot, (detector.ucen, detector.vcen))
+        add_to_image(detector.data, max_val * spot, (detector.ucen, detector.vcen))
+
+    if spectrum is not None:
+        print('using spectrum')
+        indices = np.argwhere(spectrum[:, 1] > spectrum_thr)
+        E_min = float(spectrum[indices[0], 0])
+        E_max = float(spectrum[indices[-1], 0])
+        lambda_min = lambda_keV_to_nm(E_max)
+        lambda_max = lambda_keV_to_nm(E_min)
+        print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
 
     for hkl in hklplanes:
+        (the_energy, theta) = select_lambda(hkl, orientation, verbose=False)
+        if spectrum is not None:
+            if abs(the_energy) < E_min or abs(the_energy) > E_max:
+                #print('skipping reflection {0:s} which would diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
+                continue
+            #print('including reflection {0:s} which will diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
         K = diffracted_vector(hkl, orientation)
         if K is None or np.dot([1., 0., 0.], K) == 0:
             continue  # skip diffraction // to the detector
         R = detector.project_along_direction((0., 0., 0.), K)
-        (up, vp) = detector.lab_to_pixel(R)
-        if abs(up) > 1e6 or abs(vp) > 1e6:
-            continue
-        print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], up, vp))
+        (u, v) = detector.lab_to_pixel(R)
+        if u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
+            print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], u, v))
+            print('diffracted beam energy is {0}'.format(abs(the_energy)))
         # mark corresponding pixels on the image detector
-        add_to_image(detector.data, spot, (up, vp))
+        if color_spots_by_energy:
+            add_to_image(detector.data, abs(the_energy) * spot.astype(float), (u, v))
+        else:
+            add_to_image(detector.data, max_val * spot, (u, v))
     if inverted:
         print('inverting image')
         detector.data = np.invert(detector.data)

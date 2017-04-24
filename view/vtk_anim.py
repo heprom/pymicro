@@ -2,8 +2,10 @@
    animations with vtk in the form of a series of png images.
 '''
 import vtk
-import os, numpy as np
+import os
+import numpy as np
 
+from vtk_utils import set_opacity
 
 class vtkAnimationScene:
     def __init__(self, ren, ren_size=(600, 600)):
@@ -236,6 +238,7 @@ class vtkSetVisibility(vtkAnimation):
         if not do: return
         if not self.gradually:
             self.actor.SetVisibility(self.visible)
+            set_opacity(self.actor, 1)
         else:
             t1 = self.time_anim_starts
             t2 = self.time_anim_ends
@@ -247,11 +250,8 @@ class vtkSetVisibility(vtkAnimation):
                 else:
                     opacity = self.max_opacity * (t2 - self.scene.timer_count) / float(t2 - t1)
                 if self.verbose: print 'opacity=', opacity
-                # change the opacity for each actor in the assemby
-                collection = vtk.vtkPropCollection()
-                self.actor.GetActors(collection);
-                for i in range(collection.GetNumberOfItems()):
-                    collection.GetItemAsObject(i).GetProperty().SetOpacity(opacity)
+                # change the opacity for each actor in the assembly
+                set_opacity(self.actor, opacity)
         vtkAnimation.post_execute(self, iren, event)
 
 

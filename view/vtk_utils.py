@@ -1807,7 +1807,7 @@ def show_boundaries(grid, array_id=0, array_name=None, write=False):
     # we use a vtkAppendPolyData to gather all the boundaries
     append = vtk.vtkAppendPolyData()
     gids_range = array.GetRange()
-    print('field range used to find the bounaries:', gids_range)
+    print('field range used to find the boudnaries:', gids_range)
     for gid in range(int(gids_range[0]), 1 + int(gids_range[1])):
         print('trying gid=%d' % gid)
         thresh = vtk.vtkThreshold()

@@ -264,7 +264,7 @@ class vtkMoveActor(vtkAnimation):
             t = vtk.vtkTransform()
             t.Identity()
             self.actor.SetUserTransform(t)
-        self.motion = np.array(motion)
+        self.motion = np.array(motion).astype(float)
 
     def execute(self, iren, event):
         do = vtkAnimation.pre_execute(self)

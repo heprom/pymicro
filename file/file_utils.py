@@ -3,6 +3,29 @@ import numpy as np
 import struct
 
 
+def read_image_sequence(data_dir, prefix, num_images, start_index=0, image_format='png', zero_padding=0, crop=None, verbose=False):
+    # build the numbering pattern
+    pat = '0%dd' % zero_padding
+    fmt = '{0:s}{1:' + pat + '}.{2:s}'
+    image_stack = []
+    if image_format == 'tif':
+        from pymicro.external.tifffile import TiffFile
+    elif image_format == 'png':
+        from matplotlib import pyplot as plt
+    for i in range(start_index, start_index + num_images):
+        image_path = os.path.join(data_dir, fmt.format(prefix, i, image_format))
+        if verbose:
+            print('loading image %s' % image_path)
+        if image_format == 'tif':
+            im = TiffFile(image_path).asarray()
+        elif image_format == 'png':
+            im = (np.mean(plt.imread(image_path)[:, :, :3], axis=2) * 255).astype(np.uint8)
+        if crop:
+            im = im[crop[2]:crop[3], crop[0]:crop[1]]
+        image_stack.append(im.T)
+    return image_stack
+
+
 def unpack_header(h):
     '''Unpack an ascii header.
 

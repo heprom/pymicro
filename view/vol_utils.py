@@ -167,8 +167,6 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
         vmove = (0, image_stack[0].shape[1])
     H = np.array(hmove).astype(int)
     V = np.array(vmove).astype(int)
-    print('H is', H)
-    print('V is', V)
     image_size = np.array(image_stack[0].shape)
     if adjust_bc:
         # make sure the images are overlapping
@@ -178,13 +176,14 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
         bcv = image_size[1] - V[1]  # vertical overlap
         if verbose:
             print('overlapping is {0} pixels horizontally and {1} pixels vertically'.format(bch, bcv))
-    print('image_size', image_size)
     data_type = image_stack[0].dtype
-    print('image data type', data_type)
     full_im = np.zeros((image_size[0] + (nh - 1) * H[0] + nv * V[0],
                         image_size[1] + (nv - 1) * V[1] + nh * H[1]),
                        dtype=data_type)
-    print('full image_size', full_im.shape)
+    if verbose:
+        print('image_size', image_size)
+        print('image data type', data_type)
+        print('full image_size', full_im.shape)
     for i in range(len(image_stack)):
         # compute indices
         x = i % nh
@@ -193,7 +192,6 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
             x = nh - 1 - x
         im = image_stack[i]
         xp, yp = x * H + y * V + image_size // 2
-        print('xp = {0:d}, yp = {1:d}'.format(xp, yp))
         if adjust_bc:
             if i == 0:
                 # this is the reference
@@ -205,7 +203,6 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
                     x1e = xp - image_size[0] // 2 + bch
                     y1s = yp - image_size[1] // 2
                     y1e = yp - image_size[1] // 2 + image_size[1]
-                    print('indices region 1:', x1s, x1e, y1s, y1e)
                     region1 = full_im[x1s:x1e, y1s:y1e]
                     region2 = im[:bch, :]
                 else:
@@ -214,16 +211,17 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
                     y1s = yp - image_size[1] // 2
                     y1e = yp - image_size[1] // 2 + bcv
                     region1 = full_im[x1s:x1e, y1s:y1e]
-                    print('indices region 1:', x1s, x1e, y1s, y1e)
                     region2 = im[:, :bcv]
                 if i == check:
                     fig = plt.figure()
                     ax1 = fig.add_subplot(121 if i % nh != 0 else 211)
-                    ax1.imshow(region1.T, cmap=cm.gray)
-                    plt.title('region1')
+                    im1 = ax1.imshow(region1.T, cmap=cm.gray, vmin=0, vmax=65535)
+                    fig.colorbar(im1, ax=ax1)
+                    ax1.set_title('region1')
                     ax2 = fig.add_subplot(122 if i % nh != 0 else 212)
-                    ax2.imshow(region2.T, cmap=cm.gray)
-                    plt.title('region2')
+                    im2 = ax2.imshow(region2.T, cmap=cm.gray, vmin=0, vmax=65535)
+                    fig.colorbar(im2, ax=ax2)
+                    ax2.set_title('region2')
                     plt.show()
                 region1 = region1.flatten()
                 region2 = region2.flatten()
@@ -234,19 +232,30 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
                                                 range=(data_type_min, data_type_max))
                 hist2, bin_edges = np.histogram(region2, bins=adjust_bc_nbins, density=False,
                                                 range=(data_type_min, data_type_max))
+                if i == check:
+                    hist(region1, data_range=(data_type_min, data_type_max), nb_bins=adjust_bc_nbins)
+                    hist(region2, data_range=(data_type_min, data_type_max), nb_bins=adjust_bc_nbins)
+                # compute the difference not taking into account the edges of the histograms
                 max1 = np.argmax(hist1[1:-2])
                 max2 = np.argmax(hist2[1:-2])
                 diff = (data_type_max - data_type_min) / adjust_bc_nbins * (max1 - max2)
-                print('matching max of histograms in both images: {0:d} and {1:d}, adding {2:d}'.format(max1, max2, diff))
+                if verbose:
+                    print('matching max of histograms in both images: {0:d} and {1:d}, adding {2:d}'.format(max1, max2, diff))
+                # keep a reference of saturated value (we do not want to change those)
+                im_is_min = im == data_type_min
+                im_is_max = im == data_type_max
                 # shift all the gray levels, making sure not to overflow the image type range
                 im = im.astype(float) + diff
                 im[im < data_type_min] = data_type_min
                 im[im > data_type_max] = data_type_max
                 im = im.astype(data_type)
+                # reset saturated values
+                im[im_is_min] = data_type_min
+                im[im_is_max] = data_type_max
         full_im[xp - image_size[0] // 2:xp - image_size[0] // 2 + image_size[0],
             yp - image_size[1] // 2:yp - image_size[1] // 2 + image_size[1]] = im
     if save:
-        plt.imsave('{0:s}.png'.format(save_name), full_im[::save_ds, ::save_ds],
+        plt.imsave('{0:s}.png'.format(save_name), full_im[::save_ds, ::save_ds].T,
                    cmap=cm.gray)
     if show:
         plt.imshow(full_im[::save_ds, ::save_ds].T, interpolation='nearest', cmap=cm.gray)

@@ -140,6 +140,122 @@ def alpha_cmap(color='red', opacity=1.0):
     return mycmap
 
 
+def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_bc=False, adjust_bc_nbins=256,
+           verbose=False, show=True, save=False, save_name='stitch', save_ds=1, check=None):
+    '''Stich a series of images together.
+    
+    :param int nh: number of images to stitch horizontally.
+    :param int nv: number of images to stitch vertically.
+    :param str pattern: stitching pattern ('E' or 'S').
+    :param tuple hmove: horizontal move between 2 images (first image width by default).
+    :param tuple vmove: vertical move between 2 images (first image height by default).
+    :param bool adjust_bc: adjust gray levels by comparing the histograms in the overlapping regions (False by default).
+    :param int adjust_bc_nbins: numbers of bins to use tin the histograms when adjusting the gray levels (256 by default).
+    :param bool verbose: activate verbose mode (False by default).
+    :param bool show: show the stitched image (True by default).
+    :param bool save: flag to save the image as png to the disk (False by default).
+    :param str save_name: name to use to save the stitched image (stitch by default).
+    :param int save_ds: downsampling factor using when saving the stitched image (1 by default).
+    :param int check: trigger plotting for the given image if set.
+    :returns full_im: the stitched image in [x, y] form.
+    '''
+    assert pattern in ['E', 'S']
+    # is motion not set, assume the full size of the first image
+    if hmove is None:
+        hmove = (image_stack[0].shape[0], 0)
+    if vmove is None:
+        vmove = (0, image_stack[0].shape[1])
+    H = np.array(hmove).astype(int)
+    V = np.array(vmove).astype(int)
+    print('H is', H)
+    print('V is', V)
+    image_size = np.array(image_stack[0].shape)
+    if adjust_bc:
+        # make sure the images are overlapping
+        assert image_size[0] > H[0]
+        assert image_size[1] > V[1]
+        bch = image_size[0] - H[0]  # horizontal overlap
+        bcv = image_size[1] - V[1]  # vertical overlap
+        if verbose:
+            print('overlapping is {0} pixels horizontally and {1} pixels vertically'.format(bch, bcv))
+    print('image_size', image_size)
+    data_type = image_stack[0].dtype
+    print('image data type', data_type)
+    full_im = np.zeros((image_size[0] + (nh - 1) * H[0] + nv * V[0],
+                        image_size[1] + (nv - 1) * V[1] + nh * H[1]),
+                       dtype=data_type)
+    print('full image_size', full_im.shape)
+    for i in range(len(image_stack)):
+        # compute indices
+        x = i % nh
+        y = i // nh
+        if pattern == 'S' and (y % 2) == 1:
+            x = nh - 1 - x
+        im = image_stack[i]
+        xp, yp = x * H + y * V + image_size // 2
+        print('xp = {0:d}, yp = {1:d}'.format(xp, yp))
+        if adjust_bc:
+            if i == 0:
+                # this is the reference
+                pass
+            else:
+                # isolate the overlapping regions
+                if i % nh != 0:
+                    x1s = xp - image_size[0] // 2
+                    x1e = xp - image_size[0] // 2 + bch
+                    y1s = yp - image_size[1] // 2
+                    y1e = yp - image_size[1] // 2 + image_size[1]
+                    print('indices region 1:', x1s, x1e, y1s, y1e)
+                    region1 = full_im[x1s:x1e, y1s:y1e]
+                    region2 = im[:bch, :]
+                else:
+                    x1s = xp - image_size[0] // 2
+                    x1e = xp - image_size[0] // 2 + image_size[0]
+                    y1s = yp - image_size[1] // 2
+                    y1e = yp - image_size[1] // 2 + bcv
+                    region1 = full_im[x1s:x1e, y1s:y1e]
+                    print('indices region 1:', x1s, x1e, y1s, y1e)
+                    region2 = im[:, :bcv]
+                if i == check:
+                    fig = plt.figure()
+                    ax1 = fig.add_subplot(121 if i % nh != 0 else 211)
+                    ax1.imshow(region1.T, cmap=cm.gray)
+                    plt.title('region1')
+                    ax2 = fig.add_subplot(122 if i % nh != 0 else 212)
+                    ax2.imshow(region2.T, cmap=cm.gray)
+                    plt.title('region2')
+                    plt.show()
+                region1 = region1.flatten()
+                region2 = region2.flatten()
+                # work out the histograms
+                data_type_min = np.iinfo(data_type).min
+                data_type_max = np.iinfo(data_type).max
+                hist1, bin_edges = np.histogram(region1, bins=adjust_bc_nbins, density=False,
+                                                range=(data_type_min, data_type_max))
+                hist2, bin_edges = np.histogram(region2, bins=adjust_bc_nbins, density=False,
+                                                range=(data_type_min, data_type_max))
+                max1 = np.argmax(hist1[1:-2])
+                max2 = np.argmax(hist2[1:-2])
+                diff = (data_type_max - data_type_min) / adjust_bc_nbins * (max1 - max2)
+                print('matching max of histograms in both images: {0:d} and {1:d}, adding {2:d}'.format(max1, max2, diff))
+                # shift all the gray levels, making sure not to overflow the image type range
+                im = im.astype(float) + diff
+                im[im < data_type_min] = data_type_min
+                im[im > data_type_max] = data_type_max
+                im = im.astype(data_type)
+        full_im[xp - image_size[0] // 2:xp - image_size[0] // 2 + image_size[0],
+            yp - image_size[1] // 2:yp - image_size[1] // 2 + image_size[1]] = im
+    if save:
+        plt.imsave('{0:s}.png'.format(save_name), full_im[::save_ds, ::save_ds],
+                   cmap=cm.gray)
+    if show:
+        plt.imshow(full_im[::save_ds, ::save_ds].T, interpolation='nearest', cmap=cm.gray)
+        plt.axis('off')
+        plt.show()
+    return full_im
+
+
+
 class AxShowPixelValue:
     '''A simple class that wraps a pyplot ax and modify its coordinate
     formatter to show the pixel value.'''

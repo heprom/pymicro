@@ -107,17 +107,10 @@ def recad(data, min, max):
     and max values may be chosen manually or computed by the function
     `find_min_max`.
 
-    *Parameters*
-
-    **data**: the data array to cast to uint8.
-
-    **min**: value to use as the minimum (will be 0 in the casted array).
-
-    **max**: value to use as the maximum (will be 255 in the casted array).
-
-    *Returns*
-
-    **data_uint8**: the data array casted to uint8.
+    :param data: the data array to cast to uint8.
+    :param float min: value to use as the minimum (will be 0 in the casted array).
+    :param float max: value to use as the maximum (will be 255 in the casted array).
+    :returns data_uint8: the data array casted to uint8.
     '''
     low_values_indices = data < min
     data[low_values_indices] = min
@@ -133,15 +126,9 @@ def alpha_cmap(color='red', opacity=1.0):
     Only values equal to 255 will have a non zero alpha channel.
     This is typically used to overlay a binary result on initial data.
 
-    *Parameters*
-
-    **color**: the color to use for non transparents values (ie. 255).
-
-    **opacity**: opacity value to use for visible pixels.
-
-    *Returns*
-
-    **mycmap**: a fully transparent colormap except for 255 values.
+    :param color: the color to use for non transparent values (ie. 255).
+    :param float opacity: opacity value to use for visible pixels.
+    :returns mycmap: a fully transparent colormap except for 255 values.
     '''
     color1 = colorConverter.to_rgba('white')
     color2 = colorConverter.to_rgba(color)

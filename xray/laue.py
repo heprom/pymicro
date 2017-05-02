@@ -49,7 +49,7 @@ def build_list(lattice=None, max_miller=3):
     return hklplanes
 
 
-def compute_ellpisis(orientation, detector, det_distance, uvw, verbose=False):
+def compute_ellipsis(orientation, detector, det_distance, uvw, verbose=False):
     '''
     Compute the ellipsis associated with the given zone axis. All lattice
     planes sharing this zone axis will diffract along that ellipse.
@@ -210,7 +210,7 @@ if __name__ == '__main__':
     # '''
     # uvw = HklDirection(1, 1, 0, ni)
     uvw = HklDirection(5, 1, 0, ni)
-    ellipsis_data = compute_ellpisis(orientation, detector, det_distance, uvw)
+    ellipsis_data = compute_ellipsis(orientation, detector, det_distance, uvw)
     # '''
     hklplanes = build_list(lattice=ni, max_miller=8)
 

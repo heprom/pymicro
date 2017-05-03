@@ -259,7 +259,7 @@ class RegArrayDetector2d(Detector2d):
                 detector_edges[i * num_points + j] = corners[i] + grad[j] * (corners[i + 1] - corners[i])
         return detector_edges
 
-    def project_along_direction(self, origin, direction):
+    def project_along_direction(self, direction, origin=[0., 0., 0.]):
         '''
         Return the intersection point of a line and the detector plane, in laboratory coordinates.
 
@@ -272,6 +272,9 @@ class RegArrayDetector2d(Detector2d):
 
            d=\dfrac{(p_0 - l_0).n}{l.n}
 
+        :param direction: the direction of the projection (in the laboratory frame).
+        :param origin: the origin of the projection ([0., 0., 0.] by default).
+        :returns: the point of projection in the detector plane (can be outside the detector bounds). 
         '''
         assert np.dot(self.w_dir, direction) != 0
         d = np.dot((self.ref_pos - origin), self.w_dir) / np.dot(direction, self.w_dir)

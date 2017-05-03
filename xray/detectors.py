@@ -277,6 +277,7 @@ class RegArrayDetector2d(Detector2d):
         :returns: the point of projection in the detector plane (can be outside the detector bounds). 
         '''
         assert np.dot(self.w_dir, direction) != 0
+        origin = np.array(origin)
         d = np.dot((self.ref_pos - origin), self.w_dir) / np.dot(direction, self.w_dir)
         p = origin + d * direction
         return p

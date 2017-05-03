@@ -984,8 +984,13 @@ def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, show_normal=T
     '''
     grid = lattice_grid(lattice)
     (a, b, c) = lattice._lengths
+    print(kwargs)
     if plane_origins:
         assert len(plane_origins) == len(hklplanes)
+    elif kwargs['origin'] == 'mid':
+        origin = (a / 2, b / 2, c / 2)
+    else:
+        origin = (0., 0., 0.)
     # get the atoms+edges assembly corresponding to the crystal lattice
     assembly = lattice_3d(lattice, **kwargs)
     # display all the hkl planes within the lattice

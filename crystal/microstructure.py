@@ -27,13 +27,13 @@ class Orientation:
 
     .. math::
 
-      V_c = B.V_s
+      V_c = g.V_s
 
-    and inversely (because :math:`B^{-1}=B^T`):
+    and inversely (because :math:`g^{-1}=g^T`):
 
     .. math::
 
-      V_s = B^T.V_c
+      V_s = g^T.V_c
     '''
 
     def __init__(self, matrix):
@@ -270,9 +270,9 @@ class Orientation:
         :return float: the angle between :math:`-\mathbf{X}` and :math:`\mathbf{G_{l}}` in degrees.
         '''
         X = np.array([1., 0., 0.])
-        Bt = self.orientation_matrix().transpose()
+        gt = self.orientation_matrix().transpose()
         Gc = hkl.scattering_vector()
-        Gs = Bt.dot(Gc)  # in the cartesian sample CS
+        Gs = gt.dot(Gc)  # in the cartesian sample CS
         omegar = omega * np.pi / 180
         R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
         Gl = R.dot(Gs)
@@ -322,7 +322,7 @@ class Orientation:
         (a, b, c) = hkl._lattice._lengths
         theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
         lambda_nm = 1.2398 / lambda_keV
-        gt = self.orientation_matrix().T  # our Bt (here called gt) corresponds to g^{-1} in Poulsen 2004
+        gt = self.orientation_matrix().T  # gt = g^{-1} in Poulsen 2004
         Gc = hkl.scattering_vector()
         A = np.dot(Gc, gt[0])
         B = - np.dot(Gc, gt[1])
@@ -348,12 +348,12 @@ class Orientation:
         lambda_nm = lambda_keV_to_nm(lambda_keV)
         X = np.array([1., 0., 0.]) / lambda_nm
         print 'magnitude of X', np.linalg.norm(X)
-        Bt = self.orientation_matrix().transpose()
+        gt = self.orientation_matrix().transpose()
         (h, k, l) = hkl.miller_indices()
         theta = hkl.bragg_angle(lambda_keV) * 180. / np.pi
         print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, theta))
         Gc = hkl.scattering_vector()
-        Gs = Bt.dot(Gc)
+        Gs = gt.dot(Gc)
         alphas = []
         twothetas = []
         magnitude_K = []
@@ -366,7 +366,7 @@ class Orientation:
             # R = R.dot(Rlt).dot(Rut) # with tilts
             Gl = R.dot(Gs)
             print('scattering vector in laboratory CS', Gl)
-            n = R.dot(Bt.dot(hkl.normal()))
+            n = R.dot(gt.dot(hkl.normal()))
             print 'plane normal:', hkl.normal()
             print R
             print 'rotated plane normal:', n, ' with a norm of', np.linalg.norm(n)
@@ -441,9 +441,9 @@ class Orientation:
         :param bool verbose: activate verbose mode (False by default).
         :returns tuple: (ut, lt) the two values of tilts to apply (in radians).
         '''
-        Bt = self.orientation_matrix().transpose()
+        gt = self.orientation_matrix().transpose()
         Gc = hkl.scattering_vector()
-        Gs = Bt.dot(Gc)  # in the cartesian sample CS
+        Gs = gt.dot(Gc)  # in the cartesian sample CS
         # find topotomo tilts
         ut = np.arctan(-Gs[0] / Gs[2])
         lt = np.arctan(Gs[1] / (-Gs[0] * np.sin(ut) + Gs[2] * np.cos(ut)))
@@ -494,17 +494,23 @@ class Orientation:
         o = Orientation(g)
         return o
 
-        # @staticmethod
-        # def from_Zrot(axes):
-        # g = Orientation.Zrot2OrientationMatrix()
-        # o = Orientation(g)
-        # return o
-
     @staticmethod
     def Euler2OrientationMatrix(euler):
         '''
-        Compute the orientation matrix associated with the 3 Euler angles
-        (given in degrees).
+        Compute the orientation matrix :math:`\mathbf{g}` associated with the 3 Euler angles 
+        :math:`(\phi_1, \Phi, \phi_2)`. The matrix is calculated via (see the `euler_angles` recipe in the cookbook 
+        for a detailed example):
+
+        .. math::
+        
+           \mathbf{g}=\\begin{pmatrix}
+           \cos\phi_1\cos\phi_2 - \sin\phi_1\sin\phi_2\cos\Phi & \sin\phi_1\cos\phi_2 + \cos\phi_1\sin\phi_2\cos\Phi & \sin\phi_2\sin\Phi \\\\
+           -\cos\phi_1\sin\phi_2 - \sin\phi_1\cos\phi_2\cos\Phi & -\sin\phi_1\sin\phi_2 + \cos\phi_1\cos\phi_2\cos\Phi & \cos\phi_2\sin\Phi \\\\
+           \sin\phi_1\sin\Phi & -\cos\phi_1\sin\Phi & \cos\Phi \\\\
+           \end{pmatrix}
+        
+        :param euler: The triplet of the Euler angles (in degrees).
+        :returns g: The 3x3 orientation matrix.
         '''
         (rphi1, rPhi, rphi2) = np.radians(euler)
         c1 = np.cos(rphi1)
@@ -514,18 +520,18 @@ class Orientation:
         c2 = np.cos(rphi2)
         s2 = np.sin(rphi2)
 
-        # rotation matrix B
-        b11 = c1 * c2 - s1 * s2 * c
-        b12 = s1 * c2 + c1 * s2 * c
-        b13 = s2 * s
-        b21 = -c1 * s2 - s1 * c2 * c
-        b22 = -s1 * s2 + c1 * c2 * c
-        b23 = c2 * s
-        b31 = s1 * s
-        b32 = -c1 * s
-        b33 = c
-        B = np.array([[b11, b12, b13], [b21, b22, b23], [b31, b32, b33]])
-        return B
+        # rotation matrix g
+        g11 = c1 * c2 - s1 * s2 * c
+        g12 = s1 * c2 + c1 * s2 * c
+        g13 = s2 * s
+        g21 = -c1 * s2 - s1 * c2 * c
+        g22 = -s1 * s2 + c1 * c2 * c
+        g23 = c2 * s
+        g31 = s1 * s
+        g32 = -c1 * s
+        g33 = c
+        g = np.array([[g11, g12, g13], [g21, g22, g23], [g31, g32, g33]])
+        return g
 
     @staticmethod
     def Zrot2OrientationMatrix(x1=None, x2=None, x3=None):
@@ -554,8 +560,8 @@ class Orientation:
         x2 = x2 / np.linalg.norm(x2)
         x3 = x3 / np.linalg.norm(x3)
 
-        B = np.array([x1, x2, x3]).transpose()
-        return B
+        g = np.array([x1, x2, x3]).transpose()
+        return g
 
     @staticmethod
     def OrientationMatrix2EulerSF(g):
@@ -834,11 +840,11 @@ class Orientation:
 
           M^s_{ij} = \left(l^s_i.n^s_j)
         '''
-        Bt = self.orientation_matrix().transpose()
+        gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
-        n_rot = np.dot(Bt, plane.normal())
+        n_rot = np.dot(gt, plane.normal())
         slip = s.get_slip_direction()
-        l_rot = np.dot(Bt, slip.direction())
+        l_rot = np.dot(gt, slip.direction())
         return np.outer(l_rot, n_rot)
 
     def slip_system_orientation_strain_tensor(self, s):
@@ -851,11 +857,11 @@ class Orientation:
 
           m^s_{ij} = \\frac{1}{2}\left(l^s_i.n^s_j + l^s_j.n^s_i)
         '''
-        Bt = self.orientation_matrix().transpose()
+        gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
-        n_rot = np.dot(Bt, plane.normal())
+        n_rot = np.dot(gt, plane.normal())
         slip = s.get_slip_direction()
-        l_rot = np.dot(Bt, slip.direction())
+        l_rot = np.dot(gt, slip.direction())
         m = 0.5 * (np.outer(l_rot, n_rot) + np.outer(n_rot, l_rot))
         return m
 
@@ -869,11 +875,11 @@ class Orientation:
 
           q^s_{ij} = \\frac{1}{2}\left(l^s_i.n^s_j - l^s_j.n^s_i)
         '''
-        Bt = self.orientation_matrix().transpose()
+        gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
-        n_rot = np.dot(Bt, plane.normal())
+        n_rot = np.dot(gt, plane.normal())
         slip = s.get_slip_direction()
-        l_rot = np.dot(Bt, slip.direction())
+        l_rot = np.dot(gt, slip.direction())
         q = 0.5 * (np.outer(l_rot, n_rot) - np.outer(n_rot, l_rot))
         return q
 
@@ -886,10 +892,10 @@ class Orientation:
         :returns float: a number between 0 ad 0.5.
         '''
         plane = slip_system.get_slip_plane()
-        Bt = self.orientation_matrix().transpose()
-        n_rot = np.dot(Bt, plane.normal())  # plane.normal() is a unit vector
+        gt = self.orientation_matrix().transpose()
+        n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
         slip = slip_system.get_slip_direction().direction()
-        slip_rot = np.dot(Bt, slip)
+        slip_rot = np.dot(gt, slip)
         # print n_rot, load_direction, slip_rot
         SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
         return SF
@@ -907,7 +913,7 @@ class Orientation:
         for ss in slip_systems:
             sf = self.schmid_factor(ss, load_direction)
             if verbose:
-                print 'Slip system: %s, Schmid factor is %.3f' % (ss, sf)
+                print('Slip system: %s, Schmid factor is %.3f' % (ss, sf))
             SF_list.append(sf)
         return SF_list
 
@@ -951,10 +957,10 @@ class Grain:
         The Schmid factor of this grain for the given slip system.
         '''
         plane = slip_system.get_slip_plane()
-        Bt = self.orientation_matrix().transpose()
-        n_rot = np.dot(Bt, plane.normal())  # plane.normal() is a unit vector
+        gt = self.orientation_matrix().transpose()
+        n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
         slip = slip_system.get_slip_direction().direction()
-        slip_rot = np.dot(Bt, slip)
+        slip_rot = np.dot(gt, slip)
         SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
         return self.orientation.schmid_factor(slip_system, load_direction)
 
@@ -1313,11 +1319,11 @@ class Microstructure:
         from scipy import ndimage
         for (gid, (h, k, l)) in dif_grains:
             # compute scattering vector
-            Bt = self.get_grain(gid).orientation_matrix().transpose()
+            gt = self.get_grain(gid).orientation_matrix().transpose()
             p = HklPlane(h, k, l, lattice)
             X = np.array([1., 0., 0.]) / lambda_nm
-            n = R.dot(Bt.dot(p.normal()))
-            G = n / p.interplanar_spacing()  # also G = R.dot(Bt.dot(h*astar + k*bstar + l*cstar))
+            n = R.dot(gt.dot(p.normal()))
+            G = n / p.interplanar_spacing()  # also G = R.dot(gt.dot(h*astar + k*bstar + l*cstar))
             K = X + G
             # TODO explain the - signs, account for grain position in the rotated sample
             (u, v) = (d * K[1] / K[0], d * K[2] / K[0])  # unit is mm

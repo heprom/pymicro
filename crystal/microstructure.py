@@ -599,7 +599,7 @@ class Orientation:
         Compute the Euler angles (in degrees) from the orientation matrix.
         '''
         # compute rodrigues vector
-        R = Orientation.OrientationMatrix2Rodrigues(g, eps=eps)
+        R = Orientation.OrientationMatrix2Rodrigues(g)
         if np.abs(g[2, 2] - 1) < eps:
             phi1 = 0.5 * np.arctan(g[0, 1] / g[0, 0])
             Phi = 0.0
@@ -639,12 +639,15 @@ class Orientation:
         return np.degrees(np.array([phi1, Phi, phi2]))
 
     @staticmethod
-    def OrientationMatrix2Rodrigues(g, eps=0.00000001):
+    def OrientationMatrix2Rodrigues(g):
         '''
         Compute the rodrigues vector from the orientation matrix.
+        
+        :param g: The 3x3 orientation matrix representing the rotation.
+        :returns: The Rodrigues vector as a 3 components array. 
         '''
         t = g.trace() + 1
-        if np.abs(t) < eps:
+        if np.abs(t) < np.finfo(g.dtype).eps:
             return np.zeros(3)
         else:
             r1 = (g[1, 2] - g[2, 1]) / t
@@ -653,13 +656,16 @@ class Orientation:
         return np.array([r1, r2, r3])
 
     @staticmethod
-    def Rodrigues2OrientationMatrix(rod, eps=0.000001):
+    def Rodrigues2OrientationMatrix(rod):
         '''
-        Compute the orientation matrix from the rodrigues vector.
+        Compute the orientation matrix from the Rodrigues vector.
+
+        :param rod: The Rodrigues vector as a 3 components array.
+        :returns: The 3x3 orientation matrix representing the rotation.
         '''
         r = np.linalg.norm(rod)
         I = np.diagflat(np.ones(3))
-        if r < eps:
+        if r < np.finfo(r.dtype).eps:
             return I
         else:
             theta = 2 * np.arctan(r)

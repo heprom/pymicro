@@ -6,13 +6,30 @@ from pymicro.xray.xray_utils import lambda_keV_to_nm
 
 
 class OrientationTests(unittest.TestCase):
+
     def setUp(self):
-        print 'testing the Orientation class'
+        print('testing the Orientation class')
+        self.test_eulers = [(45., 45, 0.), (10., 20, 30.), (191.9, 69.9, 138.9)]
 
     def test_Orientation(self):
         o = Orientation.from_euler([45, 45, 0])
         self.assertAlmostEqual(o.phi1(), 45.)
         self.assertAlmostEqual(o.Phi(), 45.)
+
+    def test_RodriguesConversion(self):
+        rod = [0.1449, -0.0281, 0.0616]
+        g = Orientation.Rodrigues2OrientationMatrix(rod)
+        calc_rod = Orientation.OrientationMatrix2Rodrigues(g)
+        for i in range(3):
+            self.assertAlmostEquals(calc_rod[i], rod[i])
+
+    def test_OrientationMatrix2Euler(self):
+        for test_euler in self.test_eulers:
+            o = Orientation.from_euler(test_euler)
+            g = o.orientation_matrix()
+            calc_euler = Orientation.OrientationMatrix2Euler(g)
+            for i in range(3):
+                self.assertAlmostEquals(calc_euler[i], test_euler[i])
 
     def test_SchimdFactor(self):
         o = Orientation.from_euler([0., 0., 0.])

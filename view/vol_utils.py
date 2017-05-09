@@ -263,6 +263,30 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
         plt.show()
     return full_im
 
+def compute_affine_transform(fixed, moving):
+    '''Compute the affine transform by point set registration.
+
+    The affine transform is the composition of a translation and a linear map.
+    The two lists of points must be of the same length and the order of the points should match.
+
+    :param list fixed: a list of the reference points.
+    :param list moving: a list of the moving points to register on the fixed point.
+    :returns translation, linear_map: the computed translation and linear map affine transform. 
+
+    Thanks to Will Lenthe for helping with this code.
+    '''
+    assert len(fixed) == len(moving)
+    fixed_centroid = np.average(fixed, 0)
+    moving_centroid = np.average(moving, 0)
+    # offset every point by the center of mass of all the points in the set
+    fixed_from_centroid = fixed - fixed_centroid
+    moving_from_centroid = moving - moving_centroid
+    covariance = moving_from_centroid.T.dot(fixed_from_centroid)
+    variance = moving_from_centroid.T.dot(moving_from_centroid)
+    # compute the full affine transform: translation + linear map
+    linear_map = np.linalg.inv(variance).dot(covariance).T
+    translation = fixed_centroid - linear_map.dot(moving_centroid)
+    return translation, linear_map
 
 
 class AxShowPixelValue:

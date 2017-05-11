@@ -984,7 +984,6 @@ def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, show_normal=T
     '''
     grid = lattice_grid(lattice)
     (a, b, c) = lattice._lengths
-    print(kwargs)
     if plane_origins:
         assert len(plane_origins) == len(hklplanes)
     elif kwargs['origin'] == 'mid':
@@ -1216,6 +1215,26 @@ def box_3d(size=(100, 100, 100), line_color=black):
     box.GetProperty().SetColor(line_color)
     return box
 
+
+def build_line_mesh(points):
+    '''Function to construct a vtkUnstructuredGrid representing a line mesh.
+    
+    :param list points: the list of points.
+    :returns line_mesh: the vtkUnstructuredGrid.
+    '''
+    line_mesh = vtk.vtkUnstructuredGrid()
+    nodes = vtk.vtkPoints()
+    nodes.SetNumberOfPoints(len(points));
+    for i in range(len(points)):
+        (x, y, z) = points[i]
+        nodes.InsertPoint(i, x, y, z)
+    line_mesh.SetPoints(nodes)
+    for i in range(len(points) - 1):
+        Ids = vtk.vtkIdList()
+        Ids.InsertNextId(i)
+        Ids.InsertNextId(i + 1)
+        line_mesh.InsertNextCell(4, Ids)
+    return line_mesh
 
 def line_3d(start_point, end_point):
     '''

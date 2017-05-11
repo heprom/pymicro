@@ -1237,64 +1237,50 @@ def build_line_mesh(points):
     return line_mesh
 
 def line_3d(start_point, end_point):
+    '''Function to draw a line in a 3d scene.
+
+    :param tuple start_point: the line starting point.
+    :param tuple end_point: the line ending point.
+    :returns vtkActor: The method return a vtkActor of the line that can be directly \
+    added to a 3d scene.
     '''
-    vtk helper function to draw a line in a 3d scene.
-    '''
-    linePoints = vtk.vtkPoints()
-    linePoints.SetNumberOfPoints(2)
-    linePoints.InsertPoint(0, start_point[0], start_point[1], start_point[2])
-    linePoints.InsertPoint(1, end_point[0], end_point[1], end_point[2])
-    aLine = vtk.vtkLine()
-    aLine.GetPointIds().SetId(0, 0)
-    aLine.GetPointIds().SetId(1, 1)
-    aLineGrid = vtk.vtkUnstructuredGrid()
-    aLineGrid.Allocate(1, 1)
-    aLineGrid.InsertNextCell(aLine.GetCellType(), aLine.GetPointIds())
-    aLineGrid.SetPoints(linePoints)
-    aLineMapper = vtk.vtkDataSetMapper()
+    line_grid = build_line_mesh([start_point, end_point])
+    line_mapper = vtk.vtkDataSetMapper()
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-        aLineMapper.SetInputData(aLineGrid)
+        line_mapper.SetInputData(line_grid)
     else:
-        aLineMapper.SetInput(aLineGrid)
-    aLineActor = vtk.vtkActor()
-    aLineActor.SetMapper(aLineMapper)
-    return aLineActor
+        line_mapper.SetInput(line_grid)
+    line_actor = vtk.vtkActor()
+    line_actor.SetMapper(line_mapper)
+    return line_actor
 
 
 def circle_line_3d(center=(0, 0, 0), radius=1, normal=(0, 0, 1), resolution=1):
     '''Function to draw a circle in a 3d scene.
 
-    :params tuple center: the center of the cricle.
-    :params float radius: the radius of the circle.
-    :params tuple normal: the normal to the plane of the circle.
-    :params float resolution: the resolution in degree.
-    :return vtkActor: The method return a vtkActor that can be directly \
+    :param tuple center: the center of the circle.
+    :param float radius: the radius of the circle.
+    :param tuple normal: the normal to the plane of the circle.
+    :param float resolution: the resolution in degree.
+    :returns vtkActor: The method return a vtkActor that can be directly \
     added to a 3d scene.
     '''
     n = int(360 / resolution)
-    linePoints = vtk.vtkPoints()
-    linePoints.SetNumberOfPoints(n + 1)
-    aLineGrid = vtk.vtkUnstructuredGrid()
-    aLineGrid.Allocate(1, n)
-    aLineGrid.SetPoints(linePoints)
-    linePoints.InsertPoint(0, center[0] + radius, center[1], center[2])  # starting point
+    line_points = []
+    line_points.append([center[0] + radius, center[1], center[2]])  # starting point
     for i in range(n):
-        linePoints.InsertPoint(i + 1, \
-                               center[0] + radius * np.cos(resolution * (i + 1) * np.pi / 180), \
+        line_points.append([center[0] + radius * np.cos(resolution * (i + 1) * np.pi / 180), \
                                center[1] + radius * np.sin(resolution * (i + 1) * np.pi / 180), \
-                               center[2])
-        line = vtk.vtkLine()
-        line.GetPointIds().SetId(0, i)
-        line.GetPointIds().SetId(1, i + 1)
-        aLineGrid.InsertNextCell(line.GetCellType(), line.GetPointIds())
-    aLineMapper = vtk.vtkDataSetMapper()
+                               center[2]])
+    line_grid = build_line_mesh(line_points)
+    line_mapper = vtk.vtkDataSetMapper()
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-        aLineMapper.SetInputData(aLineGrid)
+        line_mapper.SetInputData(line_grid)
     else:
-        aLineMapper.SetInput(aLineGrid)
-    aLineActor = vtk.vtkActor()
-    aLineActor.SetMapper(aLineMapper)
-    return aLineActor
+        line_mapper.SetInput(line_grid)
+    line_actor = vtk.vtkActor()
+    line_actor.SetMapper(line_mapper)
+    return line_actor
 
 
 def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discrete=False):

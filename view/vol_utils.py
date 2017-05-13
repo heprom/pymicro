@@ -267,7 +267,13 @@ def compute_affine_transform(fixed, moving):
     '''Compute the affine transform by point set registration.
 
     The affine transform is the composition of a translation and a linear map.
-    The two lists of points must be of the same length and the order of the points should match.
+    The two ordered lists of points must be of the same length larger or equal to 3.
+    The order of the points in the two list must match.
+    
+    The 2D affine transform :math:`\mathbf{A}` has 6 parameters (2 for the translation and 4 for the linear transform).
+    The best estimate of :math:`\mathbf{A}` can be computed using at least 3 pairs of matching points. Adding more 
+    pair of points will improve the quality of the estimate. The matching pairs are usually obtained by selecting 
+    unique features in both images and measuring their coordinates.
 
     :param list fixed: a list of the reference points.
     :param list moving: a list of the moving points to register on the fixed point.
@@ -276,6 +282,7 @@ def compute_affine_transform(fixed, moving):
     Thanks to Will Lenthe for helping with this code.
     '''
     assert len(fixed) == len(moving)
+    assert len(fixed) >= 3
     fixed_centroid = np.average(fixed, 0)
     moving_centroid = np.average(moving, 0)
     # offset every point by the center of mass of all the points in the set

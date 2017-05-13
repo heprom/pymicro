@@ -1215,7 +1215,6 @@ def box_3d(size=(100, 100, 100), line_color=black):
     box.GetProperty().SetColor(line_color)
     return box
 
-
 def build_line_mesh(points):
     '''Function to construct a vtkUnstructuredGrid representing a line mesh.
     
@@ -1236,15 +1235,8 @@ def build_line_mesh(points):
         line_mesh.InsertNextCell(4, Ids)
     return line_mesh
 
-def line_3d(start_point, end_point):
-    '''Function to draw a line in a 3d scene.
 
-    :param tuple start_point: the line starting point.
-    :param tuple end_point: the line ending point.
-    :returns vtkActor: The method return a vtkActor of the line that can be directly \
-    added to a 3d scene.
-    '''
-    line_grid = build_line_mesh([start_point, end_point])
+def line_actor(line_grid):
     line_mapper = vtk.vtkDataSetMapper()
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:
         line_mapper.SetInputData(line_grid)
@@ -1254,6 +1246,16 @@ def line_3d(start_point, end_point):
     line_actor.SetMapper(line_mapper)
     return line_actor
 
+def line_3d(start_point, end_point):
+    '''Function to draw a line in a 3d scene.
+
+    :param tuple start_point: the line starting point.
+    :param tuple end_point: the line ending point.
+    :returns vtkActor: The method return a vtkActor of the line that can be directly \
+    added to a 3d scene.
+    '''
+    line_grid = build_line_mesh([start_point, end_point])
+    return line_actor(line_grid)
 
 def circle_line_3d(center=(0, 0, 0), radius=1, normal=(0, 0, 1), resolution=1):
     '''Function to draw a circle in a 3d scene.
@@ -1273,15 +1275,7 @@ def circle_line_3d(center=(0, 0, 0), radius=1, normal=(0, 0, 1), resolution=1):
                                center[1] + radius * np.sin(resolution * (i + 1) * np.pi / 180), \
                                center[2]])
     line_grid = build_line_mesh(line_points)
-    line_mapper = vtk.vtkDataSetMapper()
-    if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-        line_mapper.SetInputData(line_grid)
-    else:
-        line_mapper.SetInput(line_grid)
-    line_actor = vtk.vtkActor()
-    line_actor.SetMapper(line_mapper)
-    return line_actor
-
+    return line_actor(line_grid)
 
 def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discrete=False):
     '''This method create an actor running a contour filter through the

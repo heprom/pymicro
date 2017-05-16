@@ -140,9 +140,9 @@ def compute_Laue_pattern(orientation, detector, hklplanes=None, spectrum=None, s
     :param bool show_direct_beam: A flag to control if the direct beam is shown.
     :returns: the computed pattern as a numpy array.
     '''
-    detector.data = np.zeros(detector.size, dtype=np.uint8)
+    detector.data = np.zeros(detector.size, dtype=np.uint32)
     # create a small square image for one spot
-    spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=detector.data.dtype)
+    spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=np.uint8)
     max_val = np.iinfo(detector.data.dtype.type).max  # 255 here
     if show_direct_beam:
         add_to_image(detector.data, max_val * spot, (detector.ucen, detector.vcen))
@@ -176,6 +176,10 @@ def compute_Laue_pattern(orientation, detector, hklplanes=None, spectrum=None, s
             add_to_image(detector.data, abs(the_energy) * spot.astype(float), (u, v))
         else:
             add_to_image(detector.data, max_val * spot, (u, v))
+    # limit maximum to max_val (255) and convert to uint8
+    over = detector.data > 255
+    detector.data[over] = 255
+    detector.data = detector.data.astype(np.uint8)
     if inverted:
         print('inverting image')
         detector.data = np.invert(detector.data)

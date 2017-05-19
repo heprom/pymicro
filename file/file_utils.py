@@ -4,6 +4,18 @@ import struct
 
 
 def read_image_sequence(data_dir, prefix, num_images, start_index=0, image_format='png', zero_padding=0, crop=None, verbose=False):
+    '''Read a series of images into a list of numpy arrays.
+    
+    :param str data_dir: directory where the image files are located.
+    :param str prefix: a string to construct the image file names.
+    :param int num_images: the number of images to read.
+    :param int start_index: the index to start loading the images (0 by default).
+    :param str image_format: can be tif or png (png by default).
+    :param int zero_padding: number of zero to use in zero padding (0 by default).
+    :param list crop: bounds to crop the images (None by default) 
+    :param bool verbose: activate verbose mode (False by default).
+    :return: the list of the images read from the disk.
+    '''
     # build the numbering pattern
     pat = '0%dd' % zero_padding
     fmt = '{0:s}{1:' + pat + '}.{2:s}'

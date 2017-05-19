@@ -144,6 +144,7 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
            verbose=False, show=True, save=False, save_name='stitch', save_ds=1, check=None):
     '''Stich a series of images together.
     
+    :param list image_stack: a list of the images to stitch.
     :param int nh: number of images to stitch horizontally.
     :param int nv: number of images to stitch vertically.
     :param str pattern: stitching pattern ('E' or 'S').
@@ -181,9 +182,9 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
                         image_size[1] + (nv - 1) * V[1] + nh * H[1]),
                        dtype=data_type)
     if verbose:
-        print('image_size', image_size)
-        print('image data type', data_type)
-        print('full image_size', full_im.shape)
+        print('image_size is {0}'.format(image_size))
+        print('image data type is {0}'.format(data_type))
+        print('full image_size will be {0}'.format(full_im.shape))
     for i in range(len(image_stack)):
         # compute indices
         x = i % nh

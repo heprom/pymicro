@@ -59,7 +59,7 @@ def lambda_angstrom_to_keV(lambda_angstrom):
     return 12.398 / lambda_angstrom
 
 
-def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=(1, 100), legfmt='%.1f', display=True):
+def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%.1f', display=True):
     '''Plot the transmitted intensity of a X-ray beam through a given material.
 
     This function compute the transmitted intensity from tabulated data of
@@ -77,7 +77,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=(1, 100), legfmt='%
     :param string mat: A string representing the material (e.g. 'Al')
     :param list ts: a list of thickness values of the material in mm ([1.0] by default)
     :param float rho: density of the material in g/cm^3 (None by default)
-    :param tuple energy_lim: energy bounds in keV for the plot (1, 100 by default)
+    :param list energy_lim: energy bounds in keV for the plot (1, 100 by default)
     :param string legfmt: string to format the legend plot
     :param bool display: display or save an image of the plot (False by default)
     '''

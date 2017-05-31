@@ -93,11 +93,11 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=(1, 100), legfmt='%
         # apply Beer-Lambert
         trans = 100 * np.exp(-mu_rho[:, 1] * rho * t / 10)
         plt.plot(energy, trans, '-', linewidth=3, markersize=10, label=legstr % (mat, t))
-    # bound the energy to (1, 100)
+    # bound the energy to (1, 200)
     if energy_lim[0] < 1:
         energy_lim[0] = 1
-    if energy_lim[1] > 100:
-        energy_lim[1] = 100
+    if energy_lim[1] > 200:
+        energy_lim[1] = 200
     plt.xlim(energy_lim)
     plt.grid()
     plt.legend(loc='upper left')

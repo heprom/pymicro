@@ -245,42 +245,34 @@ def hot_cmap(table_range=(0, 255)):
     return lut
 
 
-def add_hklplane_to_grain(hklplane, grid, orientation, origin=(0, 0, 0),
+def add_hklplane_to_grain(hkl_plane, grid, orientation, origin=(0, 0, 0),
                           opacity=1.0, show_normal=False, normal_length=1.0):
+    # compute the plane normal in the laboratory frame using the grain orientation
+    gt = orientation.orientation_matrix().transpose()
+    n_rot = np.dot(gt, hkl_plane.normal() / np.linalg.norm(hkl_plane.normal()))
     rot_plane = vtk.vtkPlane()
     rot_plane.SetOrigin(origin)
     # rotate the plane by setting the normal
-    Bt = orientation.orientation_matrix().transpose()
-    n_rot = np.dot(Bt, hklplane.normal() / np.linalg.norm(hklplane.normal()))
     rot_plane.SetNormal(n_rot)
-    # print '[hkl] normal direction expressed in sample coordinate system is: ', n_rot
-    if show_normal:
-        return add_plane_to_grid(rot_plane, grid, origin, opacity=opacity)
-    else:
-        return add_plane_to_grid_with_normal(rot_plane, grid, origin, \
-                                             opacity=opacity, normal_length=normal_length)
+    return add_plane_to_grid(rot_plane, grid, opacity=opacity, show_normal=show_normal, normal_length=normal_length)
 
 
-def add_plane_to_grid(plane, grid, origin, opacity=0.3):
+def add_plane_to_grid(plane, grid, origin=None, opacity=0.3, show_normal=False, normal_length=1.0):
     '''Add a 3d plane inside another object.
 
-    This function adds a plane inside another object described by a mesh
-    (vtkunstructuredgrid). The method is to use a vtkCutter with the mesh
-    as input and the plane as the cut function. An actor is returned.
+    This function adds a plane inside another object described by a mesh (vtkunstructuredgrid). 
+    The method is to use a vtkCutter with the mesh as input and the plane as the cut function. 
+    The plane normal can be displayed and its length controlled.
     This may be used directly to add hkl planes inside a lattice cell or
     a grain.
 
-    *Parameters*
-
-    **plane**: A VTK implicit function describing the plane to add.
-
-    **grid**: A VTK unstructured grid in which the plane is to be added.
-
-    **opacity**: Opacity value of the plane actor.
-
-    *Returns*
-
-    A VTK actor.
+    :param plane: A VTK implicit function describing the plane to add.
+    :param grid: A VTK unstructured grid in which the plane is to be added.
+    :param tuple origin: 
+    :param float opacity: Opacity value of the plane actor.
+    :param bool show_normal: A flag to display the plane normal.
+    :param normal_length: The length of the plane normal vector (1.0 by default).
+    :returns: A VTK actor or assembly with the plane, and its normal if requested.
     '''
     # cut the unstructured grid with the plane
     planeCut = vtk.vtkCutter()
@@ -295,38 +287,17 @@ def add_plane_to_grid(plane, grid, origin, opacity=0.3):
     cutActor = vtk.vtkActor()
     cutActor.SetMapper(cutMapper)
     cutActor.GetProperty().SetOpacity(opacity)
-    return cutActor
-
-
-def add_plane_to_grid_with_normal(plane, grid, origin, opacity=0.3, normal_length=1.0):
-    '''Add a 3d plane and display its normal inside another object.
-
-    This function adds a plane inside another object described by a mesh
-    (vtkunstructuredgrid). It basicall call `add_plane_to_grid` and also
-    add a 3d arrow to display the plane normal.
-
-    *Parameters*
-
-    **plane**: A VTK implicit function describing the plane to add.
-
-    **grid**: A VTK unstructured grid in which the plane is to be added.
-
-    **opacity**: Opacity value of the plane actor.
-
-    **normal_length**: The length of the plane normal vector.
-
-    *Returns*
-
-    A VTK assembly with the plane and the normal.
-    '''
-    assembly = vtk.vtkAssembly()
-    planeActor = add_plane_to_grid(plane, grid, origin, opacity=opacity)
-    assembly.AddPart(planeActor)
-    # add an arrow to display the normal to the plane
-    arrowActor = unit_arrow_3d(origin, normal_length * np.array(plane.GetNormal()), make_unit=False)
-    assembly.AddPart(arrowActor)
-    return assembly
-
+    if show_normal:
+        # add an arrow to display the normal to the plane
+        assembly = vtk.vtkAssembly()
+        assembly.AddPart(cutActor)
+        if origin is None:
+            origin = plane.GetOrigin()
+        arrowActor = unit_arrow_3d(origin, normal_length * np.array(plane.GetNormal()), make_unit=False)
+        assembly.AddPart(arrowActor)
+        return assembly
+    else:
+        return cutActor
 
 def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20, color=None):
     '''Build an actor for the cartesian axes.
@@ -397,6 +368,7 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
     print grain.id
     print(lut.GetTableValue(grain.id)[0:3])
     grain_actor.GetProperty().SetColor(lut.GetTableValue(grain.id)[0:3])
+    grain_actor.GetProperty().SetOpacity(0.3)
     grain_actor.SetMapper(mapper)
     assembly.AddPart(grain_actor)
     # add all hkl planes
@@ -404,12 +376,11 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
         for hklplane in hklplanes:
             # the grain has its center of mass at the origin
             origin = (0., 0., 0.)
-            hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh, \
-                                                  grain.orientation, origin, opacity=plane_opacity, \
+            hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh,
+                                                  grain.orientation, origin, opacity=plane_opacity,
                                                   show_normal=show_normal, normal_length=50.)
             assembly.AddPart(hklplaneActor)
     if show_orientation:
-        grain_actor.GetProperty().SetOpacity(0.3)
         local_orientation = add_local_orientation_axes(grain.orientation, axes_length=30)
         # add local orientation to the grain actor
         assembly.AddPart(local_orientation)

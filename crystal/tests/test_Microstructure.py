@@ -127,6 +127,10 @@ class OrientationTests(unittest.TestCase):
             for i in range(3):
                 self.assertAlmostEqual(col[i], target[i])
 
+    def test_fundamental_zone(self):
+        rod = [0.1449, -0.0281, 0.0616]
+        o = Orientation.from_rodrigues(rod)
+        self.assertTrue(o.inFZ(symmetry='cubic'))
 
 if __name__ == '__main__':
     unittest.main()

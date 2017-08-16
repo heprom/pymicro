@@ -128,6 +128,20 @@ class Orientation:
                 break
         return uvw
 
+    def inFZ(self, symmetry='cubic'):
+        """Check if the given Orientation lies within the fundamental zone.
+        
+        For a given crystal symmetry, several rotations can describe the same 
+        physcial crystllographic arangement. The Rodrigues fundamental zone 
+        restrict the orientation space accordingly. 
+        """
+        r = self.rod
+        if symmetry == 'cubic':
+            inFZ = sum([abs(x) for x in r]) <= 1.0 and max([abs(x) for x in r]) <= np.sqrt(2) - 1
+        else:
+            raise(ValueError('unsupported crystal symmetry: %s' % symmetry))
+        return inFZ
+
     @staticmethod
     def misorientation_MacKenzie(psi):
         '''Return the fraction of the misorientations corresponding to the
@@ -160,7 +174,7 @@ class Orientation:
     @staticmethod
     def misorientation_axis_from_delta(delta):
         '''Compute the misorientation axis from the misorientation matrix.
-
+ 
         :param delta: The 3x3 misorientation matrix.
         :returns: the misorientation axis (normalised vector).
         '''
@@ -600,49 +614,41 @@ class Orientation:
         return np.degrees(np.array([phi1, phi, phi2]))
 
     @staticmethod
-    def OrientationMatrix2Euler(g, eps=0.00000001):
+    def OrientationMatrix2Euler(g):
         '''
-        Compute the Euler angles (in degrees) from the orientation matrix.
+        Compute the Euler angles from the orientation matrix.
+        
+        This conversion follows the paper of Rowenhorst et al. 
+        In particular when g[2, 2] = 1 within the machine precision, 
+        there is no way to determine the values of phi1 and phi2 
+        (only their sum is defined). The convention is to attribute 
+        the entire angle to phi1 and set phi2 to zero.         
+
+        :param g: The 3x3 orientation matrix
+        :return: The 3 euler angles in degrees. 
         '''
-        # compute rodrigues vector
-        R = Orientation.OrientationMatrix2Rodrigues(g)
-        if np.abs(g[2, 2] - 1) < eps:
-            phi1 = 0.5 * np.arctan(g[0, 1] / g[0, 0])
-            Phi = 0.0
-            phi2 = phi1
+        eps = np.finfo('float').eps
+        (phi1, Phi, phi2) = (0.0, 0.0, 0.0)
+        # treat special case where g[2, 2] = 1
+        if np.abs(g[2, 2]) >= 1 - eps:
+            if g[2, 2] > 0.0:
+                phi1 = np.arctan2(g[0][1], g[0][0])
+            else:
+                phi1 = -np.arctan2(-g[0][1], g[0][0])
+                Phi = np.pi
         else:
-            phi1 = np.arctan(-g[2, 0] / g[2, 1])
-            Phi = np.arccos(g[2, 2])
-            phi2 = np.arctan(g[0, 2] / g[1, 2])
-        # conditions determined by Jia Li, fev 2012
-        if phi1 < 0:
-            if phi2 > 0:
-                if R[0] > 0:
-                    phi1 += 2 * np.pi
-                else:
-                    phi1 += np.pi
-                    phi2 += np.pi
-            else:  # phi2 < 0
-                if R[0] > 0:
-                    phi1 += 2 * np.pi
-                    phi2 += 2 * np.pi
-                else:
-                    phi1 += np.pi
-                    phi2 += np.pi
-        else:  # phi1 > 0
-            if phi2 > 0:
-                if R[0] > 0:
-                    pass  # nothing special here
-                else:
-                    phi1 += np.pi
-                    phi2 += np.pi
-            else:  # phi2 < 0
-                if R[0] > 0:
-                    pass  # nothing special here
-                else:
-                    phi1 += np.pi
-                    phi2 += np.pi
-        return np.degrees(np.array([phi1, Phi, phi2]))
+            Phi = np.arccos(g[2][2])
+            zeta = 1.0 / np.sqrt(1.0 - g[2][2] ** 2)
+            phi1 = np.arctan2(g[2][0] * zeta, -g[2][1] * zeta)
+            phi2 = np.arctan2(g[0][2] * zeta, g[1][2] * zeta)
+        # ensure angles are in the range [0, 2*pi]
+        if phi1 < 0.0:
+            phi1 += 2 * np.pi
+        if Phi < 0.0:
+            Phi += 2 * np.pi
+        if phi2 < 0.0:
+            phi2 += 2 * np.pi
+        return np.degrees([phi1, Phi, phi2])
 
     @staticmethod
     def OrientationMatrix2Rodrigues(g):

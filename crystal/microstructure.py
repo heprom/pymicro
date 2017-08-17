@@ -137,10 +137,24 @@ class Orientation:
         """
         r = self.rod
         if symmetry == 'cubic':
-            inFZ = sum([abs(x) for x in r]) <= 1.0 and max([abs(x) for x in r]) <= np.sqrt(2) - 1
+            inFZT23 = np.abs(r).sum() <= 1.0
+            # in the cubic symmetry, each component must be < 2 ** 0.5 - 1
+            inFZ = inFZT23 and np.abs(r).max() <= 2 ** 0.5 - 1
         else:
             raise(ValueError('unsupported crystal symmetry: %s' % symmetry))
         return inFZ
+
+    def move_to_FZ(self, symmetry='cubic', verbose=False):
+        """
+        Compute the equivalent crystal orientation in the Fundamental Zone of a given symmetry.
+
+        :param str symmetry: a string describing the crystal symmetry 
+        :param verbose: flag for verbose mode
+        :return: a new Orientation instance which lies in the fundamental zone.
+        """
+        from pymicro.crystal.lattice import Lattice
+        om = Lattice.move_rotation_to_FZ(self.orientation_matrix(), crystal_structure=symmetry, verbose=verbose)
+        return Orientation(om)
 
     @staticmethod
     def misorientation_MacKenzie(psi):

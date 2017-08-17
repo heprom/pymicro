@@ -151,6 +151,33 @@ class Lattice:
         return np.copy(self._matrix)
 
     @staticmethod
+    def move_rotation_to_FZ(g, crystal_structure='cubic', verbose=False):
+        """
+        Compute the rotation matrix in the Fundamental Zone of a given crystal structure.
+        
+        :param g: a 3x3 matrix representing the rotation 
+        :param str crystal_structure: a string describing the crystal structure 
+        :param verbose: flag for verbose mode
+        :return: a new 3x3 matrix for the rotation in the fundamental zone.
+        """
+        from pymicro.crystal.microstructure import Orientation
+        omegas = []  # list to store all the rotation angles
+        syms = Lattice.symmetry(crystal_structure)
+        for sym in syms:
+            # apply the symmetry operator
+            om = np.dot(sym, g)
+            # compute the Rodrigues vector of the corresponding orientation matrix
+            r = Orientation.OrientationMatrix2Rodrigues(om)
+            # and then the rotation angle
+            omega = 2 * np.arctan(np.linalg.norm(r)) * 180 / np.pi
+            omegas.append(omega)
+        index = np.argmin(omegas)
+        if verbose:
+            print(omegas)
+            print('moving to FZ, index = %d' % index)
+        return np.dot(syms[index], g)
+
+    @staticmethod
     def symmetry(crystal_structure='cubic'):
         '''Define the equivalent crystal symmetries.
 

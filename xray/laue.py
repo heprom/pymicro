@@ -12,7 +12,7 @@ def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
     :param orientation: The orientation of the crystal lattice.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param bool verbose: activate verbose mode (default False).
-    :returns tuple: A tuple of the wavelength value and the corresponding Bragg angle.
+    :returns tuple: A tuple of the wavelength value (keV) and the corresponding Bragg angle (radian).
     '''
     (h, k, l) = hkl.miller_indices()
     dhkl = hkl.interplanar_spacing()
@@ -171,6 +171,7 @@ def compute_Laue_pattern(orientation, detector, hklplanes=None, spectrum=None, s
         if u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
             print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], u, v))
             print('diffracted beam energy is {0}'.format(abs(the_energy)))
+            print('Bragg angle is {0}'.format(abs(theta * 180 / np.pi)))
         # mark corresponding pixels on the image detector
         if color_spots_by_energy:
             add_to_image(detector.data, abs(the_energy) * spot.astype(float), (u, v))
@@ -260,6 +261,49 @@ def gnomonic_projection(detector):
 
     gnom.data[ug_px, vg_px] = 1
     return gnom
+
+def confidence_index(votes):
+    n = np.sum(votes)  # total number of votes
+    v1 = max(votes)
+    votes[votes.index(v1)] = 0.
+    v2 = max(votes)
+    ci = (1. * (v1 - v2)) / n
+    return ci
+
+def poll_system(g_list, dis_tol=1.0):
+    """
+    Poll system to sort a series of orientation matrices determined by the indexation procedure.
+    
+    For each orientation matrix, check if it corresponds to an existing solution, if so: vote for it, 
+    if not add a new solution to the list
+    :param list g_list: the list of orientation matrices (should be in the fz)
+    :param float dis_tol: angular tolerance (degrees)
+    :return: a tuple composed by the most popular orientation matrix, the corresponding vote number and the confidence index
+    """
+    solution_indices = [0]
+    votes = [0]
+    dis_tol_rad = dis_tol * np.pi / 180
+    from pymicro.crystal.microstructure import Orientation
+    for i in range(len(g_list)):
+        g = g_list[i]
+        # rotations are already in the fundamental zone
+        for j in range(len(solution_indices)):
+            index = solution_indices[j]
+            delta = np.dot(g, g_list[index].T)
+            angle = Orientation.misorientation_angle_from_delta(delta)
+            if angle <= dis_tol_rad:
+                votes[j] += 1
+                print('vote list is now %s' % votes)
+                break
+            elif j == len(solution_indices) - 1:
+                solution_indices.append(i)
+                votes.append(1)
+                break
+    index_result = np.argmax(votes)
+    final_orientation_matrix = g_list[index_result]
+    result_vote = max(votes)
+    ci = confidence_index(votes)
+    return final_orientation_matrix, result_vote, ci
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt, cm, rcParams

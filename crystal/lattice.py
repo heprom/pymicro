@@ -170,6 +170,9 @@ class Lattice:
             r = Orientation.OrientationMatrix2Rodrigues(om)
             # and then the rotation angle
             omega = 2 * np.arctan(np.linalg.norm(r)) * 180 / np.pi
+            # todo: check if we can avoid computing the R vector
+            #cw = 0.5 * (om.trace() - 1)
+            #omega = np.arccos(cw)
             omegas.append(omega)
         index = np.argmin(omegas)
         if verbose:

@@ -127,10 +127,23 @@ class OrientationTests(unittest.TestCase):
             for i in range(3):
                 self.assertAlmostEqual(col[i], target[i])
 
-    def test_fundamental_zone(self):
+    def test_in_fundamental_zone(self):
         rod = [0.1449, -0.0281, 0.0616]
         o = Orientation.from_rodrigues(rod)
         self.assertTrue(o.inFZ(symmetry='cubic'))
+        o = Orientation.from_euler([191.9, 69.9, 138.9])
+        self.assertFalse(o.inFZ(symmetry='cubic'))
+
+    def test_move_to_fundamental_zone(self):
+        o = Orientation.from_euler([191.9, 69.9, 138.9])
+        # move rotation to cubic FZ
+        o_fz = o.move_to_FZ(symmetry='cubic', verbose=False)
+        # double check new orientation in is the FZ
+        self.assertTrue(o_fz.inFZ(symmetry='cubic'))
+        # verify new Euler angle values
+        val = np.array([303.402, 44.955, 60.896])
+        for i in range(3):
+            self.assertAlmostEqual(o_fz.euler[i], val[i], 3)
 
 if __name__ == '__main__':
     unittest.main()

@@ -404,7 +404,9 @@ class PoleFigure:
         self.plot_line_between_crystal_dir(c101, c111, ax=ax)
         # now plot the sample axis
         for grain in self.microstructure.grains:
-            B = grain.orientation_matrix()
+            # move to the fundamental zone
+            #g = Lattice.move_rotation_to_FZ(grain.orientation_matrix())
+            g = grain.orientation_matrix()
             # compute axis and apply SST symmetry
             if self.axis == 'Z':
                 axis = self.z
@@ -412,12 +414,13 @@ class PoleFigure:
                 axis = self.y
             else:
                 axis = self.x
-            axis_rot = self.sst_symmetry_cubic(B.dot(axis))
+            axis_rot = self.sst_symmetry_cubic(g.dot(axis))
             label = ''
             if self.map_field == 'grain_id':
                 label = 'grain ' + str(grain.id)
             self.plot_crystal_dir(axis_rot, mk=mk, col=self.get_color_from_field(grain), ax=ax, ann=ann, lab=label)
-            if self.verbose: print 'plotting ', self.axis, ' in crystal CS:', axis_rot
+            if self.verbose:
+                print('plotting %s in crystal CS: %s' % (self.axis, axis_rot))
         ax.axis('off')
         ax.axis([-0.05, 0.45, -0.05, 0.40])
         ax.set_title('%s-axis SST inverse %s projection' % (self.axis, self.proj))

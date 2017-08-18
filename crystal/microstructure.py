@@ -34,6 +34,9 @@ class Orientation:
     .. math::
 
       V_s = g^T.V_c
+
+    Most of the code to handle rotations has been written to comply with the conventions 
+    laid in :cite:`Rowenhorst2015`.
     '''
 
     def __init__(self, matrix):

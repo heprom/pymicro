@@ -162,8 +162,8 @@ class Orientation:
     @staticmethod
     def misorientation_MacKenzie(psi):
         '''Return the fraction of the misorientations corresponding to the
-        given :math:`\\psi` angle in the refenrece solution derived By MacKenzie in
-        his 1958 paper.
+        given :math:`\\psi` angle in the reference solution derived By MacKenzie in
+        his 1958 paper :cite:`MacKenzie_1958`.
 
         :param psi: the misorientation angle in radians.
         :returns: the value in the cummulative distribution corresponding to psi.

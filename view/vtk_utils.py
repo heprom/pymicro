@@ -1632,7 +1632,7 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
         iren.Start()
 
 
-def extract_poly_data(grid, inside=True):
+def extract_poly_data(grid, inside=True, boundary=True):
     '''Convert from vtkUnstructuredGrid to vtkPolyData.
     
     :param grid: the vtkUnstructuredGrid instance.
@@ -1646,7 +1646,10 @@ def extract_poly_data(grid, inside=True):
         extract.SetInputData(grid)
     else:
         extract.SetInput(grid)
-    extract.ExtractBoundaryCellsOn()
+    if boundary:
+        extract.ExtractBoundaryCellsOn()
+    else:
+        extract.ExtractBoundaryCellsOff()
     if inside:
         extract.ExtractInsideOn()
     else:
@@ -1947,14 +1950,13 @@ def grid_vol_view(scan):
     s_type = scan[:-4].split('_')[-1]
     size = [int(s_size[0]), int(s_size[1]), int(s_size[2])]
     # prepare a uniform grid to receive the image data
-    uGrid = vtk.vtkUniformGrid()
-    uGrid.SetExtent(0, size[0], 0, size[1], 0, size[2])
-    uGrid.SetOrigin(0, 0, 0)
-    uGrid.SetSpacing(1, 1, 1)
-    uGrid.SetScalarType(to_vtk_type(s_type))
+    grid = vtk.vtkUniformGrid()
+    grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
+    grid.SetOrigin(0, 0, 0)
+    grid.SetSpacing(1, 1, 1)
+    grid.SetScalarType(to_vtk_type(s_type))
     # read the actual image data
-    print 'reading scan %s with size %dx%dx%d using type %d' % \
-          (scan, size[0], size[1], size[2], to_vtk_type(s_type))
+    print('reading scan %s with size %dx%dx%d using type %d' % (scan, size[0], size[1], size[2], to_vtk_type(s_type)))
     reader = vtk.vtkImageReader2()  # 2 is faster
     reader.SetDataScalarType(to_vtk_type(s_type))
     reader.SetFileDimensionality(3)

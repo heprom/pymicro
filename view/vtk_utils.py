@@ -1481,15 +1481,7 @@ def map_data(data, function, lut=gray_cmap(), cell_data=True):
     if type(data) == np.ndarray:
         data = numpy_array_to_vtk_grid(data, cell_data)
     # use extract geometry filter to access the data
-    extract = vtk.vtkExtractGeometry()
-    if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-        extract.SetInputData(data)
-    else:
-        extract.SetInput(data)
-    extract.ExtractInsideOff()
-    extract.ExtractBoundaryCellsOn()
-    extract.SetImplicitFunction(function)
-
+    extract = extract_poly_data(data, inside=False)
     mapper = vtk.vtkDataSetMapper()
     mapper.ScalarVisibilityOn()
     mapper.SetLookupTable(lut)
@@ -1640,6 +1632,33 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
         iren.Start()
 
 
+def extract_poly_data(grid, inside=True):
+    '''Convert from vtkUnstructuredGrid to vtkPolyData.
+    
+    :param grid: the vtkUnstructuredGrid instance.
+    :param bool inside: flag to extract inside cells or not.
+    :returns: the vtkExtractGeometry filter.
+    '''
+    # use extract geometry filter to access the data
+    extract = vtk.vtkExtractGeometry()
+    # extract = vtk.vtkExtractVOI() # much faster but seems not to work with blanking
+    if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+        extract.SetInputData(grid)
+    else:
+        extract.SetInput(grid)
+    extract.ExtractBoundaryCellsOn()
+    if inside:
+        extract.ExtractInsideOn()
+    else:
+        extract.ExtractInsideOff()
+    bbox = vtk.vtkBox()
+    bounds = grid.GetBounds()
+    bbox.SetXMin(bounds[0::2])
+    bbox.SetXMax(bounds[1::2])
+    extract.SetImplicitFunction(bbox)
+    extract.Update()
+    return extract
+
 def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
     '''Create a 3d actor representing a numpy array.
 
@@ -1659,26 +1678,10 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
             grid.SetCellVisibilityArray(visible)
             # grid.SetPointVisibilityArray(visible)
         size = data.shape
-        bounds = (0, size[0], 0, size[1], 0, size[2])
     else:
         grid = data
         bounds = grid.GetBounds()
-        size = (bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])
-
-    # use extract geometry filter to access the data
-    extract = vtk.vtkExtractGeometry()
-    # extract = vtk.vtkExtractVOI() # much faster but seems not to work with blanking
-    if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-        extract.SetInputData(grid)
-    else:
-        extract.SetInput(grid)
-    extract.ExtractInsideOn()
-    extract.ExtractBoundaryCellsOn()
-    bbox = vtk.vtkBox()
-    bbox.SetXMin(bounds[0::2])
-    bbox.SetXMax(bounds[1::2])
-    extract.SetImplicitFunction(bbox)
-    extract.Update()
+    extract = extract_poly_data(grid)
     return show_mesh(extract.GetOutput(), map_scalars, lut)
 
 
@@ -1966,20 +1969,11 @@ def grid_vol_view(scan):
     data = reader.GetOutput()
     # expose the image data array
     array = data.GetPointData().GetScalars()
-    uGrid.GetCellData().SetScalars(array)
-    uGrid.SetCellVisibilityArray(array)
+    grid.GetCellData().SetScalars(array)
+    grid.SetCellVisibilityArray(array)
     # create random lut
     lut = rand_cmap(N=2048, first_is_black=True, table_range=(0, 2047))
-    # prepare the implicit function
-    bbox = vtk.vtkBox()
-    bbox.SetXMin(0, 0, 0)
-    bbox.SetXMax(size[0], size[1], size[2])
-    # use extract geometry filter to clip data
-    extract = vtk.vtkExtractGeometry()
-    extract.SetInput(uGrid)
-    # extract.ExtractInsideOn()
-    extract.SetImplicitFunction(bbox)
-    extract.ExtractBoundaryCellsOn()
+    extract = extract_poly_data(grid)
     # create mapper
     print 'creating actors'
     mapper = vtk.vtkDataSetMapper()

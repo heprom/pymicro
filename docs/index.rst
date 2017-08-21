@@ -26,6 +26,7 @@ Contents:
    cookbook
    pymicro
    changelog
+   references
 
 Indices and tables
 ==================

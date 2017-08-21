@@ -34,6 +34,9 @@ class Orientation:
     .. math::
 
       V_s = g^T.V_c
+
+    Most of the code to handle rotations has been written to comply with the conventions 
+    laid in :cite:`Rowenhorst2015`.
     '''
 
     def __init__(self, matrix):
@@ -159,8 +162,8 @@ class Orientation:
     @staticmethod
     def misorientation_MacKenzie(psi):
         '''Return the fraction of the misorientations corresponding to the
-        given :math:`\\psi` angle in the refenrece solution derived By MacKenzie in
-        his 1958 paper.
+        given :math:`\\psi` angle in the reference solution derived By MacKenzie in
+        his 1958 paper :cite:`MacKenzie_1958`.
 
         :param psi: the misorientation angle in radians.
         :returns: the value in the cummulative distribution corresponding to psi.
@@ -211,7 +214,10 @@ class Orientation:
     def misorientation_angle_from_delta(delta):
         '''Compute the misorientation angle from the misorientation matrix.
 
-        Compute the angle assocated with this misorientation matrix :math:`\\Delta g`. It is defined as :math:`\\omega = \\arccos(\\text{trace}(\\Delta g)/2-1)`.
+        Compute the angle assocated with this misorientation matrix :math:`\\Delta g`.
+        It is defined as :math:`\\omega = \\arccos(\\text{trace}(\\Delta g)/2-1)`.
+        To avoid float rounding error, the argument is rounded to 1. if it is within 1 and 1 plus 32 bits floating 
+        point precison.
 
         .. note::
 
@@ -224,6 +230,9 @@ class Orientation:
         :returns float: the misorientation angle in radians.
         '''
         cw = 0.5 * (delta.trace() - 1)
+        if cw > 1. and cw - 1. < np.finfo('float32').eps:
+            print('cw=%.20f, rounding to 1.' % cw)
+            cw = 1.
         omega = np.arccos(cw)
         return omega
 
@@ -595,7 +604,7 @@ class Orientation:
     def OrientationMatrix2EulerSF(g):
         '''
         Compute the Euler angles (in degrees) from the orientation matrix
-        in a similar way as done in MandelCrystal.c
+        in a similar way as done in Mandel_crystal.c
         '''
         tol = 0.1
         r = np.zeros(9, dtype=np.float64)  # double precision here
@@ -610,21 +619,28 @@ class Orientation:
         r[7] = g[2, 1]
         r[8] = g[2, 0]
         phi = np.arccos(r[2])
-        if (phi == 0.):
+        if phi == 0.:
             phi2 = 0.
             phi1 = np.arcsin(r[6])
-            if (abs(np.cos(phi1) - r[0]) > tol): phi1 = np.pi - phi1
+            if abs(np.cos(phi1) - r[0]) > tol:
+                phi1 = np.pi - phi1
         else:
             x2 = r[5] / np.sin(phi)
             x1 = r[8] / np.sin(phi);
-            if (x1 > 1.): x1 = 1.
-            if (x2 > 1.): x2 = 1.
-            if (x1 < -1.): x1 = -1.
-            if (x2 < -1.): x2 = -1.
+            if x1 > 1.:
+                x1 = 1.
+            if x2 > 1.:
+                x2 = 1.
+            if x1 < -1.:
+                x1 = -1.
+            if x2 < -1.:
+                x2 = -1.
             phi2 = np.arcsin(x2)
             phi1 = np.arcsin(x1)
-            if (abs(np.cos(phi2) * np.sin(phi) - r[7]) > tol): phi2 = np.pi - phi2
-            if (abs(np.cos(phi1) * np.sin(phi) + r[4]) > tol): phi1 = np.pi - phi1
+            if abs(np.cos(phi2) * np.sin(phi) - r[7]) > tol:
+                phi2 = np.pi - phi2
+            if abs(np.cos(phi1) * np.sin(phi) + r[4]) > tol:
+                phi1 = np.pi - phi1
         return np.degrees(np.array([phi1, phi, phi2]))
 
     @staticmethod
@@ -632,11 +648,11 @@ class Orientation:
         '''
         Compute the Euler angles from the orientation matrix.
         
-        This conversion follows the paper of Rowenhorst et al. 
-        In particular when g[2, 2] = 1 within the machine precision, 
-        there is no way to determine the values of phi1 and phi2 
+        This conversion follows the paper of Rowenhorst et al. :cite:`Rowenhorst2015`.
+        In particular when :math:`g_{33} = 1` within the machine precision, 
+        there is no way to determine the values of :math:`\phi_1` and :math:`\phi_2` 
         (only their sum is defined). The convention is to attribute 
-        the entire angle to phi1 and set phi2 to zero.         
+        the entire angle to :math:`\phi_1` and set :math:`\phi_2` to zero.         
 
         :param g: The 3x3 orientation matrix
         :return: The 3 euler angles in degrees. 

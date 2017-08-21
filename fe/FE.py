@@ -28,8 +28,8 @@ class FE_Calc():
         '''
         self._name = prefix
         self._wdir = wdir
-        self.node_vars = []
-        self.node_fields = []
+        self.nodal_vars = []
+        self.nodal_fields = []
         self.integ_vars = []
         self.integ_fields = []
         self.times = []
@@ -39,7 +39,7 @@ class FE_Calc():
         ''' Gives a string representation of the zset_mesh instance.'''
         out = '%s FE calcultion\n' % (self.__class__.__name__)
         out += 'working directory = %s\n' % self._wdir
-        out += 'node vars = %s\n' % self.node_vars.__repr__()
+        out += 'node vars = %s\n' % self.nodal_vars.__repr__()
         out += 'integ vars = %s\n' % self.integ_vars.__repr__()
         # out += 'times = %s\n' % self.times.__repr__()
         out += 'mesh: %s' % self._mesh.__repr__()
@@ -51,17 +51,17 @@ class FE_Calc():
         for line in ut:
             if reading_cards:
                 time = numpy.float(line.split()[4])
-                print 'reading card, time=', time
+                print('reading card, time=', time)
                 self.avail_times.append(time)
             elif line.startswith('**meshfile'):
                 meshfile = line.split()[1]
-                print 'meshfile is', meshfile
+                print('meshfile is', meshfile)
             elif line.startswith('**node'):
                 self.avail_node_vars = line.split()[1:]
-                print 'node variables are', self.node_vars
+                print('node variables are', self.nodal_vars)
             elif line.startswith('**integ'):
                 self.avail_integ_vars = line.split()[1:]
-                print 'integ variables are', self.integ_vars
+                print('integ variables are', self.integ_vars)
             elif line.startswith('**element'):
                 reading_cards = True
                 self.avail_times = []
@@ -76,8 +76,22 @@ class FE_Calc():
         self._mesh = mesh
 
     def add_integ_field(self, field_name, field):
+        '''Add integ field to the list.
+        
+        :param str field_name: The field name.
+        :param ndarray field: The field data.
+        '''
         self.integ_vars.append(field_name)
         self.integ_fields.append(field)
+
+    def add_nodal_field(self, field_name, field):
+        '''Add nodal field to the list.
+        
+        :param str field_name: The field name.
+        :param ndarray field: The field data.
+        '''
+        self.nodal_vars.append(field_name)
+        self.nodal_fields.append(field)
 
     def read_ip_values(self, card, field, el_rank, verbose=False):
         '''Read the values of the given element for the specified field
@@ -106,18 +120,31 @@ class FE_Calc():
         return element_data[self.avail_integ_vars.index(field), :]
 
     def read_integ(self, card, field, verbose=False):
-        '''Read the specified field at integration point and for the given
-         card. Note that VTK cells can only handle one value per cell so
-         for each cell, all integration point values are averaged.
+        '''Read field data in a Z-set integ file.
+        
+        Read the specified field at integration point and for the given
+        card.
 
-        Integ file can be read as: cards -> elements -> fields > integ points
-        Note that card parameter starts at 1.
+        :param int card: the card number (starts at 1).
+        :param str field: the string describing the field to read.
+        :param bool verbose: flag to activate verbose mode.
+        :returns: returns the integ field as a 1D numpy array.
+
+        .. note::
+
+          Integ file can be read as: cards -> elements -> fields > integ points
+          the card parameter numbering starts at 1 (just as in the .ut file).
+
+        .. warn::
+        
+          VTK cells can only handle one value per cell so for each cell, all integration point values are averaged.
+
         '''
         integ = open(os.path.join(self._wdir, self._name + '.integ'), 'rb')
         offset = (card - 1) * len(self.avail_integ_vars) * self._mesh.get_number_of_gauss_points() * 4
         if verbose:
-            print 'reading field in integ file with offset', offset
-            print 'quering field %s which has number %d' % (field, self.avail_integ_vars.index(field))
+            print('reading field in integ file with offset', offset)
+            print('quering field %s which has number %d' % (field, self.avail_integ_vars.index(field)))
         component = numpy.empty(self._mesh.get_number_of_elements())
         integ.seek(offset)
         for i, el in enumerate(self._mesh._elements):
@@ -131,19 +158,73 @@ class FE_Calc():
         integ.close()
         return component
 
+    def read_nodal(self, card, field, verbose=False):
+        '''Read field data in a Z-set node file.
+
+        Read the specified nodal field for the given card (ie time increment).
+
+        :param int card: the card number (starts at 1).
+        :param str field: the string describing the field to read.
+        :param bool verbose: flag to activate verbose mode.
+        :returns: returns the nodal field as a 1D numpy array.
+
+        .. note::
+
+          Node file can be read as: cards -> fields > nodes
+          the card parameter numbering starts at 1 (just as in the .ut file).
+        '''
+        nodal = open(os.path.join(self._wdir, self._name + '.node'), 'rb')
+        index_field = self.avail_node_vars.index(field)
+        offset = ((card - 1) * len(self.avail_node_vars) + index_field) * self._mesh.get_number_of_nodes() * 4
+        if verbose:
+            print('reading field in node file with offset', offset)
+            print('quering field %s which has number %d' % (field, self.avail_node_vars.index(field)))
+        #nodal_field = numpy.empty(self._mesh.get_number_of_nodes())
+        nodal.seek(offset)
+        bits_to_read = self._mesh.get_number_of_nodes() * 4
+        dt = numpy.dtype('>f4')
+        nodal_field = numpy.fromstring(nodal.read(bits_to_read), dt).astype(numpy.float32)
+        nodal.close()
+        if verbose:
+            print('read nodal field %s, range is [%.4f - %.4f]' % (field, nodal_field.min(), nodal_field.max()))
+        return nodal_field
+
+    def read_displacement_field(self, card, field_names=['U1', 'U2', 'U3']):
+        from vtk.util import numpy_support
+        dim = len(field_names)  # should be 2 or 3
+        vtk_data_array = vtk.vtkFloatArray()
+        vtk_data_array.SetName('U')
+        vtk_data_array.SetNumberOfComponents(dim)
+        vtk_data_array.SetNumberOfTuples(self._mesh.get_number_of_nodes())
+        for i in range(dim):
+            # read the individual displacement components
+            print('reading displacement component %s' % field_names[i])
+            Ui = self.read_nodal(card, field_names[i], verbose=False)
+            vtk_data_array.CopyComponent(i, numpy_support.numpy_to_vtk(numpy.ravel(Ui, order='F'), deep=1), 0)
+        self.U = vtk_data_array
+        return vtk_data_array
+
     def build_vtk(self):
-        print 'building vtk stuff for FE_calc'
+        print('building vtk stuff for FE_calc')
         vtk_mesh = self._mesh.build_vtk()
         # also store some meta data
         model = vtk.vtkModelMetadata()
         model.SetTitle(self._name)
         model.Pack(vtk_mesh)
-        print 'grid has meta data ?', vtk.vtkModelMetadata.HasMetadata(vtk_mesh)
-        # add one cell data array for each field available
+        print('grid has meta data ?', vtk.vtkModelMetadata.HasMetadata(vtk_mesh))
         from vtk.util import numpy_support
-        n_fields = len(self.integ_vars)
+        # add the displacement field if present
+        if self.U:
+            vtk_mesh.GetPointData().AddArray(self.U)
+        # one point data array for each nodal field
+        for i, field_name in enumerate(self.nodal_vars):
+            print('adding nodal field', field_name)
+            vtk_data_array = numpy_support.numpy_to_vtk(self.nodal_fields[i], deep=1)
+            vtk_data_array.SetName(field_name)
+            vtk_mesh.GetPointData().AddArray(vtk_data_array)
+        # add one cell data array for each field
         for i, field_name in enumerate(self.integ_vars):
-            print 'adding field', field_name
+            print('adding integ field', field_name)
             vtk_data_array = numpy_support.numpy_to_vtk(self.integ_fields[i], deep=1)
             vtk_data_array.SetName(field_name)
             vtk_mesh.GetCellData().AddArray(vtk_data_array)

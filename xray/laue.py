@@ -303,8 +303,14 @@ def poll_system(g_list, dis_tol=1.0):
                 votes.append(1)
                 print('vote list is now %s' % votes)
                 break
-    index_result = np.argmax(votes)
-    final_orientation_matrix = g_list[index_result]
+    print('Max vote =', np.amax(votes))
+    index_result = np.argwhere(votes == np.amax(votes))
+    print('Number of equivalent solutions :', len(index_result))
+    final_orientation_matrix = []
+    for n in range(len(index_result)):
+        solutions = g_list[index_result[n]]
+        print('Solution number {0:d} is'.format(n+1), solutions)
+        final_orientation_matrix.append(solutions)
     result_vote = max(votes)
     ci = confidence_index(votes)
     return final_orientation_matrix, result_vote, ci

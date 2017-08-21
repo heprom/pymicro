@@ -277,7 +277,7 @@ class FE_Mesh():
         if add_elset_id_field:
             from vtk.util import numpy_support
             id_field = m.compute_elset_id_field(elset_prefix)
-            print 'adding field %s' % 'elset_id'
+            print('adding field %s' % 'elset_id')
             vtk_data_array = numpy_support.numpy_to_vtk(id_field, deep=1)
             vtk_data_array.SetName('elset_id')
             vtk_mesh.GetCellData().AddArray(vtk_data_array)
@@ -303,14 +303,84 @@ class FE_Mesh():
         return self._nip
 
     @staticmethod
+    def load_from_mesh(mesh_path, verbose=False):
+        '''
+        Creates a mesh instance from an ascii .mesh file (INRIA file format).
+
+        :param str mesh_path: path to the file to read.
+        :param bool verbose: flag to activate verbose mode.
+        :returns: a FE_Mesh instance.
+        '''
+        mesh = open(mesh_path, 'r')
+        # look for Dimension
+        while (True):
+            line = mesh.readline().strip()  # get read of unnecessary spaces
+            if line.startswith('Dimension'):
+                break
+        dim = int(mesh.readline())
+        print('dimension is %d' % dim)
+        fe_mesh = FE_Mesh(dim=dim)
+        # look for Vertices
+        while True:
+            line = mesh.readline().strip()  # get read of unnecessary spaces
+            if line.startswith('Vertices'):
+                break
+        nv = int(mesh.readline())
+        percent = math.ceil(nv / 100.)
+        print('loading nodes: %2d %%' % (0 / percent))
+        assert (dim == 3)  # assume 3 dimensional mesh
+        for i in range(nv):
+            if i % percent == 0:
+                print('\b\b\b\b%2d %%' % (i / percent))
+            [x, y, z, t] = mesh.readline().split()
+            node = FE_Node(int(i + 1))
+            node._x = float(x)
+            node._y = float(y)
+            node._z = float(z)
+            node._rank = i
+            if verbose:
+                print('adding node', node)
+            fe_mesh._nodes.append(node)
+        # look for Triangles
+        while True:
+            line = mesh.readline().strip()  # get read of unnecessary spaces
+            if line.startswith('Triangles'):
+                break
+        nt = int(mesh.readline())
+        percent = math.ceil(nt / 100.)
+        print('building triangles: %2d %%' % (0 / percent))
+        for i in range(nt):
+            if i % percent == 0:
+                print('\b\b\b\b%2d %%' % (i / percent))
+            line = mesh.readline()
+            tokens = line.split()
+            el_id = i + 1
+            el_type = 's3d3'
+            el_node_nb = 3
+            element = FE_Element(el_id, el_type)
+            element._rank = i
+            for n in range(el_node_nb):
+                # here rank is always id - 1
+                element._nodelist.append(fe_mesh._nodes[int(tokens[n]) - 1])
+            if verbose:
+                print('adding element', element)
+            fe_mesh._elements.append(element)
+        mesh.close()
+        return fe_mesh
+
+    @staticmethod
     def load_from_geof(geof_path, verbose=False):
         '''
-        Creates a mesh instance from an ascii geof file (binary is not supported).
+        Creates a mesh instance from a Z-set ascii geof file (binary is not supported).
+        
+        :param str geof_path: path to the file to read.
+        :param bool verbose: flag to activate verbose mode.
+        :returns: a FE_Mesh instance.
         '''
         geof = open(geof_path, 'r')
         geof.readline()
         # look for **node
-        while (True):
+        while True:
             line = geof.readline().strip()  # get read of unnecessary spaces
             if line.startswith('**node'):
                 break
@@ -341,7 +411,7 @@ class FE_Mesh():
           id_to_rank[node._id] = node._rank
         '''
         # look for **element
-        while (True):
+        while True:
             line = geof.readline().strip()
             if line.startswith('**element'):
                 break
@@ -349,18 +419,12 @@ class FE_Mesh():
         percent = math.ceil(ne / 100.)
         print('building elements: %2d %%' % (0 / percent))
         for i in range(ne):
-            if i % percent == 0: print '\b\b\b\b%2d %%' % (i / percent)
+            if i % percent == 0:
+                print('\b\b\b\b%2d %%' % (i / percent))
             line = geof.readline()
             tokens = line.split()
             el_id = int(tokens[0])
             el_type = tokens[1]
-            '''
-            if el_type.startswith('c3d10'):
-              el_node_nb = 10
-            elif el_type.startswith('c3d20'):
-              el_node_nb = 20
-            else:
-            '''
             el_node_nb = int(el_type[3:].split('_')[0].split('r')[0])
             if (el_type not in ['c2d3', 's3d3', 'c3d4', 'c3d6', 'c3d20', 'c3d20r', 'c3d15', 'c3d13', 'c3d10', 'c3d10_4',
                                 'c3d8', 'c2d4', 'c2d8', 'c2d8r']):
@@ -374,14 +438,14 @@ class FE_Mesh():
                 print 'adding element', element
             fe_mesh._elements.append(element)
         # look for ***group
-        while (True):
+        while True:
             line = geof.readline().strip()
             print line
             if line.startswith('***group'):
                 break
         # look for ***return
         line = geof.readline()
-        while (True):
+        while True:
             if line.startswith('**elset'):
                 elset_name = line.split()[1]
                 if elset_name == 'ALL_ELEMENT':
@@ -407,7 +471,7 @@ class FE_Mesh():
             elif line.startswith('**liset'):
                 liset_name = line.split()[1]
                 new_liset = []
-                while (True):
+                while True:
                     line = geof.readline()
                     print len(line), line == '\n', line
                     if line.startswith('*') or line == ('\n'):
@@ -426,6 +490,7 @@ class FE_Mesh():
             if not line.startswith('**elset'):
                 line = geof.readline()
         fe_mesh.update_number_of_gauss_points()
+        geof.close()
         return fe_mesh
 
     def compute_id_to_rank(self, nodes=True):
@@ -497,7 +562,7 @@ class FE_Mesh():
             return vtk.VTK_QUADRATIC_QUAD  # 1
 
     def build_vtk(self):
-        print 'building vtk stuff for FE_Mesh'
+        print('building vtk stuff for FE_Mesh')
         vtk_mesh = vtk.vtkUnstructuredGrid()
         # take care of nodes
         nodes = vtk.vtkPoints()
@@ -590,7 +655,7 @@ class FE_Mesh():
         return vtk_mesh
 
     def build_vtk_for_lisets(self):
-        print 'building vtk stuff for FE_Mesh'
+        print('building vtk stuff for FE_Mesh')
         vtk_mesh = vtk.vtkUnstructuredGrid()
         # take care of nodes
         nodes = vtk.vtkPoints()

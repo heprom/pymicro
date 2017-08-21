@@ -28,8 +28,10 @@ class OrientationTests(unittest.TestCase):
             o = Orientation.from_euler(test_euler)
             g = o.orientation_matrix()
             calc_euler = Orientation.OrientationMatrix2Euler(g)
+            calc_euler2 = Orientation.OrientationMatrix2EulerSF(g)
             for i in range(3):
                 self.assertAlmostEquals(calc_euler[i], test_euler[i])
+                #self.assertAlmostEquals(calc_euler2[i], test_euler[i])
 
     def test_SchimdFactor(self):
         o = Orientation.from_euler([0., 0., 0.])
@@ -40,6 +42,13 @@ class OrientationTests(unittest.TestCase):
         o = Orientation.from_euler([0., 0., 0.])
         oct_ss = SlipSystem.get_slip_systems(plane_type='111')
         self.assertAlmostEqual(max(o.compute_all_schmid_factors(oct_ss, verbose=True)), 0.4082, 4)
+
+    def test_misorientation_matrix(self):
+        for test_euler in self.test_eulers:
+            o = Orientation.from_euler(test_euler)
+            g = o.orientation_matrix()
+            delta = np.dot(g, g.T)
+            self.assertEqual(Orientation.misorientation_angle_from_delta(delta), 0.0)
 
     def test_misorientation_angle(self):
         o1 = Orientation.from_euler((0., 0., 0.))

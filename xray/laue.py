@@ -290,14 +290,18 @@ def poll_system(g_list, dis_tol=1.0):
         for j in range(len(solution_indices)):
             index = solution_indices[j]
             delta = np.dot(g, g_list[index].T)
+            # compute misorientation angle in radians
             angle = Orientation.misorientation_angle_from_delta(delta)
+            print('j=%d -- angle=%f' % (j, angle))
             if angle <= dis_tol_rad:
                 votes[j] += 1
+                print('angle (deg) is %.2f' % (180 / np.pi * angle))
                 print('vote list is now %s' % votes)
                 break
             elif j == len(solution_indices) - 1:
                 solution_indices.append(i)
                 votes.append(1)
+                print('vote list is now %s' % votes)
                 break
     index_result = np.argmax(votes)
     final_orientation_matrix = g_list[index_result]

@@ -734,7 +734,7 @@ class FE_Element():
 
     def __repr__(self):
         ''' Gives a string representation of the element.'''
-        out = '%s element\n' % (self.__class__.__name__)
+        out = '%s element\n' % self.__class__.__name__
         out += 'type: %s\n' % self._type
         out += 'node id list = [ '
         for node in self._nodelist:
@@ -770,7 +770,7 @@ class FE_Element():
         return self._rank
 
     def set_rank(self, r):
-        rself._rank = r
+        self._rank = r
 
     def get_center_of_mass(self):
         com = numpy.array([0., 0., 0.])

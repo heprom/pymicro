@@ -260,8 +260,8 @@ class FE_Mesh():
         self._liset_names = []
 
     def __repr__(self):
-        ''' Gives a string representation of the zset_mesh instance.'''
-        out = '%s mesh\n' % (self.__class__.__name__)
+        ''' Gives a string representation of the FE_Mesh instance.'''
+        out = '%s mesh\n' % self.__class__.__name__
         out += 'dimension = %d\n' % self._dim
         out += 'nb of nodes = %d\n' % self.get_number_of_nodes()
         out += 'nb of elements = %d\n' % self.get_number_of_elements()
@@ -271,8 +271,23 @@ class FE_Mesh():
         return out
 
     @staticmethod
-    def make_vtu(geof, add_elset_id_field=False, elset_prefix='_ELSET'):
-        m = FE_Mesh.load_from_geof(geof)
+    def make_vtu(path, add_elset_id_field=False, elset_prefix='_ELSET'):
+        '''Convert a mesh to vtk format.
+        
+        This method reads the mesh and then write the corresponding .vtu file.
+        Only .geof and .mesh file are currently supported.
+
+        :param str path: path to the mesh file.
+        :param bool add_elset_id_field: flag to add a field representing the elset id.
+        :param str elset_prefix: prefix to use if computing the leset id field.
+        '''
+        if path.endswith('.geof'):
+            m = FE_Mesh.load_from_geof(path)
+        elif path.endswith('.mesh'):
+            m = FE_Mesh.load_from_mesh(path)
+        else:
+            print('unsupported mesh format (must be .geof or .mesh): %s' % path)
+            return
         vtk_mesh = m.build_vtk()
         if add_elset_id_field:
             from vtk.util import numpy_support
@@ -282,7 +297,7 @@ class FE_Mesh():
             vtk_data_array.SetName('elset_id')
             vtk_mesh.GetCellData().AddArray(vtk_data_array)
         writer = vtk.vtkXMLUnstructuredGridWriter()
-        writer.SetFileName(geof[:-5] + '.vtu')
+        writer.SetFileName(path[:-5] + '.vtu')
         writer.SetInputData(vtk_mesh)
         writer.Write()
 

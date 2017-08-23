@@ -1662,6 +1662,36 @@ def extract_poly_data(grid, inside=True, boundary=True):
     extract.Update()
     return extract
 
+def select(grid, id_list, verbose=False):
+    '''Select cells in vtkUnstructuredGrid based on a list of indices.
+
+    :param vtkUnstructuredGrid grid: the grid on which to perform the selection.
+    :param list id_list: the indices of the cells to select.
+    :param bool verbose: a flag to activate verbose mode.
+    :returns: a new vtkUnstructuredGrid containing the selected cells.
+    '''
+    ids = vtk.vtkIdTypeArray()
+    ids.SetNumberOfComponents(1)
+    for v in id_list:
+        ids.InsertNextValue(v)
+    selection_node = vtk.vtkSelectionNode()
+    selection_node.SetContentType(vtk.vtkSelectionNode.INDICES)
+    selection_node.SetSelectionList(ids)
+    selection = vtk.vtkSelection()
+    selection.AddNode(selection_node)
+    extract_selection = vtk.vtkExtractSelection()
+    extract_selection.SetInputData(0, grid)
+    extract_selection.SetInputData(1, selection)
+    extract_selection.Update()
+    # finally create a new vtkUnstructuredGrid instance to return
+    selected = vtk.vtkUnstructuredGrid()
+    selected.ShallowCopy(extract_selection.GetOutput())
+    if verbose:
+        print('performing selection with id %s' % id_list)
+        print('number of points in selection: %d' % selected.GetNumberOfPoints())
+        print('number of cells in selection: %d' % selected.GetNumberOfCells())
+    return selected
+
 def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
     '''Create a 3d actor representing a numpy array.
 

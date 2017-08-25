@@ -239,7 +239,10 @@ class FE_Calc():
         # now output a .vtu file
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(calc.get_name() + '.vtu')
-        writer.SetInputData(calc.build_vtk())
+        if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+            writer.SetInputData(calc.build_vtk())
+        else:
+            writer.SetInput(calc.build_vtk())
         writer.Write()
 
 
@@ -275,6 +278,7 @@ class FE_Mesh():
         '''Convert a mesh to vtk format.
         
         This method reads the mesh and then write the corresponding .vtu file.
+        The file will have the same name as the input mesh, with the extension changed to vtu.
         Only .geof and .mesh file are currently supported.
 
         :param str path: path to the mesh file.
@@ -298,13 +302,18 @@ class FE_Mesh():
             vtk_mesh.GetCellData().AddArray(vtk_data_array)
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(path[:-5] + '.vtu')
-        writer.SetInputData(vtk_mesh)
+        if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+            writer.SetInputData(vtk_mesh)
+        else:
+            writer.SetInput(vtk_mesh)
         writer.Write()
 
     def get_number_of_nodes(self):
+        '''Return the total number of nodes in the mesh.'''
         return len(self._nodes)
 
     def get_number_of_elements(self):
+        '''Return the total number of elements in the mesh.'''
         return len(self._elements)
 
     def update_number_of_gauss_points(self):
@@ -315,6 +324,13 @@ class FE_Mesh():
         self._nip = nip
 
     def get_number_of_gauss_points(self):
+        '''Return the total number of integration point in the mesh.
+        
+        .. note::
+        
+           If you made some changes to the mesh, you should call `update_number_of_gauss_points`
+           before reading that value.
+        '''
         return self._nip
 
     @staticmethod
@@ -527,30 +543,41 @@ class FE_Mesh():
     def compute_elset_id_field(self, elset_prefix=None, use_name_as_id=False):
         '''Compute a new field showing to which elset the element
         belongs. Note this suppose elsets are mutually exclusive (except
-        for the very first one ALL_ELEMENT).
-        A prefix can be specified (string) to filter the elsets. '''
-        if len(self._elset_names) > 255:
-            print 'warning, more than 255 elsets, using a uint16 field'
+        for the very first one ALL_ELEMENT which is disregarded here).
+        
+        :param str elset_prefix: a prefix to filter the elsets to consider.
+        :param bool use_name_as_id: a flag to use the elset name with the prefix removed as id.
+        :returns: the elset id field as a numpy array.
+        '''
+        if elset_prefix:
+            elset_list = filter(lambda k: elset_prefix in k, self._elset_names)
+        else:
+            elset_list = self._elset_names[1:]
+        if len(elset_list) > 255:
+            print('warning, more than 255 elsets, using a uint16 field')
             elset_id = numpy.zeros(self.get_number_of_elements(), dtype=numpy.uint16)
         else:
             elset_id = numpy.zeros(self.get_number_of_elements(), dtype=numpy.uint8)
         id_to_rank = self.compute_id_to_rank(nodes=False)
-        for j, elset_name in enumerate(self._elset_names[1:]):
-            if elset_prefix and not elset_name.startswith(elset_prefix): continue
-            print 'j=%d, elset name=%s' % (j, elset_name)
-            for el_id in self._elsets[j + 1]:
+        for elset_name in elset_list:
+            try:
+                j = self._elset_names.index(elset_name)
+                print('j=%d, elset name=%s' % (j, elset_name))
+            except ValueError:
+                print('elset %s not found in mesh, skipping' % elset_name)
+            for el_id in self._elsets[j]:
                 if use_name_as_id:
                     this_id = elset_name.split(elset_prefix)[1]
                     elset_id[id_to_rank[el_id]] = int(this_id)
                 else:
-                    elset_id[id_to_rank[el_id]] = j + 1
+                    elset_id[id_to_rank[el_id]] = j
         return elset_id
 
     def compute_grain_id_field(self, grain_prefix='grain_'):
         '''Compute a new field composed by the grain ids.'''
         grain_ids = self.compute_elset_id_field(elset_prefix=grain_prefix, use_name_as_id=True)
         if numpy.max(grain_ids) < 1:
-            print 'Warning, no grain found, verify the grain prefix...'
+            print('Warning, no grain found, verify the grain prefix...')
         return grain_ids
 
     @staticmethod
@@ -577,6 +604,12 @@ class FE_Mesh():
             return vtk.VTK_QUADRATIC_QUAD  # 1
 
     def build_vtk(self):
+        '''Build a vtkUnstructuredGrid instance corresponding to the mesh.
+        
+        This method creates a new vtkUnstructuredGrid object, set the nodes and the elements.
+        
+        :returns: the vtkUnstructuredGrid object.
+        '''
         print('building vtk stuff for FE_Mesh')
         vtk_mesh = vtk.vtkUnstructuredGrid()
         # take care of nodes

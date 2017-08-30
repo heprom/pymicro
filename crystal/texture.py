@@ -144,7 +144,7 @@ class PoleFigure:
         fig = plt.figure(figsize=(10, 5))
         # direct PF
         ax1 = fig.add_subplot(121, aspect='equal')
-        self.plot_pf(ax=ax1, mk='o', col='k', ann=False)
+        self.plot_pf(ax=ax1, mk='o', ann=False)
         # inverse PF
         ax2 = fig.add_subplot(122, aspect='equal')
         if plot_sst:
@@ -394,12 +394,11 @@ class PoleFigure:
         else:
             return np.array([0., 0., 0.])
 
-    def plot_sst(self, ax=None, mk='s', col='k', ann=False):
+    def plot_sst(self, ax=None, mk='s', ann=False):
         ''' Create the inverse pole figure in the unit standard triangle.
 
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
-        :param col: symbol color (black by default)
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
         '''
         from pymicro.crystal.lattice import HklDirection
@@ -446,20 +445,19 @@ class PoleFigure:
         ax.axis([-0.05, 0.45, -0.05, 0.40])
         ax.set_title('%s-axis SST inverse %s projection' % (self.axis, self.proj))
 
-    def plot_ipf(self, ax=None, mk='s', col='k', ann=False):
+    def plot_ipf(self, ax=None, mk='s', ann=False):
         ''' Create the inverse pole figure for direction Z.
 
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
-        :param col: symbol color (black by default)
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
         '''
         self.plot_pf_background(ax)
         for c in self.c111s:
             for i in range(3):
-                d = c.copy();
+                d = c.copy()
                 d[i] = 0
-                e = np.zeros_like(c);
+                e = np.zeros_like(c)
                 e[i] = c[i]
                 self.plot_line_between_crystal_dir(c, d, ax=ax)
                 self.plot_line_between_crystal_dir(c, e, ax=ax)

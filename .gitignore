@@ -1,11 +1,11 @@
 # Byte-compiled / optimized / DLL files
-*.py[cod]
-*/*.py[cod]
-*/tests/*.py[cod]
+pymicro/*.py[cod]
+pymicro/*/*.py[cod]
+pymicro/*/tests/*.py[cod]
 
 # Sphinx documentation
-docs/_build/
-docs/auto_examples/
+docs/_build
+docs/auto_examples
 
 # pycharm stuff
 .idea

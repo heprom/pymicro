@@ -33,7 +33,11 @@ print('content of .')
 print(os.listdir('.'))
 print('content of ..')
 print(os.listdir('..'))
+print('content of ../..')
+print(os.listdir('../..'))
 try:
+    import crystal
+    print('** successfully imported crystal')
     import pymicro
     print('** successfully imported pymicro')
     from pymicro.crystal.lattice import Lattice

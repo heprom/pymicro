@@ -215,7 +215,7 @@ class PoleFigure:
         '''Function to plot the background of the pole figure.
 
         :param ax: a reference to a pyplot ax to draw the backgroud.
-        :params bool labels: add lables to axes (True by default).
+        :param bool labels: add lables to axes (True by default).
         '''
         an = np.linspace(0, 2 * np.pi, 100)
         plt.hold('on')
@@ -224,38 +224,28 @@ class PoleFigure:
         ax.plot([0, 0], [-1, 1], 'k-')
         axe_labels = ['X', 'Y', 'Z']
         if self.axis == 'Z':
-            h = 0;
-            v = 1;
-            u = 2
+            (h, v, u) = (0, 1, 2)
         elif self.axis == 'Y':
-            h = 0;
-            v = 2;
-            u = 1
+            (h, v, u) = (0, 2, 1)
         else:
-            h = 1;
-            v = 2;
-            u = 0
-        ax.annotate(axe_labels[h], (1.01, 0.0), xycoords='data',
-                    fontsize=16, horizontalalignment='left', verticalalignment='center')
-        ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data',
-                    fontsize=16, horizontalalignment='center', verticalalignment='bottom')
+            (h, v, u) = (1, 2, 0)
+        if labels:
+            ax.annotate(axe_labels[h], (1.01, 0.0), xycoords='data', fontsize=16,
+                        horizontalalignment='left', verticalalignment='center')
+            ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data', fontsize=16,
+                        horizontalalignment='center', verticalalignment='bottom')
 
     def plot_pf_dir(self, c_dir, ax=None, mk='o', col='k', ann=False, lab=''):
         '''Plot a crystal direction in a direct pole figure.'''
         if self.axis == 'Z':
-            h = 0
-            v = 1
-            u = 2
+            (h, v, u) = (0, 1, 2)
         elif self.axis == 'Y':
-            h = 0
-            v = 2
-            u = 1
+            (h, v, u) = (0, 2, 1)
         else:
-            h = 1
-            v = 2
-            u = 0
+            (h, v, u) = (1, 2, 0)
         # the direction to plot is given by c_dir[h,v,u]
-        if self.verbose: print 'corrected for pf axis:', c_dir[[h, v, u]]
+        if self.verbose:
+            print('corrected for pf axis:', c_dir[[h, v, u]])
         self.plot_crystal_dir(c_dir[[h, v, u]], mk=mk, col=col, ax=ax, ann=ann, lab=lab)
 
     def plot_pf(self, ax=None, mk='o', ann=False):

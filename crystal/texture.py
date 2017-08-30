@@ -49,9 +49,9 @@ class PoleFigure:
         self.mksize = 12
         self.color_by_grain_id = False
         self.pflegend = False
-        self.x = np.array([1, 0, 0])
-        self.y = np.array([0, 1, 0])
-        self.z = np.array([0, 0, 1])
+        self.x = np.array([1., 0., 0.])
+        self.y = np.array([0., 1., 0.])
+        self.z = np.array([0., 0., 1.])
 
         # list all crystal directions
         self.c001s = np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=np.float)
@@ -167,7 +167,8 @@ class PoleFigure:
         :param str lab: Label to use in the legend of the plot ('' by default).
         :raise ValueError: if the projection type is not supported
         '''
-        if c_dir[2] < 0: c_dir *= -1  # make unit vector have z>0
+        if c_dir[2] < 0:
+            c_dir *= -1  # make unit vector have z>0
         if self.proj == 'flat':
             cp = c_dir
         elif self.proj == 'stereo':
@@ -176,12 +177,12 @@ class PoleFigure:
             cp = c
             # cp = np.cross(c, self.z)
         else:
-            raise ValueError('Error, unsupported projection type', proj)
-        ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
+            raise ValueError('Error, unsupported projection type', self.proj)
+        ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk,
                 markeredgecolor=col, markersize=self.mksize, label=lab)
         # Next 3 lines are necessary in case c_dir[2]=0, as for Euler angles [45, 45, 0]
         if c_dir[2] < 0.000001:
-            ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk, \
+            ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk,
                     markersize=self.mksize, label=lab)
         if ann:
             ax.annotate(c_dir.view(), (cp[0], cp[1] - 0.1), xycoords='data',
@@ -196,7 +197,7 @@ class PoleFigure:
         :param c1: vector describing crystal direction 1
         :param c2: vector describing crystal direction 2
         :param ax: a reference to a pyplot ax to draw the line
-        :param int: steps: number of straight lines composing the curve (11 by default)
+        :param int steps: number of straight lines composing the curve (11 by default)
         :param col: line color (black by default)
         '''
         path = np.zeros((steps, 2), dtype=float)
@@ -242,55 +243,42 @@ class PoleFigure:
     def plot_pf_dir(self, c_dir, ax=None, mk='o', col='k', ann=False, lab=''):
         '''Plot a crystal direction in a direct pole figure.'''
         if self.axis == 'Z':
-            h = 0;
-            v = 1;
+            h = 0
+            v = 1
             u = 2
         elif self.axis == 'Y':
-            h = 0;
-            v = 2;
+            h = 0
+            v = 2
             u = 1
         else:
-            h = 1;
-            v = 2;
+            h = 1
+            v = 2
             u = 0
         # the direction to plot is given by c_dir[h,v,u]
         if self.verbose: print 'corrected for pf axis:', c_dir[[h, v, u]]
         self.plot_crystal_dir(c_dir[[h, v, u]], mk=mk, col=col, ax=ax, ann=ann, lab=lab)
 
-    def plot_pf(self, ax=None, mk='o', col='k', ann=False):
+    def plot_pf(self, ax=None, mk='o', ann=False):
         '''Create the direct pole figure.
 
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (disc by default).
-        :param col: symbol color (black by default)
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
         '''
         self.plot_pf_background(ax)
         for grain in self.microstructure.grains:
-            B = grain.orientation_matrix()
-            Bt = B.transpose()
+            g = grain.orientation_matrix()
+            gt = g.transpose()
             for i, c in enumerate(self.poles):
                 label = ''
-                c_rot = Bt.dot(c)
-                if self.verbose: print 'plotting ', c, ' in sample CS (corrected for pf axis):', c_rot
-                if self.map_field:
-                    if self.map_field == 'grain_id':
-                        col = Microstructure.rand_cmap().colors[grain.id]
-                        if self.pflegend and i == 0:
-                            # only add grain legend for its first pole
-                            label = 'grain ' + str(grain.id)
-                    if self.map_field == 'ipf':
-                        col = grain.orientation.get_ipf_colour()
-                    else:  # use the field value for this grain
-                        color = int(255 * (self.field[grain.id] - self.field_min_level) / float(
-                            self.field_max_level - self.field_min_level))
-                        col_cmap = cm.get_cmap(self.lut, 256)
-                        col = col_cmap(np.arange(256))[color]  # directly access the color
+                c_rot = gt.dot(c)
+                if self.verbose:
+                    print('plotting ', c, ' in sample CS (corrected for pf axis):', c_rot)
+                col = self.get_color_from_field(grain)
                 self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
         ax.axis([-1.1, 1.1, -1.1, 1.1])
         if self.pflegend and self.map_field == 'grain_id':
-            ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, \
-                      prop={'size': 10})
+            ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, prop={'size': 10})
         ax.axis('off')
         ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
@@ -316,10 +304,10 @@ class PoleFigure:
         xv, yv = np.meshgrid(phis, psis)
         values = np.zeros((n_psi, n_phi), dtype=int)
         for grain in self.microstructure.grains:
-            B = grain.orientation_matrix()
-            Bt = B.transpose()
+            g = grain.orientation_matrix()
+            gt = g.transpose()
             for c in self.poles:
-                c_rot = Bt.dot(c)
+                c_rot = gt.dot(c)
                 # handle poles pointing down
                 if c_rot[2] < 0: c_rot *= -1  # make unit vector have z>0
                 if c_rot[1] >= 0:
@@ -374,19 +362,37 @@ class PoleFigure:
         return np.array([z_rot[1], z_rot[2], z_rot[0]])
 
     def get_color_from_field(self, grain):
+        """Get the color of the given grain according to the chosen field.
+        
+        This function will return the color associated with the given grain. Depending on how the pole figure has been 
+        configured (see the `set_map_field` function), it will be obtained from:
+         
+         * the grain id, according to the `Microstructure.rand_cmap` function
+         * ipf the colour will reflect the orientation according to the IPF scheme
+         * the field value mapped on a pyplot color map if the lut field of the PoleFigure instance is a string.
+         * a color directly read from the lut field; in this case the field value must reflect the category of the given grain. 
+        
+        :param grain: the `Grain` instance.
+        :return: the color as a 3 element numpy array representing the rgb values. 
+        """
         if self.map_field:
             if self.map_field == 'grain_id':
                 col = Microstructure.rand_cmap().colors[grain.id]
             elif self.map_field == 'ipf':
                 col = grain.orientation.get_ipf_colour()
-            else:  # use the field value for this grain
-                color = int(255 * (self.field[grain.id] - self.field_min_level) / float(
-                    self.field_max_level - self.field_min_level))
-                col_cmap = cm.get_cmap(self.lut, 256)
-                col = col_cmap(np.arange(256))[color]  # directly access the color
+            else:
+                if type(self.lut) is str:
+                    # get the color map from pyplot
+                    color_map = cm.get_cmap(self.lut, 256)
+                    # use the field value for this grain
+                    color = int(255 * (self.field[grain.id] - self.field_min_level) / float(
+                        self.field_max_level - self.field_min_level))
+                    col = color_map(np.arange(256))[color]
+                else:
+                    col = self.lut[self.field[grain.id]]  # directly access the color
             return col
         else:
-            return (0, 0, 0)
+            return np.array([0., 0., 0.])
 
     def plot_sst(self, ax=None, mk='s', col='k', ann=False):
         ''' Create the inverse pole figure in the unit standard triangle.
@@ -396,12 +402,27 @@ class PoleFigure:
         :param col: symbol color (black by default)
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
         '''
-        c001 = np.array([0, 0, 1])
-        c101 = np.array([1, 0, 1])
-        c111 = np.array([1, 1, 1])
-        self.plot_line_between_crystal_dir(c001, c101, ax=ax)
-        self.plot_line_between_crystal_dir(c001, c111, ax=ax)
-        self.plot_line_between_crystal_dir(c101, c111, ax=ax)
+        from pymicro.crystal.lattice import HklDirection
+        c001 = HklDirection(0, 0, 1)
+        c101 = HklDirection(1, 0, 1)
+        c111 = HklDirection(1, 1, 1)
+        self.plot_line_between_crystal_dir(c001.direction(), c101.direction(), ax=ax)
+        self.plot_line_between_crystal_dir(c001.direction(), c111.direction(), ax=ax)
+        self.plot_line_between_crystal_dir(c101.direction(), c111.direction(), ax=ax)
+        # display the crystal axes
+        poles = [c001, c101, c111]
+        v_align = ['top', 'top', 'bottom']
+        for i in range(3):
+            uvw = poles[i]
+            c_dir = uvw.direction()
+            print(c_dir.view())
+            c = c_dir + self.z
+            c /= c[2]  # SP'/SP = r/z with r=1
+            print(c.view())
+            pole_str = '%d%d%d' % uvw.miller_indices()
+            ax.annotate(pole_str, (c[0], c[1] - (2 * (i < 2) - 1) * 0.01), xycoords='data',
+                        fontsize=12, horizontalalignment='center', verticalalignment=v_align[i])
+
         # now plot the sample axis
         for grain in self.microstructure.grains:
             # move to the fundamental zone
@@ -459,12 +480,10 @@ class PoleFigure:
             else:
                 axis = self.x
             axis_rot = B.dot(axis)
-            if self.map_field == 'grain_id':
-                col = Microstructure.rand_cmap().colors[grain.id]
+            col = self.get_color_from_field(grain)
             self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
-            if self.map_field == 'ipf':
-                col = grain.orientation.get_ipf_colour()
-            if self.verbose: print 'plotting ', self.axis, ' in crystal CS:', axis_rot
+            if self.verbose:
+                print('plotting ', self.axis, ' in crystal CS:', axis_rot)
         ax.axis([-1.1, 1.1, -1.1, 1.1])
         ax.axis('off')
         ax.set_title('%s-axis inverse %s projection' % (self.axis, self.proj))

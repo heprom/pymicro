@@ -18,7 +18,7 @@ from xml.dom.minidom import Document, parse
 
 
 class Orientation:
-    '''Crystallographic orientation class.
+    """Crystallographic orientation class.
 
     This follows the passive rotation definition which means that it brings
     the sample coordinate system into coincidence with the crystal coordinate
@@ -37,21 +37,21 @@ class Orientation:
 
     Most of the code to handle rotations has been written to comply with the conventions 
     laid in :cite:`Rowenhorst2015`.
-    '''
+    """
 
     def __init__(self, matrix):
-        '''Initialization from the 9 components of the orientation matrix.'''
+        """Initialization from the 9 components of the orientation matrix."""
         g = np.array(matrix, dtype=np.float64).reshape((3, 3))
         self._matrix = g
         self.euler = Orientation.OrientationMatrix2Euler(g)
         self.rod = Orientation.OrientationMatrix2Rodrigues(g)
 
     def orientation_matrix(self):
-        '''Returns the orientation matrix in the form of a 3x3 numpy array.'''
+        """Returns the orientation matrix in the form of a 3x3 numpy array."""
         return self._matrix
 
     def __repr__(self):
-        '''Provide a string representation of the class.'''
+        """Provide a string representation of the class."""
         s = 'Crystal Orientation'
         s += '\norientation matrix = %s' % self._matrix.view()
         s += '\nEuler angles (degrees) = (%8.3f,%8.3f,%8.3f)' % (self.phi1(), self.Phi(), self.phi2())
@@ -60,42 +60,42 @@ class Orientation:
 
     @staticmethod
     def cube():
-        '''Create the particular crystal orienation called Cube and which
-        corresponds to euler angle (0,0,0).'''
+        """Create the particular crystal orientation called Cube and which
+        corresponds to euler angle (0, 0, 0)."""
         return Orientation.from_euler((0., 0., 0.))
 
     @staticmethod
     def brass():
-        '''Create the particular crystal orienation called Brass and which
-        corresponds to euler angle (35.264,45,0).'''
+        """Create the particular crystal orientation called Brass and which
+        corresponds to euler angle (35.264, 45, 0)."""
         return Orientation.from_euler((35.264, 45., 0.))
 
     @staticmethod
     def copper():
-        '''Create the particular crystal orienation called Copper and which
-        corresponds to euler angle (90,35.264,45).'''
+        """Create the particular crystal orientation called Copper and which
+        corresponds to euler angle (90, 35.264, 45)."""
         return Orientation.from_euler((90., 35.264, 45.))
 
     @staticmethod
     def s3():
-        '''Create the particular crystal orienation called S3 and which
-        corresponds to euler angle (59,37,63).'''
+        """Create the particular crystal orientation called S3 and which
+        corresponds to euler angle (59, 37, 63)."""
         return Orientation.from_euler((58.980, 36.699, 63.435))
 
     @staticmethod
     def goss():
-        '''Create the particular crystal orienation called Goss and which
-        corresponds to euler angle (0,45,0).'''
+        """Create the particular crystal orientation called Goss and which
+        corresponds to euler angle (0, 45, 0)."""
         return Orientation.from_euler((0., 45., 0.))
 
     @staticmethod
     def shear():
-        '''Create the particular crystal orienation called shear and which
-        corresponds to euler angle (45,0,0).'''
+        """Create the particular crystal orientation called shear and which
+        corresponds to euler angle (45, 0, 0)."""
         return Orientation.from_euler((45., 0., 0.))
 
     def get_ipf_colour(self, axis=np.array([0., 0., 1.])):
-        '''Compute the IPF (inverse pole figure) colour for this orientation.
+        """Compute the IPF (inverse pole figure) colour for this orientation.
 
         Given a particular axis expressed in the laboratory coordinate system,
         one can compute the so called IPF colour based on that direction
@@ -113,7 +113,7 @@ class Orientation:
            hard coded for the cubic crystal symmetry for now on, it should
            be rather straightforward to generalize this to any symmetry
            making use of the Lattice.symmetry() method.
-        '''
+        """
         axis /= np.linalg.norm(axis)
         from pymicro.crystal.lattice import Lattice
         # find the axis lying in the fundamental zone
@@ -161,13 +161,13 @@ class Orientation:
 
     @staticmethod
     def misorientation_MacKenzie(psi):
-        '''Return the fraction of the misorientations corresponding to the
+        """Return the fraction of the misorientations corresponding to the
         given :math:`\\psi` angle in the reference solution derived By MacKenzie in
         his 1958 paper :cite:`MacKenzie_1958`.
 
         :param psi: the misorientation angle in radians.
         :returns: the value in the cummulative distribution corresponding to psi.
-        '''
+        """
         from math import sqrt, sin, cos, tan, pi, acos
         psidg = 180 * psi / pi
         if psidg >= 0 and psidg <= 45:
@@ -190,29 +190,29 @@ class Orientation:
 
     @staticmethod
     def misorientation_axis_from_delta(delta):
-        '''Compute the misorientation axis from the misorientation matrix.
+        """Compute the misorientation axis from the misorientation matrix.
  
         :param delta: The 3x3 misorientation matrix.
         :returns: the misorientation axis (normalised vector).
-        '''
+        """
         n = np.array([delta[1, 2] - delta[2, 1], delta[2, 0] - delta[0, 2], delta[0, 1] - delta[1, 0]])
         n /= np.sqrt(
             (delta[1, 2] - delta[2, 1]) ** 2 + (delta[2, 0] - delta[0, 2]) ** 2 + (delta[0, 1] - delta[1, 0]) ** 2)
         return n
 
     def misorientation_axis(self, orientation):
-        '''Compute the misorientation axis with another crystal orientation.
+        """Compute the misorientation axis with another crystal orientation.
         This vector is by definition common to both crystalline orientations.
 
         :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class.
         :returns: the misorientation axis (normalised vector).
-        '''
+        """
         delta = np.dot(self.orientation_matrix(), orientation.orientation_matrix().T)
         return Orientation.misorientation_axis_from_delta(delta)
 
     @staticmethod
     def misorientation_angle_from_delta(delta):
-        '''Compute the misorientation angle from the misorientation matrix.
+        """Compute the misorientation angle from the misorientation matrix.
 
         Compute the angle assocated with this misorientation matrix :math:`\\Delta g`.
         It is defined as :math:`\\omega = \\arccos(\\text{trace}(\\Delta g)/2-1)`.
@@ -228,7 +228,7 @@ class Orientation:
 
         :param delta: The 3x3 misorientation matrix.
         :returns float: the misorientation angle in radians.
-        '''
+        """
         cw = 0.5 * (delta.trace() - 1)
         if cw > 1. and cw - 1. < np.finfo('float32').eps:
             print('cw=%.20f, rounding to 1.' % cw)
@@ -237,7 +237,7 @@ class Orientation:
         return omega
 
     def disorientation(self, orientation, crystal_structure='cubic'):
-        '''Compute the disorientation another crystal orientation.
+        """Compute the disorientation another crystal orientation.
 
         Considering all the possible crystal symmetries, the disorientation
         is defined as the combination of the minimum misorientation angle
@@ -247,7 +247,7 @@ class Orientation:
         :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
         :param str crystal_structure: a string describing the crystal structure, 'cubic' by default.
         :returns tuple: the misorientation angle in radians, the axis as a numpy vector (crystal coordinates), the axis as a numpy vector (sample coordinates).
-        '''
+        """
         the_angle = np.pi
         from pymicro.crystal.lattice import Lattice
         symmetries = Lattice.symmetry(crystal_structure)
@@ -272,19 +272,19 @@ class Orientation:
         return (the_angle, the_axis, the_axis_xyz)
 
     def phi1(self):
-        '''Convenience methode to expose the first Euler angle.'''
+        """Convenience methode to expose the first Euler angle."""
         return self.euler[0]
 
     def Phi(self):
-        '''Convenience methode to expose the second Euler angle.'''
+        """Convenience methode to expose the second Euler angle."""
         return self.euler[1]
 
     def phi2(self):
-        '''Convenience methode to expose the third Euler angle.'''
+        """Convenience methode to expose the third Euler angle."""
         return self.euler[2]
 
     def compute_XG_angle(self, hkl, omega, verbose=False):
-        '''Compute the angle between the scattering vector :math:`\mathbf{G_{l}}`
+        """Compute the angle between the scattering vector :math:`\mathbf{G_{l}}`
         and :math:`\mathbf{-X}` the X-ray unit vector at a given angular position :math:`\\omega`.
 
         A given hkl plane defines the scattering vector :math:`\mathbf{G_{hkl}}` by
@@ -305,7 +305,7 @@ class Orientation:
         :param omega: the angle of rotation of the crystal around the laboratory vertical axis.
         :param bool verbose: activate verbose mode (False by default).
         :return float: the angle between :math:`-\mathbf{X}` and :math:`\mathbf{G_{l}}` in degrees.
-        '''
+        """
         X = np.array([1., 0., 0.])
         gt = self.orientation_matrix().transpose()
         Gc = hkl.scattering_vector()
@@ -322,7 +322,7 @@ class Orientation:
         return alpha
 
     def dct_omega_angles(self, hkl, lambda_keV, verbose=False):
-        '''Compute the two omega angles which satisfy the Bragg condition.
+        """Compute the two omega angles which satisfy the Bragg condition.
 
         For a given crystal orientation sitting on a vertical rotation axis,
         there is exactly two :math:`\omega` positions in :math:`[0, 2\pi]` for which
@@ -354,7 +354,7 @@ class Orientation:
         :param bool verbose: Verbose mode (False by default)
         :returns tuple: :math:`(\omega_1, \omega_2)` the two values of the \
         rotation angle around the vertical axis (in degrees).
-        '''
+        """
         (h, k, l) = hkl.miller_indices()
         (a, b, c) = hkl._lattice._lengths
         theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
@@ -472,12 +472,12 @@ class Orientation:
             plt.savefig('rotating_crystal_plot_%d%d%d.pdf' % (h, k, l))
 
     def topotomo_tilts(self, hkl, verbose=False):
-        '''Compute the tilts for topotomography alignment.
+        """Compute the tilts for topotomography alignment.
 
         :param hkl: the hkl plane, an instance of :py:class:`~pymicro.crystal.lattice.HklPlane`
         :param bool verbose: activate verbose mode (False by default).
         :returns tuple: (ut, lt) the two values of tilts to apply (in radians).
-        '''
+        """
         gt = self.orientation_matrix().transpose()
         Gc = hkl.scattering_vector()
         Gs = gt.dot(Gc)  # in the cartesian sample CS
@@ -490,9 +490,9 @@ class Orientation:
         return (ut, lt)
 
     def to_xml(self, doc):
-        '''
+        """
         Returns an XML representation of the Orientation instance.
-        '''
+        """
         orientation = doc.createElement('Orientation')
         orientation_phi1 = doc.createElement('phi1')
         orientation_phi1_text = doc.createTextNode('%f' % self.phi1())
@@ -533,7 +533,7 @@ class Orientation:
 
     @staticmethod
     def Euler2OrientationMatrix(euler):
-        '''
+        """
         Compute the orientation matrix :math:`\mathbf{g}` associated with the 3 Euler angles 
         :math:`(\phi_1, \Phi, \phi_2)`. The matrix is calculated via (see the `euler_angles` recipe in the cookbook 
         for a detailed example):
@@ -548,7 +548,7 @@ class Orientation:
         
         :param euler: The triplet of the Euler angles (in degrees).
         :returns g: The 3x3 orientation matrix.
-        '''
+        """
         (rphi1, rPhi, rphi2) = np.radians(euler)
         c1 = np.cos(rphi1)
         s1 = np.sin(rphi1)
@@ -572,12 +572,12 @@ class Orientation:
 
     @staticmethod
     def Zrot2OrientationMatrix(x1=None, x2=None, x3=None):
-        '''Compute the orientation matrix  from the rotated coordinates given in the
+        """Compute the orientation matrix  from the rotated coordinates given in the
            .inp file for Zebulon's computations
            Need at least two vectors to compute cross product
 
            Still need some tests to validate this function
-        '''
+        """
 
         if (x1 is None and x2 is None):
             raise NameError('Need at least two vectors to compute the matrix')
@@ -602,10 +602,10 @@ class Orientation:
 
     @staticmethod
     def OrientationMatrix2EulerSF(g):
-        '''
+        """
         Compute the Euler angles (in degrees) from the orientation matrix
         in a similar way as done in Mandel_crystal.c
-        '''
+        """
         tol = 0.1
         r = np.zeros(9, dtype=np.float64)  # double precision here
         # Z-set order for tensor is 11 22 33 12 23 13 21 32 31
@@ -645,7 +645,7 @@ class Orientation:
 
     @staticmethod
     def OrientationMatrix2Euler(g):
-        '''
+        """
         Compute the Euler angles from the orientation matrix.
         
         This conversion follows the paper of Rowenhorst et al. :cite:`Rowenhorst2015`.
@@ -656,7 +656,7 @@ class Orientation:
 
         :param g: The 3x3 orientation matrix
         :return: The 3 euler angles in degrees. 
-        '''
+        """
         eps = np.finfo('float').eps
         (phi1, Phi, phi2) = (0.0, 0.0, 0.0)
         # treat special case where g[2, 2] = 1
@@ -682,12 +682,12 @@ class Orientation:
 
     @staticmethod
     def OrientationMatrix2Rodrigues(g):
-        '''
+        """
         Compute the rodrigues vector from the orientation matrix.
         
         :param g: The 3x3 orientation matrix representing the rotation.
         :returns: The Rodrigues vector as a 3 components array. 
-        '''
+        """
         t = g.trace() + 1
         if np.abs(t) < np.finfo(g.dtype).eps:
             return np.zeros(3)
@@ -699,12 +699,12 @@ class Orientation:
 
     @staticmethod
     def Rodrigues2OrientationMatrix(rod):
-        '''
+        """
         Compute the orientation matrix from the Rodrigues vector.
 
         :param rod: The Rodrigues vector as a 3 components array.
         :returns: The 3x3 orientation matrix representing the rotation.
-        '''
+        """
         r = np.linalg.norm(rod)
         I = np.diagflat(np.ones(3))
         if r < np.finfo(r.dtype).eps:
@@ -717,13 +717,13 @@ class Orientation:
 
     @staticmethod
     def Axis2OrientationMatrix(axis, angle):
-        '''
+        """
         Compute the (passive) orientation matrix associated the rotation defined by the given (axis, angle) pair.
 
         :param axis: the rotation axis.
         :param angle: the rotation angle (degrees).
         :returns: the 3x3 orientation matrix.
-        '''
+        """
         omega = np.radians(angle)
         c = np.cos(omega)
         s = np.sin(omega)
@@ -734,12 +734,12 @@ class Orientation:
 
     @staticmethod
     def Euler2Axis(euler):
-        '''
+        """
         Compute the (axis, angle) representation associated to this (passive) rotation expressed by the Euler angles.
 
         :param euler: 3 euler angles (in degrees)
         :returns: a tuple containing the axis (a vector) and the angle (in radians).
-        '''
+        """
         (phi1, Phi, phi2) = np.radians(euler)
         t = np.tan(0.5 * Phi)
         s = 0.5 * (phi1 + phi2)
@@ -751,9 +751,9 @@ class Orientation:
 
     @staticmethod
     def Euler2Quaternion(euler):
-        '''
+        """
         Compute the quaternion from the 3 euler angles (in degrees)
-        '''
+        """
         (phi1, Phi, phi2) = np.radians(euler)
         q0 = np.cos(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
         q1 = np.cos(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
@@ -763,9 +763,9 @@ class Orientation:
 
     @staticmethod
     def Euler2Rodrigues(euler):
-        '''
+        """
         Compute the rodrigues vector from the 3 euler angles (in degrees)
-        '''
+        """
         (phi1, Phi, phi2) = np.radians(euler)
         a = 0.5 * (phi1 - phi2)
         b = 0.5 * (phi1 + phi2)
@@ -776,17 +776,17 @@ class Orientation:
 
     @staticmethod
     def read_euler_txt(txt_path):
-        '''
+        """
         Read a set of euler angles from an ascii file.
 
         :param str txt_path: path to the text file containing the euler angles.
         :returns dict: a dictionary with the line number and the corresponding orientation.
-        '''
+        """
         return Orientation.read_orientations(txt_path)
 
     @staticmethod
     def read_orientations(txt_path, data_type='euler', **kwargs):
-        '''
+        """
         Read a set of grain orientations from a text file.
 
         The text file must be organised in 3 columns (the other are ignored), corresponding to either the three euler
@@ -798,7 +798,7 @@ class Orientation:
         :param str data_type: 'euler' (default) or 'rodrigues'.
         :param dict kwargs: additional parameters passed to genfromtxt.
         :returns dict: a dictionary with the line number and the corresponding orientation.
-        '''
+        """
         data = np.genfromtxt(txt_path, **kwargs)
         size = len(data)
         orientations = []
@@ -812,7 +812,7 @@ class Orientation:
 
     @staticmethod
     def read_euler_from_zset_inp(inp_path):
-        '''Read a set of grain orientations from a z-set input file.
+        """Read a set of grain orientations from a z-set input file.
 
         In z-set input files, the orientation data may be specified
         either using the rotation of two vector, euler angles or
@@ -830,7 +830,7 @@ class Orientation:
 
         :param str inp_path: the path to the ascii file to read.
         :returns dict: a dictionary of the orientations associated with the elset names.
-        '''
+        """
         inp = open(inp_path)
         lines = inp.readlines()
         for i, line in enumerate(lines):
@@ -867,7 +867,7 @@ class Orientation:
         return dict(euler)
 
     def slip_system_orientation_tensor(self, s):
-        '''Compute the orientation strain tensor m^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
+        """Compute the orientation strain tensor m^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
         and the given slip system.
 
         :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
@@ -875,7 +875,7 @@ class Orientation:
         .. math::
 
           M^s_{ij} = \left(l^s_i.n^s_j)
-        '''
+        """
         gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
         n_rot = np.dot(gt, plane.normal())
@@ -884,7 +884,7 @@ class Orientation:
         return np.outer(l_rot, n_rot)
 
     def slip_system_orientation_strain_tensor(self, s):
-        '''Compute the orientation strain tensor m^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
+        """Compute the orientation strain tensor m^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
         and the given slip system.
 
         :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
@@ -892,7 +892,7 @@ class Orientation:
         .. math::
 
           m^s_{ij} = \\frac{1}{2}\left(l^s_i.n^s_j + l^s_j.n^s_i)
-        '''
+        """
         gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
         n_rot = np.dot(gt, plane.normal())
@@ -902,7 +902,7 @@ class Orientation:
         return m
 
     def slip_system_orientation_rotation_tensor(self, s):
-        '''Compute the orientation rotation tensor q^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
+        """Compute the orientation rotation tensor q^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
         and the given slip system.
 
         :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
@@ -910,7 +910,7 @@ class Orientation:
         .. math::
 
           q^s_{ij} = \\frac{1}{2}\left(l^s_i.n^s_j - l^s_j.n^s_i)
-        '''
+        """
         gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
         n_rot = np.dot(gt, plane.normal())
@@ -920,13 +920,13 @@ class Orientation:
         return q
 
     def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
-        '''Compute the Schmid factor for this crystal orientation and the
+        """Compute the Schmid factor for this crystal orientation and the
         given slip system.
 
         :param slip_system: a slip system instance.
         :param load_direction: a unit vector describing the loading direction (default: vertical axis [0, 0, 1]).
         :returns float: a number between 0 ad 0.5.
-        '''
+        """
         plane = slip_system.get_slip_plane()
         gt = self.orientation_matrix().transpose()
         n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
@@ -937,14 +937,14 @@ class Orientation:
         return SF
 
     def compute_all_schmid_factors(self, slip_systems, load_direction=[0., 0., 1], verbose=False):
-        '''Compute all Schmid factors for this crystal orientation and the
+        """Compute all Schmid factors for this crystal orientation and the
         given list of slip systems.
 
         :param slip_systems: a list of the slip system from which to compute the Schmid factor values.
         :param load_direction: a unit vector describing the loading direction (default: vertical axis [0, 0, 1]).
         :param bool verbose: activate verbose mode.
         :returns list: a list of the schmid factors.
-        '''
+        """
         SF_list = []
         for ss in slip_systems:
             sf = self.schmid_factor(ss, load_direction)
@@ -955,14 +955,14 @@ class Orientation:
 
 
 class Grain:
-    '''
+    """
     Class defining a crystallographic grain.
 
     A grain has its own crystallographic orientation.
     An optional id for the grain may be specified.
     The position field is the center of mass of the grain in world coordinates.
     The volume of the grain is expressed in pixel/voxel unit.
-    '''
+    """
 
     def __init__(self, grain_id, grain_orientation):
         self.id = grain_id
@@ -972,7 +972,7 @@ class Grain:
         self.vtkmesh = None
 
     def __repr__(self):
-        '''Provide a string representation of the class.'''
+        """Provide a string representation of the class."""
         s = '%s\n * id = %d\n' % (self.__class__.__name__, self.id)
         s += ' * %s\n' % (self.orientation)
         s += ' * position %s\n' % np.array_str(self.position)
@@ -980,7 +980,7 @@ class Grain:
         return s
 
     def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
-        '''Compute the Schmid factor of this grain for the given slip system.
+        """Compute the Schmid factor of this grain for the given slip system.
 
         **Parameters**:
 
@@ -991,7 +991,7 @@ class Grain:
         **Returns**
 
         The Schmid factor of this grain for the given slip system.
-        '''
+        """
         plane = slip_system.get_slip_plane()
         gt = self.orientation_matrix().transpose()
         n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
@@ -1001,12 +1001,12 @@ class Grain:
         return self.orientation.schmid_factor(slip_system, load_direction)
 
     def SetVtkMesh(self, mesh):
-        '''Set the VTK mesh of this grain.
+        """Set the VTK mesh of this grain.
 
         **Parameters:**
 
         *mesh* The grain mesh in VTK format (typically vtkunstructuredgrid)
-        '''
+        """
         self.vtkmesh = mesh
 
     def add_vtk_mesh(self, array, contour=True, verbose=False):
@@ -1056,9 +1056,9 @@ class Grain:
             self.SetVtkMesh(thresh.GetOutput())
 
     def to_xml(self, doc, file_name=None):
-        '''
+        """
         Returns an XML representation of the Grain instance.
-        '''
+        """
         grain = doc.createElement('Grain')
         grain_id = doc.createElement('Id')
         grain_id_text = doc.createTextNode('%s' % self.id)
@@ -1127,11 +1127,11 @@ class Grain:
         self.vtkmesh = reader.GetOutput()
 
     def orientation_matrix(self):
-        '''Returns the grain orientation matrix.'''
+        """Returns the grain orientation matrix."""
         return self.orientation.orientation_matrix()
 
     def dct_omega_angles(self, hkl, lambda_keV, verbose=False):
-        '''Compute the two omega angles which satisfy the Bragg condition.
+        """Compute the two omega angles which satisfy the Bragg condition.
 
         For a grain with a given crystal orientation sitting on a vertical
         rotation axis, there is exactly two omega positions in [0, 2pi] for
@@ -1143,16 +1143,16 @@ class Grain:
         :param float lambda_keV: The X-rays energy expressed in keV
         :param bool verbose: Verbose mode (False by default)
         :returns tuple: (w1, w2) the two values of the omega angle.
-        '''
+        """
         return self.orientation.dct_omega_angles(hkl, lambda_keV, verbose)
 
 
 class Microstructure:
-    '''
+    """
     Class used to manipulate a full microstructure.
 
     It is typically defined as a list of grains objects.
-    '''
+    """
 
     def __init__(self, name='empty'):
         self.name = name
@@ -1161,12 +1161,12 @@ class Microstructure:
 
     @staticmethod
     def random_texture(n=100):
-        '''Generate a random texture microstructure.
+        """Generate a random texture microstructure.
 
         **parameters:**
 
         *n* The number of grain orientations in the microstructure.
-        '''
+        """
         from random import random
         from math import acos
         m = Microstructure(name='random_texture')
@@ -1179,11 +1179,11 @@ class Microstructure:
 
     @staticmethod
     def rand_cmap(N=4096, first_is_black=False):
-        '''Creates a random color map.
+        """Creates a random color map.
 
            The first color can be enforced to black and usually figure out the background.
            The random seed is fixed to consistently produce the same colormap.
-        '''
+        """
         np.random.seed(13)
         rand_colors = np.random.rand(N, 3)
         if first_is_black:
@@ -1191,9 +1191,9 @@ class Microstructure:
         return colors.ListedColormap(rand_colors)
 
     def ipf_cmap(self):
-        '''
+        """
         Return a colormap with ipf colors.
-        '''
+        """
 
         N = len(self.grains)
         ipf_colors = np.zeros((4096, 3))
@@ -1203,11 +1203,11 @@ class Microstructure:
 
     @staticmethod
     def from_xml(xml_file_name, grain_ids=None, verbose=False):
-        '''Load a Microstructure object from an xml file.
+        """Load a Microstructure object from an xml file.
 
         It is possible to restrict the grains which are loaded by providing
         the list of ids of the grains of interest.
-        '''
+        """
         if verbose and grain_ids: print 'loading only grain ids %s' % grain_ids
         micro = Microstructure()
         dom = parse(xml_file_name)
@@ -1222,7 +1222,7 @@ class Microstructure:
         return micro
 
     def get_grain(self, gid):
-        '''Get a particular grain given its id.
+        """Get a particular grain given its id.
 
         This method browses the microstructure and return the grain
         corresponding to the given id. If the grain is not found, the
@@ -1235,14 +1235,14 @@ class Microstructure:
         *Returns*
 
         The method return a `Grain` with the corresponding id.
-        '''
+        """
         for grain in self.grains:
             if grain.id == gid:
                 return grain
         raise ValueError('grain %d not found in the microstructure' % gid)
 
     def __repr__(self):
-        '''Provide a string representation of the class.'''
+        """Provide a string representation of the class."""
         s = '%s\n' % self.__class__.__name__
         s += '* name: %s\n' % self.name
         for g in self.grains:
@@ -1253,13 +1253,13 @@ class Microstructure:
         self.vtkmesh = mesh
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
-        '''
+        """
         Outputs the material block corresponding to this microstructure for
         a finite element calculation with z-set.
 
         :param str mat_file: The name of the file where the material behaviour is located
         :param str grain_prefix: The grain prefix used to name the elsets corresponding to the different grains
-        '''
+        """
         f = open('elset_list.txt', 'w')
         for g in self.grains:
             o = g.orientation
@@ -1269,9 +1269,9 @@ class Microstructure:
         f.close()
 
     def to_xml(self, doc):
-        '''
+        """
         Returns an XML representation of the Microstructure instance.
-        '''
+        """
         root = doc.createElement('Microstructure')
         doc.appendChild(root)
         name = doc.createElement('Name')
@@ -1285,11 +1285,11 @@ class Microstructure:
             grains.appendChild(grain.to_xml(doc, file_name))
 
     def save(self):
-        '''Saving the microstructure to the disk.
+        """Saving the microstructure to the disk.
 
         Save the metadata as a XML file and when available, also save the
         vtk representation of the grains.
-        '''
+        """
         # save the microstructure instance as xml
         doc = Document()
         self.to_xml(doc)
@@ -1313,12 +1313,12 @@ class Microstructure:
 
     def dct_projection(self, data, lattice, omega, dif_grains, lambda_keV, d, ps, det_npx=np.array([2048, 2048]), ds=1,
                        display=False, verbose=False):
-        '''Compute the detector image in dct configuration.
+        """Compute the detector image in dct configuration.
 
         :params np.ndarray data: The 3d data set from which to compute the projection.
         :params lattice: The crystal lattice of the material.
         :params float omega: The rotation angle at which the projection is computed.
-        '''
+        """
         lambda_nm = 1.2398 / lambda_keV
         # prepare rotation matrix
         omegar = omega * np.pi / 180
@@ -1427,10 +1427,10 @@ class Microstructure:
 
 
 class EbsdMicrostructure:
-    '''
+    """
     Class used to manipulate a full microstructure read from an EBSD
     measurement for instance.
-    '''
+    """
 
     def __init__(self, name='empty'):
         self.name = name
@@ -1506,7 +1506,7 @@ if __name__ == '__main__':
     micro = Microstructure.from_xml(os.path.join(data_dir, 'grains_302x302x100_uint8.xml'))
     print micro
 
-    '''
+    """
     #g6 = Grain(6, 142.845, 31.966, 214.384)
     #print g6.__repr__
     m = EbsdMicrostructure()
@@ -1514,5 +1514,5 @@ if __name__ == '__main__':
     #m.read_from_ebsd('/home/proudhon/data/ebsd/AlMgSi_Reza/80min_80Cr_17mm_export.txt')
     print m.records.shape
     m.plot(type='GID')
-    '''
+    """
     print 'done'

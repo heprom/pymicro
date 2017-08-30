@@ -3,9 +3,13 @@ pymicro/*.py[cod]
 pymicro/*/*.py[cod]
 pymicro/*/tests/*.py[cod]
 
+# examples
+examples/*/*.py[cod]
+
 # Sphinx documentation
 docs/_build
 docs/auto_examples
+docs/sphinxext/*.py[cod]
 
 # pycharm stuff
 .idea

@@ -22,11 +22,17 @@ for mod_name in MOCK_MODULES:
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
+sys.path.insert(0, os.path.abspath('../../..'))
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../pymicro'))
 sys.path.append(os.path.abspath('sphinxext'))
 print(sys.path)
+print('content of .')
+print(os.listdir('.'))
+print('content of ..')
+print(os.listdir('..'))
 try:
     import pymicro
     print('** successfully imported pymicro')

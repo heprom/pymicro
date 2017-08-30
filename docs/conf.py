@@ -24,13 +24,21 @@ for mod_name in MOCK_MODULES:
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('test'))
+sys.path.insert(0, os.path.abspath('../pymicro'))
 sys.path.append(os.path.abspath('sphinxext'))
 print(sys.path)
+try:
+    import pymicro
+    print('** successfully imported pymicro')
+    from pymicro.crystal.lattice import Lattice
+    print('** successfully imported Lattice')
+except:
+    print('problem during import')
+    pass
+
 
 try:
     import gen_rst
-
     print('** successfully imported gen_rst')
 except:
     pass

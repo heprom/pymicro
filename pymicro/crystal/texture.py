@@ -59,6 +59,13 @@ class PoleFigure:
                               dtype=np.float) / np.sqrt(2)
         self.c111s = np.array([[1, 1, 1], [-1, -1, 1], [1, -1, 1], [-1, 1, 1]], dtype=np.float) / np.sqrt(3)
 
+    def get_orientations(self):
+        """Get the list of orientations in the PoleFigure.
+        
+        :return: a list of `Orientation` instances.
+        """
+        return [grain.orientation for grain in self.microstructure.grains]
+
     def set_hkl_poles(self, hkl):
         '''Set the pole list to plot.
 

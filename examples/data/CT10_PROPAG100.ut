@@ -1,0 +1,5 @@
+**meshfile CT10_PROPAG100.geof
+**node U1 U2 U3 RU1 RU2 RU3
+**integ sig22 eto22 epcum
+**element
+1 1 1 2 1.000000000000000e+00

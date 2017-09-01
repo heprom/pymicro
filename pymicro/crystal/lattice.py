@@ -166,13 +166,16 @@ class Lattice:
         for sym in syms:
             # apply the symmetry operator
             om = np.dot(sym, g)
+            print(om)
+            print(om.trace())
             # compute the Rodrigues vector of the corresponding orientation matrix
-            r = Orientation.OrientationMatrix2Rodrigues(om)
+            #r = Orientation.OrientationMatrix2Rodrigues(om)
+            #print(r)
             # and then the rotation angle
-            omega = 2 * np.arctan(np.linalg.norm(r)) * 180 / np.pi
+            #omega = 2 * np.arctan(np.linalg.norm(r)) * 180 / np.pi
             # todo: check if we can avoid computing the R vector
-            #cw = 0.5 * (om.trace() - 1)
-            #omega = np.arccos(cw)
+            cw = 0.5 * (om.trace() - 1)
+            omega = np.arccos(cw)
             omegas.append(omega)
         index = np.argmin(omegas)
         if verbose:

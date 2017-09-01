@@ -746,7 +746,7 @@ class Orientation:
         d = 0.5 * (phi1 - phi2)
         tau = np.sqrt(t**2 + np.sin(s)**2)
         alpha = 2 * np.arctan2(tau, np.cos(s))
-        if alpha > pi:
+        if alpha > np.pi:
             axis = np.array([-t / tau * np.cos(d), -t / tau * np.sin(d), -1 / tau * np.sin(s)])
             angle = 2 * pi - alpha
         else:

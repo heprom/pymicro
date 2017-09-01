@@ -690,6 +690,7 @@ class Orientation:
         """
         t = g.trace() + 1
         if np.abs(t) < np.finfo(g.dtype).eps:
+            print('warning, returning [0., 0., 0.], consider using axis, angle representation instead')
             return np.zeros(3)
         else:
             r1 = (g[1, 2] - g[2, 1]) / t

@@ -1027,6 +1027,116 @@ def lattice_3d_with_plane_series(lattice, hkl, nps=1, **kwargs):
     return lattice_3d_with_planes(lattice, hkl_planes, plane_origins=plane_origins, **kwargs)
 
 
+def pole_figure_3d(pf, radius=1.0, show_lattice=False):
+    """
+    Method to display a pole figure in 3d.
+
+    This method displays a sphere of radius 1 with a crystal lattice placed at the center (only shown if 
+    the show_lattice parameter is True). The poles associated with the pole figure are shown on the outbounding 
+    sphere as well as the projection n the equatorial plane.
+
+    :param pf: the `PoleFigure` instance .
+    :param float radius: the outbounding sphere radius (1 by default).
+    :param show_lattice: a flag to show the crystal lattice in the center of the sphere.
+    :return: a vtk assembly that can be added to a `Scene3D` instance.
+    """
+    pole_figure = vtk.vtkAssembly()
+    orientations = pf.get_orientations()
+    # keep a list of useful points on the sphere
+    points_on_sphere = [(0.0, 0.0, -radius)]  # first point is the south pole
+
+    # get a list of hkl planes in the family
+    hkl_planes = HklPlane.get_family(pf.family)
+    orientation = orientations[0]  # treat only the first orientation for now
+    g = orientation.orientation_matrix()
+    gt = g.transpose()
+    lattice_3d = lattice_3d_with_planes(pf.lattice, hkl_planes,
+                                        crystal_orientation=orientation,
+                                        show_normal=False,
+                                        origin='mid',
+                                        tubeRadius=0.2 * radius / 10,
+                                        sphereRadius=0.5 * radius / 10,
+                                        plane_opacity=0.5)
+    origin = 0.5 * np.array(pf.lattice._lengths)
+    for hkl_plane in hkl_planes:
+        if gt.dot(hkl_plane.normal())[2] < 0:
+            print('inverting hkl')
+            hkl_plane._h = -hkl_plane._h
+            hkl_plane._k = -hkl_plane._k
+            hkl_plane._l = -hkl_plane._l
+        points_on_sphere.append(radius * gt.dot(hkl_plane.normal()))
+        if show_lattice:
+            # add an arrow to display the normal to the plane
+            arrow_actor = unit_arrow_3d(origin, radius * hkl_plane.normal())
+            lattice_3d.AddPart(arrow_actor)
+    if show_lattice:
+        pole_figure.AddPart(lattice_3d)
+
+    # add the outbounding sphere
+    sphere_source = vtk.vtkSphereSource()
+    sphere_source.SetCenter(0.0, 0.0, 0.0)
+    sphere_source.SetRadius(radius)
+    sphere_source.SetPhiResolution(300)
+    sphere_source.SetThetaResolution(300)
+    sphere_mapper = vtk.vtkPolyDataMapper()
+    sphere_mapper.SetInputConnection(sphere_source.GetOutputPort())
+    sphere_mapper.ScalarVisibilityOff()
+    sphere_actor = vtk.vtkActor()
+    sphere_actor.SetMapper(sphere_mapper)
+    sphere_actor.GetProperty().SetOpacity(0.1)
+    pole_figure.AddPart(sphere_actor)
+
+    # draw south pole and arrow tip
+    for i, c in enumerate(points_on_sphere):
+        south_pole = vtk.vtkSphere()
+        south_pole.SetCenter(c)
+        south_pole.SetRadius(radius * 0.05)
+        south_pole_cut = vtk.vtkCutter()
+        south_pole_cut.SetInputConnection(sphere_source.GetOutputPort())
+        south_pole_cut.SetCutFunction(south_pole)
+        south_pole_cut_mapper = vtk.vtkPolyDataMapper()
+        south_pole_cut_mapper.SetInputConnection(south_pole_cut.GetOutputPort())
+        south_pole_cut_actor = vtk.vtkActor()
+        south_pole_cut_actor.SetMapper(south_pole_cut_mapper)
+        south_pole_cut_actor.GetProperty().SetLineWidth(2.0)
+        south_pole_cut_actor.GetProperty().SetColor(black)
+        pole_figure.AddPart(south_pole_cut_actor)
+        if i > 0:
+            # add a line between the arrow tip and the south pole
+            line_actor = line_3d(points_on_sphere[0], c)
+            line_actor.GetProperty().SetLineWidth(2.0)
+            line_actor.GetProperty().SetDiffuseColor(1.0, 0., 0.)
+            pole_figure.AddPart(line_actor)
+            # now add the pole on the equatorial plane
+            cp = np.array(c) + np.array([0, 0, radius])
+            cp /= cp[2] / radius  # SP'/SP = r/z with r != 1
+            pole = vtk.vtkRegularPolygonSource()
+            pole.SetRadius(radius * 0.05)
+            pole.SetCenter(cp[0], cp[1], 0.0)
+            pole.SetNumberOfSides(50)
+            pole_ma = vtk.vtkPolyDataMapper()
+            pole_ma.SetInputConnection(pole.GetOutputPort())
+            pole_actor = vtk.vtkActor()
+            pole_actor.SetMapper(pole_ma)
+            pole_actor.GetProperty().SetColor(black)
+            pole_figure.AddPart(pole_actor)
+
+    # add the equatorial plane trace on the sphere
+    equatorial_plane_source = vtk.vtkPlaneSource()
+    equatorial_plane_source.SetOrigin(-radius, -radius, 0)
+    equatorial_plane_source.SetPoint1(radius, -radius, 0)
+    equatorial_plane_source.SetPoint2(-radius, radius, 0)
+    equatorial_plane = vtk.vtkPlane()
+    equatorial_plane.SetOrigin(0, 0, 0)
+    equatorial_plane.SetNormal(0, 0, 1)
+    equatorial_plane_contour = add_plane_to_grid(equatorial_plane, sphere_source.GetOutput(), None, opacity=1.0)
+    equatorial_plane_contour.GetProperty().SetLineWidth(2.0)
+    equatorial_plane_contour.GetProperty().SetColor(black)
+    pole_figure.AddPart(equatorial_plane_contour)
+
+    return pole_figure
+
+
 def apply_translation_to_actor(actor, trans):
     '''
     Transform the actor (or whole assembly) using the specified translation.

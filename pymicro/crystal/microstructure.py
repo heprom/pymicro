@@ -748,7 +748,7 @@ class Orientation:
         alpha = 2 * np.arctan2(tau, np.cos(s))
         if alpha > np.pi:
             axis = np.array([-t / tau * np.cos(d), -t / tau * np.sin(d), -1 / tau * np.sin(s)])
-            angle = 2 * pi - alpha
+            angle = 2 * np.pi - alpha
         else:
             axis = np.array([t / tau * np.cos(d), t / tau * np.sin(d), 1 / tau * np.sin(s)])
             angle = alpha

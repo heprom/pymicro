@@ -12,7 +12,9 @@ orientation:
  * :py:class:`~pymicro.crystal.microstructure.Orientation`
 """
 import numpy as np
-import os, vtk
+import os
+import vtk
+import h5py
 from matplotlib import pyplot as plt, colors, cm
 from xml.dom.minidom import Document, parse
 
@@ -493,6 +495,7 @@ class Orientation:
         """
         Returns an XML representation of the Orientation instance.
         """
+        print('deprecated as we are moving to dhf5 format')
         orientation = doc.createElement('Orientation')
         orientation_phi1 = doc.createElement('phi1')
         orientation_phi1_text = doc.createTextNode('%f' % self.phi1())
@@ -1273,6 +1276,70 @@ class Microstructure:
                 '  **elset %s%d *file %s *integration theta_method_a 1.0 1.e-9 150 *rotation %7.3f %7.3f %7.3f\n' % (
                     grain_prefix, g.id, mat_file, o.phi1(), o.Phi(), o.phi2()))
         f.close()
+
+    def to_h5(self):
+        """Write the microstructure as a hdf5 file compatible with DREAM3D."""
+        import time
+        f = h5py.File('%s.h5' % self.name, 'w')
+        f.attrs['FileVersion'] = np.string_('7.0')
+        f.attrs['DREAM3D Version'] = np.string_('6.1.77.d28a796')
+        f.attrs['HDF5_Version'] = h5py.version.hdf5_version
+        f.attrs['h5py_version'] = h5py.version.version
+        f.attrs['file_time'] = time.time()
+        # pipeline group (empty here)
+        pipeline = f.create_group('Pipeline')
+        pipeline.attrs['Number_Filters'] = np.int32(0)
+        # create the data container group
+        data_containers = f.create_group('DataContainers')
+        m = data_containers.create_group('DataContainer')
+        # ensemble data
+        ed = m.create_group('EnsembleData')
+        ed.attrs['AttributeMatrixType'] = np.uint32(11)
+        ed.attrs['TupleDimensions'] = np.uint64(2)
+        cryst_structure = ed.create_dataset('CrystalStructures', data=np.array([[999], [1]], dtype=np.uint32))
+        cryst_structure.attrs['ComponentDimensions'] = np.uint64(1)
+        cryst_structure.attrs['DataArrayVersion'] = np.int32(2)
+        cryst_structure.attrs['ObjectType'] = np.string_('DataArray<uint32_t>')
+        cryst_structure.attrs['Tuple Axis Dimensions'] = np.string_('x=2')
+        cryst_structure.attrs['TupleDimensions'] = np.uint64(2)
+        mat_name = ed.create_dataset('MaterialName', data=['Invalid Phase', 'Unknown'])
+        mat_name.attrs['ComponentDimensions'] = np.uint64(1)
+        mat_name.attrs['DataArrayVersion'] = np.int32(2)
+        mat_name.attrs['ObjectType'] = np.string_('StringDataArray')
+        mat_name.attrs['Tuple Axis Dimensions'] = np.string_('x=2')
+        mat_name.attrs['TupleDimensions'] = np.uint64(2)
+        # feature data
+        fd = m.create_group('FeatureData')
+        fd.attrs['AttributeMatrixType'] = np.uint32(7)
+        fd.attrs['TupleDimensions'] = np.uint64(len(self.grains))
+        avg_euler = fd.create_dataset('AvgEulerAngles', data=np.array([g.orientation.euler for g in self.grains], dtype=np.float32))
+        avg_euler.attrs['ComponentDimensions'] = np.uint64(3)
+        avg_euler.attrs['DataArrayVersion'] = np.int32(2)
+        avg_euler.attrs['ObjectType'] = np.string_('DataArray<float>')
+        avg_euler.attrs['Tuple Axis Dimensions'] = np.string_('x=%d' % len(self.grains))
+        avg_euler.attrs['TupleDimensions'] = np.uint64(len(self.grains))
+        # geometry
+        geom = m.create_group('_SIMPL_GEOMETRY')
+        geom.attrs['GeometryType'] = np.uint32(999)
+        geom.attrs['GeometryTypeName'] = np.string_('UnkownGeometry')
+        # create the data container bundles group
+        f.create_group('DataContainerBundles')
+        f.close()
+
+    @staticmethod
+    def from_h5(file_path):
+        """Read a microstructure from a hdf5 file.
+        
+        :param str file_path: the path to the hdf5 file to read.
+        :return: a Microstructure instance created from the hdf5 file.
+        """
+        micro = Microstructure()
+        with h5py.File(file_path, 'r') as f:
+            eulers = f['DataContainers']['DataContainer']['FeatureData']['AvgEulerAngles'][:]
+            for i in range(len(eulers)):
+                euler = eulers[i]
+                micro.grains.append(Grain(i +1, Orientation.from_euler(euler)))
+        return micro
 
     def to_xml(self, doc):
         """

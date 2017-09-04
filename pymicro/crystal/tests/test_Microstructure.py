@@ -1,8 +1,28 @@
 import unittest
+import os
 import numpy as np
-from pymicro.crystal.microstructure import Orientation, Grain
+from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from pymicro.crystal.lattice import Lattice, HklPlane, HklDirection, SlipSystem
 from pymicro.xray.xray_utils import lambda_keV_to_nm
+
+
+class MicrostructureTests(unittest.TestCase):
+
+    def setUp(self):
+        print('testing the Microstructure class')
+        self.test_eulers = [(45., 45, 0.), (10., 20, 30.), (191.9, 69.9, 138.9)]
+        self.micro = Microstructure()
+        self.micro.name = 'test'
+        for i in range(len(self.test_eulers)):
+            euler = self.test_eulers[i]
+            self.micro.grains.append(Grain(i + 1, Orientation.from_euler(euler)))
+
+    def test_to_h5(self):
+        self.micro.to_h5()
+        # read the file we have just written
+        m = Microstructure.from_h5('%s.h5' % self.micro.name)
+        self.assertEqual(len(m.grains), len(self.test_eulers))
+        os.remove('%s.h5' % self.micro.name)
 
 
 class OrientationTests(unittest.TestCase):

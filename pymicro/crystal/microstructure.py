@@ -170,13 +170,13 @@ class Orientation:
         """
         from math import sqrt, sin, cos, tan, pi, acos
         psidg = 180 * psi / pi
-        if psidg >= 0 and psidg <= 45:
+        if 0 <= psidg <= 45:
             p = 2. / 15 * (1 - cos(psi))
-        elif psidg > 45 and psidg <= 60:
+        elif 45 < psidg <= 60:
             p = 2. / 15 * (3 * (sqrt(2) - 1) * sin(psi) - 2 * (1 - cos(psi)))
-        elif psidg > 60 and psidg <= 60.72:
+        elif 60 < psidg <= 60.72:
             p = 2. / 15 * ((3 * (sqrt(2) - 1) + 4. / sqrt(3)) * sin(psi) - 6. * (1 - cos(psi)))
-        elif psidg > 60.72 and psidg <= 62.8:
+        elif 60.72 < psidg <= 62.8:
             X = (sqrt(2) - 1) / (1 - (sqrt(2) - 1) ** 2 / tan(0.5 * psi) ** 2) ** 0.5
             Y = (sqrt(2) - 1) ** 2 / ((3 - 1 / tan(0.5 * psi) ** 2) ** 0.5)
             p = (2. / 15) * ((3 * (sqrt(2) - 1) + 4 / sqrt(3)) * sin(psi) - 6 * (1 - cos(psi))) \

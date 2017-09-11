@@ -22,21 +22,27 @@ for mod_name in MOCK_MODULES:
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('../..'))
-sys.path.insert(0, os.path.abspath('../apps'))
-sys.path.insert(0, os.path.abspath('../crystal'))
-sys.path.insert(0, os.path.abspath('../external'))
-sys.path.insert(0, os.path.abspath('../fe'))
-sys.path.insert(0, os.path.abspath('../file'))
-sys.path.insert(0, os.path.abspath('../math'))
-sys.path.insert(0, os.path.abspath('../xray'))
 sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('.'))
 sys.path.append(os.path.abspath('sphinxext'))
+print(sys.path)
+print('content of .')
+print(os.listdir('.'))
+print('content of ..')
+print(os.listdir('..'))
+print('content of ../..')
+print(os.listdir('../..'))
+try:
+    import pymicro
+    print('** successfully imported pymicro')
+    from pymicro.crystal.lattice import Lattice
+    print('** successfully imported Lattice')
+except:
+    print('problem during import')
+    pass
+
 
 try:
     import gen_rst
-
     print('** successfully imported gen_rst')
 except:
     pass
@@ -81,7 +87,7 @@ def extract_version():
     Extracts version values from the main __init__.py and
     returns them as a dictionary.
     """
-    with open('../__init__.py') as fd:
+    with open('../pymicro/__init__.py') as fd:
         for line in fd.readlines():
             if (line.startswith('__version__')):
                 exec (line.strip())

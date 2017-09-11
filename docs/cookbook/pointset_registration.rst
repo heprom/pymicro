@@ -14,7 +14,7 @@ Here we will illustrate the method `compute_affine_transform` and then apply it 
 Let's consider 5 points given by their coordinates :math:`(x, y)` in the reference 2D space.
 
 .. literalinclude:: pointset_registration.py
-:lines: 9-14
+   :lines: 9-14
 
     For the sake of the
     example, let's transform the 5 points by an isotropic scaling of :math:`s=1.4`, a rotation of :math:`\theta=22` degrees
@@ -55,7 +55,7 @@ For this example we have chosen the following transformation:
    \end{pmatrix}
 
 .. literalinclude:: pointset_registration.py
-:lines: 25-39
+   :lines: 25-39
 
     Which is also equivalent to:
 
@@ -80,25 +80,25 @@ In this case, one can verify that the full transformation is:
 With either solution, we can transform the points to obtain the new coordinates:
 
 .. literalinclude:: pointset_registration.py
-:lines: 41-46
+   :lines: 41-46
 
 .. image:: pointset_registration_1.png
-:width: 45%
+   :width: 45%
 .. image:: pointset_registration_2.png
-:width: 45%
+   :width: 45%
 
 With the two lists (or arrays) of points, one can compute the affine transform:
 
 .. literalinclude:: pointset_registration.py
-:lines: 60-63
+   :lines: 60-63
 
 And register the points using the inverse affine transform and the offset computed from the centroids.
 
 .. literalinclude:: pointset_registration.py
-:lines: 64-68
+   :lines: 64-68
 
 .. figure:: pointset_registration_3.png
-:align: center
+   :align: center
    :width: 50%
 
        The 5 transformed points registered by applying the inverse affine transform.

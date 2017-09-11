@@ -20,6 +20,7 @@ densities = {'Li': 0.533,  # Z = 3
              'Ge': 5.370,  # Z = 32
              'Nb': 8.550,  # Z = 41
              'Pb': 11.330,  # Z = 82
+             'WC': 15.63, # Z(W) = 74
              }
 
 
@@ -84,7 +85,9 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     path = os.path.dirname(__file__)
     print path
     mu_rho = np.genfromtxt(os.path.join(path, 'data', mat + '.txt'), usecols=(0, 1), comments='#')
+    print(mu_rho)
     energy = mu_rho[:, 0]
+    print(energy)
     # look up density
     if rho is None:
         rho = densities[mat]
@@ -102,7 +105,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     plt.grid()
     plt.legend(loc='upper left')
     plt.xlabel('Photon Energy (keV)')
-    plt.ylabel(r'Transmission $I/I_0$ (%)')
+    plt.ylabel('Transmission I/I0 (%)')
     if display:
         plt.show()
     else:

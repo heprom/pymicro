@@ -119,8 +119,44 @@ def diffracted_vector(hkl, orientation, min_theta=0.1, verbose=False):
     return K
 
 
-def compute_Laue_pattern(orientation, detector, hklplanes=None, spectrum=None, spectrum_thr=0.,
-                         r_spot=5, color_spots_by_energy=False, inverted=False, show_direct_beam=False):
+def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
+    '''Compute the diffracted intensity.
+    
+    This compute a number representing the diffracted intensity within the kinematical approximation. 
+    This number includes many correction factors:
+    
+     * atomic factor
+     * structural factor
+     * polarisation factor
+     * Debye-Waller factor
+     * absorption factor
+     * ...
+    
+    :param HklPlane hkl: the hkl Bragg reflection.
+    :param float I0: intensity of the incident beam.
+    :param str symbol: string representing the considered lattice.
+    :param bool verbose: flag to activate verbose mode.
+    :return: the diffracted intensity.
+    :rtype: float.
+    '''
+    # TODO find a way to load the atom scattering data from the lattice... and not load it for every reflection!
+    path = os.path.dirname(__file__)
+    scat_data = np.genfromtxt(os.path.join(path, 'data', '%s_atom_scattering.txt' % symbol))
+    # scale the intensity with the atomic scattering factor
+    q = 1 / (2 * hkl.interplanar_spacing())
+    try:
+        index = (scat_data[:, 0] < q).tolist().index(False)
+    except ValueError:
+        index = -1
+    fa = scat_data[index, 1] / scat_data[0, 1]  # should we normalize with respect to Z?
+    if verbose:
+        print('q=%f in nm^-1 -> fa=%.3f' % (q, fa))
+    I = I0 * fa
+    return I
+
+
+def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, spectrum_thr=0.,
+                         r_spot=5, color_field='constant', inverted=False, show_direct_beam=False):
     '''
     Compute a transmission Laue pattern. The data array of the given
     `Detector2d` instance is initialized with the result.
@@ -129,21 +165,25 @@ def compute_Laue_pattern(orientation, detector, hklplanes=None, spectrum=None, s
     an instance of the `Orientation` class. The `Detector2d` instance holds all the geometry (detector size and 
     position).
 
+    A parameter controls the meaning of the values in the diffraction spots in the image. It can be just a constant 
+    value, the diffracted beam energy (in keV) or the intensity as computed by the :py:meth:`diffracted_intensity` 
+    method.
+
     :param orientation: The crystal orientation.
     :param detector: An instance of the Detector2d class.
-    :param list hklplanes: A list of the lattice planes to include in the pattern.
+    :param list hkl_planes: A list of the lattice planes to include in the pattern.
     :param spectrum: A two columns array of the spectrum to use for the calculation.
     :param float spectrum_thr: The threshold to use to determine if a wave length is contributing or not.
     :param int r_spot: Size of the spots on the detector in pixel (5 by default)
-    :param bool color_spots_by_energy: Flag to color the diffraction spots in the image by the diffracted beam energy (in keV).
+    :param str color_field: a traing describing, must be 'constant', 'energy' or 'intensity'
     :param bool inverted: A flag to control if the pattern needs to be inverted.
     :param bool show_direct_beam: A flag to control if the direct beam is shown.
     :returns: the computed pattern as a numpy array.
     '''
-    detector.data = np.zeros(detector.size, dtype=np.uint32)
+    detector.data = np.zeros(detector.size, dtype=np.float32)
     # create a small square image for one spot
     spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=np.uint8)
-    max_val = np.iinfo(detector.data.dtype.type).max  # 255 here
+    max_val = np.iinfo(np.uint8).max  # 255 here
     if show_direct_beam:
         add_to_image(detector.data, max_val * spot, (detector.ucen, detector.vcen))
 
@@ -156,7 +196,7 @@ def compute_Laue_pattern(orientation, detector, hklplanes=None, spectrum=None, s
         lambda_max = lambda_keV_to_nm(E_min)
         print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
 
-    for hkl in hklplanes:
+    for hkl in hkl_planes:
         (the_energy, theta) = select_lambda(hkl, orientation, verbose=False)
         if spectrum is not None:
             if abs(the_energy) < E_min or abs(the_energy) > E_max:
@@ -169,20 +209,27 @@ def compute_Laue_pattern(orientation, detector, hklplanes=None, spectrum=None, s
         R = detector.project_along_direction(K, origin=[0., 0., 0.])
         (u, v) = detector.lab_to_pixel(R)
         if u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
+            print('* %d%d%d reflexion' % hkl.miller_indices())
             print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], u, v))
-            print('diffracted beam energy is {0}'.format(abs(the_energy)))
-            print('Bragg angle is {0}'.format(abs(theta * 180 / np.pi)))
+            print('diffracted beam energy is {0:.1f} keV'.format(abs(the_energy)))
+            print('Bragg angle is {0:.2f} deg'.format(abs(theta * 180 / np.pi)))
         # mark corresponding pixels on the image detector
-        if color_spots_by_energy:
-            add_to_image(detector.data, abs(the_energy) * spot.astype(float), (u, v))
-        else:
+        if color_field == 'constant':
             add_to_image(detector.data, max_val * spot, (u, v))
-    # limit maximum to max_val (255) and convert to uint8
-    over = detector.data > 255
-    detector.data[over] = 255
-    detector.data = detector.data.astype(np.uint8)
+        elif color_field == 'energy':
+            add_to_image(detector.data, abs(the_energy) * spot.astype(float), (u, v))
+        elif color_field == 'intensity':
+            I = diffracted_intensity(hkl, I0=max_val)
+            add_to_image(detector.data, I * spot, (u, v))
+        else:
+            raise ValueError('unsupported color_field: %s' % color_field)
     if inverted:
-        print('inverting image')
+        # np.invert works only with integer types
+        print('casting to uint8 and inverting image')
+        # limit maximum to max_val (255) and convert to uint8
+        over = detector.data > 255
+        detector.data[over] = 255
+        detector.data = detector.data.astype(np.uint8)
         detector.data = np.invert(detector.data)
     return detector.data
 

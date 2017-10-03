@@ -9,21 +9,20 @@ from pymicro.xray.detectors import Varian2520
 if __name__ == '__main__':
     det_distance = 150.
     detector = Varian2520()
+    detector.ref_pos = np.array([det_distance, 0., 0.])
     ni = Lattice.face_centered_cubic(0.3524)
     phi1 = 89.4  # deg
     phi = 92.0  # deg
     phi2 = 86.8  # deg
     orientation = Orientation.from_euler([phi1, phi, phi2])
-    Bt = orientation.orientation_matrix().transpose()
-
     uvw = HklDirection(1, 0, 5, ni)
-    hklplanes = uvw.find_planes_in_zone(max_miller=8)
 
     all_planes = build_list(lattice=ni, max_miller=8)
-    compute_Laue_pattern(orientation, detector, det_distance, all_planes, inverted=True)
+    compute_Laue_pattern(orientation, detector, all_planes, color_field='constant', r_spot=10, inverted=True)
+    print(detector.data.max())
 
     plt.figure()  # new figure
-    plt.imshow(detector.data.T, cmap=cm.gray)
+    plt.imshow(detector.data.T, cmap=cm.gray, vmin=0, vmax=255)
     plt.axis('equal')
     plt.xlabel('u coordinate (pixel)')
     plt.ylabel('v coordinate (pixel)')
@@ -31,7 +30,7 @@ if __name__ == '__main__':
     plt.title("Laue pattern, detector distance = %g" % det_distance)
     plt.plot(detector.ucen, detector.vcen, 'ks', label='diffracted beams')
     uvw_miller = uvw.miller_indices()
-    ellipse = compute_ellpisis(orientation, detector, det_distance, uvw, verbose=True)
+    ellipse = compute_ellipsis(orientation, detector, det_distance, uvw, verbose=True)
     plt.plot(ellipse[0], ellipse[1], 'r--', label='ellipse zone [%d%d%d]' % uvw_miller)
     plt.legend(numpoints=1, loc='lower right')
 
@@ -40,5 +39,4 @@ if __name__ == '__main__':
     plt.savefig(image_name, format='png')
 
     from matplotlib import image
-
     image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

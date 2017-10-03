@@ -129,7 +129,7 @@ class Orientation:
             uvw /= max(uvw)
             if (uvw[0] >= 0. and uvw[0] <= 1.0) and (uvw[1] >= 0. and uvw[1] <= 1.0) and (
                             uvw[2] >= 0. and uvw[2] <= 1.0):
-                #print('found sym for sst')
+                # print('found sym for sst')
                 break
         return uvw
 
@@ -146,7 +146,7 @@ class Orientation:
             # in the cubic symmetry, each component must be < 2 ** 0.5 - 1
             inFZ = inFZT23 and np.abs(r).max() <= 2 ** 0.5 - 1
         else:
-            raise(ValueError('unsupported crystal symmetry: %s' % symmetry))
+            raise (ValueError('unsupported crystal symmetry: %s' % symmetry))
         return inFZ
 
     def move_to_FZ(self, symmetry='cubic', verbose=False):
@@ -365,8 +365,8 @@ class Orientation:
         Gc = hkl.scattering_vector()
         A = np.dot(Gc, gt[0])
         B = - np.dot(Gc, gt[1])
-        #A = h / a * gt[0, 0] + k / b * gt[0, 1] + l / c * gt[0, 2]
-        #B = -h / a * gt[1, 0] - k / b * gt[1, 1] - l / c * gt[1, 2]
+        # A = h / a * gt[0, 0] + k / b * gt[0, 1] + l / c * gt[0, 2]
+        # B = -h / a * gt[1, 0] - k / b * gt[1, 1] - l / c * gt[1, 2]
         C = -2 * np.sin(theta) ** 2 / lambda_nm  # the minus sign comes from the main equation
         Delta = 4 * (A ** 2 + B ** 2 - C ** 2)
         if Delta < 0:
@@ -731,9 +731,12 @@ class Orientation:
         omega = np.radians(angle)
         c = np.cos(omega)
         s = np.sin(omega)
-        g = np.array([[c + (1 - c) * axis[0]**2, (1 - c) * axis[0] * axis[1] + s * axis[2], (1 - c) * axis[0] * axis[2] - s * axis[1]],
-                      [(1 - c) * axis[0] * axis[1] - s * axis[2], c + (1 - c) * axis[1]**2, (1 - c) * axis[1] * axis[2] + s * axis[0]],
-                      [(1 - c) * axis[0] * axis[2] + s * axis[1], (1 - c) * axis[1] * axis[2] - s * axis[0], c + (1 - c) * axis[2]**2]])
+        g = np.array([[c + (1 - c) * axis[0] ** 2, (1 - c) * axis[0] * axis[1] + s * axis[2],
+                       (1 - c) * axis[0] * axis[2] - s * axis[1]],
+                      [(1 - c) * axis[0] * axis[1] - s * axis[2], c + (1 - c) * axis[1] ** 2,
+                       (1 - c) * axis[1] * axis[2] + s * axis[0]],
+                      [(1 - c) * axis[0] * axis[2] + s * axis[1], (1 - c) * axis[1] * axis[2] - s * axis[0],
+                       c + (1 - c) * axis[2] ** 2]])
         return g
 
     @staticmethod
@@ -748,7 +751,7 @@ class Orientation:
         t = np.tan(0.5 * Phi)
         s = 0.5 * (phi1 + phi2)
         d = 0.5 * (phi1 - phi2)
-        tau = np.sqrt(t**2 + np.sin(s)**2)
+        tau = np.sqrt(t ** 2 + np.sin(s) ** 2)
         alpha = 2 * np.arctan2(tau, np.cos(s))
         if alpha > np.pi:
             axis = np.array([-t / tau * np.cos(d), -t / tau * np.sin(d), -1 / tau * np.sin(s)])
@@ -1207,7 +1210,7 @@ class Microstructure:
         N = len(self.grains)
         ipf_colors = np.zeros((4096, 3))
         for g in self.grains:
-            ipf_colors[g.id,:] = g.orientation.get_ipf_colour()
+            ipf_colors[g.id, :] = g.orientation.get_ipf_colour()
         return colors.ListedColormap(ipf_colors)
 
     @staticmethod
@@ -1312,7 +1315,8 @@ class Microstructure:
         fd = m.create_group('FeatureData')
         fd.attrs['AttributeMatrixType'] = np.uint32(7)
         fd.attrs['TupleDimensions'] = np.uint64(len(self.grains))
-        avg_euler = fd.create_dataset('AvgEulerAngles', data=np.array([g.orientation.euler for g in self.grains], dtype=np.float32))
+        avg_euler = fd.create_dataset('AvgEulerAngles',
+                                      data=np.array([g.orientation.euler for g in self.grains], dtype=np.float32))
         avg_euler.attrs['ComponentDimensions'] = np.uint64(3)
         avg_euler.attrs['DataArrayVersion'] = np.int32(2)
         avg_euler.attrs['ObjectType'] = np.string_('DataArray<float>')
@@ -1327,18 +1331,26 @@ class Microstructure:
         f.close()
 
     @staticmethod
-    def from_h5(file_path):
+    def from_h5(file_path, data_container='DataContainer', grain_data='FeatureData',
+                grain_euler_angles='AvgEulerAngles', grain_centroid='Centroids'):
         """Read a microstructure from a hdf5 file.
         
         :param str file_path: the path to the hdf5 file to read.
-        :return: a Microstructure instance created from the hdf5 file.
+        :param str data_container: the string describing the data container group in the hdf5 file.
+        :param str grain_data: the string describing the grain data group in the hdf5 file.
+        :param str grain_euler_angles: the string describing the average grain euler angles field in the hdf5 file.
+        :param str grain_centroid: the string describing the grain centroid in the hdf5 file.
+        :return: a `Microstructure` instance created from the hdf5 file.
         """
         micro = Microstructure()
         with h5py.File(file_path, 'r') as f:
-            eulers = f['DataContainers']['DataContainer']['FeatureData']['AvgEulerAngles'][:]
+            eulers = f['DataContainers'][data_container][grain_data][grain_euler_angles][:]
+            centroids = f['DataContainers'][data_container][grain_data][grain_centroid][:]
             for i in range(len(eulers)):
-                euler = eulers[i]
-                micro.grains.append(Grain(i +1, Orientation.from_euler(euler)))
+                # start with grain 0 which is always (0., 0., 0.)
+                g = Grain(i, Orientation.from_euler(eulers[i] * 180 / np.pi))
+                g.position = centroids[i]
+                micro.grains.append(g)
         return micro
 
     def to_xml(self, doc):

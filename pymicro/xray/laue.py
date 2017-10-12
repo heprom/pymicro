@@ -156,7 +156,7 @@ def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
 
 
 def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, spectrum_thr=0.,
-                         r_spot=5, color_field='constant', inverted=False, show_direct_beam=False):
+                         r_spot=5, color_field='constant', inverted=False, show_direct_beam=False, verbose=False):
     '''
     Compute a transmission Laue pattern. The data array of the given
     `Detector2d` instance is initialized with the result.
@@ -178,6 +178,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
     :param str color_field: a traing describing, must be 'constant', 'energy' or 'intensity'
     :param bool inverted: A flag to control if the pattern needs to be inverted.
     :param bool show_direct_beam: A flag to control if the direct beam is shown.
+    :param bool verbose: activate verbose mode (False by default).
     :returns: the computed pattern as a numpy array.
     '''
     detector.data = np.zeros(detector.size, dtype=np.float32)
@@ -194,7 +195,8 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
         E_max = float(spectrum[indices[-1], 0])
         lambda_min = lambda_keV_to_nm(E_max)
         lambda_max = lambda_keV_to_nm(E_min)
-        print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
+        if verbose:
+            print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
 
     for hkl in hkl_planes:
         (the_energy, theta) = select_lambda(hkl, orientation, verbose=False)
@@ -208,7 +210,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
             continue  # skip diffraction // to the detector
         R = detector.project_along_direction(K, origin=[0., 0., 0.])
         (u, v) = detector.lab_to_pixel(R)
-        if u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
+        if verbose and u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
             print('* %d%d%d reflexion' % hkl.miller_indices())
             print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], u, v))
             print('diffracted beam energy is {0:.1f} keV'.format(abs(the_energy)))
@@ -219,7 +221,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
         elif color_field == 'energy':
             add_to_image(detector.data, abs(the_energy) * spot.astype(float), (u, v))
         elif color_field == 'intensity':
-            I = diffracted_intensity(hkl, I0=max_val)
+            I = diffracted_intensity(hkl, I0=max_val, verbose=verbose)
             add_to_image(detector.data, I * spot, (u, v))
         else:
             raise ValueError('unsupported color_field: %s' % color_field)

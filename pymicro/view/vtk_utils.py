@@ -1938,6 +1938,7 @@ def show_boundaries(grid, array_id=0, array_name=None, write=False):
         thresh.SetInputData(grid)
         thresh.ThresholdBetween(gid - 0.5, gid + 0.5)
         thresh.SetInputArrayToProcess(1, 0, 0, 0, array_name)
+        thresh.Update()
         geometryFilter = vtk.vtkGeometryFilter()
         geometryFilter.SetInputConnection(thresh.GetOutputPort())
         boundariesExtractor = vtk.vtkFeatureEdges()

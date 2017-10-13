@@ -20,7 +20,7 @@ class MicrostructureTests(unittest.TestCase):
     def test_to_h5(self):
         self.micro.to_h5()
         # read the file we have just written
-        m = Microstructure.from_h5('%s.h5' % self.micro.name)
+        m = Microstructure.from_h5('%s.h5' % self.micro.name, grain_centroid=None)
         self.assertEqual(len(m.grains), len(self.test_eulers))
         os.remove('%s.h5' % self.micro.name)
 

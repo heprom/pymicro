@@ -1345,11 +1345,13 @@ class Microstructure:
         micro = Microstructure()
         with h5py.File(file_path, 'r') as f:
             eulers = f['DataContainers'][data_container][grain_data][grain_euler_angles][:]
-            centroids = f['DataContainers'][data_container][grain_data][grain_centroid][:]
+            if grain_centroid:
+                centroids = f['DataContainers'][data_container][grain_data][grain_centroid][:]
             for i in range(len(eulers)):
                 # start with grain 0 which is always (0., 0., 0.)
                 g = Grain(i, Orientation.from_euler(eulers[i] * 180 / np.pi))
-                g.position = centroids[i]
+                if grain_centroid:
+                    g.position = centroids[i]
                 micro.grains.append(g)
         return micro
 

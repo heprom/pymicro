@@ -1,5 +1,6 @@
 import numpy as np
-from pymicro.crystal.lattice import HklPlane
+from pymicro.crystal.lattice import HklPlane, Lattice
+from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import *
 from pymicro.xray.dct import add_to_image
 
@@ -311,6 +312,127 @@ def gnomonic_projection(detector):
     gnom.data[ug_px, vg_px] = 1
     return gnom
 
+
+def identify_hkl_from_list(hkl_list):
+    if hkl_list[1] == hkl_list[2]:
+        ids = [1, 3, 0]
+    elif hkl_list[1] == hkl_list[3]:
+        ids = [1, 2, 0]
+    elif hkl_list[0] == hkl_list[2]:
+        ids = [0, 3, 1]
+    elif hkl_list[0] == hkl_list[3]:
+        ids = [0, 2, 1]
+    '''
+    if hkl_list[1] == hkl_list[2]:
+        if hkl_list[3] == hkl_list[4] and hkl_list[0] == hkl_list[5] or \
+                                hkl_list[3] == hkl_list[5] and hkl_list[0] == hkl_list[4]:
+            identified_list = [hkl_list[1], hkl_list[3], hkl_list[0]]
+
+    elif hkl_list[1] == hkl_list[3]:
+        if hkl_list[2] == hkl_list[4]:
+            if hkl_list[0] == hkl_list[5]:
+                identified_list = [hkl_list[1], hkl_list[2], hkl_list[0]]
+
+        elif hkl_list[2] == hkl_list[5]:
+            if hkl_list[0] == hkl_list[4]:
+                identified_list = [hkl_list[1], hkl_list[2], hkl_list[0]]
+
+    elif hkl_list[0] == hkl_list[2]:
+        if hkl_list[3] == hkl_list[4]:
+            if hkl_list[1] == hkl_list[5]:
+                identified_list = [hkl_list[0], hkl_list[3], hkl_list[1]]
+
+        elif hkl_list[3] == hkl_list[5]:
+            if hkl_list[1] == hkl_list[4]:
+                identified_list = [hkl_list[0], hkl_list[3], hkl_list[1]]
+
+    elif hkl_list[0] == hkl_list[3]:
+        if hkl_list[2] == hkl_list[4]:
+            if hkl_list[1] == hkl_list[5]:
+                identified_list = [hkl_list[0], hkl_list[2], hkl_list[1]]
+
+        elif hkl_list[2] == hkl_list[5]:
+            if hkl_list[1] == hkl_list[4]:
+                identified_list = [hkl_list[0], hkl_list[2], hkl_list[1]]
+    '''
+    return [hkl_list[i] for i in ids]
+
+
+def triplet_indexing(OP, angles_exp, angles_th, tol=1.0):
+    '''
+    evaluate each triplet composed by 3 diffracted points.
+    the total number of triplet is given by the binomial coefficient (n, 3) = n*(n-1)*(n-2)/6
+    '''
+    nombre_triplet = 0
+    OP_indexed = []
+    for ti in range(len(OP) - 2):
+
+        for tj in range(ti + 1, len(OP) - 1):
+
+            triplet = np.zeros(3)
+            for tk in range(tj + 1, len(OP)):
+                nombre_triplet = nombre_triplet + 1
+                print('\n\ntriplet number = {0:d}'.format(nombre_triplet))
+                # look for possible matches for a given triplet
+                triplet = [(ti, tj), (tj, tk), (ti, tk)]
+                print('** testing triplet %s' % triplet)
+                candidates = []  # will contain the 3 lists of candidates for a given triplet
+                for (i, j) in triplet:
+                    angle_to_match = angles_exp[i, j]
+                    # find the index by looking to matching angles within the tolerance
+                    cand = np.argwhere(
+                        abs(angles_th['angle'] - angle_to_match) < tol).flatten()  # flatten since shape is (n, 1)
+                    print('* couple (OP%d, OP%d) has angle %.2f -> %d couple candidate(s) in the angle_th list: %s' % (
+                        i, j, angle_to_match, len(cand), cand))
+                    candidates.append(cand)
+                print('looking for real triplet in all %d candidates pairs:' % (
+                    len(candidates[0]) * len(candidates[1]) * len(candidates[2])))
+                for ci in candidates[0]:
+                    for cj in candidates[1]:
+                        for ck in candidates[2]:
+                            # make a list of the candidate hkl plane indices, based on the angle match
+                            hkl_list = [angles_th['hkl1'][ci], angles_th['hkl2'][ci],
+                                        angles_th['hkl1'][cj], angles_th['hkl2'][cj],
+                                        angles_th['hkl1'][ck], angles_th['hkl2'][ck]]
+                            # look how many unique planes are in the list (should be 3 for a triplet)
+                            print('- candidates with indices %s correspond to %s' % ([ci, cj, ck], hkl_list))
+                            unique_indices = np.unique(hkl_list)
+                            if len(unique_indices) != 3:
+                                print('not a real triplet, skipping this one')
+                                continue
+                            print('this is a triplet: %s' % unique_indices)
+                            # the points can now be identified from the hkl_list ordering
+                            identified_list = identify_hkl_from_list(hkl_list)
+                            full_list = [tj, tk, ti]
+                            full_list.extend(identified_list)
+                            print(full_list)
+                            OP_indexed.append(full_list)
+                            print('*  (OP%d) -> %d ' % (tj, identified_list[0]))
+                            print('*  (OP%d) -> %d ' % (tk, identified_list[1]))
+                            print('*  (OP%d) -> %d ' % (ti, identified_list[2]))
+    print('indexed list length is %d' % len(OP_indexed))
+    print(OP_indexed)
+    return OP_indexed
+
+
+def transformation_matrix(hkl_plane_1, hkl_plane_2, xyz_normal_1, xyz_normal_2):
+    # create the vectors representing this frame in the crystal coordinate system
+    e1_hat_c = hkl_plane_1.normal()
+    e2_hat_c = np.cross(hkl_plane_1.normal(), hkl_plane_2.normal()) / np.linalg.norm(
+        np.cross(hkl_plane_1.normal(), hkl_plane_2.normal()))
+    e3_hat_c = np.cross(e1_hat_c, e2_hat_c)
+    e_hat_c = np.array([e1_hat_c, e2_hat_c, e3_hat_c])
+    # create local frame attached to the indexed crystallographic features in XYZ
+    e1_hat_star = xyz_normal_1
+    e2_hat_star = np.cross(xyz_normal_1, xyz_normal_2) / np.linalg.norm(
+        np.cross(xyz_normal_1, xyz_normal_2))
+    e3_hat_star = np.cross(e1_hat_star, e2_hat_star)
+    e_hat_star = np.array([e1_hat_star, e2_hat_star, e3_hat_star])
+    # now build the orientation matrix
+    orientation_matrix = np.dot(e_hat_c.T, e_hat_star)
+    return orientation_matrix
+
+
 def confidence_index(votes):
     n = np.sum(votes)  # total number of votes
     v1 = max(votes)
@@ -318,6 +440,7 @@ def confidence_index(votes):
     v2 = max(votes)
     ci = (1. * (v1 - v2)) / n
     return ci
+
 
 def poll_system(g_list, dis_tol=1.0):
     """
@@ -331,6 +454,7 @@ def poll_system(g_list, dis_tol=1.0):
     """
     solution_indices = [0]
     votes = [0]
+    vote_index = np.zeros(len(g_list), dtype=int)
     dis_tol_rad = dis_tol * np.pi / 180
     from pymicro.crystal.microstructure import Orientation
     for i in range(len(g_list)):
@@ -344,25 +468,94 @@ def poll_system(g_list, dis_tol=1.0):
             print('j=%d -- angle=%f' % (j, angle))
             if angle <= dis_tol_rad:
                 votes[j] += 1
+                vote_index[i] = j
                 print('angle (deg) is %.2f' % (180 / np.pi * angle))
                 print('vote list is now %s' % votes)
+                print('solution_indices list is now %s' % solution_indices)
                 break
             elif j == len(solution_indices) - 1:
                 solution_indices.append(i)
                 votes.append(1)
+                vote_index[i] = len(votes) - 1
                 print('vote list is now %s' % votes)
+                print('solution_indices list is now %s' % solution_indices)
                 break
     print('Max vote =', np.amax(votes))
     index_result = np.argwhere(votes == np.amax(votes))
+    print('index result:', index_result)
     print('Number of equivalent solutions :', len(index_result))
     final_orientation_matrix = []
     for n in range(len(index_result)):
-        solutions = g_list[index_result[n]]
+        solutions = g_list[solution_indices[index_result[n]]]
         print('Solution number {0:d} is'.format(n+1), solutions)
         final_orientation_matrix.append(solutions)
     result_vote = max(votes)
     ci = confidence_index(votes)
-    return final_orientation_matrix, result_vote, ci
+    vote_field = [votes[i] for i in vote_index]
+    return final_orientation_matrix, result_vote, ci, vote_field
+
+
+def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, display=False):
+    # angles between normal from the gnomonic projection
+    angles_exp = np.zeros((len(hkl_normals), len(hkl_normals)), dtype=float)
+    print('\nlist of angles between points on the detector')
+    for i in range(len(hkl_normals)):
+        for j in range(i + 1, len(hkl_normals)):
+            angle = 180 / np.pi * np.arccos(np.dot(hkl_normals[i], hkl_normals[j]))
+            angles_exp[i, j] = angle
+            print('%.2f, OP%d, OP%d' % (angles_exp[i, j], i, j))
+    # keep a list of the hkl values as string
+    hkl_str = []
+    for p in hkl_planes:
+        (h, k, l) = p.miller_indices()
+        hkl_str.append('(%d%d%d)' % (h, k, l))
+    # compute theoretical angle between each plane normal, store the results using a structured array
+    angles_th = np.empty(len(hkl_planes) * (len(hkl_planes) - 1) / 2,
+                         dtype=[('angle', 'f4'), ('hkl1', 'i4'), ('hkl2', 'i4')])
+    index = 0
+    for i in range(len(hkl_planes)):
+        for j in range(i + 1, len(hkl_planes)):
+            angle = 180 / np.pi * np.arccos(np.dot(hkl_planes[i].normal(), hkl_planes[j].normal()))
+            angles_th[index] = (angle, i, j)
+            index += 1
+
+    # sort the array by increasing angle
+    angles_th.sort(order='angle')
+    print('\nsorted list of angles between hkl plane normals')
+    for i in range(len(angles_th)):
+        print('%.3f, (%d, %d) -> %s, %s' % (
+            angles_th['angle'][i], angles_th['hkl1'][i], angles_th['hkl2'][i], hkl_str[angles_th['hkl1'][i]],
+            hkl_str[angles_th['hkl2'][i]]))
+
+    # index by triplets
+    normal_indexed = triplet_indexing(hkl_normals, angles_exp, angles_th, tol=tol_angle)
+    print('indexed list length is %d' % len(normal_indexed))
+    print(normal_indexed)
+
+    # Compute the orientation matrix g for all different triplets
+    g_indexation = []
+    for i in range(len(normal_indexed)):
+        # a given indexed triplet allow to construct 3 orientation matrices (which should be identical)
+        pos = [[0, 1, 3, 4], [1, 2, 4, 5], [2, 0, 5, 3]]
+        for j in range(3):
+            orientation_matrix = transformation_matrix(
+                hkl_planes[normal_indexed[i][pos[j][2]]], hkl_planes[normal_indexed[i][pos[j][3]]],
+                hkl_normals[normal_indexed[i][pos[j][0]]], hkl_normals[normal_indexed[i][pos[j][1]]])
+        # move to the fundamental zone
+        om_fz = Lattice.move_rotation_to_FZ(orientation_matrix)  # we only add the third one
+        g_indexation.append(om_fz)
+    final_orientation_matrix, vote, ci, vote_field = poll_system(g_indexation, dis_tol=tol_disorientation)
+    print('\n\n\n### FINAL SOLUTION(S) ###\n')
+    for n in range(len(final_orientation_matrix)):
+        print('- SOLUTION %d -' % (n + 1))
+        final_orientation = Orientation(final_orientation_matrix[n])
+        print(final_orientation.inFZ())
+        print ('- Cristal orientation in Fundamental Zone \n {0:s} \n'.format(final_orientation.euler))
+        print('- Rodrigues vector in the fundamental Zone \n {0:s} \n'.format(final_orientation.rod))
+        if display:
+            from pymicro.crystal.texture import PoleFigure
+            PoleFigure.plot(final_orientation, axis='Z')
+    return final_orientation_matrix
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt, cm, rcParams

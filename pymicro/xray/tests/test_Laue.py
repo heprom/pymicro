@@ -7,12 +7,12 @@ from pymicro.xray.laue import select_lambda, index
 
 class LaueTests(unittest.TestCase):
     def setUp(self):
-        print('testing the laue module')
+        """testing the laue module:"""
+        self.ni = Lattice.from_symbol('Ni')
 
     def test_angle_zone(self):
-        '''Verify the angle between X and a particular zone axis expressed
-        in (X, Y, Z), given a crystal orientation.'''
-        ni = Lattice.from_symbol('Ni')
+        """Verify the angle between X and a particular zone axis expressed
+        in (X, Y, Z), given a crystal orientation."""
         # euler angles in degrees
         phi1 = 89.4
         phi = 92.0
@@ -20,7 +20,7 @@ class LaueTests(unittest.TestCase):
         orientation = Orientation.from_euler([phi1, phi, phi2])
         Bt = orientation.orientation_matrix().transpose()
         # zone axis
-        uvw = HklDirection(1, 0, 5, ni)
+        uvw = HklDirection(1, 0, 5, self.ni)
         ZA = Bt.dot(uvw.direction())
         if ZA[0] < 0:
             ZA *= -1  # make sur the ZA vector is going forward
@@ -28,17 +28,15 @@ class LaueTests(unittest.TestCase):
         self.assertAlmostEqual(psi0 * 180 / np.pi, 9.2922, 3)
 
     def test_select_lambda(self):
-        '''Verify the wavelength diffracted by a given hkl plane.'''
-        ni = Lattice.from_symbol('Ni')
+        """Verify the wavelength diffracted by a given hkl plane."""
         orientation = Orientation.cube()
-        hkl = HklPlane(-1, -1, -1, ni)
+        hkl = HklPlane(-1, -1, -1, self.ni)
         (the_lambda, theta) = select_lambda(hkl, orientation)
         self.assertAlmostEqual(the_lambda, 5.277, 3)
         self.assertAlmostEqual(theta * 180 / np.pi, 35.264, 3)
 
     def test_indexation(self):
-        from pymicro.crystal.lattice import Lattice
-        ni = Lattice.face_centered_cubic(0.3524)
+        """Verify indexing solution from a known Laue pattern."""
         euler_angles = (191.9, 69.9, 138.9)  # degrees, /!\ not in fz
         orientation = Orientation.from_euler(euler_angles)
         # list of plane normals, obtained from the detector image
@@ -63,12 +61,11 @@ class LaueTests(unittest.TestCase):
         hkl_planes = []
         for indices in miller_indices:
             (h, k, l) = indices
-            hkl_planes.append(HklPlane(h, k, l, ni))
+            hkl_planes.append(HklPlane(h, k, l, self.ni))
         solutions = index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=3.0)
+        self.assertEqual(len(solutions), 1)
         final_orientation = Orientation(solutions[0])
-        print(final_orientation)
         angle, ax1, ax2 = final_orientation.disorientation(orientation, crystal_structure='cubic')
-        print(angle)
         self.assertLess(angle * 180 / np.pi, 1.0)
 
 

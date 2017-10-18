@@ -555,7 +555,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, displa
         if display:
             from pymicro.crystal.texture import PoleFigure
             PoleFigure.plot(final_orientation, axis='Z')
-    return final_orientation_matrix
+    return final_orientation_matrix, ci
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt, cm, rcParams

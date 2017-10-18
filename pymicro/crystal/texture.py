@@ -163,7 +163,7 @@ class PoleFigure:
         else:
             plt.savefig('%s_pole_figure.%s' % (self.microstructure.name, save_as), format=save_as)
 
-    def plot_crystal_dir(self, c_dir, mk='o', col='k', ax=None, ann=False, lab=''):
+    def plot_crystal_dir(self, c_dir, ax=None, ann=False, lab='', **kwargs):
         '''Function to plot a crystal direction on a pole figure.
 
         :param c_dir: A vector describing the crystal direction.
@@ -185,7 +185,10 @@ class PoleFigure:
             # cp = np.cross(c, self.z)
         else:
             raise ValueError('Error, unsupported projection type', self.proj)
-        ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk,
+        mk = kwargs.get('marker', 'o')
+        col = kwargs.get('markeredgecolor', 'k')
+        face = kwargs.get('markerfacecolor', 'k')
+        ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=face, marker=mk,
                 markeredgecolor=col, markersize=self.mksize, label=lab)
         # Next 3 lines are necessary in case c_dir[2]=0, as for Euler angles [45, 45, 0]
         if c_dir[2] < 0.000001:

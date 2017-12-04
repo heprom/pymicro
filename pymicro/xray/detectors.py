@@ -446,7 +446,7 @@ class Xpad(Detector2d):
             if stack == 'first':
                 image = rawdata[:, :, 0]
             elif stack == 'median':
-                image = np.median(image, axis=2)
+                image = np.median(rawdata, axis=2)
             self.data = image.astype(np.float32).transpose()
             self.compute_corrected_image()
         elif image_path.endswith('.nxs'):

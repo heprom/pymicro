@@ -141,3 +141,23 @@ def radiographs(data, omegas):
         a = radon(data[:, :, z], -omegas)  # - 90  # the 90 seems to come from the radon function itself
         projections[:, z, :] = a[:, :]
     return projections
+
+def divide_path(corners, div=10, closed=False):
+    """Divide a path given a series of points.
+    
+    :param np.array corners: the corner coordinates in the form of a (n, 2) array.
+    :param int div: the number of division between each pair of points.
+    :param bool closed: flag to close the path from the last to the first point.
+    :returns path: a two columns array of the path coordinates.
+    """
+    if closed:
+        corners = np.vstack((corners, corners[0]))
+    path = np.empty(((len(corners) - 1) * div + 1, 2), dtype=float)
+    for j in range(len(corners) - 1):
+        for i in range(div):
+            path[j * div + i] = corners[j] + i * (corners[j + 1] - corners[j]) / div
+    # add last corner
+    path[(len(corners) - 1) * div] = corners[len(corners) - 1]
+    return path
+
+

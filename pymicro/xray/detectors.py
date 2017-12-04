@@ -346,15 +346,18 @@ class RegArrayDetector2d(Detector2d):
         r = np.sqrt((uu - self.ucen) ** 2 + (vv - self.vcen) ** 2)
         self.two_thetas = np.arctan(r / distance) * inv_deg2rad
         self.psis = np.arccos((uu - self.ucen) / r) * inv_deg2rad
+        self.psis[vv > self.vcen] = 360 - self.psis[vv > self.vcen]
 
     def angles_to_pixels(self, two_theta, psi):
-        '''given two values 2theta and psi (that could be arrays), compute the corresponding pixel on the detector.'''
+        '''given two values 2theta and psi in degrres (that could be arrays), compute the corresponding pixel on the detector.'''
         distance = self.calib / np.tan(np.pi / 180.)
         r = distance * np.tan(two_theta * np.pi / 180.)
-        print(psi, np.sign((psi > 90) - 0.5))
-        u = self.ucen + r * np.cos(psi * np.pi / 180.)
-        v = self.vcen - np.sign(psi) * np.sqrt(r ** 2 - (u - self.ucen) ** 2)
-        return (u, v)
+        # use the psi value in [0, 2pi] range
+        psi_values = (psi * np.pi / 180.) % (2 * np.pi)
+        u = self.ucen + r * np.cos(psi_values)
+        #v = self.vcen - np.sign(psi) * np.sqrt(r ** 2 - (u - self.ucen) ** 2)
+        v = self.vcen - r * np.sin(psi_values)
+        return u, v
 
 
 class Varian2520(RegArrayDetector2d):

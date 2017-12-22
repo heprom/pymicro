@@ -1,6 +1,7 @@
 import os, numpy as np
 from matplotlib import pyplot as plt
 from skimage.transform import radon
+from math import *
 
 densities = {'Li': 0.533,  # Z = 3
              'Be': 1.8450,  # Z = 4
@@ -22,6 +23,35 @@ densities = {'Li': 0.533,  # Z = 3
              'Pb': 11.330,  # Z = 82
              'WC': 15.63, # Z(W) = 74
              }
+
+def atom_scat_factor_function(mat='Al', sintheta_lambda_max=12, display=True):
+    '''Compute and display the fit function of the atomic scattering factor.
+
+    :param string mat: A string representing the material (e.g. 'Al')
+    :param float sintheta_lambda_max: maximal value of sin theta / lambda
+    :param bool display: display an image of the plot
+    '''
+
+    data_dir = '../../pymicro/xray/data'
+    param = np.genfromtxt(os.path.join(data_dir, mat + '_fit_fatom'))
+    print('Fit coefficient for', param[:,1])
+    fit = []
+    sintheta_lambda = np.linspace(0.0, sintheta_lambda_max, 100)
+
+    for i in sintheta_lambda:
+        fit_fatom = param[0, 1] * exp(-param[1, 1] * i ** 2) + param[2, 1] * exp(-param[3, 1] * i ** 2) + param[4, 1] * exp(-param[5, 1] * i ** 2) + param[6, 1] * exp(-param[7, 1] * i ** 2) + param[8, 1]
+        fit.append(fit_fatom)
+    print(fit)
+
+    plt.figure()
+    plt.plot(sintheta_lambda, fit, 'o-', label=mat)
+    plt.legend(loc='upper right')
+    plt.xlabel(r'$\sin\theta / \lambda (nm^{-1})$')
+    plt.ylabel('Atomic scattering factor')
+    plt.title('Fit function of : %s' % mat)
+    if display:
+        plt.show()
+    return fit
 
 
 def lambda_keV_to_nm(lambda_keV):
@@ -85,9 +115,9 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     path = os.path.dirname(__file__)
     print path
     mu_rho = np.genfromtxt(os.path.join(path, 'data', mat + '.txt'), usecols=(0, 1), comments='#')
-    print(mu_rho)
+    print('Data :', mu_rho)
     energy = mu_rho[:, 0]
-    print(energy)
+    print('Energy :', energy)
     # look up density
     if rho is None:
         rho = densities[mat]
@@ -102,10 +132,12 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     if energy_lim[1] > 200:
         energy_lim[1] = 200
     plt.xlim(energy_lim)
+    plt.ylim(0, 10)
     plt.grid()
     plt.legend(loc='upper left')
     plt.xlabel('Photon Energy (keV)')
     plt.ylabel('Transmission I/I0 (%)')
+    plt.title('Transmitted intensity of : %s' % mat)
     if display:
         plt.show()
     else:

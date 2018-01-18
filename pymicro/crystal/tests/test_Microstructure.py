@@ -174,5 +174,20 @@ class OrientationTests(unittest.TestCase):
         for i in range(3):
             self.assertAlmostEqual(o_fz.euler[i], val[i], 3)
 
+    def test_small_disorientation(self):
+        o_ref = Orientation(np.array([[-0.03454188, 0.05599919, -0.99783313],
+                                      [-0.01223192, -0.99837784, -0.05560633],
+                                      [-0.99932839, 0.01028467, 0.03517083]]))
+        o_12 = Orientation(np.array([[-0.03807341, -0.06932796, -0.99686712],
+                                     [-0.0234124, -0.99725469, 0.07024911],
+                                     [-0.99900064, 0.02601367, 0.03634576]]))
+        (angle, axis, axis_xyz) = o_ref.disorientation(o_12, crystal_structure='cubic')
+        self.assertAlmostEqual(angle * 180 / np.pi, 7.24, 2)
+        o_ref_fz = o_ref.move_to_FZ(symmetry='cubic', verbose=False)
+        o_12_fz = o_12.move_to_FZ(symmetry='cubic', verbose=False)
+        delta = np.dot(o_ref_fz.orientation_matrix(), o_12_fz.orientation_matrix().T)
+        mis_angle = Orientation.misorientation_angle_from_delta(delta)
+        self.assertAlmostEqual(mis_angle * 180 / np.pi, 7.24, 2)
+
 if __name__ == '__main__':
     unittest.main()

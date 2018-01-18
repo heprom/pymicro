@@ -306,18 +306,21 @@ def rawmar_read(image_name, size, verbose=False):
     return data
 
 
-def HST_write(data, file_name, verbose=True):
+def HST_write(data, file_name, verbose=True, pack_binary=False):
     '''Write data as a raw binary file.
 
     This function write a (x,y,z) 3D dataset to the disk. The actual data type is used, you can convert your data array 
     on the fly using data.astype if you want to change the type. 
     The file is written as a Z-stack. It means that the first nx*ny bytes written represent the first slice and so on...
+    For binary data files (stored in memory as integer or bool data type), binary packing mode can be activated which 
+    stores 8 values on each byte (saving 7/8 of the disk space).
 
     A .info file containing the volume size and data type is also written.
 
     :param data: the 3d array to write to the disk in [x, y, z] form.
     :param str file_name: the name of the file to write, including file extension.
     :param bool verbose: flag to activate verbose mode.
+    :param bool pack_binary: flag to activate binary packing.
     '''
     (nx, ny, nz) = data.shape
     if verbose:
@@ -326,7 +329,10 @@ def HST_write(data, file_name, verbose=True):
         print('data type is %s' % data.dtype)
     f = open(file_name, 'wb')
     # HP 11/2013 swap axes according to read function
-    s = np.ravel(data.transpose(2, 1, 0)).tostring()
+    if pack_binary:
+        s = np.packbits(data.astype(np.uint8).transpose(2, 1, 0)).tostring()
+    else:
+        s = np.ravel(data.transpose(2, 1, 0)).tostring()
     f.write(s)
     f.close()
     if verbose:
@@ -336,7 +342,10 @@ def HST_write(data, file_name, verbose=True):
     f.write('NUM_X = %4d\n' % nx)
     f.write('NUM_Y = %4d\n' % ny)
     f.write('NUM_Z = %4d\n' % nz)
-    f.write('DATA_TYPE = %s' % data.dtype)
+    if pack_binary:
+        f.write('DATA_TYPE = PACKED_BINARY')
+    else:
+        f.write('DATA_TYPE = %s' % data.dtype)
     f.close()
     if verbose:
         print('done with writing')

@@ -166,8 +166,9 @@ class Lattice:
         for sym in syms:
             # apply the symmetry operator
             om = np.dot(sym, g)
-            print(om)
-            print(om.trace())
+            if verbose:
+                print(om)
+                print(om.trace())
             # compute the Rodrigues vector of the corresponding orientation matrix
             #r = Orientation.OrientationMatrix2Rodrigues(om)
             #print(r)

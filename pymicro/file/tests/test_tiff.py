@@ -12,10 +12,10 @@ class file_utils_Tests(unittest.TestCase):
         HST_write(self.data, 'temp_20x30x10_uint8.raw')
 
     def test_HST_info(self):
-        dims = HST_info('temp_20x30x10_uint8.raw.info')
-        self.assertEqual(dims[0], 20)
-        self.assertEqual(dims[1], 30)
-        self.assertEqual(dims[2], 10)
+        infos = HST_info('temp_20x30x10_uint8.raw.info')
+        self.assertEqual(infos['x_dim'], 20)
+        self.assertEqual(infos['y_dim'], 30)
+        self.assertEqual(infos['z_dim'], 10)
 
     def test_HST_read(self):
         data = HST_read('temp_20x30x10_uint8.raw', autoparse_filename=True)

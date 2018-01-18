@@ -209,13 +209,17 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
 
 
 def HST_info(info_file):
-    '''Read the given info file and returns the volume size.
+    '''Read the given info file and returns a dictionnary containing the data size and type.
     
     .. note::
     
        The first line of the file must begin by ! PyHST or directly 
        by NUM_X.
+    
+    :param str info_file: path to the ascii file to read.
+    :return: a dictionnary with the values.
     '''
+    info_values = {}
     f = open(info_file, 'r')
     # the first line must contain PyHST or NUM_X
     line = f.readline()
@@ -226,10 +230,11 @@ def HST_info(info_file):
         pass
     else:
         sys.exit('The file does not seem to be a PyHST info file')
-    x_dim = int(line.split()[2])
-    y_dim = int(f.readline().split()[2])
-    z_dim = int(f.readline().split()[2])
-    return [x_dim, y_dim, z_dim]
+    info_values['x_dim'] = int(line.split()[2])
+    info_values['y_dim'] = int(f.readline().split()[2])
+    info_values['z_dim'] = int(f.readline().split()[2])
+    info_values['data_type'] = f.readline().split()[2]
+    return info_values
 
 
 def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
@@ -258,31 +263,30 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
     '''
     if autoparse_filename:
         s_type = scan_name[:-4].split('_')[-1]
-        if s_type == 'uint8':
-            data_type = np.uint8
-        elif s_type == 'uint16':
-            data_type = np.uint16
-        elif s_type == 'float32':
-            data_type = np.float32
+        data_type = np.dtype(s_type)
         s_size = scan_name[:-4].split('_')[-2].split('x')
         dims = (int(s_size[0]), int(s_size[1]), int(s_size[2]))
-        if verbose: print('auto parsing filename: data type is set to', data_type)
-    if verbose: print('data type is', data_type)
+        if verbose:
+            print('auto parsing filename: data type is set to', data_type)
     if dims is None:
-        [nx, ny, nz] = HST_info(scan_name + '.info')
+        infos = HST_info(scan_name + '.info')
+        [nx, ny, nz] = [infos['x_dim'], infos['y_dim'], infos['z_dim']]
+        if 'data_type' in infos:
+            data_type = np.dtye(infos['data_type'])  # overwrite defaults with .info file value
     else:
         (nx, ny, nz) = dims
     if zrange is None:
         zrange = range(0, nz)
     if verbose:
-        print 'volume size is ', nx, 'x', ny, 'x', len(zrange)
+        print('data type is', data_type)
+        print('volume size is %d x %d x %d' % (nx, ny, len(zrange)))
     if mmap:
         data = np.memmap(scan_name, dtype=data_type, mode='c', shape=(len(zrange), ny, nx))
     else:
         f = open(scan_name, 'rb')
-        # data = np.empty((ny, nx, len(zrange)), dtype=data_type)
         f.seek(header_size + np.dtype(data_type).itemsize * nx * ny * zrange[0])
-        if verbose: print('reading volume... from byte %d' % f.tell())
+        if verbose:
+            print('reading volume... from byte %d' % f.tell())
         data = np.reshape(np.fromstring(
             f.read(np.dtype(data_type).itemsize * len(zrange) * ny * nx),
             data_type).astype(data_type), (len(zrange), ny, nx), order='C')
@@ -377,7 +381,8 @@ def recad_vol(vol_filename, min, max, verbose=False):
     **verbose**: activate verbose mode (False by default).
     '''
     prefix = vol_filename[:-4]
-    vol_size = HST_info(vol_filename + '.info')
+    infos = HST_info(vol_filename + '.info')
+    vol_size = [infos['x_dim'], infos['y_dim'], infos['z_dim']]
     data = HST_read(vol_filename, type=np.float32)
     data_uint8 = recad(data, min, max)
     if verbose:

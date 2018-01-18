@@ -307,37 +307,39 @@ def rawmar_read(image_name, size, verbose=False):
 
 
 def HST_write(data, file_name, verbose=True):
-    '''Write binary raw file.
+    '''Write data as a raw binary file.
 
-    This function write a (x,y,z) 3D dataset to the disk.
-    The file is written as a Z-stack. It means that the first nx*ny bytes
-    represent the first slice and so on...
+    This function write a (x,y,z) 3D dataset to the disk. The actual data type is used, you can convert your data array 
+    on the fly using data.astype if you want to change the type. 
+    The file is written as a Z-stack. It means that the first nx*ny bytes written represent the first slice and so on...
 
-    A .info file containing the volume size is also written.
+    A .info file containing the volume size and data type is also written.
 
-    *Parameters*
-
-    **data**: the 3d array to write to the disk.
-
-    **file_name**: the name of file to write.
+    :param data: the 3d array to write to the disk in [x, y, z] form.
+    :param str file_name: the name of the file to write, including file extension.
+    :param bool verbose: flag to activate verbose mode.
     '''
     (nx, ny, nz) = data.shape
     if verbose:
         print('opening %s for writing' % file_name)
         print('volume size is %dx%dx%d' % (nx, ny, nz))
+        print('data type is %s' % data.dtype)
     f = open(file_name, 'wb')
     # HP 11/2013 swap axes according to read function
     s = np.ravel(data.transpose(2, 1, 0)).tostring()
     f.write(s)
     f.close()
-    if verbose: print('writing .info file')
+    if verbose:
+        print('writing .info file')
     f = open(file_name + '.info', 'w')
     f.write('! PyHST_SLAVE VOLUME INFO FILE\n')
     f.write('NUM_X = %4d\n' % nx)
     f.write('NUM_Y = %4d\n' % ny)
     f.write('NUM_Z = %4d\n' % nz)
+    f.write('DATA_TYPE = %s' % data.dtype)
     f.close()
-    if verbose: print('done with writing')
+    if verbose:
+        print('done with writing')
 
 
 def recad_vol(vol_filename, min, max, verbose=False):

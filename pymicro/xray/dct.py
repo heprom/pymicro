@@ -69,6 +69,9 @@ def add_to_image(image, inset, (u, v), verbose=False):
     :param tuple (u,v): the location (center) where to add the inset.
     :param bool verbose: activate verbose mode (False by default).
     """
+    # round the center to the closest integer value
+    u = int(u)
+    v = int(v)
     spot_size = inset.shape
     u_start = 0
     u_end = spot_size[0]

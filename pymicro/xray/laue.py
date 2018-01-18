@@ -4,17 +4,18 @@ from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import *
 from pymicro.xray.dct import add_to_image
 
+
 def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
-    '''
+    """
     Compute the wavelength corresponding to the first order reflection
-    of a given lattice plane.
+    of a given lattice plane in the specified orientation.
 
     :param hkl: The given lattice plane.
     :param orientation: The orientation of the crystal lattice.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param bool verbose: activate verbose mode (default False).
     :returns tuple: A tuple of the wavelength value (keV) and the corresponding Bragg angle (radian).
-    '''
+    """
     (h, k, l) = hkl.miller_indices()
     dhkl = hkl.interplanar_spacing()
     Gc = hkl.scattering_vector()

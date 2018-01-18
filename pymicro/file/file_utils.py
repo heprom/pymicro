@@ -238,7 +238,7 @@ def HST_info(info_file):
 
 
 def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
-             header_size=0, autoparse_filename=False, dims=None, mmap=False):
+             header_size=0, autoparse_filename=False, dims=None, mmap=False, pack_binary=False):
     '''Read a volume file stored as a concatenated stack of binary images.
 
     The volume size must be specified by dims=(nx,ny,nz) unless an associated
@@ -272,7 +272,11 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
         infos = HST_info(scan_name + '.info')
         [nx, ny, nz] = [infos['x_dim'], infos['y_dim'], infos['z_dim']]
         if 'data_type' in infos:
-            data_type = np.dtye(infos['data_type'])  # overwrite defaults with .info file value
+            if infos['data_type'] == 'PACKED_BINARY':
+                pack_binary = True
+                data_type = np.uint8
+            else:
+                data_type = np.dtype(infos['data_type'])  # overwrite defaults with .info file value
     else:
         (nx, ny, nz) = dims
     if zrange is None:
@@ -280,6 +284,8 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
     if verbose:
         print('data type is', data_type)
         print('volume size is %d x %d x %d' % (nx, ny, len(zrange)))
+        if pack_binary:
+            print('unpacking binary data from single bytes (8 values per byte)')
     if mmap:
         data = np.memmap(scan_name, dtype=data_type, mode='c', shape=(len(zrange), ny, nx))
     else:
@@ -287,9 +293,14 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
         f.seek(header_size + np.dtype(data_type).itemsize * nx * ny * zrange[0])
         if verbose:
             print('reading volume... from byte %d' % f.tell())
-        data = np.reshape(np.fromstring(
-            f.read(np.dtype(data_type).itemsize * len(zrange) * ny * nx),
-            data_type).astype(data_type), (len(zrange), ny, nx), order='C')
+        # read the payload
+        payload = f.read(np.dtype(data_type).itemsize * len(zrange) * ny * nx)
+        if pack_binary:
+            data = np.unpackbits(np.fromstring(payload, data_type))[:len(zrange) * ny * nx]
+        else:
+            data = np.fromstring(payload, data_type)
+        # convert the payload into actual 3D data
+        data = np.reshape(data.astype(data_type), (len(zrange), ny, nx), order='C')
         f.close()
     # HP 10/2013 start using proper [x,y,z] data ordering
     data_xyz = data.transpose(2, 1, 0)

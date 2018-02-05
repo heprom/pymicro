@@ -91,7 +91,7 @@ def edf_info(file_name, header_size=None):
 
 
 def edf_read(file_name):
-    '''Read an edf file.
+    """Read an edf file.
 
     edf stands for ESRF data file. It has a variable header size which is
     a multiple of 512 bytes and contains the image meta in ASCII format
@@ -106,11 +106,9 @@ def edf_read(file_name):
       >>> im.shape
       (2048, 2048)
 
-    *Parameters*
-
-    **file_name**: the name of the edf file to read.
-
-    '''
+    :param str file_name: the name of the edf file to read.
+    :return: a numpy array containing the data
+    """
     header_values = edf_info(file_name)
     f = open(file_name, 'r')
     data_type = esrf_to_numpy_datatype(header_values['DataType'])
@@ -122,12 +120,12 @@ def edf_read(file_name):
     try:
         dim_2 = int(header_values['Dim_2'].split('.')[0])
     except:
-        print 'Dim_2 not defined in header'
+        print('Dim_2 not defined in header')
         dim_2 = None
     try:
         dim_3 = int(header_values['Dim_3'].split('.')[0])
     except:
-        print 'Dim_3 not defined in header'
+        print('Dim_3 not defined in header')
         dim_3 = None
     # now read binary data
     header_size = os.path.getsize(file_name) - payload_size

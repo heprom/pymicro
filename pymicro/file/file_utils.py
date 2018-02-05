@@ -177,9 +177,9 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
     from time import gmtime, strftime
     today = strftime('%d-%b-%Y', gmtime())
     size = np.shape(data)
-    print 'data size in pixels is ', size
+    print('data size in pixels is ', size)
     nbytes = np.prod(size) * np.dtype(type).itemsize
-    print 'opening', fname, 'for writing'
+    print('opening', fname, 'for writing')
     # craft an ascii header of the appropriate size
     f = open(fname, 'wb')
     head = '{\n'
@@ -427,8 +427,8 @@ def Vtk_write(data, fname):
        The header assumes uint8 data type.
     '''
     (nz, ny, nx) = data.shape
-    print 'opening', fname, 'for writing'
-    print 'volume size is ', nx, 'x', ny, 'x', nz
+    print('opening', fname, 'for writing')
+    print('volume size is %d x %d x %d' % (nx, ny, nz))
     # write header
     f = open(fname, 'w')
     f.write('# vtk DataFile Version3.0\n')
@@ -447,4 +447,4 @@ def Vtk_write(data, fname):
     s = np.ravel(data).tostring()
     f.write(s)
     f.close()
-    print 'done with writing'
+    print('done with writing')

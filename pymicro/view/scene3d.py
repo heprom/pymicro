@@ -83,7 +83,7 @@ class Scene3D:
         else:
             file_name = '%s.png' % self.name
         if self.verbose:
-            print 'writing still image ' + file_name
+            print('writing still image ' + file_name)
         writer.SetFileName(file_name)
         self.renWin.Render()
         writer.Write()
@@ -93,11 +93,11 @@ class Scene3D:
     def print_camera_settings(self):
         '''Print out the active camera settings.'''
         cam = self.renderer.GetActiveCamera()
-        print 'Camera settings:'
-        print '  * position:        %s' % (cam.GetPosition(),)
-        print '  * focal point:     %s' % (cam.GetFocalPoint(),)
-        print '  * up vector:       %s' % (cam.GetViewUp(),)
-        print '  * clipping range:  %s' % (cam.GetViewUp(),)
+        print('Camera settings:')
+        print('  * position:        %s' % (cam.GetPosition(),))
+        print('  * focal point:     %s' % (cam.GetFocalPoint(),))
+        print('  * up vector:       %s' % (cam.GetViewUp(),))
+        print('  * clipping range:  %s' % (cam.GetViewUp(),))
 
     def pymicro_callback(self, obj, event):
         '''Standard key pressed callback to attach to the 3d scene.
@@ -117,7 +117,7 @@ class Scene3D:
             self.print_camera_settings()
         elif key == 'q':
             if self.verbose:
-                print "Bye, thanks for using pymicro."
+                print("Bye, thanks for using pymicro.")
             sys.exit(0)
 
     def render(self, key_pressed_callback=None):

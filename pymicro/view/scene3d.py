@@ -2,15 +2,15 @@ import vtk, sys, os
 
 
 class Scene3D:
-    '''A class to manage a 3D scene using VTK actors.
+    """A class to manage a 3D scene using VTK actors.
 
     Each instance of this class has its own `vtkRenderer`, it can be used
     to display the scene interactlively and/or save a still image in png
     format. The actual 3D rendering is done by calling the `render` method.
-    '''
+    """
 
     def __init__(self, display=True, ren_size=(600, 600), name=None, background=(1., 1., 1.)):
-        '''Initialization called when creating a new `Scene3D` object.
+        """Initialization called when creating a new `Scene3D` object.
 
         :param display: a boolean to control if the scene has to be displayed
         interactively to the user (default True). If True, a frame counter
@@ -26,7 +26,7 @@ class Scene3D:
         interactively.
 
         :param background: the background of the scene (white by default).
-        '''
+        """
         ren = vtk.vtkRenderer()
         ren.SetBackground(background)
         self.renderer = ren
@@ -47,32 +47,52 @@ class Scene3D:
         self.verbose = True
 
     def add(self, actor):
-        '''Add a given actor to the 3D scene.
+        """Add a given actor to the 3D scene.
 
         *Parameters*
 
         **actor** a VTK actor to add to the renderer.
-        '''
+        """
         self.renderer.AddActor(actor)
 
     def get_renderer(self):
-        '''Get the vtk renderer attached to this 3d scene.'''
+        """Get the vtk renderer attached to this 3d scene."""
         return self.renderer
 
     def set_camera(self, cam):
-        '''Set the camera for the 3D scene.
+        """Set the camera for the 3D scene.
 
         *Parameters*
 
         **cam** a VTK camera to attach to the renderer.
-        '''
+        """
         self.renderer.SetActiveCamera(cam)
 
+    def get_frame(self):
+        """
+        Generate a frame from the vtkRenderer instance of the 3d scene.
+        
+        :return: the image as a string buffer.
+        """
+        self.renWin.SetOffScreenRendering(1)
+        self.renWin.Render()
+        w2i = vtk.vtkWindowToImageFilter()
+        w2i.SetInput(self.renWin)
+        w2i.Update()
+
+        writer = vtk.vtkPNGWriter()
+        writer.SetWriteToMemory(1)
+        writer.SetInputConnection(w2i.GetOutputPort())
+        writer.Write()
+        data = str(buffer(writer.GetResult()))
+        self.renWin.SetOffScreenRendering(0)
+        return data
+
     def save_frame(self):
-        '''Render the 3D scene and save a png image.
+        """Render the 3D scene and save a png image.
 
         When using the internal frame counter, it is incremented by 1 each
-        time this method is called.'''
+        time this method is called."""
         w2i = vtk.vtkWindowToImageFilter()
         writer = vtk.vtkPNGWriter()
         w2i.SetInput(self.renWin)
@@ -91,7 +111,7 @@ class Scene3D:
         del writer, w2i
 
     def print_camera_settings(self):
-        '''Print out the active camera settings.'''
+        """Print out the active camera settings."""
         cam = self.renderer.GetActiveCamera()
         print('Camera settings:')
         print('  * position:        %s' % (cam.GetPosition(),))
@@ -100,7 +120,7 @@ class Scene3D:
         print('  * clipping range:  %s' % (cam.GetViewUp(),))
 
     def pymicro_callback(self, obj, event):
-        '''Standard key pressed callback to attach to the 3d scene.
+        """Standard key pressed callback to attach to the 3d scene.
 
         This fuction can be used directly to be attached to the rendering
         window `vtkRenderWindowInteractor`. It handles user events by
@@ -109,7 +129,7 @@ class Scene3D:
          *s save a png image of the scene
          *c print the current camera settings
          *q exit the interactive rendering
-        '''
+        """
         key = obj.GetKeySym()
         if key == 's':
             self.save_frame()
@@ -121,7 +141,7 @@ class Scene3D:
             sys.exit(0)
 
     def render(self, key_pressed_callback=None):
-        '''Render the VTK scene in 3D.
+        """Render the VTK scene in 3D.
 
         This function does the actual 3D rendering using the `vtkRenderer`
         of the object. It can be used to display the scene interactlively
@@ -131,7 +151,7 @@ class Scene3D:
 
         **key_pressed_callback** a function (functions are first class variables)
         called in interactive mode when a key is pressed.
-        '''
+        """
         if self.display:
             # start the initialization and rendering
             iren = vtk.vtkRenderWindowInteractor()

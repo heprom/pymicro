@@ -496,7 +496,7 @@ class Orientation:
         """
         Returns an XML representation of the Orientation instance.
         """
-        print('deprecated as we are moving to dhf5 format')
+        print('deprecated as we are moving to hdf5 format')
         orientation = doc.createElement('Orientation')
         orientation_phi1 = doc.createElement('phi1')
         orientation_phi1_text = doc.createTextNode('%f' % self.phi1())

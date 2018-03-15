@@ -38,55 +38,40 @@ class Detector2d:
         self.correction = 'none'  # could be none, bg, flat
         self.orientation = 'horizontal'  # either 'horizontal' or 'vertical'
 
-    def azimuthal_regroup(self, two_theta_mini=None, two_theta_maxi=None, \
-                          two_theta_step=None, psi_min=None, psi_max=None, write_txt=False, \
+    def azimuthal_regroup(self, two_theta_mini=None, two_theta_maxi=None, two_theta_step=None,
+                          psi_mask=None, psi_min=None, psi_max=None, write_txt=False,
                           output_image=False, debug=False):
         # assign default values if needed
-        if not two_theta_mini: two_theta_mini = self.two_thetas.min()
-        if not two_theta_maxi: two_theta_maxi = self.two_thetas.max()
-        if not two_theta_step: two_theta_step = 1. / self.calib
-        nbOfBins = int((two_theta_maxi - two_theta_mini) / two_theta_step)
-        print '* Azimuthal regroup (two theta binning)'
-        print '  delta range = [%.1f-%.1f] with a %g deg step (%d bins)' % (
-            two_theta_mini, two_theta_maxi, two_theta_step, nbOfBins)
+        if not two_theta_mini:
+            two_theta_mini = self.two_thetas.min()
+        if not two_theta_maxi:
+            two_theta_maxi = self.two_thetas.max()
+        if not two_theta_step:
+            two_theta_step = 1. / self.calib
+        if (psi_mask is None) and (psi_min or psi_max):
+            psi_mask = (self.psis > psi_min) & (self.psis < psi_max)
+        n_bins = int((two_theta_maxi - two_theta_mini) / two_theta_step)
+        print('* Azimuthal regroup (two theta binning)')
+        print('  delta range = [%.1f-%.1f] with a %g deg step (%d bins)' % (
+            two_theta_mini, two_theta_maxi, two_theta_step, n_bins))
 
-        bin_edges = np.linspace(two_theta_mini, two_theta_maxi, 1 + nbOfBins)
+        bin_edges = np.linspace(two_theta_mini, two_theta_maxi, 1 + n_bins)
         two_theta_values = bin_edges[:-1] + 0.5 * two_theta_step
-        intensityResult = np.zeros(nbOfBins)  # this will be the summed intensity
-        counts = np.zeros(nbOfBins)  # this will be the number of pixel contributing to each point
+        intensityResult = np.zeros(n_bins)  # this will be the summed intensity
+        counts = np.zeros(n_bins)  # this will be the number of pixel contributing to each point
 
         # calculating bin indices for each pixel
-        binIndices = np.floor((self.two_thetas - two_theta_mini) / two_theta_step).astype(np.int16)
-        binIndices[self.two_thetas > two_theta_maxi] = -1
-        binIndices[self.two_thetas < two_theta_mini] = -1
-        ind = np.unique(binIndices)
-        if debug:
-            print(self.psis.min())
-            print(self.psis.max())
-            print(np.max(self.psis < psi_max))
-            plt.imshow(((self.psis < psi_max) & (self.psis > psi_min)).T, interpolation='nearest')
-            # plt.imshow(binIndices.T, interpolation='nearest')
-            plt.colorbar()
-            plt.show()
-            print('bin indices:', ind)
-            for i in range(1, len(ind)):
-                print(ind[i], two_theta_mini + i * two_theta_step)
-            im = np.ones_like(self.corr_data)
-            im[binIndices < 40] = 0
-            im[binIndices > 57] = 0
-            plt.imshow(im.T, vmin=0, vmax=1, interpolation='nearest', origin='upper')
-            plt.show()
+        bin_id = np.floor((self.two_thetas - two_theta_mini) / two_theta_step).astype(np.int16)
+        bin_id[self.two_thetas > two_theta_maxi] = -1
+        bin_id[self.two_thetas < two_theta_mini] = -1
         # mark out pixels with negative intensity
-        binIndices[self.corr_data < 0] = -1
-        # mark out pixels outside of phi range which is [0,psi_max] and [180-psi_max,180]
-        if psi_min:
-            binIndices[(self.psis < psi_min)] = -1
-        if psi_max:
-            binIndices[(self.psis > psi_max)] = -1
-            # binIndices[(self.psis > psi_max) & (self.psis < 180 - psi_max)] = -1
-        for ii in range(nbOfBins):
-            intensityResult[ii] = self.corr_data[binIndices == ii].sum()
-            counts[ii] = (binIndices == ii).sum()
+        bin_id[self.corr_data < 0] = -1
+        # mark out pixels according to the psi mask
+        if psi_mask is not None:
+            bin_id[psi_mask == 0] = -1
+        for ii in range(n_bins):
+            intensityResult[ii] = self.corr_data[bin_id == ii].sum()
+            counts[ii] = (bin_id == ii).sum()
         intensityResult /= counts
 
         if output_image:
@@ -291,8 +276,8 @@ class RegArrayDetector2d(Detector2d):
         # check if the point is on the detector plane
         vec = np.array(p) - np.array(self.ref_pos)
         assert np.dot(self.w_dir, vec) < 1.e-6
-        u = self.ucen + np.dot(self.u_dir, vec) / self.pixel_size
-        v = self.vcen + np.dot(self.v_dir, vec) / self.pixel_size
+        u = 0.5 * self.size[0] + np.dot(self.u_dir, vec) / self.pixel_size
+        v = 0.5 * self.size[1] + np.dot(self.v_dir, vec) / self.pixel_size
         return u, v
 
     def pixel_to_lab(self, u, v):
@@ -302,7 +287,7 @@ class RegArrayDetector2d(Detector2d):
         :param int v: the given pixel number along the second direction.
         :return tuple (x, y, z): the laboratory coordinates.
         '''
-        r = (u - self.ucen) * self.u_dir + (v - self.vcen) * self.v_dir
+        r = (u - 0.5 * self.size[0]) * self.u_dir + (v - 0.5 * self.size[1]) * self.v_dir
         p = self.ref_pos + r * self.pixel_size
         return p
 

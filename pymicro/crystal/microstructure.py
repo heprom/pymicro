@@ -524,8 +524,19 @@ class Orientation:
         return orientation
 
     @staticmethod
-    def from_euler(euler):
-        g = Orientation.Euler2OrientationMatrix(euler)
+    def from_euler(euler, convention='Bunge'):
+        """Rotation matrix from Euler angles.
+        
+        This is the classical method to obtain an orientation matrix by 3 successive rotations. The result depends on 
+        the convention used (how the successive rotation axes are chosen). In the Bunge convention, the first rotation 
+        is around Z, the second around the new X and the third one around the new Z. In the Roe convention, the second 
+        one is around Y.
+        """
+        if convention == 'Roe':
+            (phi1, phi, phi2) = (euler[0] + 90, euler[1], euler[2] - 90)
+        else:
+            (phi1, phi, phi2) = euler
+        g = Orientation.Euler2OrientationMatrix((phi1, phi, phi2))
         o = Orientation(g)
         return o
 

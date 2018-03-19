@@ -160,15 +160,16 @@ class Lattice:
         :param verbose: flag for verbose mode
         :return: a new 3x3 matrix for the rotation in the fundamental zone.
         """
-        from pymicro.crystal.microstructure import Orientation
         omegas = []  # list to store all the rotation angles
         syms = Lattice.symmetry(crystal_structure)
         for sym in syms:
             # apply the symmetry operator
             om = np.dot(sym, g)
-            print(om)
-            print(om.trace())
+            if verbose:
+                print(om)
+                print(om.trace())
             # compute the Rodrigues vector of the corresponding orientation matrix
+            #from pymicro.crystal.microstructure import Orientation
             #r = Orientation.OrientationMatrix2Rodrigues(om)
             #print(r)
             # and then the rotation angle

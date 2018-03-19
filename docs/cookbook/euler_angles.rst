@@ -76,16 +76,23 @@ With the orientation matrix it is the possible to express any vector :math:`V_c`
 
    V_s = \mathbf{g}^{-1}.V_c \quad\textrm{with}\quad \mathbf{g}^{-1}=\mathbf{g}^T
 
-For instance, using the same Euler angles and considering the vector :math:`V_c = (1, 1, 1)` gives :math:`V_s=(1.240, 1.203, 0.111)`. This can be verified using pymicro:
+From this it follows that the lines of :math:`\mathbf{g}` are actually composed by the 3 cartesian lattice vectors expressed in the lab frame.
+Similarly, the columns of  :math:`\mathbf{g}` are composed by the 3 cartesian laboratory vectors expressed in the crystal frame.
+
+For instance, using the same Euler angles and considering the vector :math:`V_c = (1, 0, 0)` gives :math:`V_s=(0.946, -0.117, -0.299)` which is the first line of :math:`\mathbf{g}`.
+Chosing :math:`V_c = (1, 1, 1)` gives :math:`V_s=(1.240, 1.203, 0.111)`. This can be verified using pymicro:
 
 .. code-block:: python
 
   >>> g = orientation.orientation_matrix()
+  >>> Vc = np.array([1, 0, 0])
+  >>> print(np.dot(g.T, Vc))
+  [ 0.94690263, -0.11723012, -0.2993869]
   >>> Vc = np.array([1, 1, 1])
   >>> print(np.dot(g.T, Vc))
   [ 1.24033795  1.20380558  0.11141766]
 
-Finally, looking at the 3d representation shows the values seem correct.
+Finally, looking at the 3d representation for direction :math:`[1, 1, 1]` shows the values seem correct.
 
 .. figure:: euler_angles_and_orientation_matrix.png
    :align: center

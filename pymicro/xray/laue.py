@@ -4,17 +4,18 @@ from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import *
 from pymicro.xray.dct import add_to_image
 
+
 def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
-    '''
+    """
     Compute the wavelength corresponding to the first order reflection
-    of a given lattice plane.
+    of a given lattice plane in the specified orientation.
 
     :param hkl: The given lattice plane.
     :param orientation: The orientation of the crystal lattice.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param bool verbose: activate verbose mode (default False).
     :returns tuple: A tuple of the wavelength value (keV) and the corresponding Bragg angle (radian).
-    '''
+    """
     (h, k, l) = hkl.miller_indices()
     dhkl = hkl.interplanar_spacing()
     Gc = hkl.scattering_vector()
@@ -279,21 +280,18 @@ def gnomonic_projection(detector):
     # create 2d image of the gnomonic projection because the gnomonic projection is bigger than the pattern
     from pymicro.xray.detectors import RegArrayDetector2d
     gnom = RegArrayDetector2d(size=np.array(detector.size))
-    gnom.ref_pos = detector.ref_pos
+    gnom.ref_pos = detector.ref_pos  # same ref position as the actual detector
     gnom.pixel_size = 1. / detector.pixel_size  # mm
+    gnom.ucen = gnom.size[0] / 2 - gnom.ref_pos[1] / gnom.pixel_size  # should include u_dir
+    gnom.vcen = gnom.size[1] / 2 - gnom.ref_pos[2] / gnom.pixel_size  # should include v_dir
 
     gnom.data = np.zeros(gnom.size, dtype=np.uint8)
     u_gnom = np.linspace(0, gnom.size[0] - 1, gnom.size[0])
     v_gnom = np.linspace(0, gnom.size[1] - 1, gnom.size[1])
-    vv_gnom, uu_gnom = np.meshgrid(v_gnom, u_gnom)
 
     # TODO use a function to go from mm to pixel coordinates
-    u_px = gnom.ucen + u_dif / gnom.pixel_size  # pixel, wrt (top left corner of gnom detector)
-    v_px = gnom.vcen + v_dif / gnom.pixel_size  # pixel, wrt (top left corner of gnom detector)
     ug_px = gnom.ucen + ug_mm / gnom.pixel_size  # pixel, wrt (top left corner of gnom detector)
     vg_px = gnom.vcen + vg_mm / gnom.pixel_size  # pixel, wrt (top left corner of gnom detector)
-    print(ug_px)
-    print(vg_px)
 
     # remove pixel outside of the ROI (TODO use masked numpy array)
     vg_px[ug_px > gnom.size[0] - 1] = gnom.vcen  # change vg_px first when testing on ug_px

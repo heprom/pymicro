@@ -16,7 +16,7 @@ import mock
 
 MOCK_MODULES = ['numpy', 'scipy', 'scipy.special', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.image',
                 'matplotlib.cm', 'matplotlib.colors', 'scipy.ndimage', 'wx', 'wx.Panel', 'vtk', 'vtk.util',
-                'vtk.util.colors', 'skimage', 'skimage.transform', '_tifffile']  # , 'ImPanel', 'PlotPanel']
+                'vtk.util.colors', 'skimage', 'skimage.transform', '_tifffile', 'h5py']  # , 'ImPanel', 'PlotPanel']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -78,7 +78,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'pymicro'
-copyright = u'2013-2017, Henry Proudhon'
+copyright = u'2013-2018, Henry Proudhon'
 
 
 # The project version is extracted from the main __init__.py

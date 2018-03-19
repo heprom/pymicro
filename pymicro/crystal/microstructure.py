@@ -232,6 +232,7 @@ class Orientation:
         :returns float: the misorientation angle in radians.
         """
         cw = 0.5 * (delta.trace() - 1)
+        print(delta, cw)
         if cw > 1. and cw - 1. < np.finfo('float32').eps:
             print('cw=%.20f, rounding to 1.' % cw)
             cw = 1.
@@ -495,7 +496,7 @@ class Orientation:
         """
         Returns an XML representation of the Orientation instance.
         """
-        print('deprecated as we are moving to dhf5 format')
+        print('deprecated as we are moving to hdf5 format')
         orientation = doc.createElement('Orientation')
         orientation_phi1 = doc.createElement('phi1')
         orientation_phi1_text = doc.createTextNode('%f' % self.phi1())
@@ -523,8 +524,19 @@ class Orientation:
         return orientation
 
     @staticmethod
-    def from_euler(euler):
-        g = Orientation.Euler2OrientationMatrix(euler)
+    def from_euler(euler, convention='Bunge'):
+        """Rotation matrix from Euler angles.
+        
+        This is the classical method to obtain an orientation matrix by 3 successive rotations. The result depends on 
+        the convention used (how the successive rotation axes are chosen). In the Bunge convention, the first rotation 
+        is around Z, the second around the new X and the third one around the new Z. In the Roe convention, the second 
+        one is around Y.
+        """
+        if convention == 'Roe':
+            (phi1, phi, phi2) = (euler[0] + 90, euler[1], euler[2] - 90)
+        else:
+            (phi1, phi, phi2) = euler
+        g = Orientation.Euler2OrientationMatrix((phi1, phi, phi2))
         o = Orientation(g)
         return o
 

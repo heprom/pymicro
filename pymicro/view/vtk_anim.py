@@ -157,10 +157,10 @@ class vtkRotateActorAroundAxis(vtkAnimation):
             transform = vtk.vtkTransform()
             transform.Identity()
             actor.SetUserTransform(transform)
-        self.user_transform_matrix = actor.GetUserTransform().GetMatrix()
+        #self.user_transform_matrix = actor.GetUserTransform().GetMatrix()
 
     def execute(self, iren, event):
-        '''instruction block exectued when a TimerEvent is captured by the vtkRotateActorAroundAxis.
+        '''instruction block executed when a TimerEvent is captured by the vtkRotateActorAroundAxis.
 
         If the time is not in [start, end] nothing is done. Otherwise the
         transform matrix corresponding to the 3D rotation is applied to the actor.
@@ -179,7 +179,8 @@ class vtkRotateActorAroundAxis(vtkAnimation):
             for i in range(3):
                 m.SetElement(j, i, om[i, j])
         t = vtk.vtkTransform()
-        t.SetMatrix(self.user_transform_matrix)
+        #t.SetMatrix(self.user_transform_matrix)
+        t.SetMatrix(self.actor.GetUserTransform().GetMatrix())
         t.Concatenate(m)
         self.actor.SetUserTransform(t)
         vtkAnimation.post_execute(self, iren, event)

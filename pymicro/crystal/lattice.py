@@ -189,7 +189,7 @@ class Lattice:
         '''Define the equivalent crystal symmetries.
 
         Those come from Randle & Engler, 2000. For instance in the cubic
-        crystal struture, there are 24 equivalent cube orientations, they
+        crystal struture, for instance there are 24 equivalent cube orientations, they
         correspond to:
 
          * 1 for pure cube
@@ -198,7 +198,7 @@ class Lattice:
          * 8 possible 120 degrees rotations around <111> axes
 
         :param str crystal_structure: a string describing the crystal structure.
-        :raise ValueError: if the given crystal structure is not cubic or none.
+        :raise ValueError: if the given crystal structure is not supported.
         :returns array: A numpy array of shape (n, 3, 3) where n is the \
         number of symmetries of the given crystal structure.
         '''
@@ -228,6 +228,12 @@ class Lattice:
             sym[21] = np.array([[0., 0., 1.], [0., -1., 0.], [1., 0., 0.]])
             sym[22] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
             sym[23] = np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]])
+        elif crystal_structure == 'orthorhombic':
+            sym = np.zeros((4, 3, 3), dtype=np.float)
+            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+            sym[1] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
+            sym[2] = np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]])
+            sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
         elif crystal_structure == 'tetragonal':
             sym = np.zeros((8, 3, 3), dtype=np.float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
@@ -672,10 +678,11 @@ class HklObject:
         return (self._h, self._k, self._l)
 
     @staticmethod
-    def skip_higher_order(hkl_list, verbose=False):
+    def skip_higher_order(hkl_list, keep_friedel_pair=False, verbose=False):
         """Create a copy of a list of some hkl object retaining only the first order.
 
         :param list hkl_list: The list of `HklObject`.
+        :param bool keep_friedel_pair: flag to keep order -1 in the list. 
         :param bool verbose: activate verbose mode.
         :returns list: A new list of :py:class:`~pymicro.crystal.lattice.HklObject` without any multiple reflection.
         """
@@ -703,6 +710,10 @@ class HklObject:
                     print('looking at: (%d, %d, %d)' % (u, v, w))
                 n = hkl_sum[hkl_next] / np.sum(np.abs(np.array((u, v, w))), axis=0)
                 for order in [-n, n]:
+                    if keep_friedel_pair and order == -1:
+                        if verbose:
+                            print('keeping Friedel pair reflexion: (%d, %d, %d) with n=%d' % (u, v, w, order))
+                        continue
                     if (u * order == h) and (v * order == k) and (w * order) == l:
                         if verbose:
                             print('lower order reflexion was found: (%d, %d, %d) with n=%d' % (u, v, w, order))

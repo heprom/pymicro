@@ -15,12 +15,23 @@ class file_utils_Tests(unittest.TestCase):
         data[1, 2, 3] = True
         data[2, 3, 4] = True
         HST_write(data, 'test_bool_write.raw', pack_binary=True)
+        # craft a custom info file without the DATA_TYPE info
+        f = open('temp.info', 'w')
+        f.write('! PyHST_SLAVE VOLUME INFO FILE\n')
+        f.write('NUM_X = 953\n')
+        f.write('NUM_Y = 542\n')
+        f.write('NUM_Z = 104\n')
+        f.close()
 
     def test_HST_info(self):
         infos = HST_info('temp_20x30x10_uint8.raw.info')
         self.assertEqual(infos['x_dim'], 20)
         self.assertEqual(infos['y_dim'], 30)
         self.assertEqual(infos['z_dim'], 10)
+        infos = HST_info('temp.info')
+        self.assertEqual(infos['x_dim'], 953)
+        self.assertEqual(infos['y_dim'], 542)
+        self.assertEqual(infos['z_dim'], 104)
 
     def test_HST_read(self):
         data = HST_read('temp_20x30x10_uint8.raw', autoparse_filename=True)
@@ -52,6 +63,7 @@ class file_utils_Tests(unittest.TestCase):
         os.remove('temp_20x30x10_uint8.raw.info')
         os.remove('test_bool_write.raw')
         os.remove('test_bool_write.raw.info')
+        os.remove('temp.info')
 
 
 class TiffTests(unittest.TestCase):

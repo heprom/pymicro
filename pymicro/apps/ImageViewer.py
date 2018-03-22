@@ -15,7 +15,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from pymicro.file.file_utils import edf_read
-from pymicro.file.tifffile import TiffFile
+from pymicro.external.tifffile import TiffFile
 from pymicro.view.vol_utils import hist
 
 
@@ -188,8 +188,8 @@ class ImageViewer(QApplication):
 
 
 if __name__ == "__main__":
-    # ImageViewer(['wdir=/home/proudhon/data/tomo/rawdata/ma1921/Pb_balls_316LN_', 'pattern=.edf'])
-    ImageViewer(sys.argv)
+    ImageViewer(['wdir=/home/proudhon/data/tomo/rawdata/ma1921/Pb_balls_316LN_', 'pattern=.edf'])
+    #ImageViewer(sys.argv)
     # a = np.zeros((100, 50, 10))
     # a[50, :, 1] = 1
     # ImageViewer(a)

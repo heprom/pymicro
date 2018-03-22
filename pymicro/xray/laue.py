@@ -247,7 +247,29 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
         detector.data = np.invert(detector.data)
     return detector.data
 
-def gnomonic_projection(detector):
+
+def gnomonic_projection_point(data):
+    """compute the gnomonic projection of a given point or series of points.
+
+    This methods assumes the incident X-ray beam is along (1, 0, 0). This could be extended to any incident direction. 
+    The points coordinates are passed along with a single array which must be of size (n, 3) where n is the number of 
+    points. If a single point is used, the data can indifferently be of size (1, 3) or (3). 
+
+    :param ndarray data: array of the point(s) coordinates in the laboratory frame.
+    :return data_gp: array of the projected point(s) coordinates in the laboratory frame.
+    """
+    if data.ndim == 1:
+        data = data.reshape((1, 3))
+    r = np.sqrt(data[:, 1] ** 2 + data[:, 2] ** 2)  # mm
+    theta = 0.5 * np.arctan(r / data[:, 0])
+    p = data[:, 0] * np.tan(pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
+    data_gp = np.zeros_like(data)  # mm
+    data_gp[:, 0] = data[:, 0]
+    data_gp[:, 1] = - data[:, 1] * p / r
+    data_gp[:, 2] = - data[:, 2] * p / r
+    return data_gp
+
+def gnomonic_projection(detector, pixel_size=None):
     '''This function carries out the gnomonic projection of the detector image.
     
     The data must be of uint8 type (between 0 and 255) with diffraction spots equals to 255.
@@ -281,7 +303,10 @@ def gnomonic_projection(detector):
     from pymicro.xray.detectors import RegArrayDetector2d
     gnom = RegArrayDetector2d(size=np.array(detector.size))
     gnom.ref_pos = detector.ref_pos  # same ref position as the actual detector
-    gnom.pixel_size = 1. / detector.pixel_size  # mm
+    if not pixel_size:
+        gnom.pixel_size = 1. / detector.pixel_size  # mm
+    else:
+        gnom.pixel_size = pixel_size  # mm
     gnom.ucen = gnom.size[0] / 2 - gnom.ref_pos[1] / gnom.pixel_size  # should include u_dir
     gnom.vcen = gnom.size[1] / 2 - gnom.ref_pos[2] / gnom.pixel_size  # should include v_dir
 
@@ -504,7 +529,7 @@ def poll_system(g_list, dis_tol=1.0):
     return final_orientation_matrix, result_vote, ci, vote_field
 
 
-def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, display=False):
+def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crystal_structure='cubic', display=False):
     # angles between normal from the gnomonic projection
     angles_exp = np.zeros((len(hkl_normals), len(hkl_normals)), dtype=float)
     print('\nlist of angles between points on the detector')
@@ -551,7 +576,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, displa
                 hkl_planes[normal_indexed[i][pos[j][2]]], hkl_planes[normal_indexed[i][pos[j][3]]],
                 hkl_normals[normal_indexed[i][pos[j][0]]], hkl_normals[normal_indexed[i][pos[j][1]]])
         # move to the fundamental zone
-        om_fz = Lattice.move_rotation_to_FZ(orientation_matrix)  # we only add the third one
+        om_fz = Lattice.move_rotation_to_FZ(orientation_matrix, crystal_structure=crystal_structure)  # we only add the third one
         g_indexation.append(om_fz)
     final_orientation_matrix, vote, ci, vote_field = poll_system(g_indexation, dis_tol=tol_disorientation)
     print('\n\n\n### FINAL SOLUTION(S) ###\n')

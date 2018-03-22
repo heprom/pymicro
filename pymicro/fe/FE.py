@@ -28,6 +28,7 @@ class FE_Calc():
         '''
         self._name = prefix
         self._wdir = wdir
+        self.U = None
         self.nodal_vars = []
         self.nodal_fields = []
         self.integ_vars = []

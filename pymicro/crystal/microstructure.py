@@ -232,7 +232,7 @@ class Orientation:
         :returns float: the misorientation angle in radians.
         """
         cw = 0.5 * (delta.trace() - 1)
-        print(delta, cw)
+        #print(delta, cw)
         if cw > 1. and cw - 1. < np.finfo('float32').eps:
             print('cw=%.20f, rounding to 1.' % cw)
             cw = 1.

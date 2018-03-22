@@ -2,7 +2,8 @@ import unittest
 import numpy as np
 from pymicro.crystal.lattice import Lattice, HklDirection, HklPlane, SlipSystem
 from pymicro.crystal.microstructure import Orientation
-from pymicro.xray.laue import select_lambda, index
+from pymicro.xray.laue import select_lambda, diffracted_vector, gnomonic_projection_point, index
+from pymicro.xray.detectors import RegArrayDetector2d
 
 
 class LaueTests(unittest.TestCase):
@@ -34,6 +35,33 @@ class LaueTests(unittest.TestCase):
         (the_lambda, theta) = select_lambda(hkl, orientation)
         self.assertAlmostEqual(the_lambda, 5.277, 3)
         self.assertAlmostEqual(theta * 180 / np.pi, 35.264, 3)
+
+    def test_gnomonic_projection_point(self):
+        """Verify that the gnomonic projection of two diffracted points on a detector give access to the angle 
+        between the lattice plane normals."""
+        olivine = Lattice.orthorombic(1.022, 0.596, 0.481)  # nm Barret & Massalski convention
+        orientation = Orientation.cube()
+        p1 = HklPlane(2, 0, -3, olivine)
+        p2 = HklPlane(3, -1, -3, olivine)
+        detector = RegArrayDetector2d(size=(512, 512), u_dir=[0, -1, 0], v_dir=[0, 0, -1])
+        detector.pixel_size = 0.200  # mm, 0.1 mm with factor 2 binning
+        detector.ucen = 235
+        detector.vcen = 297
+        detector.ref_pos = np.array([131., 0., 0.]) + \
+                           (detector.size[0] / 2 - detector.ucen) * detector.u_dir * detector.pixel_size + \
+                           (detector.size[1] / 2 - detector.vcen) * detector.v_dir * detector.pixel_size  # mm
+
+        angle = 180 / np.pi * np.arccos(np.dot(p1.normal(), p2.normal()))
+        K1 = diffracted_vector(p1, orientation)
+        K2 = diffracted_vector(p2, orientation)
+        R1 = detector.project_along_direction(K1, origin=[0., 0., 0.])
+        R2 = detector.project_along_direction(K2, origin=[0., 0., 0.])
+        OP1 = gnomonic_projection_point(R1)[0]
+        OP2 = gnomonic_projection_point(R2)[0]
+        hkl_normal1 = OP1 / np.linalg.norm(OP1)
+        hkl_normal2 = (OP2 / np.linalg.norm(OP2))
+        angle_gp = 180 / np.pi * np.arccos(np.dot(hkl_normal1, hkl_normal2))
+        self.assertEqual(angle, angle_gp)
 
     def test_indexation(self):
         """Verify indexing solution from a known Laue pattern."""

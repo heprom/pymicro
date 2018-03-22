@@ -207,16 +207,16 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
 
 
 def HST_info(info_file):
-    '''Read the given info file and returns a dictionnary containing the data size and type.
+    """Read the given info file and returns a dictionary containing the data size and type.
     
     .. note::
     
-       The first line of the file must begin by ! PyHST or directly 
-       by NUM_X.
+       The first line of the file must begin by ! PyHST or directly by NUM_X. 
+       Also note that if the data type is not specified, it will not be present in the dictionary.
     
     :param str info_file: path to the ascii file to read.
-    :return: a dictionnary with the values.
-    '''
+    :return: a dictionary with the values for x_dim, y_dim, z_dim and data_type if needed.
+    """
     info_values = {}
     f = open(info_file, 'r')
     # the first line must contain PyHST or NUM_X
@@ -231,7 +231,10 @@ def HST_info(info_file):
     info_values['x_dim'] = int(line.split()[2])
     info_values['y_dim'] = int(f.readline().split()[2])
     info_values['z_dim'] = int(f.readline().split()[2])
-    info_values['data_type'] = f.readline().split()[2]
+    try:
+        info_values['data_type'] = f.readline().split()[2]
+    except IndexError:
+        pass
     return info_values
 
 

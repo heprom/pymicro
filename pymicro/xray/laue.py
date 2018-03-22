@@ -157,9 +157,12 @@ def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
     except ValueError:
         index = -1
     fa = scat_data[index, 1] / scat_data[0, 1]  # should we normalize with respect to Z?
+
+    I = I0 * fa
+
     if verbose:
         print('q=%f in nm^-1 -> fa=%.3f' % (q, fa))
-    I = I0 * fa
+        print('intensity:', I)
     return I
 
 
@@ -194,17 +197,17 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
     spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=np.uint8)
     max_val = np.iinfo(np.uint8).max  # 255 here
     if show_direct_beam:
-        add_to_image(detector.data, max_val * spot, (detector.ucen, detector.vcen))
+        add_to_image(detector.data, max_val * 3 * spot, (detector.ucen, detector.vcen))
 
     if spectrum is not None:
         print('using spectrum')
-        indices = np.argwhere(spectrum[:, 1] > spectrum_thr)
-        E_min = float(spectrum[indices[0], 0])
-        E_max = float(spectrum[indices[-1], 0])
+        #indices = np.argwhere(spectrum[:, 1] > spectrum_thr)
+        E_min = min(spectrum) #float(spectrum[indices[0], 0])
+        E_max = max(spectrum) #float(spectrum[indices[-1], 0])
         lambda_min = lambda_keV_to_nm(E_max)
         lambda_max = lambda_keV_to_nm(E_min)
-        if verbose:
-            print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
+        #if verbose:
+        print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
 
     for hkl in hkl_planes:
         (the_energy, theta) = select_lambda(hkl, orientation, verbose=False)
@@ -212,10 +215,11 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
             if abs(the_energy) < E_min or abs(the_energy) > E_max:
                 #print('skipping reflection {0:s} which would diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
                 continue
-            #print('including reflection {0:s} which will diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
+                #print('including reflection {0:s} which will diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
         K = diffracted_vector(hkl, orientation)
         if K is None or np.dot([1., 0., 0.], K) == 0:
             continue  # skip diffraction // to the detector
+
         R = detector.project_along_direction(K, origin=[0., 0., 0.])
         (u, v) = detector.lab_to_pixel(R)
         if verbose and u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
@@ -513,6 +517,7 @@ def poll_system(g_list, dis_tol=1.0):
     index_result = np.argwhere(votes == np.amax(votes))
     print('index result:', index_result)
     print('Number of equivalent solutions :', len(index_result))
+    print(type(index_result))
     final_orientation_matrix = []
     for n in range(len(index_result)):
         solutions = g_list[solution_indices[index_result[n]]]

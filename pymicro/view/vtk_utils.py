@@ -576,7 +576,7 @@ def lattice_points(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
 
 
 def lattice_grid(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
-    '''
+    """
     Create a mesh representation of a crystal lattice.
 
     A vtkUnstructuredGrid instance is used with a hexaedron element
@@ -589,7 +589,7 @@ def lattice_grid(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
     :param int n: the number of cells in the [010] direction (1 by default).
     :param int p: the number of cells in the [001] direction (1 by default).
     :return: A vtkUnstructuredGrid with (m x n x p) hexaedron cell representing the crystal lattice.
-    '''
+    """
     points = lattice_points(lattice, origin, m, n, p)
     # build the unstructured grid with m x n x p cells
     grid = vtk.vtkUnstructuredGrid()
@@ -613,6 +613,16 @@ def lattice_grid(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
 
 
 def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
+    """
+    Create a mesh representation of a hexagonal crystal lattice.
+
+    A vtkUnstructuredGrid instance is used with a hexagonal prism element
+    corresponding to 3 unit cells of the lattice system.
+
+    :param Lattice lattice: The Lattice instance from which to construct the grid.
+    :param tuple origin: cartesian coordinates of the origin.
+    :return: A vtkUnstructuredGrid one hexagnal prism cell representing the crystal lattice.
+    """
     [A, B, C] = lattice._matrix
     O = origin
     points = vtk.vtkPoints()

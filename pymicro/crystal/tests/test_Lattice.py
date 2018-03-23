@@ -101,6 +101,16 @@ class HklDirectionTests(unittest.TestCase):
         hkl_planes2 = HklObject.skip_higher_order(hkl_planes)
         self.assertEqual(len(hkl_planes2), 7)
 
+    def test_4indices_representation(self):
+        u, v, w = HklDirection.four_to_three_indices(2, -1, -1, 0)
+        self.assertEqual(u, 1)
+        self.assertEqual(v, 0)
+        self.assertEqual(w, 0)
+        U, V, T, W = HklDirection.three_to_four_indices(2, 1, 0)
+        self.assertEqual(U, 1)
+        self.assertEqual(V, 0)
+        self.assertEqual(T, -1)
+        self.assertEqual(W, 0)
 
 class HklPlaneTests(unittest.TestCase):
     def setUp(self):

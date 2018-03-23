@@ -766,6 +766,37 @@ class HklDirection(HklObject):
         d2 = HklDirection(h2, k2, l2, lattice)
         return d1.angle_with_direction(d2)
 
+    @staticmethod
+    def three_to_four_indices(u, v, w):
+        """Convert from Miller indices to Miller-Bravais indices. this is used for hexagonal crystal lattice."""
+        return (2 * u - v) / 3., (2 * v - u) / 3., -(u + v) / 3., w
+
+    @staticmethod
+    def four_to_three_indices(U, V, T, W):
+        """Convert from Miller-Bravais indices to Miller indices. this is used for hexagonal crystal lattice."""
+        import fractions
+        u, v, w = U - T, V - T, W
+        gcd = reduce(fractions.gcd, (u, v, w))
+        return u / gcd, v / gcd, w / gcd
+
+    @staticmethod
+    def angle_between_4indices_directions((h1, k1, i1, l1), (h2, k2, i2, l2), (a, c)):
+        """Computes the angle between two crystallographic directions in a hexagonal lattice.
+
+        The solution was derived by F. Frank in:
+        On Miller - Bravais indices and four dimensional vectors. Acta Cryst. 18, 862-866 (1965)
+
+        :param tuple (h1, k1, i1, l1): The quartet of the indices of the first direction.
+        :param tuple (h2, k2, i2, l2): The quartet of the indices of the second direction.
+        :param tuple (a, c): the lattice parameters of the hexagonal structure.
+        :returns float: The angle in radian.
+        """
+        lambda_square = 2. / 3 * (c / a) ** 2
+        value = (h1 * h2 + k1 * k2 + i1 * i2 + lambda_square * l1 * l2) / \
+                (np.sqrt(h1 ** 2 + k1 ** 2 + i1 ** 2 + lambda_square * l1 ** 2) *
+                 np.sqrt(h2 ** 2 + k2 ** 2 + i2 ** 2 + lambda_square * l2 ** 2))
+        return np.arccos(value)
+
     def find_planes_in_zone(self, max_miller=5):
         '''
         This method finds the hkl planes in zone with the crystallographic
@@ -916,14 +947,15 @@ class HklPlane(HklObject):
         return theta
 
     @staticmethod
-    def four_to_three_index(h, k, i, l):
-        '''Convert four to three index direction (used for hexagonal crystal lattice).'''
-        return (6 * h / 5. - 3 * k / 5., 3 * h / 5. + 6 * k / 5., l)
+    def four_to_three_indices(U, V, T, W):
+        """Convert four to three index representation of a slip plane (used for hexagonal crystal lattice)."""
+        #return (6 * h / 5. - 3 * k / 5., 3 * h / 5. + 6 * k / 5., l)
+        return U, V, W
 
     @staticmethod
-    def three_to_four_index(u, v, w):
-        '''Convert three to four index direction (used for hexagonal crystal lattice).'''
-        return ((2 * u - v) / 3., (2 * v - u) / 3., -(u + v) / 3., w)
+    def three_to_four_indices(u, v, w):
+        """Convert three to four index representation of a slip plane (used for hexagonal crystal lattice)."""
+        return u, v, -(u + v), w
 
     @staticmethod
     def auto_family(hkl, lattice=None, include_friedel_pair=False):

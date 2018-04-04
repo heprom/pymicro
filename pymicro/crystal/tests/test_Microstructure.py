@@ -100,6 +100,7 @@ class OrientationTests(unittest.TestCase):
             self.assertAlmostEqual(alpha, 180 / np.pi * (np.pi / 2 - theta_bragg))
 
     def test_dct_omega_angles(self):
+        # test with a BCC Titanium lattice
         lambda_keV = 30
         lambda_nm = 1.2398 / lambda_keV
         a = 0.3306  # lattice parameter in nm
@@ -131,6 +132,15 @@ class OrientationTests(unittest.TestCase):
         (w1, w2) = o.dct_omega_angles(hkl, lambda_keV, verbose=False)
         self.assertAlmostEqual(w1, 196.709, 2)
         self.assertAlmostEqual(w2, 28.334, 2)
+        # test with an FCC Aluminium-Lithium lattice
+        a = 0.40495  # lattice parameter in nm
+        Al_fcc = Lattice.face_centered_cubic(a)
+        hkl = HklPlane(-1, 1, 1, Al_fcc)
+        o = Orientation.from_rodrigues([0.0499, -0.3048, 0.1040])
+        w1, w2 = o.dct_omega_angles(hkl, 40, verbose=False)
+        self.assertAlmostEqual(w1, 109.2, 1)
+        self.assertAlmostEqual(w2, 296.9, 1)
+
 
     def test_topotomo_tilts(self):
         al = Lattice.from_symbol('Al')

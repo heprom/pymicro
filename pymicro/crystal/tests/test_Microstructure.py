@@ -99,6 +99,14 @@ class OrientationTests(unittest.TestCase):
             theta_bragg = p.bragg_angle(lambda_keV)
             self.assertAlmostEqual(alpha, 180 / np.pi * (np.pi / 2 - theta_bragg))
 
+    def test_solve_trig_equation(self):
+        x1, x2 = Orientation.solve_trig_equation(2, -6, 3)
+        self.assertAlmostEqual(x1, 3.9575 * 180 / np.pi, 2)
+        self.assertAlmostEqual(x2, 6.1107 * 180 / np.pi, 2)
+        x1, x2 = Orientation.solve_trig_equation(5, 4, 6)
+        self.assertAlmostEqual(x1, 0.3180 * 180 / np.pi, 2)
+        self.assertAlmostEqual(x2, 1.0314 * 180 / np.pi, 2)
+
     def test_dct_omega_angles(self):
         # test with a BCC Titanium lattice
         lambda_keV = 30

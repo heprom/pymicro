@@ -1105,10 +1105,16 @@ class HklPlane(HklObject):
             raise ValueError('warning, family not supported: %s' % hkl)
         return family
 
-    def slip_traces(self, orientation, n_int=np.array([0, 0, 1]), view_up=np.array([0, 1, 0]),
-                    trace_size=100, verbose=False):
+    def slip_trace(self, orientation, n_int=np.array([0, 0, 1]), view_up=np.array([0, 1, 0]), trace_size=100, verbose=False):
         """
-        Compute the slip planes intersection with a particular plane.
+        Compute the intersection of the lattice plane with a particular plane defined by its normal.
+
+        :param orientation: The crystal orientation.
+        :param n_int: normal to the plane of intersection (laboratory local frame).
+        :param view_up: vector to place upwards on the plot.
+        :param int trace_size: size of the trace.
+        :param verbose: activate verbose mode.
+        :return: a numpy array with the coordinates of the two points defining the trace.
         """
         gt = orientation.orientation_matrix().transpose()
         n_rot = gt.dot(self.normal())
@@ -1140,30 +1146,27 @@ class HklPlane(HklObject):
         """
         A method to plot the slip planes intersection with a particular plane
         (known as slip traces if the plane correspond to the surface).
+        A few parameters can be used to control the plot looking.
         Thank to Jia Li for starting this code.
 
-        * orientation: The crystal orientation.
-        * hkl: the slip plane family (eg. 111 or 110)
-        * n_int: normal to the plane of intersection.
-        * view_up: vector to place upwards on the plot
-        * verbose: activate verbose mode.
-
-        A few additional parameters can be used to control the plot looking.
-
-        * title: display a title above the plot
-        * legend: display the legend
-        * trans: use a transparent background for the figure (useful to
-          overlay the figure on top of another image).
-        * str_plane: particular string to use to represent the plane in the image name.
+        :param orientation: The crystal orientation.
+        :param hkl: the slip plane family (eg. 111 or 110)
+        :param n_int: normal to the plane of intersection.
+        :param view_up: vector to place upwards on the plot.
+        :param verbose: activate verbose mode.
+        :param title: display a title above the plot.
+        :param legend: display the legend.
+        :param trans: use a transparent background for the figure (useful to overlay the figure on top of another image).
+        :param str_plane: particular string to use to represent the plane in the image name.
         """
+        plt.figure()
         hkl_planes = HklPlane.get_family(hkl)
         colors = 'rgykcmbw'
-        traces = slip_traces(orientation, hkl_planes, n_int=n_int, view_up=view_up,
-                    trace_size=1, verbose=verbose)
-        for i, trace in enumerate(traces):
+        for i, hkl_plane in enumerate(hkl_planes):
+            trace = hkl_plane.slip_trace(orientation, n_int=n_int, view_up=view_up, trace_size=1, verbose=verbose)
             x = [-trace[0] / 2, trace[0] / 2]
             y = [-trace[1] / 2, trace[1] / 2]
-            plt.plot(x, y, colors[i % len(hkl_planes)], label='%d%d%d' % (p._h, p._k, p._l), linewidth=2)
+            plt.plot(x, y, colors[i % len(hkl_planes)], label='%d%d%d' % hkl_plane.miller_indices(), linewidth=2)
         plt.axis('equal')
         t = np.linspace(0., 2 * np.pi, 100)
         plt.plot(0.5 * np.cos(t), 0.5 * np.sin(t), 'k')

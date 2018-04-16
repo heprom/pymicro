@@ -35,7 +35,7 @@ class LatticeTests(unittest.TestCase):
             self.assertEqual(al._angles[i], 90.0)
 
     def test_reciprocal_lattice(self):
-        Mg2Si = Lattice.from_parameters(1.534, 0.405, 0.683, 90., 106., 90.)
+        Mg2Si = Lattice.from_parameters(1.534, 0.405, 0.683, 90., 106., 90., x_aligned_with_a=False)
         [astar, bstar, cstar] = Mg2Si.reciprocal_lattice()
         self.assertAlmostEqual(astar[0], 0.678, 3)
         self.assertAlmostEqual(astar[1], 0., 3)
@@ -154,8 +154,9 @@ class HklPlaneTests(unittest.TestCase):
         This test comes from
         http://www.mse.mtu.edu/~drjohn/my3200/stereo/sg5.html
         corrected for a few errors in the html page.
+        In this test, the lattice is defined with the c-axis aligned with the Z direction of the Cartesian frame.
         """
-        Mg2Si = Lattice.from_parameters(1.534, 0.405, 0.683, 90., 106., 90.)
+        Mg2Si = Lattice.from_parameters(1.534, 0.405, 0.683, 90., 106., 90., x_aligned_with_a=False)
         a = Mg2Si.matrix[0]
         b = Mg2Si.matrix[1]
         c = Mg2Si.matrix[2]

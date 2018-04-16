@@ -511,56 +511,38 @@ class Lattice:
         return Lattice.from_parameters(a, b, c, alpha, beta, gamma)
 
     @staticmethod
-    def from_parameters(a, b, c, alpha, beta, gamma, centering='P'):
-        '''
+    def from_parameters(a, b, c, alpha, beta, gamma, x_aligned_with_a=True, centering='P'):
+        """
         Create a Lattice using unit cell lengths and angles (in degrees).
         The lattice centering can also be specified (among 'P', 'I', 'F',
         'A', 'B' or 'C').
 
-        *Parameters*
-
-        **a**: first lattice length parameter
-
-        **b**: second lattice length parameter
-
-        **c**: third lattice length parameter
-
-        **alpha**: first lattice angle parameter
-
-        **beta**: second lattice angle parameter
-
-        **gamma**: third lattice angle parameter
-
-        **centering**: lattice centering ('P' by default)
-
-        *Returns*
-
-        A `Lattice` instance with the specified lattice parameters.
-        '''
+        :param float a: first lattice length parameter.
+        :param float b: second lattice length parameter.
+        :param float c: third lattice length parameter.
+        :param float alpha: first lattice angle parameter.
+        :param float beta: second lattice angle parameter.
+        :param float gamma: third lattice angle parameter.
+        :param bool x_aligned_with_a: flag to control the convention used to define the Cartesian frame.
+        :param str centering: lattice centering ('P' by default) passed to the `Lattice` class.
+        :return: A `Lattice` instance with the specified lattice parameters and centering.
+        """
         alpha_r = radians(alpha)
         beta_r = radians(beta)
         gamma_r = radians(gamma)
-        val = (np.cos(alpha_r) * np.cos(beta_r) - np.cos(gamma_r)) \
-              / (np.sin(alpha_r) * np.sin(beta_r))
-        # Sometimes rounding errors result in values slightly > 1.
-        val = val if abs(val) <= 1 else val / abs(val)
-        gamma_star = np.arccos(val)
-        vector_a = [a * np.sin(beta_r), 0.0, a * np.cos(beta_r)]
-        vector_b = [-b * np.sin(alpha_r) * np.cos(gamma_star), b * np.sin(alpha_r) * np.sin(gamma_star),
-                    b * np.cos(alpha_r)]
-        vector_c = [0.0, 0.0, float(c)]
+        if x_aligned_with_a:  # first lattice vector (a) is aligned with X
+            vector_a = a * np.array([1, 0, 0])
+            vector_b = b * np.array([np.cos(gamma_r), np.sin(gamma_r), 0])
+            c1 = c * np.cos(beta_r)
+            c2 = c * (np.cos(alpha_r) - np.cos(gamma_r) * np.cos(beta_r)) / np.sin(gamma_r)
+            vector_c = np.array([c1, c2, np.sqrt(c ** 2 - c1 ** 2 - c2 ** 2)])
+        else:  # third lattice vector (c) is aligned with Z
+            cos_gamma_star = (np.cos(alpha_r) * np.cos(beta_r) - np.cos(gamma_r)) / (np.sin(alpha_r) * np.sin(beta_r))
+            sin_gamma_star = np.sqrt(1 - cos_gamma_star ** 2)
+            vector_a = [a * np.sin(beta_r), 0.0, a * np.cos(beta_r)]
+            vector_b = [-b * np.sin(alpha_r) * cos_gamma_star, b * np.sin(alpha_r) * sin_gamma_star, b * np.cos(alpha_r)]
+            vector_c = [0.0, 0.0, float(c)]
         return Lattice([vector_a, vector_b, vector_c], centering)
-        '''
-        # this is a transposed version of the cartesian-crystal matrix
-        val = (np.cos(gamma_r) - np.cos(alpha_r) * np.cos(beta_r)) \
-          / (np.sin(alpha_r) * np.sin(beta_r))
-        delta = np.arccos(val)
-        M = [[a * np.sin(beta_r), b * np.sin(alpha_r) * np.cos(delta), 0.0],
-             [0.0, b * np.sin(alpha_r) * np.sin(delta), 0.0],
-             [a * np.cos(beta_r), b * np.cos(alpha_r), float(c)]]
-        return Lattice(M)
-        # there is a third version in H. Poulsen's book p34. should check everything is consistent...
-        '''
 
     def volume(self):
         '''Compute the volume of the unit cell.'''

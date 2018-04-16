@@ -155,9 +155,16 @@ class OrientationTests(unittest.TestCase):
         p = HklPlane(0, 0, 2, lattice=al)
         rod = [0.1449, -0.0281, 0.0616]
         o = Orientation.from_rodrigues(rod)
-        (ut, lt) = o.topotomo_tilts(p, verbose=True)
+        (ut, lt) = o.topotomo_tilts(p)
         self.assertAlmostEqual(180 / np.pi * ut, 2.236, 3)
         self.assertAlmostEqual(180 / np.pi * lt, -16.615, 3)
+        # use test case from AlLi_sam8_dct_cen_
+        p = HklPlane(2, 0, 2, lattice=al)
+        rod = [0.0499, -0.3048, 0.1040]
+        o = Orientation.from_rodrigues(rod)
+        (ut, lt) = o.topotomo_tilts(p)
+        self.assertAlmostEqual(180 / np.pi * ut, -11.04, 2)
+        self.assertAlmostEqual(180 / np.pi * lt, 0.53, 2)
 
     def test_IPF_color(self):
         o1 = Orientation.cube()  # 001 // Z

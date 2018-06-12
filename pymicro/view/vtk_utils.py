@@ -1512,7 +1512,10 @@ def numpy_array_to_vtk_grid(data, cell_data=True):
         print('treating the 4th dimension as 3 different components')
         assert data.shape[3] == 3
         size = np.shape(data)[:3]
-        vtk_data_array = vtk.vtkUnsignedCharArray()
+        # create the right type of array
+        vtk_type = numpy_support.get_vtk_array_type(data.dtype)
+        print('creating vtk array with type %d' % vtk_type)
+        vtk_data_array = vtk.vtkDataArray.CreateDataArray(vtk_type)
         vtk_data_array.SetNumberOfComponents(data.shape[3])
         n = np.prod(size)
         vtk_data_array.SetNumberOfTuples(n)

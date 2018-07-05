@@ -475,7 +475,7 @@ def confidence_index(votes):
     return ci
 
 
-def poll_system(g_list, dis_tol=1.0):
+def poll_system(g_list, dis_tol=1.0, verbose=False):
     """
     Poll system to sort a series of orientation matrices determined by the indexation procedure.
     
@@ -483,6 +483,7 @@ def poll_system(g_list, dis_tol=1.0):
     if not add a new solution to the list
     :param list g_list: the list of orientation matrices (should be in the fz)
     :param float dis_tol: angular tolerance (degrees)
+    :param bool verbose: activate verbose mode (False by default)
     :return: a tuple composed by the most popular orientation matrix, the corresponding vote number and the confidence index
     """
     solution_indices = [0]
@@ -498,30 +499,36 @@ def poll_system(g_list, dis_tol=1.0):
             delta = np.dot(g, g_list[index].T)
             # compute misorientation angle in radians
             angle = Orientation.misorientation_angle_from_delta(delta)
-            print('j=%d -- angle=%f' % (j, angle))
+            if verbose:
+                print('j=%d -- angle=%f' % (j, angle))
             if angle <= dis_tol_rad:
                 votes[j] += 1
                 vote_index[i] = j
-                print('angle (deg) is %.2f' % (180 / np.pi * angle))
-                print('vote list is now %s' % votes)
-                print('solution_indices list is now %s' % solution_indices)
+                if verbose:
+                    print('angle (deg) is %.2f' % (180 / np.pi * angle))
+                    print('vote list is now %s' % votes)
+                    print('solution_indices list is now %s' % solution_indices)
                 break
             elif j == len(solution_indices) - 1:
                 solution_indices.append(i)
                 votes.append(1)
                 vote_index[i] = len(votes) - 1
-                print('vote list is now %s' % votes)
-                print('solution_indices list is now %s' % solution_indices)
+                if verbose:
+                    print('vote list is now %s' % votes)
+                    print('solution_indices list is now %s' % solution_indices)
                 break
-    print('Max vote =', np.amax(votes))
-    index_result = np.argwhere(votes == np.amax(votes))
-    print('index result:', index_result)
-    print('Number of equivalent solutions :', len(index_result))
-    print(type(index_result))
+    index_result = np.argwhere(votes == np.amax(votes)).flatten()
+    if verbose:
+        print('Max vote =', np.amax(votes))
+        print('index result:', index_result)
+        print('Number of equivalent solutions :', len(index_result))
+        print(type(index_result))
+        print(index_result.shape)
     final_orientation_matrix = []
     for n in range(len(index_result)):
         solutions = g_list[solution_indices[index_result[n]]]
-        print('Solution number {0:d} is'.format(n+1), solutions)
+        if verbose:
+            print('Solution number {0:d} is'.format(n+1), solutions)
         final_orientation_matrix.append(solutions)
     result_vote = max(votes)
     ci = confidence_index(votes)
@@ -578,7 +585,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crysta
         # move to the fundamental zone
         om_fz = Lattice.move_rotation_to_FZ(orientation_matrix, crystal_structure=crystal_structure)  # we only add the third one
         g_indexation.append(om_fz)
-    final_orientation_matrix, vote, ci, vote_field = poll_system(g_indexation, dis_tol=tol_disorientation)
+    final_orientation_matrix, vote, ci, vote_field = poll_system(g_indexation, dis_tol=tol_disorientation, verbose=True)
     print('\n\n\n### FINAL SOLUTION(S) ###\n')
     for n in range(len(final_orientation_matrix)):
         print('- SOLUTION %d -' % (n + 1))

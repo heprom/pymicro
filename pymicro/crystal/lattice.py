@@ -382,7 +382,7 @@ class Lattice:
         return Lattice.from_parameters(a, a, c, 90, 90, 90, 'I')
 
     @staticmethod
-    def orthorombic(a, b, c):
+    def orthorhombic(a, b, c):
         '''
         Create a tetragonal Lattice unit cell with 3 different length
         parameters a, b and c.
@@ -390,7 +390,7 @@ class Lattice:
         return Lattice.from_parameters(a, b, c, 90, 90, 90)
 
     @staticmethod
-    def base_centered_orthorombic(a, b, c):
+    def base_centered_orthorhombic(a, b, c):
         '''
         Create a based centered orthorombic Lattice unit cell.
 
@@ -410,7 +410,7 @@ class Lattice:
         return Lattice.from_parameters(a, b, c, 90, 90, 90, 'C')
 
     @staticmethod
-    def body_centered_orthorombic(a, b, c):
+    def body_centered_orthorhombic(a, b, c):
         '''
         Create a body centered orthorombic Lattice unit cell.
 
@@ -430,7 +430,7 @@ class Lattice:
         return Lattice.from_parameters(a, b, c, 90, 90, 90, 'I')
 
     @staticmethod
-    def face_centered_orthorombic(a, b, c):
+    def face_centered_orthorhombic(a, b, c):
         '''
         Create a face centered orthorombic Lattice unit cell.
 

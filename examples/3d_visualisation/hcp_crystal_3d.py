@@ -8,7 +8,7 @@ from pymicro.crystal.microstructure import Orientation
 if __name__ == '__main__':
     '''
     Create a 3d scene with a hexagonal crystal lattice.
-    Hkl planes are added to the lattice and displayed.
+    The usual hexagonal prism is displayed with the unit cell highlighted.
     '''
     # Create the 3D scene
     base_name = os.path.splitext(__file__)[0]

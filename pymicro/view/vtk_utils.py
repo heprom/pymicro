@@ -339,7 +339,7 @@ def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20, color=None):
     return axes
 
 
-def grain_3d(grain, hklplanes=None, show_normal=False, \
+def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
              plane_opacity=1.0, show_orientation=False, N=2048):
     '''Creates a 3d representation of a crystallographic grain.
 
@@ -347,12 +347,13 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
     representing a Grain object. An optional list of crystallographic
     planes can be given
 
-    :params grain: the Grain object to be shown in 3d.
-    :params list hklplanes: the list of HklPlanes object to add to the assembly.
-    :params bool show_normal: show also the normal to the hkl planes if True.
-    :params float plane_opacity: set the opacity of the grain actor.
-    :params bool show_orientation: show also the grain orientation with a vtkAxesActor placed at the grain center if True.
-    :params int N: the number of colors to use in the colormap.
+    :param grain: the Grain object to be shown in 3d.
+    :param list hklplanes: the list of HklPlanes object to add to the assembly.
+    :param bool show_normal: show also the normal to the hkl planes if True.
+    :param list plane_origins: the list of each plane origin (3d scene coordinates).
+    :param float plane_opacity: set the opacity of the grain actor.
+    :param bool show_orientation: show also the grain orientation with a vtkAxesActor placed at the grain center if True.
+    :param int N: the number of colors to use in the colormap.
     :returns: a vtkAssembly of the grain mesh and the optional hkl planes.
     '''
     assembly = vtk.vtkAssembly()
@@ -373,9 +374,12 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
     assembly.AddPart(grain_actor)
     # add all hkl planes
     if hklplanes != None:
-        for hklplane in hklplanes:
+        for i, hklplane in enumerate(hklplanes):
             # the grain has its center of mass at the origin
             origin = (0., 0., 0.)
+            if plane_origins is not None:
+                origin = plane_origins[i]  # in unit of the 3d scene
+                print('using origin %s' % str(origin))
             hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh,
                                                   grain.orientation, origin, opacity=plane_opacity,
                                                   show_normal=show_normal, normal_length=50.)
@@ -389,7 +393,6 @@ def grain_3d(grain, hklplanes=None, show_normal=False, \
 
 # deprecated, will be removed soon
 def add_grain_to_3d_scene(grain, hklplanes, show_orientation=False):
-    orientation = grain.orientation
     assembly = vtk.vtkAssembly()
     # create mapper
     print 'creating grain actor'
@@ -398,7 +401,7 @@ def add_grain_to_3d_scene(grain, hklplanes, show_orientation=False):
         mapper.SetInputData(grain.vtkmesh)
     else:
         mapper.SetInput(grain.vtkmesh)
-    mapper.ScalarVisibilityOff()  # we use the grain id for chosing the color
+    mapper.ScalarVisibilityOff()  # we use the grain id for choosing the color
     lut = rand_cmap(N=2048, first_is_black=True, table_range=(0, 2047))
     grain_actor = vtk.vtkActor()
     grain_actor.GetProperty().SetColor(lut.GetTableValue(grain.id)[0:3])
@@ -576,7 +579,7 @@ def lattice_points(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
 
 
 def lattice_grid(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
-    '''
+    """
     Create a mesh representation of a crystal lattice.
 
     A vtkUnstructuredGrid instance is used with a hexaedron element
@@ -589,7 +592,7 @@ def lattice_grid(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
     :param int n: the number of cells in the [010] direction (1 by default).
     :param int p: the number of cells in the [001] direction (1 by default).
     :return: A vtkUnstructuredGrid with (m x n x p) hexaedron cell representing the crystal lattice.
-    '''
+    """
     points = lattice_points(lattice, origin, m, n, p)
     # build the unstructured grid with m x n x p cells
     grid = vtk.vtkUnstructuredGrid()
@@ -613,6 +616,16 @@ def lattice_grid(lattice, origin=(0., 0., 0.), m=1, n=1, p=1):
 
 
 def hexagonal_lattice_grid(lattice, origin=[0., 0., 0.]):
+    """
+    Create a mesh representation of a hexagonal crystal lattice.
+
+    A vtkUnstructuredGrid instance is used with a hexagonal prism element
+    corresponding to 3 unit cells of the lattice system.
+
+    :param Lattice lattice: The Lattice instance from which to construct the grid.
+    :param tuple origin: cartesian coordinates of the origin.
+    :return: A vtkUnstructuredGrid one hexagnal prism cell representing the crystal lattice.
+    """
     [A, B, C] = lattice._matrix
     O = origin
     points = vtk.vtkPoints()

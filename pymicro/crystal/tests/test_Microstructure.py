@@ -99,7 +99,16 @@ class OrientationTests(unittest.TestCase):
             theta_bragg = p.bragg_angle(lambda_keV)
             self.assertAlmostEqual(alpha, 180 / np.pi * (np.pi / 2 - theta_bragg))
 
+    def test_solve_trig_equation(self):
+        x1, x2 = Orientation.solve_trig_equation(2, -6, 3)
+        self.assertAlmostEqual(x1, 3.9575 * 180 / np.pi, 2)
+        self.assertAlmostEqual(x2, 6.1107 * 180 / np.pi, 2)
+        x1, x2 = Orientation.solve_trig_equation(5, 4, 6)
+        self.assertAlmostEqual(x1, 0.3180 * 180 / np.pi, 2)
+        self.assertAlmostEqual(x2, 1.0314 * 180 / np.pi, 2)
+
     def test_dct_omega_angles(self):
+        # test with a BCC Titanium lattice
         lambda_keV = 30
         lambda_nm = 1.2398 / lambda_keV
         a = 0.3306  # lattice parameter in nm
@@ -131,15 +140,31 @@ class OrientationTests(unittest.TestCase):
         (w1, w2) = o.dct_omega_angles(hkl, lambda_keV, verbose=False)
         self.assertAlmostEqual(w1, 196.709, 2)
         self.assertAlmostEqual(w2, 28.334, 2)
+        # test with an FCC Aluminium-Lithium lattice
+        a = 0.40495  # lattice parameter in nm
+        Al_fcc = Lattice.face_centered_cubic(a)
+        hkl = HklPlane(-1, 1, 1, Al_fcc)
+        o = Orientation.from_rodrigues([0.0499, -0.3048, 0.1040])
+        w1, w2 = o.dct_omega_angles(hkl, 40, verbose=False)
+        self.assertAlmostEqual(w1, 109.2, 1)
+        self.assertAlmostEqual(w2, 296.9, 1)
+
 
     def test_topotomo_tilts(self):
         al = Lattice.from_symbol('Al')
         p = HklPlane(0, 0, 2, lattice=al)
         rod = [0.1449, -0.0281, 0.0616]
         o = Orientation.from_rodrigues(rod)
-        (ut, lt) = o.topotomo_tilts(p, verbose=True)
+        (ut, lt) = o.topotomo_tilts(p)
         self.assertAlmostEqual(180 / np.pi * ut, 2.236, 3)
         self.assertAlmostEqual(180 / np.pi * lt, -16.615, 3)
+        # use test case from AlLi_sam8_dct_cen_
+        p = HklPlane(2, 0, 2, lattice=al)
+        rod = [0.0499, -0.3048, 0.1040]
+        o = Orientation.from_rodrigues(rod)
+        (ut, lt) = o.topotomo_tilts(p)
+        self.assertAlmostEqual(180 / np.pi * ut, -11.04, 2)
+        self.assertAlmostEqual(180 / np.pi * lt, 0.53, 2)
 
     def test_IPF_color(self):
         o1 = Orientation.cube()  # 001 // Z

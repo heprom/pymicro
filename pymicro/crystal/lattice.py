@@ -511,56 +511,38 @@ class Lattice:
         return Lattice.from_parameters(a, b, c, alpha, beta, gamma)
 
     @staticmethod
-    def from_parameters(a, b, c, alpha, beta, gamma, centering='P'):
-        '''
+    def from_parameters(a, b, c, alpha, beta, gamma, x_aligned_with_a=True, centering='P'):
+        """
         Create a Lattice using unit cell lengths and angles (in degrees).
         The lattice centering can also be specified (among 'P', 'I', 'F',
         'A', 'B' or 'C').
 
-        *Parameters*
-
-        **a**: first lattice length parameter
-
-        **b**: second lattice length parameter
-
-        **c**: third lattice length parameter
-
-        **alpha**: first lattice angle parameter
-
-        **beta**: second lattice angle parameter
-
-        **gamma**: third lattice angle parameter
-
-        **centering**: lattice centering ('P' by default)
-
-        *Returns*
-
-        A `Lattice` instance with the specified lattice parameters.
-        '''
+        :param float a: first lattice length parameter.
+        :param float b: second lattice length parameter.
+        :param float c: third lattice length parameter.
+        :param float alpha: first lattice angle parameter.
+        :param float beta: second lattice angle parameter.
+        :param float gamma: third lattice angle parameter.
+        :param bool x_aligned_with_a: flag to control the convention used to define the Cartesian frame.
+        :param str centering: lattice centering ('P' by default) passed to the `Lattice` class.
+        :return: A `Lattice` instance with the specified lattice parameters and centering.
+        """
         alpha_r = radians(alpha)
         beta_r = radians(beta)
         gamma_r = radians(gamma)
-        val = (np.cos(alpha_r) * np.cos(beta_r) - np.cos(gamma_r)) \
-              / (np.sin(alpha_r) * np.sin(beta_r))
-        # Sometimes rounding errors result in values slightly > 1.
-        val = val if abs(val) <= 1 else val / abs(val)
-        gamma_star = np.arccos(val)
-        vector_a = [a * np.sin(beta_r), 0.0, a * np.cos(beta_r)]
-        vector_b = [-b * np.sin(alpha_r) * np.cos(gamma_star), b * np.sin(alpha_r) * np.sin(gamma_star),
-                    b * np.cos(alpha_r)]
-        vector_c = [0.0, 0.0, float(c)]
+        if x_aligned_with_a:  # first lattice vector (a) is aligned with X
+            vector_a = a * np.array([1, 0, 0])
+            vector_b = b * np.array([np.cos(gamma_r), np.sin(gamma_r), 0])
+            c1 = c * np.cos(beta_r)
+            c2 = c * (np.cos(alpha_r) - np.cos(gamma_r) * np.cos(beta_r)) / np.sin(gamma_r)
+            vector_c = np.array([c1, c2, np.sqrt(c ** 2 - c1 ** 2 - c2 ** 2)])
+        else:  # third lattice vector (c) is aligned with Z
+            cos_gamma_star = (np.cos(alpha_r) * np.cos(beta_r) - np.cos(gamma_r)) / (np.sin(alpha_r) * np.sin(beta_r))
+            sin_gamma_star = np.sqrt(1 - cos_gamma_star ** 2)
+            vector_a = [a * np.sin(beta_r), 0.0, a * np.cos(beta_r)]
+            vector_b = [-b * np.sin(alpha_r) * cos_gamma_star, b * np.sin(alpha_r) * sin_gamma_star, b * np.cos(alpha_r)]
+            vector_c = [0.0, 0.0, float(c)]
         return Lattice([vector_a, vector_b, vector_c], centering)
-        '''
-        # this is a transposed version of the cartesian-crystal matrix
-        val = (np.cos(gamma_r) - np.cos(alpha_r) * np.cos(beta_r)) \
-          / (np.sin(alpha_r) * np.sin(beta_r))
-        delta = np.arccos(val)
-        M = [[a * np.sin(beta_r), b * np.sin(alpha_r) * np.cos(delta), 0.0],
-             [0.0, b * np.sin(alpha_r) * np.sin(delta), 0.0],
-             [a * np.cos(beta_r), b * np.cos(alpha_r), float(c)]]
-        return Lattice(M)
-        # there is a third version in H. Poulsen's book p34. should check everything is consistent...
-        '''
 
     def volume(self):
         '''Compute the volume of the unit cell.'''
@@ -766,6 +748,37 @@ class HklDirection(HklObject):
         d2 = HklDirection(h2, k2, l2, lattice)
         return d1.angle_with_direction(d2)
 
+    @staticmethod
+    def three_to_four_indices(u, v, w):
+        """Convert from Miller indices to Miller-Bravais indices. this is used for hexagonal crystal lattice."""
+        return (2 * u - v) / 3., (2 * v - u) / 3., -(u + v) / 3., w
+
+    @staticmethod
+    def four_to_three_indices(U, V, T, W):
+        """Convert from Miller-Bravais indices to Miller indices. this is used for hexagonal crystal lattice."""
+        import fractions
+        u, v, w = U - T, V - T, W
+        gcd = reduce(fractions.gcd, (u, v, w))
+        return u / gcd, v / gcd, w / gcd
+
+    @staticmethod
+    def angle_between_4indices_directions((h1, k1, i1, l1), (h2, k2, i2, l2), (a, c)):
+        """Computes the angle between two crystallographic directions in a hexagonal lattice.
+
+        The solution was derived by F. Frank in:
+        On Miller - Bravais indices and four dimensional vectors. Acta Cryst. 18, 862-866 (1965)
+
+        :param tuple (h1, k1, i1, l1): The quartet of the indices of the first direction.
+        :param tuple (h2, k2, i2, l2): The quartet of the indices of the second direction.
+        :param tuple (a, c): the lattice parameters of the hexagonal structure.
+        :returns float: The angle in radian.
+        """
+        lambda_square = 2. / 3 * (c / a) ** 2
+        value = (h1 * h2 + k1 * k2 + i1 * i2 + lambda_square * l1 * l2) / \
+                (np.sqrt(h1 ** 2 + k1 ** 2 + i1 ** 2 + lambda_square * l1 ** 2) *
+                 np.sqrt(h2 ** 2 + k2 ** 2 + i2 ** 2 + lambda_square * l2 ** 2))
+        return np.arccos(value)
+
     def find_planes_in_zone(self, max_miller=5):
         '''
         This method finds the hkl planes in zone with the crystallographic
@@ -916,14 +929,15 @@ class HklPlane(HklObject):
         return theta
 
     @staticmethod
-    def four_to_three_index(h, k, i, l):
-        '''Convert four to three index direction (used for hexagonal crystal lattice).'''
-        return (6 * h / 5. - 3 * k / 5., 3 * h / 5. + 6 * k / 5., l)
+    def four_to_three_indices(U, V, T, W):
+        """Convert four to three index representation of a slip plane (used for hexagonal crystal lattice)."""
+        #return (6 * h / 5. - 3 * k / 5., 3 * h / 5. + 6 * k / 5., l)
+        return U, V, W
 
     @staticmethod
-    def three_to_four_index(u, v, w):
-        '''Convert three to four index direction (used for hexagonal crystal lattice).'''
-        return ((2 * u - v) / 3., (2 * v - u) / 3., -(u + v) / 3., w)
+    def three_to_four_indices(u, v, w):
+        """Convert three to four index representation of a slip plane (used for hexagonal crystal lattice)."""
+        return u, v, -(u + v), w
 
     @staticmethod
     def auto_family(hkl, lattice=None, include_friedel_pair=False):
@@ -1073,10 +1087,16 @@ class HklPlane(HklObject):
             raise ValueError('warning, family not supported: %s' % hkl)
         return family
 
-    def slip_traces(self, orientation, n_int=np.array([0, 0, 1]), view_up=np.array([0, 1, 0]),
-                    trace_size=100, verbose=False):
+    def slip_trace(self, orientation, n_int=np.array([0, 0, 1]), view_up=np.array([0, 1, 0]), trace_size=100, verbose=False):
         """
-        Compute the slip planes intersection with a particular plane.
+        Compute the intersection of the lattice plane with a particular plane defined by its normal.
+
+        :param orientation: The crystal orientation.
+        :param n_int: normal to the plane of intersection (laboratory local frame).
+        :param view_up: vector to place upwards on the plot.
+        :param int trace_size: size of the trace.
+        :param verbose: activate verbose mode.
+        :return: a numpy array with the coordinates of the two points defining the trace.
         """
         gt = orientation.orientation_matrix().transpose()
         n_rot = gt.dot(self.normal())
@@ -1108,30 +1128,27 @@ class HklPlane(HklObject):
         """
         A method to plot the slip planes intersection with a particular plane
         (known as slip traces if the plane correspond to the surface).
+        A few parameters can be used to control the plot looking.
         Thank to Jia Li for starting this code.
 
-        * orientation: The crystal orientation.
-        * hkl: the slip plane family (eg. 111 or 110)
-        * n_int: normal to the plane of intersection.
-        * view_up: vector to place upwards on the plot
-        * verbose: activate verbose mode.
-
-        A few additional parameters can be used to control the plot looking.
-
-        * title: display a title above the plot
-        * legend: display the legend
-        * trans: use a transparent background for the figure (useful to
-          overlay the figure on top of another image).
-        * str_plane: particular string to use to represent the plane in the image name.
+        :param orientation: The crystal orientation.
+        :param hkl: the slip plane family (eg. 111 or 110)
+        :param n_int: normal to the plane of intersection.
+        :param view_up: vector to place upwards on the plot.
+        :param verbose: activate verbose mode.
+        :param title: display a title above the plot.
+        :param legend: display the legend.
+        :param trans: use a transparent background for the figure (useful to overlay the figure on top of another image).
+        :param str_plane: particular string to use to represent the plane in the image name.
         """
+        plt.figure()
         hkl_planes = HklPlane.get_family(hkl)
         colors = 'rgykcmbw'
-        traces = slip_traces(orientation, hkl_planes, n_int=n_int, view_up=view_up,
-                    trace_size=1, verbose=verbose)
-        for i, trace in enumerate(traces):
+        for i, hkl_plane in enumerate(hkl_planes):
+            trace = hkl_plane.slip_trace(orientation, n_int=n_int, view_up=view_up, trace_size=1, verbose=verbose)
             x = [-trace[0] / 2, trace[0] / 2]
             y = [-trace[1] / 2, trace[1] / 2]
-            plt.plot(x, y, colors[i % len(hkl_planes)], label='%d%d%d' % (p._h, p._k, p._l), linewidth=2)
+            plt.plot(x, y, colors[i % len(hkl_planes)], label='%d%d%d' % hkl_plane.miller_indices(), linewidth=2)
         plt.axis('equal')
         t = np.linspace(0., 2 * np.pi, 100)
         plt.plot(0.5 * np.cos(t), 0.5 * np.sin(t), 'k')

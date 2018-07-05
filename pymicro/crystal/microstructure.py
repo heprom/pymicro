@@ -324,6 +324,28 @@ class Orientation:
             print('angle (deg) between -X and G', alpha)
         return alpha
 
+    @staticmethod
+    def solve_trig_equation(A, B, C, verbose=False):
+        """Solve the trigonometric equation in the form of:
+        
+        .. math::
+
+           A\cos\\theta + B\sin\\theta = C
+
+        :param float A: the A constant in the equation.
+        :param float B: the B constant in the equation.
+        :param float C: the C constant in the equation.
+        :return tuple: the two solutions angular values in degrees.
+        """
+        Delta = 4 * (A ** 2 + B ** 2 - C ** 2)
+        if Delta < 0:
+            raise ValueError('Delta < 0 (%f)' % Delta)
+        if verbose:
+            print('A={0:.3f}, B={1:.3f}, C={2:.3f}, Delta={3:.1f}'.format(A, B, C, Delta))
+        theta_1 = 2 * np.arctan2(B - 0.5 * np.sqrt(Delta), A + C) * 180. / np.pi % 360
+        theta_2 = 2 * np.arctan2(B + 0.5 * np.sqrt(Delta), A + C) * 180. / np.pi % 360
+        return theta_1, theta_2
+
     def dct_omega_angles(self, hkl, lambda_keV, verbose=False):
         """Compute the two omega angles which satisfy the Bragg condition.
 
@@ -359,7 +381,6 @@ class Orientation:
         rotation angle around the vertical axis (in degrees).
         """
         (h, k, l) = hkl.miller_indices()
-        (a, b, c) = hkl._lattice._lengths
         theta = hkl.bragg_angle(lambda_keV, verbose=verbose)
         lambda_nm = 1.2398 / lambda_keV
         gt = self.orientation_matrix().T  # gt = g^{-1} in Poulsen 2004
@@ -369,19 +390,10 @@ class Orientation:
         # A = h / a * gt[0, 0] + k / b * gt[0, 1] + l / c * gt[0, 2]
         # B = -h / a * gt[1, 0] - k / b * gt[1, 1] - l / c * gt[1, 2]
         C = -2 * np.sin(theta) ** 2 / lambda_nm  # the minus sign comes from the main equation
-        Delta = 4 * (A ** 2 + B ** 2 - C ** 2)
-        if Delta < 0:
-            raise ValueError('Delta < 0 (%f) for reflexion (%d%d%d)' % (Delta, h, k, l))
-        t1 = (B - 0.5 * np.sqrt(Delta)) / (A + C)
-        t2 = (B + 0.5 * np.sqrt(Delta)) / (A + C)
-        w1 = 2 * np.arctan(t1) * 180. / np.pi
-        w2 = 2 * np.arctan(t2) * 180. / np.pi
-        if w1 < 0: w1 += 360.
-        if w2 < 0: w2 += 360.
+        omega_1, omega_2 = Orientation.solve_trig_equation(A, B, C, verbose=verbose)
         if verbose:
-            print('A={0:.3f}, B={1:.3f}, C={2:.3f}, Delta={3:.1f}'.format(A, B, C, Delta))
-            print('the two omega values in degrees fulfilling the Bragg condition are (%.1f, %.1f)' % (w1, w2))
-        return w1, w2
+            print('the two omega values in degrees fulfilling the Bragg condition are (%.1f, %.1f)' % (omega_1, omega_2))
+        return omega_1, omega_2
 
     def rotating_crystal(self, hkl, lambda_keV, omega_step=0.5, display=True, verbose=False):
         from pymicro.xray.xray_utils import lambda_keV_to_nm

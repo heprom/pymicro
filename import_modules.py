@@ -1,7 +1,10 @@
-print 'importing functions from the pymicro library'
-from pymicro.apps.wxImageViewer import ImageViewer
-from pymicro.apps.wxVolumeViewer import wxVolumeViewer
-from pymicro.apps.View import View
+print('importing functions from the pymicro library')
+try:
+    from pymicro.apps.wxImageViewer import ImageViewer
+    from pymicro.apps.wxVolumeViewer import wxVolumeViewer
+    from pymicro.apps.View import View
+except:
+    print('exception occured importing modules')
 
 from pymicro.crystal.lattice import *
 from pymicro.crystal.microstructure import *

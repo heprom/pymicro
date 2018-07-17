@@ -15,6 +15,7 @@ class file_utils_Tests(unittest.TestCase):
         data[1, 2, 3] = True
         data[2, 3, 4] = True
         HST_write(data, 'test_bool_write.raw', pack_binary=True)
+        HST_write(data, 'test_bool_write_as_uint8.raw', pack_binary=False)
         # craft a custom info file without the DATA_TYPE info
         f = open('temp.info', 'w')
         f.write('! PyHST_SLAVE VOLUME INFO FILE\n')
@@ -58,9 +59,17 @@ class file_utils_Tests(unittest.TestCase):
         self.assertEqual(bin_data[1, 2, 3], True)
         self.assertEqual(bin_data[2, 3, 4], True)
 
+    def test_write_bool_array(self):
+        bin_data = HST_read('test_bool_write_as_uint8.raw')
+        self.assertEqual(bin_data.dtype, np.uint8)
+        size = os.path.getsize('test_bool_write_as_uint8.raw')
+        self.assertEqual(size, 60)
+
     def tearDown(self):
         os.remove('temp_20x30x10_uint8.raw')
         os.remove('temp_20x30x10_uint8.raw.info')
+        os.remove('test_bool_write_as_uint8.raw')
+        os.remove('test_bool_write_as_uint8.raw.info')
         os.remove('test_bool_write.raw')
         os.remove('test_bool_write.raw.info')
         os.remove('temp.info')

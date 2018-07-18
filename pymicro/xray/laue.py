@@ -33,10 +33,7 @@ def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
     return (the_energy, theta)
 
 
-def build_list(lattice=None, max_miller=3):
-    '''Create a list of all HklPlanes.
-    This should move to the HklPlane class as a static method.'''
-    # build a list of all hkl planes
+def build_list(lattice=None, max_miller=3, extinction=None):
     hklplanes = []
     indices = range(-max_miller, max_miller + 1)
     for h in indices:
@@ -44,10 +41,16 @@ def build_list(lattice=None, max_miller=3):
             for l in indices:
                 if h == k == l == 0:  # skip (0, 0, 0)
                     continue
-                hklplanes.append(HklPlane(h, k, l, lattice))
-                # if (h % 2 == 0 & k % 2 == 0 and l % 2 == 0) or (h % 2 == 1 & k % 2 == 1 and l % 2 == 1):
-                #  # take only all odd or all even hkl indices
-                #  hklplanes.append(HklPlane(h, k, l, lattice))
+                if not extinction :
+                    hklplanes.append(HklPlane(h, k, l, lattice))
+                if extinction == 'FCC':
+                    # take plane if only all odd or all even hkl indices
+                    if (h % 2 == 0 and k % 2 == 0 and l % 2 == 0) or (h % 2 == 1 and k % 2 == 1 and l % 2 == 1):
+                        hklplanes.append(HklPlane(h, k, l, lattice))
+                if extinction == 'BCC':
+                    # take plane only if the sum indices is even
+                    if ((h**2 + k**2 + l**2) % 2 == 0):
+                        hklplanes.append(HklPlane(h, k, l, lattice))
     return hklplanes
 
 
@@ -514,19 +517,22 @@ def poll_system(g_list, dis_tol=1.0):
                 print('solution_indices list is now %s' % solution_indices)
                 break
     print('Max vote =', np.amax(votes))
-    index_result = np.argwhere(votes == np.amax(votes))
-    print('index result:', index_result)
-    print('Number of equivalent solutions :', len(index_result))
-    print(type(index_result))
-    final_orientation_matrix = []
-    for n in range(len(index_result)):
-        solutions = g_list[solution_indices[index_result[n]]]
-        print('Solution number {0:d} is'.format(n+1), solutions)
-        final_orientation_matrix.append(solutions)
-    result_vote = max(votes)
-    ci = confidence_index(votes)
-    vote_field = [votes[i] for i in vote_index]
-    return final_orientation_matrix, result_vote, ci, vote_field
+    if np.amax(votes) == 0:
+        return 0, 0, 0, 0
+    else:
+        index_result = np.argwhere(votes == np.amax(votes))
+        print('index result:', index_result)
+        print('Number of equivalent solutions :', len(index_result))
+        print(type(index_result))
+        final_orientation_matrix = []
+        for n in range(len(index_result)):
+            solutions = g_list[solution_indices[index_result[n]]]
+            print('Solution number {0:d} is'.format(n+1), solutions)
+            final_orientation_matrix.append(solutions)
+        result_vote = max(votes)
+        ci = confidence_index(votes)
+        vote_field = [votes[i] for i in vote_index]
+        return final_orientation_matrix, result_vote, ci, vote_field
 
 
 def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crystal_structure='cubic', display=False):
@@ -579,17 +585,20 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crysta
         om_fz = Lattice.move_rotation_to_FZ(orientation_matrix, crystal_structure=crystal_structure)  # we only add the third one
         g_indexation.append(om_fz)
     final_orientation_matrix, vote, ci, vote_field = poll_system(g_indexation, dis_tol=tol_disorientation)
-    print('\n\n\n### FINAL SOLUTION(S) ###\n')
-    for n in range(len(final_orientation_matrix)):
-        print('- SOLUTION %d -' % (n + 1))
-        final_orientation = Orientation(final_orientation_matrix[n])
-        print(final_orientation.inFZ())
-        print ('- Cristal orientation in Fundamental Zone \n {0:s} \n'.format(final_orientation.euler))
-        print('- Rodrigues vector in the fundamental Zone \n {0:s} \n'.format(final_orientation.rod))
-        if display:
-            from pymicro.crystal.texture import PoleFigure
-            PoleFigure.plot(final_orientation, axis='Z')
-    return final_orientation_matrix, ci
+    if final_orientation_matrix == 0:
+        print('Troubles in the data set !')
+    else:
+        print('\n\n\n### FINAL SOLUTION(S) ###\n')
+        for n in range(len(final_orientation_matrix)):
+            print('- SOLUTION %d -' % (n + 1))
+            final_orientation = Orientation(final_orientation_matrix[n])
+            print(final_orientation.inFZ())
+            print ('- Cristal orientation in Fundamental Zone \n {0:s} \n'.format(final_orientation.euler))
+            print('- Rodrigues vector in the fundamental Zone \n {0:s} \n'.format(final_orientation.rod))
+            if display:
+                from pymicro.crystal.texture import PoleFigure
+                PoleFigure.plot(final_orientation, axis='Z')
+        return final_orientation_matrix, ci
 
 if __name__ == '__main__':
     from matplotlib import pyplot as plt, cm, rcParams

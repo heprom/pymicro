@@ -39,7 +39,7 @@ class LaueTests(unittest.TestCase):
     def test_gnomonic_projection_point(self):
         """Verify that the gnomonic projection of two diffracted points on a detector give access to the angle 
         between the lattice plane normals."""
-        olivine = Lattice.orthorombic(1.022, 0.596, 0.481)  # nm Barret & Massalski convention
+        olivine = Lattice.orthorhombic(1.022, 0.596, 0.481)  # nm Barret & Massalski convention
         orientation = Orientation.cube()
         p1 = HklPlane(2, 0, -3, olivine)
         p2 = HklPlane(3, -1, -3, olivine)

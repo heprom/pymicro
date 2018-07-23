@@ -338,6 +338,9 @@ def HST_write(data, file_name, verbose=True, pack_binary=False):
     :param bool verbose: flag to activate verbose mode.
     :param bool pack_binary: flag to activate binary packing.
     '''
+    if data.dtype == np.bool:
+        print('casting bool array to uint8, you may consider using binary packing to save disk space.')
+        data = data.astype(np.uint8)
     (nx, ny, nz) = data.shape
     if verbose:
         print('opening %s for writing' % file_name)

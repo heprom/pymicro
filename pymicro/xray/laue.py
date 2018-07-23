@@ -512,6 +512,14 @@ def poll_system(g_list, dis_tol=1.0, verbose=False):
                     print('vote list is now %s' % votes)
                     print('solution_indices list is now %s' % solution_indices)
                 break
+            elif j == len(solution_indices) - 1:
+                solution_indices.append(i)
+                votes.append(1)
+                vote_index[i] = len(votes) - 1
+                if verbose:
+                    print('vote list is now %s' % votes)
+                    print('solution_indices list is now %s' % solution_indices)
+                break
     index_result = np.argwhere(votes == np.amax(votes)).flatten()
     if verbose:
         print('Max vote =', np.amax(votes))

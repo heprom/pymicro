@@ -257,7 +257,7 @@ def add_hklplane_to_grain(hkl_plane, grid, orientation, origin=(0, 0, 0),
     return add_plane_to_grid(rot_plane, grid, opacity=opacity, show_normal=show_normal, normal_length=normal_length)
 
 
-def add_plane_to_grid(plane, grid, origin=None, opacity=0.3, show_normal=False, normal_length=1.0):
+def add_plane_to_grid(plane, grid, origin=None, color=None, opacity=0.3, show_normal=False, normal_length=1.0):
     '''Add a 3d plane inside another object.
 
     This function adds a plane inside another object described by a mesh (vtkunstructuredgrid). 
@@ -268,7 +268,8 @@ def add_plane_to_grid(plane, grid, origin=None, opacity=0.3, show_normal=False, 
 
     :param plane: A VTK implicit function describing the plane to add.
     :param grid: A VTK unstructured grid in which the plane is to be added.
-    :param tuple origin: 
+    :param tuple origin: (x, y, z) tuple to define the origin of the plane.
+    :param tuple color: A color defined by its rgb components.
     :param float opacity: Opacity value of the plane actor.
     :param bool show_normal: A flag to display the plane normal.
     :param normal_length: The length of the plane normal vector (1.0 by default).
@@ -286,6 +287,8 @@ def add_plane_to_grid(plane, grid, origin=None, opacity=0.3, show_normal=False, 
     cutMapper.SetInputConnection(planeCut.GetOutputPort())
     cutActor = vtk.vtkActor()
     cutActor.SetMapper(cutMapper)
+    if color:
+        cutActor.GetProperty().SetColor(color)
     cutActor.GetProperty().SetOpacity(opacity)
     if show_normal:
         # add an arrow to display the normal to the plane
@@ -931,7 +934,7 @@ def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
     return assembly
 
 
-def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, show_normal=True,
+def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, plane_colors=None, show_normal=True,
                            plane_opacity=1.0, **kwargs):
     '''
     Create the 3D representation of a crystal lattice.
@@ -961,6 +964,7 @@ def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, show_normal=T
     :param lattice: An instance of :py:class:`~pymicro.crystal.lattice.Lattice` corresponding to the crystal lattice to be displayed.
     :param hklplanes: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` instances to add to the lattice.
     :param plane_origins: A list of tuples describing the plane origins (must be the same length as `hklplanes`), if None, the planes are created to pass through the middle of the lattice (default).
+    :param plane_colors: A list of tuples describing the plane colors (must be the same length as `hklplanes`), if None, the planes are left gray (default).
     :param bool show_normal: Control if the slip plane normals are shown (default: True).
     :param float plane_opacity: A float number in the [0.,1.0] range controlling the slip plane opacity.
     :param **kwargs: additional parameters are passed to the `lattice_3d` method.
@@ -974,6 +978,8 @@ def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, show_normal=T
         origin = (a / 2, b / 2, c / 2)
     else:
         origin = (0., 0., 0.)
+    if plane_colors:
+        assert len(plane_colors) == len(hklplanes)
     # get the atoms+edges assembly corresponding to the crystal lattice
     assembly = lattice_3d(lattice, **kwargs)
     # display all the hkl planes within the lattice
@@ -982,7 +988,10 @@ def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, show_normal=T
         plane = vtk.vtkPlane()
         plane.SetOrigin(mid)
         plane.SetNormal(hklplane.normal())
-        hklplaneActor = add_plane_to_grid(plane, grid, mid, opacity=plane_opacity)
+        plane_color = None
+        if plane_colors:
+            plane_color = plane_colors[i]
+        hklplaneActor = add_plane_to_grid(plane, grid, mid, color=plane_color, opacity=plane_opacity)
         if plane_origins:
             origin = plane_origins[i] * np.array([a, b, c]) - mid
             print('using origin', origin)
@@ -1166,6 +1175,26 @@ def apply_translation_to_actor(actor, trans):
     actor.SetUserTransform(transform)
 
 
+def apply_rotation_to_actor(actor, R):
+    '''
+    Transform the actor with a given rotation matrix.
+
+    :param vtkActor actor: the vtk actor.
+    :param R: a (3x3) array representing the rotation matrix.
+    '''
+    transform = actor.GetUserTransform()
+    if transform is None:
+        transform = vtk.vtkTransform()
+        transform.Identity()
+    m = vtk.vtkMatrix4x4()
+    m.Identity()
+    for i in range(3):
+        for j in range(3):
+            m.SetElement(i, j, R[i, j])
+    transform.Concatenate(m)
+    actor.SetUserTransform(transform)
+
+
 def apply_orientation_to_actor(actor, orientation):
     '''
     Transform the actor (or whole assembly) using the specified orientation.
@@ -1177,19 +1206,8 @@ def apply_orientation_to_actor(actor, orientation):
     :param vtkActor actor: the vtk actor.
     :param orientation: an instance of the :py:class:`pymicro.crystal.microstructure.Orientation` class
     '''
-    transform = actor.GetUserTransform()
-    if transform == None:
-        transform = vtk.vtkTransform()
-        transform.Identity()
-    Bt = orientation.orientation_matrix().transpose()
-    m = vtk.vtkMatrix4x4()
-    m.Identity()
-    m.DeepCopy((Bt[0, 0], Bt[0, 1], Bt[0, 2], 0,
-                Bt[1, 0], Bt[1, 1], Bt[1, 2], 0,
-                Bt[2, 0], Bt[2, 1], Bt[2, 2], 0,
-                0, 0, 0, 1))
-    transform.Concatenate(m)
-    actor.SetUserTransform(transform)
+    gt = orientation.orientation_matrix().transpose()
+    apply_rotation_to_actor(actor, gt)
 
 
 def load_STL_actor(name, ext='STL', verbose=False, color=grey, feature_edges=False):
@@ -1295,7 +1313,7 @@ def box_3d(size=(100, 100, 100), line_color=black):
     '''
     vtk helper function to draw a box of a given size.
     '''
-    l = Lattice.orthorombic(size[0], size[1], size[2])
+    l = Lattice.orthorhombic(size[0], size[1], size[2])
     grid = lattice_grid(l, origin=[0., 0., 0.])
     edges = vtk.vtkExtractEdges()
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:

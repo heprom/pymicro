@@ -1198,3 +1198,20 @@ class HklPlane(HklObject):
         HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int=np.array([0, -1, 0]), \
                                   view_up=np.array([0, 0, 1]), title=title, legend=legend, \
                                   trans=trans, verbose=verbose, str_plane='XZ')
+
+    def gethkl_fromtwo_directions(ZA1, ZA2):
+        """
+        Work in progress
+        by AA
+
+        ZA1, ZA2 must be HklDirection instance
+        TODO : - return an instance of HklPlane
+               - add the Friedel's pair
+               - maybe change the function name?
+        """
+        (u1, v1, w1) = ZA1.miller_indices()
+        (u2, v2, w2) = ZA2.miller_indices()
+        h = v1 * w2 - w1 * v2
+        k = w1 * u2 - u1 * w2
+        l = u1 * v2 - v1 * u2
+        return h, k, l

@@ -65,11 +65,39 @@ def flat(img, ref, dark):
     return flat
 
 
+def min_max_cumsum(data, cut=0.001, verbose=False):
+    """Compute the indices corresponding to the edge of a distribution.
+    
+    The min and max indices are calculated according to a cutoff value (0.001 by default) meaning 99.99% 
+    of the distribution lies within this range.
+    
+    """
+    total = np.sum(data)
+    p = np.cumsum(data)
+    nb_bins = data.shape[0]
+
+    mini = 0.0
+    maxi = 0.0
+    for i in range(nb_bins):
+        if p[i] > total * cut:
+            mini = i
+            if verbose:
+                print('min = %f (i=%d)' % (mini, i))
+            break
+    for i in range(nb_bins):
+        if total - p[nb_bins - 1 - i] > total * cut:
+            maxi = nb_bins - 1 - i
+            if verbose:
+                print('max = %f (i=%d)' % (maxi, i))
+            break
+    return mini, maxi
+
+
 def auto_min_max(data, cut=0.0002, nb_bins=256, verbose=False):
-    '''Compute the min and max values in a numpy data array.
+    """Compute the min and max values in a numpy data array.
 
     The min and max values are calculated based on the histogram of the
-    array which is limited at both end by the cut parameter (0.0002 by
+    array which is limited at both ends by the cut parameter (0.0002 by
     default). This means 99.98% of the values are within the [min, max]
     range.
 
@@ -77,26 +105,12 @@ def auto_min_max(data, cut=0.0002, nb_bins=256, verbose=False):
     :param float cut: the cut off value to use on the histogram (0.0002 by default).
     :param int nb_bins: number of bins to use in the histogram (256 by default).
     :param bool verbose: activate verbose mode (False by default).
-    :returns tuple (min, max): a tuple containing the min and max values.
-    '''
+    :returns tuple (val_mini, val_maxi): a tuple containing the min and max values.
+    """
     n, bins = np.histogram(data, bins=nb_bins, density=False)
-    min = 0.0
-    max = 0.0
-    total = np.sum(n)
-    p = np.cumsum(n)
-    for i in range(nb_bins):
-        if p[i] > total * cut:
-            min = bins[i]
-            if verbose:
-                print('min = %f (i=%d)' % (min, i))
-            break
-    for i in range(nb_bins):
-        if total - p[nb_bins - 1 - i] > total * cut:
-            max = bins[nb_bins - 1 - i]
-            if verbose:
-                print('max = %f' % max)
-            break
-    return min, max
+    mini, maxi = min_max_cumsum(n, cut=cut, verbose=verbose)
+    val_mini, val_maxi = bins[mini], bins[maxi]
+    return val_mini, val_maxi
 
 
 def recad(data, min, max):

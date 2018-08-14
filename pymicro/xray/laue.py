@@ -112,16 +112,27 @@ def compute_ellipsis(orientation, detector, uvw, n=101, verbose=False):
     return yz_data
 
 
-def diffracted_vector(hkl, orientation, min_theta=0.1, verbose=False):
-    Bt = orientation.orientation_matrix().transpose()
+def diffracted_vector(hkl, orientation, Xu=[1., 0., 0.], min_theta=0.1, verbose=False):
+    """Compute the diffraction vector for a given reflection of a crystal.
+
+    This method compute the diffraction vector.
+    The incident wave vector is along the X axis by default but can be changed by specifying any unit vector.
+
+    :param hkl: an instance of the `HklPlane` class.
+    :param orientation: an instance of the `Orientation` class.
+    :param float min_theta: the minimum considered Bragg angle (in radian).
+    :param bool verbose: a flag to activate verbose mode.
+    :return: the diffraction vector as a numpy array.
+    """
+    gt = orientation.orientation_matrix().transpose()
     (h, k, l) = hkl.miller_indices()
     # this hkl plane will select a particular lambda
     (the_energy, theta) = select_lambda(hkl, orientation, verbose=verbose)
     if abs(theta) < min_theta * np.pi / 180:  # skip angles < min_theta deg
         return None
     lambda_nm = 1.2398 / the_energy
-    X = np.array([1., 0., 0.]) / lambda_nm
-    Gs = Bt.dot(hkl.scattering_vector())
+    X = np.array(Xu) / lambda_nm
+    Gs = gt.dot(hkl.scattering_vector())
     if verbose:
         print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, hkl.bragg_angle(the_energy) * 180 / np.pi))
     assert (abs(theta - hkl.bragg_angle(the_energy)) < 1e-6)  # verify than theta_bragg is equal to the glancing angle
@@ -169,15 +180,15 @@ def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
     return I
 
 
-def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, spectrum_thr=0.,
+def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1., 0., 0.]), spectrum=None, spectrum_thr=0.,
                          r_spot=5, color_field='constant', inverted=False, show_direct_beam=False, verbose=False):
     '''
     Compute a transmission Laue pattern. The data array of the given
     `Detector2d` instance is initialized with the result.
     
-    The incident beam is assumed to be along the X axis: (1, 0, 0). The crystal can have any orientation and uses 
-    an instance of the `Orientation` class. The `Detector2d` instance holds all the geometry (detector size and 
-    position).
+    The incident beam is assumed to be along the X axis: (1, 0, 0) but can be changed to any direction. 
+    The crystal can have any orientation using an instance of the `Orientation` class. 
+    The `Detector2d` instance holds all the geometry (detector size and position).
 
     A parameter controls the meaning of the values in the diffraction spots in the image. It can be just a constant 
     value, the diffracted beam energy (in keV) or the intensity as computed by the :py:meth:`diffracted_intensity` 
@@ -186,6 +197,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
     :param orientation: The crystal orientation.
     :param detector: An instance of the Detector2d class.
     :param list hkl_planes: A list of the lattice planes to include in the pattern.
+    :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param spectrum: A two columns array of the spectrum to use for the calculation.
     :param float spectrum_thr: The threshold to use to determine if a wave length is contributing or not.
     :param int r_spot: Size of the spots on the detector in pixel (5 by default)
@@ -213,13 +225,13 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, spectrum=None, 
         print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
 
     for hkl in hkl_planes:
-        (the_energy, theta) = select_lambda(hkl, orientation, verbose=False)
+        (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=False)
         if spectrum is not None:
             if abs(the_energy) < E_min or abs(the_energy) > E_max:
                 #print('skipping reflection {0:s} which would diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
                 continue
                 #print('including reflection {0:s} which will diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
-        K = diffracted_vector(hkl, orientation)
+        K = diffracted_vector(hkl, orientation, Xu=Xu)
         if K is None or np.dot([1., 0., 0.], K) == 0:
             continue  # skip diffraction // to the detector
 

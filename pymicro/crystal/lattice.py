@@ -607,6 +607,14 @@ class SlipSystem:
         return self._direction
 
     @staticmethod
+    def from_indices(plane_indices, direction_indices, lattice=None):
+        '''A static method to create a slip system from the indices of the plane and the direction.
+        '''
+        plane = HklPlane(plane_indices[0], plane_indices[1], plane_indices[2], lattice)
+        direction = HklDirection(direction_indices[0], direction_indices[1], direction_indices[2], lattice)
+        return SlipSystem(plane, direction)
+
+    @staticmethod
     def get_slip_systems(plane_type='111'):
         '''A static method to get all slip systems for a given hkl plane family.
 

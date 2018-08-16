@@ -6,6 +6,7 @@ from pymicro.external.tifffile import imsave, imread
 
 
 class file_utils_Tests(unittest.TestCase):
+
     def setUp(self):
         print('testing the file_utils module')
         self.data = (255 * np.random.rand(20, 30, 10)).astype(np.uint8)
@@ -59,6 +60,14 @@ class file_utils_Tests(unittest.TestCase):
         self.assertEqual(bin_data[1, 2, 3], True)
         self.assertEqual(bin_data[2, 3, 4], True)
 
+    def test_write_append(self):
+        n = 5
+        HST_write(self.data, 'test_append.raw', mode='w')
+        for i in range(n - 1):
+            HST_write(self.data, 'test_append.raw', mode='a')
+        size = os.path.getsize('test_bool_write_as_uint8.raw')
+        self.assertEqual(size, n * np.prod(self.data.shape))
+
     def test_write_bool_array(self):
         bin_data = HST_read('test_bool_write_as_uint8.raw')
         self.assertEqual(bin_data.dtype, np.uint8)
@@ -72,6 +81,8 @@ class file_utils_Tests(unittest.TestCase):
         os.remove('test_bool_write_as_uint8.raw.info')
         os.remove('test_bool_write.raw')
         os.remove('test_bool_write.raw.info')
+        os.remove('test_append.raw')
+        os.remove('test_append.raw.info')
         os.remove('temp.info')
 
 

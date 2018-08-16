@@ -322,7 +322,7 @@ def rawmar_read(image_name, size, verbose=False):
     return data
 
 
-def HST_write(data, file_name, verbose=True, pack_binary=False):
+def HST_write(data, file_name, mode='w', verbose=True, pack_binary=False):
     '''Write data as a raw binary file.
 
     This function write a (x,y,z) 3D dataset to the disk. The actual data type is used, you can convert your data array 
@@ -335,6 +335,7 @@ def HST_write(data, file_name, verbose=True, pack_binary=False):
 
     :param data: the 3d array to write to the disk in [x, y, z] form.
     :param str file_name: the name of the file to write, including file extension.
+    :param char mode: file write mode, change to 'a' to append to a file.
     :param bool verbose: flag to activate verbose mode.
     :param bool pack_binary: flag to activate binary packing.
     '''
@@ -343,10 +344,10 @@ def HST_write(data, file_name, verbose=True, pack_binary=False):
         data = data.astype(np.uint8)
     (nx, ny, nz) = data.shape
     if verbose:
-        print('opening %s for writing' % file_name)
+        print('opening %s for writing in mode %s' % (file_name, mode))
         print('volume size is %dx%dx%d' % (nx, ny, nz))
         print('data type is %s' % data.dtype)
-    f = open(file_name, 'wb')
+    f = open(file_name, mode + 'b')
     # HP 11/2013 swap axes according to read function
     if pack_binary:
         s = np.packbits(data.astype(np.uint8).transpose(2, 1, 0)).tostring()
@@ -356,15 +357,15 @@ def HST_write(data, file_name, verbose=True, pack_binary=False):
     f.close()
     if verbose:
         print('writing .info file')
-    f = open(file_name + '.info', 'w')
+    f = open(file_name + '.info', mode)
     f.write('! PyHST_SLAVE VOLUME INFO FILE\n')
     f.write('NUM_X = %4d\n' % nx)
     f.write('NUM_Y = %4d\n' % ny)
     f.write('NUM_Z = %4d\n' % nz)
     if pack_binary:
-        f.write('DATA_TYPE = PACKED_BINARY')
+        f.write('DATA_TYPE = PACKED_BINARY\n')
     else:
-        f.write('DATA_TYPE = %s' % data.dtype)
+        f.write('DATA_TYPE = %s\n' % data.dtype)
     f.close()
     if verbose:
         print('done with writing')

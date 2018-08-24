@@ -113,25 +113,20 @@ def auto_min_max(data, cut=0.0002, nb_bins=256, verbose=False):
     return val_mini, val_maxi
 
 
-def recad(data, min, max):
-    '''Cast a numpy array into 8 bit data type.
+def recad(data, mini, maxi):
+    """Cast a numpy array into 8 bit data type.
 
     This function change the data type of a numpy array into 8 bit. The
     data values are interpolated from [min, max] to [0, 255]. Both min
     and max values may be chosen manually or computed by the function
-    `find_min_max`.
+    `auto_min_max`.
 
     :param data: the data array to cast to uint8.
-    :param float min: value to use as the minimum (will be 0 in the casted array).
-    :param float max: value to use as the maximum (will be 255 in the casted array).
+    :param float mini: value to use as the minimum (will be 0 in the casted array).
+    :param float maxi: value to use as the maximum (will be 255 in the casted array).
     :returns data_uint8: the data array casted to uint8.
-    '''
-    low_values_indices = data < min
-    data[low_values_indices] = min
-    large_values_indices = data > max
-    data[large_values_indices] = max
-    data_uint8 = (255 * (data - min) / (max - min)).astype(np.uint8)
-    return data_uint8
+    """
+    return (255 * (data.clip(mini, maxi) - mini) / (maxi - mini)).astype(np.uint8)
 
 
 def alpha_cmap(color='red', opacity=1.0):

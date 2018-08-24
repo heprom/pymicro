@@ -1067,8 +1067,8 @@ def pole_figure_3d(pf, radius=1.0, show_lattice=False):
     # keep a list of useful points on the sphere
     points_on_sphere = [(0.0, 0.0, -radius)]  # first point is the south pole
 
-    # get a list of hkl planes in the family
-    hkl_planes = HklPlane.get_family(pf.family)
+    # get the list of hkl planes
+    hkl_planes = pf.poles
     orientation = orientations[0]  # treat only the first orientation for now
     g = orientation.orientation_matrix()
     gt = g.transpose()
@@ -1108,21 +1108,21 @@ def pole_figure_3d(pf, radius=1.0, show_lattice=False):
     sphere_actor.GetProperty().SetOpacity(0.1)
     pole_figure.AddPart(sphere_actor)
 
-    # draw south pole and arrow tip
+    # draw all the poles on the sphere and lines to the south pole
     for i, c in enumerate(points_on_sphere):
-        south_pole = vtk.vtkSphere()
-        south_pole.SetCenter(c)
-        south_pole.SetRadius(radius * 0.05)
-        south_pole_cut = vtk.vtkCutter()
-        south_pole_cut.SetInputConnection(sphere_source.GetOutputPort())
-        south_pole_cut.SetCutFunction(south_pole)
-        south_pole_cut_mapper = vtk.vtkPolyDataMapper()
-        south_pole_cut_mapper.SetInputConnection(south_pole_cut.GetOutputPort())
-        south_pole_cut_actor = vtk.vtkActor()
-        south_pole_cut_actor.SetMapper(south_pole_cut_mapper)
-        south_pole_cut_actor.GetProperty().SetLineWidth(2.0)
-        south_pole_cut_actor.GetProperty().SetColor(black)
-        pole_figure.AddPart(south_pole_cut_actor)
+        pole = vtk.vtkSphere()
+        pole.SetCenter(c)
+        pole.SetRadius(radius * 0.05)
+        pole_cut = vtk.vtkCutter()
+        pole_cut.SetInputConnection(sphere_source.GetOutputPort())
+        pole_cut.SetCutFunction(pole)
+        pole_cut_mapper = vtk.vtkPolyDataMapper()
+        pole_cut_mapper.SetInputConnection(pole_cut.GetOutputPort())
+        pole_cut_actor = vtk.vtkActor()
+        pole_cut_actor.SetMapper(pole_cut_mapper)
+        pole_cut_actor.GetProperty().SetLineWidth(2.0)
+        pole_cut_actor.GetProperty().SetColor(black)
+        pole_figure.AddPart(pole_cut_actor)
         if i > 0:
             # add a line between the arrow tip and the south pole
             line_actor = line_3d(points_on_sphere[0], c)

@@ -169,7 +169,7 @@ def radiographs(data, omegas):
     assert data.ndim == 3
     if type(omegas) is list:
         omegas = np.array(omegas)
-    width = np.ceil(max(data.shape[0], data.shape[1]) * 2 ** 0.5)
+    width = int(np.ceil(max(data.shape[0], data.shape[1]) * 2 ** 0.5))
     projections = np.zeros((width, np.shape(data)[2], len(omegas)), dtype=np.float)
     for z in range(np.shape(data)[2]):
         a = radon(data[:, :, z], -omegas)  # - 90  # the 90 seems to come from the radon function itself

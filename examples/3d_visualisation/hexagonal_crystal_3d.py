@@ -22,16 +22,16 @@ if __name__ == '__main__':
     c = 1.5  # 0.521 # nm
     l = Lattice.hexagonal(a, c)
     grid = hexagonal_lattice_grid(l)
-    print np.array(HklPlane.four_to_three_index(1, 0, -1, 0)) / 0.6  # prismatic 1
-    print np.array(HklPlane.four_to_three_index(0, 1, -1, 0)) / 0.6  # prismatic 2
-    print np.array(HklPlane.four_to_three_index(0, 1, -1, 1)) / 0.6 * 3  # pyramidal 1
-    print np.array(HklPlane.four_to_three_index(1, 1, -2, 2)) / 0.6 * 3  # pyramidal 2
-    print np.array(HklPlane.four_to_three_index(0, 0, 0, 1))  # basal
+    print np.array(HklPlane.four_to_three_indices(1, 0, -1, 0)) / 0.6  # prismatic 1
+    print np.array(HklPlane.four_to_three_indices(0, 1, -1, 0)) / 0.6  # prismatic 2
+    print np.array(HklPlane.four_to_three_indices(0, 1, -1, 1)) / 0.6 * 3  # pyramidal 1
+    print np.array(HklPlane.four_to_three_indices(1, 1, -2, 2)) / 0.6 * 3  # pyramidal 2
+    print np.array(HklPlane.four_to_three_indices(0, 0, 0, 1))  # basal
     p1 = HklPlane(2., 1, 0, lattice=l)  # attach the plane to the hexagonal lattice
     p2 = HklPlane(-1, 2, 0, lattice=l)
     p3 = HklPlane(-3., 6., 5., lattice=l)
     p4 = HklPlane(3, 9, 10, lattice=l)
-    p5 = HklPlane(0, 0, 1, lattice=l)
+    p5 = HklPlane(0, 0, 1, lattice=l)  # basal
     hklplanes = [p3, p5]
     hexagon = vtk.vtkAssembly()
     Edges = lattice_edges(grid, tubeRadius=0.025 * a)

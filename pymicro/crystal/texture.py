@@ -1,7 +1,7 @@
 """The texture module provide some utilities to generate, analyse and plot crystallographic textures.
 """
 import numpy as np
-from pymicro.crystal.lattice import Lattice, SlipSystem
+from pymicro.crystal.lattice import Lattice, HklPlane, SlipSystem
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from matplotlib import pyplot as plt, colors, cm
 
@@ -69,7 +69,7 @@ class PoleFigure:
         return [grain.orientation for grain in self.microstructure.grains]
 
     def set_hkl_poles(self, hkl='111'):
-        """Set the pole list to to use in the `PoleFigure`.
+        """Set the pole (aka hkl planes) list to to use in the `PoleFigure`.
 
         The list of poles can be given by the family type or directly by a list of `HklPlanes` objects.
 
@@ -81,7 +81,7 @@ class PoleFigure:
         elif type(hkl) is list:
             self.family = None
             hkl_planes = hkl
-        self.poles = [p.normal() for p in hkl_planes]
+        self.poles = hkl_planes  #[p.normal() for p in hkl_planes]
 
     def set_map_field(self, field_name, field=None, field_min_level=None, field_max_level=None, lut='hot'):
         '''Set the PoleFigure to color poles with the given field.
@@ -274,11 +274,13 @@ class PoleFigure:
         for grain in self.microstructure.grains:
             g = grain.orientation_matrix()
             gt = g.transpose()
-            for i, c in enumerate(self.poles):
+            for i, hkl_plane in enumerate(self.poles):
+                c = hkl_plane.normal()
                 label = ''
                 c_rot = gt.dot(c)
                 if self.verbose:
-                    print('plotting ', c, ' in sample CS (corrected for pf axis):', c_rot)
+                    h, k, l = hkl_plane.miller_indices()
+                    print('plotting (%d%d%d) with normal %s in sample CS (corrected for pf axis): %s' %(h, k, l, c, c_rot))
                 col = self.get_color_from_field(grain)
                 self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
         ax.axis([-1.1, 1.1, -1.1, 1.1])
@@ -311,10 +313,12 @@ class PoleFigure:
         for grain in self.microstructure.grains:
             g = grain.orientation_matrix()
             gt = g.transpose()
-            for c in self.poles:
+            for hkl_plane in self.poles:
+                c = hkl_plane.normal()
                 c_rot = gt.dot(c)
                 # handle poles pointing down
-                if c_rot[2] < 0: c_rot *= -1  # make unit vector have z>0
+                if c_rot[2] < 0:
+                    c_rot *= -1  # make unit vector have z>0
                 if c_rot[1] >= 0:
                     phi = np.arccos(c_rot[0] / np.sqrt(c_rot[0] ** 2 + c_rot[1] ** 2))
                 else:

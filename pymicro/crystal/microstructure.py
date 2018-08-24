@@ -1355,27 +1355,39 @@ class Microstructure:
         f.close()
 
     @staticmethod
-    def from_h5(file_path, data_container='DataContainer', grain_data='FeatureData',
-                grain_euler_angles='AvgEulerAngles', grain_centroid='Centroids'):
+    def from_h5(file_path, main_key='DataContainers', data_container='DataContainer', grain_data='FeatureData',
+                grain_orientations='AvgEulerAngles', orientation_type='euler', grain_centroid='Centroids'):
         """Read a microstructure from a hdf5 file.
         
         :param str file_path: the path to the hdf5 file to read.
+        :param str main_key: the string describing the root key.
         :param str data_container: the string describing the data container group in the hdf5 file.
         :param str grain_data: the string describing the grain data group in the hdf5 file.
-        :param str grain_euler_angles: the string describing the average grain euler angles field in the hdf5 file.
+        :param str grain_orientations: the string describing the average grain orientations in the hdf5 file.
+        :param str orientation_type: the string describing the descriptor used for orientation data.
         :param str grain_centroid: the string describing the grain centroid in the hdf5 file.
         :return: a `Microstructure` instance created from the hdf5 file.
         """
         micro = Microstructure()
         with h5py.File(file_path, 'r') as f:
-            eulers = f['DataContainers'][data_container][grain_data][grain_euler_angles][:]
+            grain_data_path = '%s/%s/%s' % (main_key, data_container, grain_data)
+            orientations = f[grain_data_path][grain_orientations].value
             if grain_centroid:
-                centroids = f['DataContainers'][data_container][grain_data][grain_centroid][:]
-            for i in range(len(eulers)):
-                # start with grain 0 which is always (0., 0., 0.)
-                g = Grain(i, Orientation.from_euler(eulers[i] * 180 / np.pi))
+                centroids = f[grain_data_path][grain_centroid].value
+                offset = 0
+                if len(centroids) < len(orientations):
+                    offset = 1  # if grain 0 has not a centroid
+            for i in range(len(orientations)):
+                if orientations[i, 0] == 0. and orientations[i, 1] == 0. and orientations[i, 2] == 0.:
+                    # skip grain 0 which is always (0., 0., 0.)
+                    print('skipping (0., 0., 0.)')
+                    continue
+                if orientation_type == 'euler':
+                    g = Grain(i, Orientation.from_euler(orientations[i] * 180 / np.pi))
+                elif orientation_type == 'rodrigues':
+                    g = Grain(i, Orientation.from_rodrigues(orientations[i]))
                 if grain_centroid:
-                    g.position = centroids[i]
+                    g.position = centroids[i - offset]
                 micro.grains.append(g)
         return micro
 

@@ -123,6 +123,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     if rho is None:
         rho = densities[mat]
     legstr = '%%s %s mm' % legfmt
+    plt.figure()
     for t in ts:
         # apply Beer-Lambert
         trans = 100 * np.exp(-mu_rho[:, 1] * rho * t / 10)
@@ -133,7 +134,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     if energy_lim[1] > 200:
         energy_lim[1] = 200
     plt.xlim(energy_lim)
-    plt.ylim(0, 10)
+    #plt.ylim(0, 10)
     plt.grid()
     plt.legend(loc='upper left')
     plt.xlabel('Photon Energy (keV)')

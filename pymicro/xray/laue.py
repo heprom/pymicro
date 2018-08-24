@@ -17,20 +17,20 @@ def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
     :returns tuple: A tuple of the wavelength value (keV) and the corresponding Bragg angle (radian).
     """
     (h, k, l) = hkl.miller_indices()
-    dhkl = hkl.interplanar_spacing()
+    d_hkl = hkl.interplanar_spacing()
     Gc = hkl.scattering_vector()
-    Bt = orientation.orientation_matrix().transpose()
-    Gs = Bt.dot(Gc)
+    gt = orientation.orientation_matrix().transpose()
+    Gs = gt.dot(Gc)
     # compute the theta angle between X and the scattering vector which is theta + pi/2
     theta = np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
     # find the lambda selected by this hkl plane
-    the_energy = lambda_nm_to_keV(2 * dhkl * np.sin(theta))
+    the_energy = lambda_nm_to_keV(2 * d_hkl * np.sin(theta))
     if verbose:
         print('\n** Looking at plane %d%d%d **' % (h, k, l))
         print('scattering vector in laboratory CS', Gs)
         print('glancing angle between incident beam and the hkl plane is %.1f deg' % (theta * 180 / np.pi))
-        print('corresponding energy is %.1f' % the_energy)
-    return (the_energy, theta)
+        print('corresponding energy is %.1f keV' % the_energy)
+    return the_energy, theta
 
 
 def build_list(lattice=None, max_miller=3, extinction=None):
@@ -54,16 +54,17 @@ def build_list(lattice=None, max_miller=3, extinction=None):
     return hklplanes
 
 
-def compute_ellipsis(orientation, detector, uvw, n=101, verbose=False):
+def compute_ellipsis(orientation, detector, uvw, Xu=[1., 0., 0.], n=101, verbose=False):
     """
     Compute the ellipsis associated with the given zone axis. 
     
-    The detector is supposed to be normal to the incident beam (along the X-axis).
+    The detector is supposed to be normal to the X-axis, but the incident wave vector can be specified.
     All lattice planes sharing this zone axis will diffract along that ellipse.
 
     :param orientation: The crystal orientation.
     :param detector: An instance of the Detector2D class.
     :param uvw: An instance of the HklDirection representing the zone axis.
+    :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param int n: number of poits used to define the ellipse.
     :param bool verbose: activate verbose mode (default False).
     :returns data: the (Y, Z) data (in mm unit) representing the ellipsis.
@@ -71,26 +72,45 @@ def compute_ellipsis(orientation, detector, uvw, n=101, verbose=False):
     gt = orientation.orientation_matrix().transpose()
     za = gt.dot(uvw.direction())  # zone axis unit vector in lab frame
     OA = detector.project_along_direction(za)  # vector from the origin to projection of the zone axis onto the detector
-    X = np.array([1., 0., 0.])
-    # psi = np.arccos(np.dot(ZAD/np.linalg.norm(ZAD), X))
-    from math import atan2, pi
-    psi = atan2(np.linalg.norm(np.cross(za, X)), np.dot(za, X))  # use cross product
-    eta = pi / 2 - atan2(OA[1],
-                         OA[2])  # atan2(y, x) compute the arc tangent of y/x considering the sign of both y and x
-    e = np.tan(psi)  # ellipis excentricity, this assume the incident beam is normal to the detector
+    OC = detector.project_along_direction(Xu)  # C is the intersection of the direct beam with the detector
+    ON = detector.project_along_direction(detector.w_dir)  # N is the intersection of the X-axis with the detector plane
+    CA = OA - OC
+    NA = OA - ON
+    from math import cos, sin, tan, atan2, pi
+    # psi = np.arccos(np.dot(ZAD/np.linalg.norm(ZAD), Xu))
+    psi = atan2(np.linalg.norm(np.cross(za, Xu)), np.dot(za, Xu))  # use cross product instead of arccos
+    nu = atan2(np.linalg.norm(np.cross(za, detector.w_dir)), np.dot(za, detector.w_dir))
+    e = np.sin(nu) / np.cos(psi)  # ellipis excentricity (general case), e reduces to tan(psi) when the incident beam is normal to the detector (nu = psi)
+    '''
+    The major axis direction is given by the intersection of the plane defined by ON and OA and by the detector 
+    plane. It does not depends on Xu, like the cone angle. If the detector is perpendicular to the X-axis, 
+    this direction is given by NA. both N and A are located on the major axis.
+    '''
+    eta = pi / 2 - atan2(NA[1],
+                         NA[2])  # atan2(y, x) compute the arc tangent of y/x considering the sign of both y and x
     (uc, vc) = (detector.ucen - OA[1] / detector.pixel_size, detector.vcen - OA[2] / detector.pixel_size)
     '''
     # wrong formulae from Amoros (The Laue Method)...
-    a = det_distance*np.tan(psi)/detector.pixel_size
-    b = det_distance*np.sin(psi)/detector.pixel_size
+    a = ON * np.tan(psi)
+    b = ON * np.sin(psi)
+    # the proper equation for normal incidence are (Cruickshank 1991):
+    a = abs(0.5 * ON * np.tan(2 * psi))
+    b = abs(0.5 * ON * np.tan(2 * psi) * np.sqrt(1 - np.tan(psi) ** 2))
+    this equation does not hold if the incident beam is not normal with the detector !
+    the general equation is:
+    2.a / ON = tan(nu) + tan(psi - nu) + sin(psi) / (cos(nu) * cos(psi + nu))
+    this reduces when nu = psi to 2.a / ON = np.tan(2.psi)
     '''
-    # the proper equation is:
-    a = abs(0.5 * detector.ref_pos[0] * np.tan(2 * psi))
-    b = abs(0.5 * detector.ref_pos[0] * np.tan(2 * psi) * np.sqrt(1 - np.tan(psi) ** 2))
+    factor = tan(nu) + tan(psi - nu) + sin(psi) / (cos(nu) * cos(psi + nu))
+    a = 0.5 * np.linalg.norm(ON) * factor
+    #a = abs(0.5 * np.linalg.norm(ON) * np.tan(2 * psi))
+    b = a * np.sqrt(1 - e ** 2)
     if verbose:
-        print('angle psi (deg) is', psi * 180 / np.pi)
-        print('angle eta (deg) is', eta * 180 / np.pi)
-        print('zone axis cross the det plane at', OA)
+        print('angle nu (deg) is %.1f' % (nu * 180 / np.pi))
+        print('angle psi (deg) is %.1f' % (psi * 180 / np.pi))
+        print('angle eta (deg) is %.1f' % (eta * 180 / np.pi))
+        print('direct beam crosses the det plane at %s' % OC)
+        print('zone axis crosses the det plane at %s' % OA)
         print('zone axis crosses the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (OA[1], OA[2], uc, vc))
         print('ellipse eccentricity is %f' % e)
         print('ellipsis major and minor half axes are a=%.1f and b=%.1f' % (a, b))
@@ -103,8 +123,16 @@ def compute_ellipsis(orientation, detector, uvw, n=101, verbose=False):
     R = np.array([[np.cos(eta), -np.sin(eta)], [np.sin(eta), np.cos(eta)]])
     data = np.dot(R, data)  # rotate our ellipse
     # move one end of the great axis to the direct beam position
-    data[0] += a * np.cos(eta)
-    data[1] += a * np.sin(eta)
+    '''
+    NB: in the general case, point C (intersection of the direct beam and the detector) is on the ellipse 
+    but not lying on the great axis. Point A and N still lie on the major axis, so the translation can be determined. 
+    '''
+    NX = np.linalg.norm(ON) * tan(psi - nu)
+    print('****************** NX = %.1f' % NX)
+    data[0] += (a - NX) * np.cos(eta)
+    data[1] += (a - NX) * np.sin(eta)
+    #data[0] += ON[1] + a * np.cos(eta)
+    #data[1] += ON[2] + a * np.sin(eta)
     yz_data = np.empty((n, 2), dtype=float)
     for i in range(n):
         yz_data[i, 0] = data[0, i]
@@ -120,6 +148,7 @@ def diffracted_vector(hkl, orientation, Xu=[1., 0., 0.], min_theta=0.1, verbose=
 
     :param hkl: an instance of the `HklPlane` class.
     :param orientation: an instance of the `Orientation` class.
+    :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param float min_theta: the minimum considered Bragg angle (in radian).
     :param bool verbose: a flag to activate verbose mode.
     :return: the diffraction vector as a numpy array.
@@ -127,7 +156,7 @@ def diffracted_vector(hkl, orientation, Xu=[1., 0., 0.], min_theta=0.1, verbose=
     gt = orientation.orientation_matrix().transpose()
     (h, k, l) = hkl.miller_indices()
     # this hkl plane will select a particular lambda
-    (the_energy, theta) = select_lambda(hkl, orientation, verbose=verbose)
+    (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=verbose)
     if abs(theta) < min_theta * np.pi / 180:  # skip angles < min_theta deg
         return None
     lambda_nm = 1.2398 / the_energy
@@ -277,12 +306,47 @@ def gnomonic_projection_point(data):
         data = data.reshape((1, 3))
     r = np.sqrt(data[:, 1] ** 2 + data[:, 2] ** 2)  # mm
     theta = 0.5 * np.arctan(r / data[:, 0])
-    p = data[:, 0] * np.tan(pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
+    p = data[:, 0] * np.tan(np.pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
     data_gp = np.zeros_like(data)  # mm
     data_gp[:, 0] = data[:, 0]
     data_gp[:, 1] = - data[:, 1] * p / r
     data_gp[:, 2] = - data[:, 2] * p / r
     return data_gp
+
+
+def gnomonic_projection_point2(data, OC=None):
+    """compute the gnomonic projection of a given point or series of points in the general case.
+
+    This methods *does not* assumes the incident X-ray beam is along (1, 0, 0).  
+    The points coordinates are passed along with a single array which must be of size (n, 3) where n is the number of 
+    points. If a single point is used, the data can indifferently be of size (1, 3) or (3). 
+
+    :param ndarray data: array of the point(s) coordinates in the laboratory frame, aka OR components.
+    :param ndarray OC: coordinates of the center of the gnomonic projection in the laboratory frame.
+    :return data_gp: array of the projected point(s) coordinates in the laboratory frame.
+    """
+    if OC is None:
+        return gnomonic_projection_point(data)
+    from math import cos, sin, pi, atan2
+    if data.ndim == 1:
+        data = data.reshape((1, 3))
+    data_gp = np.zeros_like(data)  # mm
+    data_gp[:, 0] = data[:, 0]
+    for i in range(data.shape[0]):
+        R = data[i]  # diffraction spot position in the laboratory frame
+        CR = R - OC
+        alpha = atan2(
+            np.linalg.norm(np.cross(OC / np.linalg.norm(OC), CR / np.linalg.norm(CR))),
+            np.dot(OC / np.linalg.norm(OC), CR / np.linalg.norm(CR))) - pi / 2
+        # the Bragg angle can be measured using the diffraction spot position
+        theta = 0.5 * np.arccos(np.dot(OC / np.linalg.norm(OC), R / np.linalg.norm(R)))
+        r = np.sqrt(CR[1] ** 2 + CR[2] ** 2)  # mm
+        # distance from the incident beam to the gnomonic projection mm
+        p = np.linalg.norm(OC) * cos(theta) / sin(theta - alpha)
+        data_gp[:, 1] = OC[1] - CR[1] * p / r
+        data_gp[:, 2] = OC[2] - CR[2] * p / r
+    return data_gp
+
 
 def gnomonic_projection(detector, pixel_size=None):
     '''This function carries out the gnomonic projection of the detector image.

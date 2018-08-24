@@ -45,7 +45,7 @@ def dct_projection(orientations, data, dif_grains, omega, lambda_keV, detector, 
         K = X + G
         # position of the grain at this rotation
         g_pos_rot = np.dot(R, g_center_mm)
-        pg = detector.project_along_direction(g_pos_rot, K)
+        pg = detector.project_along_direction(K, g_pos_rot)
         (up, vp) = detector.lab_to_pixel(pg)
         if verbose:
             print('\n* gid=%d, (%d,%d,%d) plane, angle=%.1f' % (gid, h, k, l, omega))

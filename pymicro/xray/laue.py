@@ -54,7 +54,7 @@ def build_list(lattice=None, max_miller=3, extinction=None):
     return hklplanes
 
 
-def compute_ellipsis(orientation, detector, uvw, Xu=[1., 0., 0.], n=101, verbose=False):
+def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose=False):
     """
     Compute the ellipsis associated with the given zone axis. 
     
@@ -343,8 +343,8 @@ def gnomonic_projection_point2(data, OC=None):
         r = np.sqrt(CR[1] ** 2 + CR[2] ** 2)  # mm
         # distance from the incident beam to the gnomonic projection mm
         p = np.linalg.norm(OC) * cos(theta) / sin(theta - alpha)
-        data_gp[:, 1] = OC[1] - CR[1] * p / r
-        data_gp[:, 2] = OC[2] - CR[2] * p / r
+        data_gp[i, 1] = OC[1] - CR[1] * p / r
+        data_gp[i, 2] = OC[2] - CR[2] * p / r
     return data_gp
 
 

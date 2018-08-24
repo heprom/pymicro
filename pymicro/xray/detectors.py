@@ -263,6 +263,7 @@ class RegArrayDetector2d(Detector2d):
         '''
         assert np.dot(self.w_dir, direction) != 0
         origin = np.array(origin)
+        direction = np.array(direction)
         d = np.dot((self.ref_pos - origin), self.w_dir) / np.dot(direction, self.w_dir)
         p = origin + d * direction
         return p

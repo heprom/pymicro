@@ -10,6 +10,8 @@ class LaueTests(unittest.TestCase):
     def setUp(self):
         """testing the laue module:"""
         self.ni = Lattice.from_symbol('Ni')
+        self.al = Lattice.face_centered_cubic(0.40495)
+        self.g4 = Orientation.from_rodrigues([0.0499199, -0.30475322, 0.10396082])
 
     def test_angle_zone(self):
         """Verify the angle between X and a particular zone axis expressed
@@ -35,6 +37,18 @@ class LaueTests(unittest.TestCase):
         (the_lambda, theta) = select_lambda(hkl, orientation)
         self.assertAlmostEqual(the_lambda, 5.277, 3)
         self.assertAlmostEqual(theta * 180 / np.pi, 35.264, 3)
+
+    def test_select_lambda(self):
+        """Verify that the rotating crystal conditions correspond to the selected wave length diffracted 
+        after rotating the crystal in both positions."""
+        hkl_dif = HklPlane(2, 0, 2, self.al)
+        lambda_keV = 40.0
+        w1, w2 = self.g4.dct_omega_angles(hkl_dif, lambda_keV, verbose=False)
+        for omega in [w1, w2]:
+            omegar = omega * np.pi / 180
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
+            o_rot = Orientation(np.dot(self.g4.orientation_matrix(), R.T))
+            self.assertAlmostEqual(select_lambda(hkl_dif, o_rot, verbose=False)[0], lambda_keV, 6)
 
     def test_gnomonic_projection_point(self):
         """Verify that the gnomonic projection of two diffracted points on a detector give access to the angle 

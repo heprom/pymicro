@@ -1,3 +1,5 @@
+"""The laue module provide helpers functions to work with polychromatic X-ray diffraction.
+"""
 import numpy as np
 from math import cos, sin, tan, atan2, pi
 from pymicro.crystal.lattice import HklPlane, Lattice

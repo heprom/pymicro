@@ -1,3 +1,5 @@
+"""The dct module provide helpers functions to work with experimental diffraction contrast tomography data.
+"""
 import os
 import numpy as np
 from scipy import ndimage

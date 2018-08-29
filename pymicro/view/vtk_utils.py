@@ -1335,7 +1335,7 @@ def build_line_mesh(points):
     '''
     line_mesh = vtk.vtkUnstructuredGrid()
     nodes = vtk.vtkPoints()
-    nodes.SetNumberOfPoints(len(points));
+    nodes.SetNumberOfPoints(len(points))
     for i in range(len(points)):
         (x, y, z) = points[i]
         nodes.InsertPoint(i, x, y, z)
@@ -1358,6 +1358,7 @@ def line_actor(line_grid):
     line_actor.SetMapper(line_mapper)
     return line_actor
 
+
 def line_3d(start_point, end_point):
     '''Function to draw a line in a 3d scene.
 
@@ -1369,6 +1370,7 @@ def line_3d(start_point, end_point):
     line_grid = build_line_mesh([start_point, end_point])
     return line_actor(line_grid)
 
+
 def circle_line_3d(center=(0, 0, 0), radius=1, normal=(0, 0, 1), resolution=1):
     '''Function to draw a circle in a 3d scene.
 
@@ -1376,8 +1378,7 @@ def circle_line_3d(center=(0, 0, 0), radius=1, normal=(0, 0, 1), resolution=1):
     :param float radius: the radius of the circle.
     :param tuple normal: the normal to the plane of the circle.
     :param float resolution: the resolution in degree.
-    :returns vtkActor: The method return a vtkActor that can be directly \
-    added to a 3d scene.
+    :returns vtkActor: The method return a vtkActor that can be directly added to a 3d scene.
     '''
     n = int(360 / resolution)
     line_points = []
@@ -1388,6 +1389,36 @@ def circle_line_3d(center=(0, 0, 0), radius=1, normal=(0, 0, 1), resolution=1):
                                center[2]])
     line_grid = build_line_mesh(line_points)
     return line_actor(line_grid)
+
+
+def point_cloud(data_points, point_color=(0, 0, 0), point_size=1):
+    '''Function to display a point cloud in a 3d scene.
+    
+    :param list data_points: the list of points in he cloud.
+    :param tuple point_color: the color to use to display the points.
+    :param float point_size: the size of the points.
+    :returns: The method return a vtkActor of the point cloud that can be directly added to a 3d scene.
+    '''
+    data = vtk.vtkPolyData()
+    points = vtk.vtkPoints()
+    cells = vtk.vtkCellArray()
+    points.SetNumberOfPoints(len(data_points))
+    for i in range(len(data_points)):
+        (x, y, z) = data_points[i]
+        points.InsertPoint(i, x, y, z)
+        cells.InsertNextCell(1)
+        cells.InsertCellPoint(i)
+    data.SetPoints(points)
+    data.SetVerts(cells)
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(data)
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetColor(point_color)
+    actor.GetProperty().SetPointSize(point_size)
+    return actor
+
 
 def contourFilter(data, value, color=grey, diffuseColor=grey, opacity=1.0, discrete=False):
     '''This method create an actor running a contour filter through the
@@ -1512,11 +1543,12 @@ def elevationFilter(data, value, (low, high), low_point=None, high_point=None):
     return actor
 
 
-def numpy_array_to_vtk_grid(data, cell_data=True):
+def numpy_array_to_vtk_grid(data, cell_data=True, array_name=None):
     '''Transform a 3d numpy data array into a vtk uniform grid with scalar data.
 
     :param data: the 3d numpy data array, possibly with 3 components using a 4th dimension.
-    :param bool cell_data: boolean to assign cell data or point data ito the grid (True by default).
+    :param bool cell_data: flag to assign cell data, as opposed to point data, to the grid (True by default).
+    :param str array_name: an optional name for the vtk array.
     :return vtkUniformGrid: The method return a vtkUniformGrid with scalar data initialized from
     the provided numpy array.
     '''
@@ -1539,6 +1571,8 @@ def numpy_array_to_vtk_grid(data, cell_data=True):
         vtk_data_array.SetNumberOfTuples(n)
         for i in range(3):
             vtk_data_array.CopyComponent(i, numpy_support.numpy_to_vtk(np.ravel(data[:, :, :, i], order='F'), deep=1), 0)
+    if array_name:
+        vtk_data_array.SetName(array_name)
     grid = vtk.vtkUniformGrid()
     if cell_data:
         grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
@@ -1960,12 +1994,12 @@ def show_boundaries(grid, array_id=0, array_name=None, write=False):
         return
     array = grid.GetCellData().GetArray(array_id)
     assert array.GetName() == array_name
-    assert array.GetDataType() == vtk.VTK_UNSIGNED_SHORT or array.GetDataType() == vtk.VTK_UNSIGNED_CHAR or array.GetDataType() == vtk.VTK_INT
+    assert array.GetDataType() in [vtk.VTK_UNSIGNED_SHORT, vtk.VTK_UNSIGNED_CHAR, vtk.VTK_INT]
     grid.GetCellData().SetActiveScalars(array_name)
     # we use a vtkAppendPolyData to gather all the boundaries
     append = vtk.vtkAppendPolyData()
     gids_range = array.GetRange()
-    print('field range used to find the boudnaries:', gids_range)
+    print('field range used to find the boudnaries: [%d - %d]' % (gids_range[0], gids_range[1]))
     for gid in range(int(gids_range[0]), 1 + int(gids_range[1])):
         print('trying gid=%d' % gid)
         thresh = vtk.vtkThreshold()

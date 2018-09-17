@@ -1,8 +1,10 @@
 """A package to play with X-rays
 
-   The xray package currently has three modules:
+   The xray package currently has five modules:
 
+   * dct (experimental)
    * detectors
+   * fitting
    * laue
    * xray_utils
 

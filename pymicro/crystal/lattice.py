@@ -993,7 +993,7 @@ class HklPlane(HklObject):
     def is_in_list(self, hkl_planes, friedel_pair=False):
         """Check if the hkl plane is in the given list.
 
-        By default this relies on the built in in test from the list tyep which in turn calls in the __eq__ method.
+        By default this relies on the built in in test from the list type which in turn calls in the __eq__ method.
         This means it will return True if a plane with the exact same miller indices (and same lattice) is in the list.
         Turning on the friedel_pair flag will allow to test also the Friedel pair (-h, -k, -l) and return True if it is
         in the list.
@@ -1137,7 +1137,7 @@ class HklPlane(HklObject):
             P[k, 1] = Yp[k]
             P[k, 2] = Zp[k]
         trace = trace_size * P.transpose().dot(trace_xyz)  # X'=P^-1.X
-        if verbose == 26:
+        if verbose:
             print('n_rot = %s' % n_rot)
             print('trace in XYZ', trace_xyz)
             print(P)
@@ -1184,41 +1184,47 @@ class HklPlane(HklObject):
         plt.savefig('slip_traces_%s_%s.png' % (hkl, str_plane), transparent=trans, format='png')
 
     @staticmethod
-    def plot_XY_slip_traces(orientation, hkl='111', title=True, \
+    def plot_XY_slip_traces(orientation, hkl='111', title=True,
                             legend=True, trans=False, verbose=False):
-        ''' Helper method to plot the slip traces on the XY plane.'''
-        HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int=np.array([0, 0, 1]), \
-                                  view_up=np.array([0, 1, 0]), title=title, legend=legend, \
+        """Helper method to plot the slip traces on the XY plane."""
+        HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int=np.array([0, 0, 1]),
+                                  view_up=np.array([0, 1, 0]), title=title, legend=legend,
                                   trans=trans, verbose=verbose, str_plane='XY')
 
     @staticmethod
-    def plot_YZ_slip_traces(orientation, hkl='111', title=True, \
+    def plot_YZ_slip_traces(orientation, hkl='111', title=True,
                             legend=True, trans=False, verbose=False):
-        ''' Helper method to plot the slip traces on the YZ plane.'''
-        HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int=np.array([1, 0, 0]), \
-                                  view_up=np.array([0, 0, 1]), title=title, legend=legend, \
+        """Helper method to plot the slip traces on the YZ plane."""
+        HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int=np.array([1, 0, 0]),
+                                  view_up=np.array([0, 0, 1]), title=title, legend=legend,
                                   trans=trans, verbose=verbose, str_plane='YZ')
 
     @staticmethod
-    def plot_XZ_slip_traces(orientation, hkl='111', title=True, \
+    def plot_XZ_slip_traces(orientation, hkl='111', title=True,
                             legend=True, trans=False, verbose=False):
-        ''' Helper method to plot the slip traces on the XZ plane.'''
-        HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int=np.array([0, -1, 0]), \
-                                  view_up=np.array([0, 0, 1]), title=title, legend=legend, \
+        """Helper method to plot the slip traces on the XZ plane."""
+        HklPlane.plot_slip_traces(orientation, hkl=hkl, n_int=np.array([0, -1, 0]),
+                                  view_up=np.array([0, 0, 1]), title=title, legend=legend,
                                   trans=trans, verbose=verbose, str_plane='XZ')
 
-    def gethkl_fromtwo_directions(ZA1, ZA2):
+    @staticmethod
+    def indices_from_two_directions(uvw1, uvw2):
         """
-        Work in progress
-        by AA
+        Two crystallographic directions :math:`uvw_1` and :math:`uvw_2`define a unique set of hkl planes. 
+        This does not depends on the crystal symmetry.
+        
+        .. math::
 
-        ZA1, ZA2 must be HklDirection instance
-        TODO : - return an instance of HklPlane
-               - add the Friedel's pair
-               - maybe change the function name?
+           h = v_1 . w_2 - w_1 . v_2 \\\\
+           k = w_1 . u_2 - u_1 . w_2 \\\\
+           l = u_1 . v_2 - v_1 . u_2
+
+        :param uvw1: The first instance of the `HklDirection` class.
+        :param uvw2: The second instance of the `HklDirection` class.
+        :return h, k, l: the miller indices of the `HklPlane` defined by the two directions.
         """
-        (u1, v1, w1) = ZA1.miller_indices()
-        (u2, v2, w2) = ZA2.miller_indices()
+        (u1, v1, w1) = uvw1.miller_indices()
+        (u2, v2, w2) = uvw2.miller_indices()
         h = v1 * w2 - w1 * v2
         k = w1 * u2 - u1 * w2
         l = u1 * v2 - v1 * u2

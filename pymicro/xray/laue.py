@@ -1,11 +1,14 @@
+"""The laue module provide helpers functions to work with polychromatic X-ray diffraction.
+"""
 import numpy as np
+from math import cos, sin, tan, atan2, pi
 from pymicro.crystal.lattice import HklPlane, Lattice
 from pymicro.crystal.microstructure import Orientation
-from pymicro.xray.xray_utils import *
+from pymicro.xray.xray_utils import lambda_nm_to_keV
 from pymicro.xray.dct import add_to_image
 
 
-def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
+def select_lambda(hkl, orientation, Xu=(1., 0., 0.), verbose=False):
     """
     Compute the wavelength corresponding to the first order reflection
     of a given lattice plane in the specified orientation.
@@ -22,13 +25,13 @@ def select_lambda(hkl, orientation, Xu=np.array([1., 0., 0.]), verbose=False):
     gt = orientation.orientation_matrix().transpose()
     Gs = gt.dot(Gc)
     # compute the theta angle between X and the scattering vector which is theta + pi/2
-    theta = np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
+    theta = np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - pi / 2
     # find the lambda selected by this hkl plane
     the_energy = lambda_nm_to_keV(2 * d_hkl * np.sin(theta))
     if verbose:
         print('\n** Looking at plane %d%d%d **' % (h, k, l))
-        print('scattering vector in laboratory CS', Gs)
-        print('glancing angle between incident beam and the hkl plane is %.1f deg' % (theta * 180 / np.pi))
+        print('scattering vector in laboratory frame = %s' % Gs)
+        print('glancing angle between incident beam and the hkl plane is %.1f deg' % (theta * 180 / pi))
         print('corresponding energy is %.1f keV' % the_energy)
     return the_energy, theta
 
@@ -76,7 +79,6 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     ON = detector.project_along_direction(detector.w_dir)  # N is the intersection of the X-axis with the detector plane
     CA = OA - OC
     NA = OA - ON
-    from math import cos, sin, tan, atan2, pi
     # psi = np.arccos(np.dot(ZAD/np.linalg.norm(ZAD), Xu))
     psi = atan2(np.linalg.norm(np.cross(za, Xu)), np.dot(za, Xu))  # use cross product instead of arccos
     nu = atan2(np.linalg.norm(np.cross(za, detector.w_dir)), np.dot(za, detector.w_dir))
@@ -106,16 +108,16 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     #a = abs(0.5 * np.linalg.norm(ON) * np.tan(2 * psi))
     b = a * np.sqrt(1 - e ** 2)
     if verbose:
-        print('angle nu (deg) is %.1f' % (nu * 180 / np.pi))
-        print('angle psi (deg) is %.1f' % (psi * 180 / np.pi))
-        print('angle eta (deg) is %.1f' % (eta * 180 / np.pi))
+        print('angle nu (deg) is %.1f' % (nu * 180 / pi))
+        print('angle psi (deg) is %.1f' % (psi * 180 / pi))
+        print('angle eta (deg) is %.1f' % (eta * 180 / pi))
         print('direct beam crosses the det plane at %s' % OC)
         print('zone axis crosses the det plane at %s' % OA)
         print('zone axis crosses the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (OA[1], OA[2], uc, vc))
         print('ellipse eccentricity is %f' % e)
         print('ellipsis major and minor half axes are a=%.1f and b=%.1f' % (a, b))
     # use a parametric curve to plot the ellipsis
-    t = np.linspace(0., 2 * np.pi, n)
+    t = np.linspace(0., 2 * pi, n)
     x = a * np.cos(t)
     y = b * np.sin(t)
     data = np.array([x, y])
@@ -140,7 +142,7 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     return yz_data
 
 
-def diffracted_vector(hkl, orientation, Xu=[1., 0., 0.], min_theta=0.1, verbose=False):
+def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, verbose=False):
     """Compute the diffraction vector for a given reflection of a crystal.
 
     This method compute the diffraction vector.
@@ -157,13 +159,13 @@ def diffracted_vector(hkl, orientation, Xu=[1., 0., 0.], min_theta=0.1, verbose=
     (h, k, l) = hkl.miller_indices()
     # this hkl plane will select a particular lambda
     (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=verbose)
-    if abs(theta) < min_theta * np.pi / 180:  # skip angles < min_theta deg
+    if abs(theta) < min_theta * pi / 180:  # skip angles < min_theta deg
         return None
     lambda_nm = 1.2398 / the_energy
     X = np.array(Xu) / lambda_nm
     Gs = gt.dot(hkl.scattering_vector())
     if verbose:
-        print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, hkl.bragg_angle(the_energy) * 180 / np.pi))
+        print('bragg angle for %d%d%d reflection is %.1f' % (h, k, l, hkl.bragg_angle(the_energy) * 180 / pi))
     assert (abs(theta - hkl.bragg_angle(the_energy)) < 1e-6)  # verify than theta_bragg is equal to the glancing angle
     # compute diffracted direction
     K = X + Gs
@@ -270,7 +272,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
             print('* %d%d%d reflexion' % hkl.miller_indices())
             print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], u, v))
             print('diffracted beam energy is {0:.1f} keV'.format(abs(the_energy)))
-            print('Bragg angle is {0:.2f} deg'.format(abs(theta * 180 / np.pi)))
+            print('Bragg angle is {0:.2f} deg'.format(abs(theta * 180 / pi)))
         # mark corresponding pixels on the image detector
         if color_field == 'constant':
             add_to_image(detector.data, max_val * spot, (u, v))
@@ -306,7 +308,7 @@ def gnomonic_projection_point(data):
         data = data.reshape((1, 3))
     r = np.sqrt(data[:, 1] ** 2 + data[:, 2] ** 2)  # mm
     theta = 0.5 * np.arctan(r / data[:, 0])
-    p = data[:, 0] * np.tan(np.pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
+    p = data[:, 0] * np.tan(pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
     data_gp = np.zeros_like(data)  # mm
     data_gp[:, 0] = data[:, 0]
     data_gp[:, 1] = - data[:, 1] * p / r
@@ -366,7 +368,7 @@ def gnomonic_projection(detector, pixel_size=None):
     r_pxl = np.sqrt((uu - detector.ucen) ** 2 + (vv - detector.vcen) ** 2)  # pixel
     r = r_pxl * detector.pixel_size  # distance from the incident beam to the pxl in mm
     theta = 0.5 * np.arctan(r / detector.ref_pos[0])  # bragg angle rad
-    p = detector.ref_pos[0] * np.tan(np.pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
+    p = detector.ref_pos[0] * np.tan(pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
 
     # compute gnomonic projection coordinates in mm
     u_dif = (uu[dif] - detector.ucen) * detector.pixel_size  # mm, wrt detector center
@@ -568,7 +570,7 @@ def poll_system(g_list, dis_tol=1.0, verbose=False):
     solution_indices = [0]
     votes = [0]
     vote_index = np.zeros(len(g_list), dtype=int)
-    dis_tol_rad = dis_tol * np.pi / 180
+    dis_tol_rad = dis_tol * pi / 180
     from pymicro.crystal.microstructure import Orientation
     for i in range(len(g_list)):
         g = g_list[i]
@@ -584,7 +586,7 @@ def poll_system(g_list, dis_tol=1.0, verbose=False):
                 votes[j] += 1
                 vote_index[i] = j
                 if verbose:
-                    print('angle (deg) is %.2f' % (180 / np.pi * angle))
+                    print('angle (deg) is %.2f' % (180 / pi * angle))
                     print('vote list is now %s' % votes)
                     print('solution_indices list is now %s' % solution_indices)
                 break
@@ -621,7 +623,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crysta
     print('\nlist of angles between points on the detector')
     for i in range(len(hkl_normals)):
         for j in range(i + 1, len(hkl_normals)):
-            angle = 180 / np.pi * np.arccos(np.dot(hkl_normals[i], hkl_normals[j]))
+            angle = 180 / pi * np.arccos(np.dot(hkl_normals[i], hkl_normals[j]))
             angles_exp[i, j] = angle
             print('%.2f, OP%d, OP%d' % (angles_exp[i, j], i, j))
     # keep a list of the hkl values as string
@@ -635,7 +637,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crysta
     index = 0
     for i in range(len(hkl_planes)):
         for j in range(i + 1, len(hkl_planes)):
-            angle = 180 / np.pi * np.arccos(np.dot(hkl_planes[i].normal(), hkl_planes[j].normal()))
+            angle = 180 / pi * np.arccos(np.dot(hkl_planes[i].normal(), hkl_planes[j].normal()))
             angles_th[index] = (angle, i, j)
             index += 1
 
@@ -679,99 +681,3 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crysta
                 from pymicro.crystal.texture import PoleFigure
                 PoleFigure.plot(final_orientation, axis='Z')
         return final_orientation_matrix, ci
-
-if __name__ == '__main__':
-    from matplotlib import pyplot as plt, cm, rcParams
-
-    rcParams.update({'font.size': 12})
-    rcParams['text.latex.preamble'] = [r"\usepackage{amsmath}"]
-
-    from pymicro.xray.detectors import Varian2520
-
-    det_distance = 100
-    detector = Varian2520()
-    detector.pixel_size = 0.127  # mm
-    det_size_pixel = np.array((1950, 1456))
-    det_size_mm = det_size_pixel * detector.pixel_size  # mm
-
-    # orientation of our single crystal
-    from pymicro.crystal.lattice import *
-
-    ni = Lattice.from_symbol('Ni')
-    from pymicro.crystal.microstructure import *
-
-    phi1 = 10  # deg
-    phi = 20  # deg
-    phi2 = 10  # deg
-    orientation = Orientation.from_euler([phi1, phi, phi2])
-
-    # '''
-    # uvw = HklDirection(1, 1, 0, ni)
-    uvw = HklDirection(5, 1, 0, ni)
-    ellipsis_data = compute_ellipsis(orientation, detector, det_distance, uvw)
-    # '''
-    hklplanes = build_list(lattice=ni, max_miller=8)
-
-    # compute image for the cube orientation
-    det_distance = 300
-    orientation = Orientation.cube()
-
-    '''
-    # euler angles from EBSD
-    euler1 = [286.3, 2.1, 70.5]
-    euler2 = [223.7, 2.8, 122.2]
-    eulers = [euler1, euler2]
-    o_ebsd = Orientation.from_euler(eulers[0])
-    # apply the transformation matrix corresponding to putting the sample with X being along the X-ray direction
-    Tr = np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]])
-    orientation = Orientation(np.dot(o_ebsd.orientation_matrix(), Tr.T))
-
-    # compute the list of zone axes having a glancing angle < 45 deg
-    max_miller = 5
-    # max glancing angle in the vertical direction
-    max_glangle = np.arctan(0.5*det_size_pixel[1]*detector.pixel_size/det_distance)*180./np.pi
-    zoneaxes = []
-    indices = range(-max_miller, max_miller+1)
-    Bt = orientation.orientation_matrix().transpose()
-    for u in indices:
-      for v in indices:
-        for w in indices:
-          if u == v == w == 0: # skip (0, 0, 0)
-            continue
-          uvw = HklDirection(u, v, w, ni)
-          ZA = Bt.dot(uvw.direction())
-          psi = np.arccos(np.dot(ZA, np.array([1., 0., 0.])))*180./np.pi
-          print('angle between incident beam and zone axis is %.1f' % psi)
-          if psi < max_glangle:
-            zoneaxes.append(HklDirection(u, v, w, ni))
-    for ZA in zoneaxes:
-      print(ZA.miller_indices())
-    print(len(zoneaxes))
-    '''
-    image = compute_Laue_pattern(orientation, detector, det_distance, hklplanes)
-    plt.imshow(image.T, cmap=cm.gray)
-    plt.plot(ellipsis_data[0], ellipsis_data[1], 'b-')
-    plt.title(r'Simulated Laue pattern, cube orientation, $d={0}$ mm'.format(det_distance))
-    # plt.savefig('Laue_plot_cube_distance_%02d.pdf' % det_distance)
-    plt.show()
-
-    '''
-    # simple loop to vary the detector distance
-    for i in range(6):
-      det_distance = 50 + 10*i # mm
-      # compute image
-      image = compute_Laue_pattern(orientation, detector, det_distance, hklplanes)
-      plt.imshow(image.T, cmap=cm.gray)
-      plt.title(r'Simulated Laue pattern, $d={0}$ mm, ($\varphi_1={1}^\circ$, $\phi={2}^\circ$, $\varphi_2={3}^\circ$)'.format(det_distance, phi1, phi, phi2))
-      plt.savefig('Laue_plot_distance_%02d' % i)
-
-    # another loop to vary the crystal orientation
-    for i in range(20):
-      phi2 = 2*i # mm
-      orientation = Orientation.from_euler([phi1, phi, phi2])
-      # compute image
-      image = compute_Laue_pattern(orientation, detector, det_distance, hklplanes)
-      plt.imshow(image.T, cmap=cm.gray)
-      plt.title(r'Simulated Laue pattern, $d={0}$ mm, ($\varphi_1={1}^\circ$, $\phi={2}^\circ$, $\varphi_2={3}^\circ$)'.format(det_distance, phi1, phi, phi2))
-      plt.savefig('Laue_plot_phi2_%02d' % i)
-    '''

@@ -74,8 +74,8 @@ class LaueTests(unittest.TestCase):
             K2 = diffracted_vector(p2, orientation, Xu=Xu)
             R1 = detector.project_along_direction(K1, origin=[0., 0., 0.])
             R2 = detector.project_along_direction(K2, origin=[0., 0., 0.])
-            OP1 = gnomonic_projection_point2(R1, OC=OC)[0]
-            OP2 = gnomonic_projection_point2(R2, OC=OC)[0]
+            OP1 = gnomonic_projection_point(R1, OC=OC)[0]
+            OP2 = gnomonic_projection_point(R2, OC=OC)[0]
             hkl_normal1 = OP1 / np.linalg.norm(OP1)
             hkl_normal2 = (OP2 / np.linalg.norm(OP2))
             # the projection must give the normal to the diffracting plane

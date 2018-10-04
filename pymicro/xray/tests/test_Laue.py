@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from pymicro.crystal.lattice import Lattice, HklDirection, HklPlane, SlipSystem
 from pymicro.crystal.microstructure import Orientation
-from pymicro.xray.laue import select_lambda, diffracted_vector, gnomonic_projection_point2, index
+from pymicro.xray.laue import select_lambda, diffracted_vector, gnomonic_projection_point, index
 from pymicro.xray.detectors import RegArrayDetector2d
 
 

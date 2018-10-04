@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from pymicro.crystal.lattice import Lattice, HklDirection, HklPlane, SlipSystem
 from pymicro.crystal.microstructure import Orientation
-from pymicro.xray.laue import select_lambda, diffracted_vector, gnomonic_projection_point, index
+from pymicro.xray.laue import select_lambda, diffracted_vector, gnomonic_projection_point2, index
 from pymicro.xray.detectors import RegArrayDetector2d
 
 
@@ -66,16 +66,24 @@ class LaueTests(unittest.TestCase):
                            (detector.size[1] / 2 - detector.vcen) * detector.v_dir * detector.pixel_size  # mm
 
         angle = 180 / np.pi * np.arccos(np.dot(p1.normal(), p2.normal()))
-        K1 = diffracted_vector(p1, orientation)
-        K2 = diffracted_vector(p2, orientation)
-        R1 = detector.project_along_direction(K1, origin=[0., 0., 0.])
-        R2 = detector.project_along_direction(K2, origin=[0., 0., 0.])
-        OP1 = gnomonic_projection_point(R1)[0]
-        OP2 = gnomonic_projection_point(R2)[0]
-        hkl_normal1 = OP1 / np.linalg.norm(OP1)
-        hkl_normal2 = (OP2 / np.linalg.norm(OP2))
-        angle_gp = 180 / np.pi * np.arccos(np.dot(hkl_normal1, hkl_normal2))
-        self.assertEqual(angle, angle_gp)
+        # test the gnomonic projection for normal and not normal X-ray incidence
+        for ksi in [0.0, 1.0]:  # deg
+            Xu = np.array([np.cos(ksi * np.pi / 180), 0., np.sin(ksi * np.pi / 180)])
+            OC = detector.project_along_direction(Xu)  # C is the intersection of the direct beam with the detector
+            K1 = diffracted_vector(p1, orientation, Xu=Xu)
+            K2 = diffracted_vector(p2, orientation, Xu=Xu)
+            R1 = detector.project_along_direction(K1, origin=[0., 0., 0.])
+            R2 = detector.project_along_direction(K2, origin=[0., 0., 0.])
+            OP1 = gnomonic_projection_point2(R1, OC=OC)[0]
+            OP2 = gnomonic_projection_point2(R2, OC=OC)[0]
+            hkl_normal1 = OP1 / np.linalg.norm(OP1)
+            hkl_normal2 = (OP2 / np.linalg.norm(OP2))
+            # the projection must give the normal to the diffracting plane
+            for i in range(3):
+                self.assertAlmostEqual(hkl_normal1[i], p1.normal()[i], 6)
+                self.assertAlmostEqual(hkl_normal2[i], p2.normal()[i], 6)
+            angle_gp = 180 / np.pi * np.arccos(np.dot(hkl_normal1, hkl_normal2))
+            self.assertAlmostEqual(angle, angle_gp, 6)
 
     def test_indexation(self):
         """Verify indexing solution from a known Laue pattern."""

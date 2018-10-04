@@ -294,32 +294,13 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
     return detector.data
 
 
-def gnomonic_projection_point(data):
-    """compute the gnomonic projection of a given point or series of points.
-
-    This methods assumes the incident X-ray beam is along (1, 0, 0). This could be extended to any incident direction. 
-    The points coordinates are passed along with a single array which must be of size (n, 3) where n is the number of 
-    points. If a single point is used, the data can indifferently be of size (1, 3) or (3). 
-
-    :param ndarray data: array of the point(s) coordinates in the laboratory frame.
-    :return data_gp: array of the projected point(s) coordinates in the laboratory frame.
-    """
-    if data.ndim == 1:
-        data = data.reshape((1, 3))
-    r = np.sqrt(data[:, 1] ** 2 + data[:, 2] ** 2)  # mm
-    theta = 0.5 * np.arctan(r / data[:, 0])
-    p = data[:, 0] * np.tan(pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
-    data_gp = np.zeros_like(data)  # mm
-    data_gp[:, 0] = data[:, 0]
-    data_gp[:, 1] = - data[:, 1] * p / r
-    data_gp[:, 2] = - data[:, 2] * p / r
-    return data_gp
-
-
-def gnomonic_projection_point2(data, OC=None):
+def gnomonic_projection_point(data, OC=None):
     """compute the gnomonic projection of a given point or series of points in the general case.
 
-    This methods *does not* assumes the incident X-ray beam is along (1, 0, 0).  
+    This methods *does not* assumes the incident X-ray beam is along (1, 0, 0). This is accounted for with the 
+    parameter OC which indicates the center of the projection (the incident beam intersection with the detector). 
+    A conditional treatment is done as the projection is is faster to compute in the case of normal incidence.
+
     The points coordinates are passed along with a single array which must be of size (n, 3) where n is the number of 
     points. If a single point is used, the data can indifferently be of size (1, 3) or (3). 
 
@@ -327,30 +308,38 @@ def gnomonic_projection_point2(data, OC=None):
     :param ndarray OC: coordinates of the center of the gnomonic projection in the laboratory frame.
     :return data_gp: array of the projected point(s) coordinates in the laboratory frame.
     """
-    if OC is None:
-        return gnomonic_projection_point(data)
-    from math import cos, sin, pi, atan2
     if data.ndim == 1:
         data = data.reshape((1, 3))
-    data_gp = np.zeros_like(data)  # mm
-    data_gp[:, 0] = data[:, 0]
-    for i in range(data.shape[0]):
-        R = data[i]  # diffraction spot position in the laboratory frame
-        CR = R - OC
-        alpha = atan2(
-            np.linalg.norm(np.cross(OC / np.linalg.norm(OC), CR / np.linalg.norm(CR))),
-            np.dot(OC / np.linalg.norm(OC), CR / np.linalg.norm(CR))) - pi / 2
-        # the Bragg angle can be measured using the diffraction spot position
-        theta = 0.5 * np.arccos(np.dot(OC / np.linalg.norm(OC), R / np.linalg.norm(R)))
-        r = np.sqrt(CR[1] ** 2 + CR[2] ** 2)  # mm
-        # distance from the incident beam to the gnomonic projection mm
-        p = np.linalg.norm(OC) * cos(theta) / sin(theta - alpha)
-        data_gp[i, 1] = OC[1] - CR[1] * p / r
-        data_gp[i, 2] = OC[2] - CR[2] * p / r
+    if OC is None:
+        # fall back on normal incidence case
+        r = np.sqrt(data[:, 1] ** 2 + data[:, 2] ** 2)  # mm
+        theta = 0.5 * np.arctan(r / data[:, 0])
+        p = data[:, 0] * np.tan(pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
+        data_gp = np.zeros_like(data)  # mm
+        data_gp[:, 0] = data[:, 0]
+        data_gp[:, 1] = - data[:, 1] * p / r
+        data_gp[:, 2] = - data[:, 2] * p / r
+    else:
+        from math import cos, sin, pi, atan2
+        data_gp = np.zeros_like(data)  # mm
+        data_gp[:, 0] = data[:, 0]
+        for i in range(data.shape[0]):
+            R = data[i]  # diffraction spot position in the laboratory frame
+            CR = R - OC
+            alpha = atan2(
+                np.linalg.norm(np.cross(OC / np.linalg.norm(OC), CR / np.linalg.norm(CR))),
+                np.dot(OC / np.linalg.norm(OC), CR / np.linalg.norm(CR))) - pi / 2
+            # the Bragg angle can be measured using the diffraction spot position
+            theta = 0.5 * np.arccos(np.dot(OC / np.linalg.norm(OC), R / np.linalg.norm(R)))
+            r = np.sqrt(CR[1] ** 2 + CR[2] ** 2)  # mm
+            # distance from the incident beam to the gnomonic projection mm
+            p = np.linalg.norm(OC) * cos(theta) / sin(theta - alpha)
+            data_gp[i, 1] = OC[1] - CR[1] * p / r
+            data_gp[i, 2] = OC[2] - CR[2] * p / r
     return data_gp
 
 
-def gnomonic_projection(detector, pixel_size=None):
+def gnomonic_projection(detector, pixel_size=None, OC=None):
     '''This function carries out the gnomonic projection of the detector image.
     
     The data must be of uint8 type (between 0 and 255) with diffraction spots equals to 255.
@@ -358,6 +347,8 @@ def gnomonic_projection(detector, pixel_size=None):
     as the given detector and with an inverse pixel size. The gnomonic projection is stored into this new detector data.
     
     :param RegArrayDetector2d detector: the detector instance with the data from which to compute the projection.
+    :param float pixel_size: pixel size to use in the virtual detector for the gnomonic projection.
+    :param ndarray OC: coordinates of the center of the gnomonic projection in the laboratory frame.
     :returns RegArrayDetector2d gnom: A virtual detector with the gnomonic projection as its data.
     '''
     assert detector.data.dtype == np.uint8

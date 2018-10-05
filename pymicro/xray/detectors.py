@@ -276,7 +276,7 @@ class RegArrayDetector2d(Detector2d):
         '''
         # check if the point is on the detector plane
         vec = np.array(p) - np.array(self.ref_pos)
-        assert np.dot(self.w_dir, vec) < 1.e-6
+        assert abs(np.dot(self.w_dir, vec)) < 1.e-6
         u = 0.5 * self.size[0] + np.dot(self.u_dir, vec) / self.pixel_size
         v = 0.5 * self.size[1] + np.dot(self.v_dir, vec) / self.pixel_size
         return u, v

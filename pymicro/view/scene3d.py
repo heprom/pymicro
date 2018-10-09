@@ -117,7 +117,7 @@ class Scene3D:
         print('  * position:        %s' % (cam.GetPosition(),))
         print('  * focal point:     %s' % (cam.GetFocalPoint(),))
         print('  * up vector:       %s' % (cam.GetViewUp(),))
-        print('  * clipping range:  %s' % (cam.GetViewUp(),))
+        print('  * clipping range:  %s' % (cam.GetClippingRange(),))
 
     def pymicro_callback(self, obj, event):
         """Standard key pressed callback to attach to the 3d scene.

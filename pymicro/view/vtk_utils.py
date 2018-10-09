@@ -1391,7 +1391,7 @@ def circle_line_3d(center=(0, 0, 0), radius=1, normal=(0, 0, 1), resolution=1):
     return line_actor(line_grid)
 
 
-def point_cloud(data_points, point_color=(0, 0, 0), point_size=1):
+def point_cloud_3d(data_points, point_color=(0, 0, 0), point_size=1):
     '''Function to display a point cloud in a 3d scene.
     
     :param list data_points: the list of points in he cloud.
@@ -1889,6 +1889,7 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
         grid = numpy_array_to_vtk_grid(data, cell_data=True)
         if hide_zero_values:
             visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
+            #FIXME this method seems not to be available anymore in vtk 6.3
             grid.SetCellVisibilityArray(visible)
             # grid.SetPointVisibilityArray(visible)
         size = data.shape

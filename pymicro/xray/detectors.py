@@ -276,11 +276,11 @@ class RegArrayDetector2d(Detector2d):
         :param ndarray points: the coordinates of the points in the laboratory frame.
         :return ndarray uv: the detector coordinates of the given points as an array of size (n, 2).
         '''
+        if len(points) == 3:
+            points = np.reshape(points, (1, 3))
         vec = points - np.array(self.ref_pos)
         # check that each point is on the detector plane
         assert np.count_nonzero(np.dot(vec, self.w_dir)) == 0
-        u = 0.5 * self.size[0] + np.dot(vec, self.u_dir) / self.pixel_size
-        v = 0.5 * self.size[1] + np.dot(vec, self.v_dir) / self.pixel_size
         prod = np.vstack((np.dot(vec, self.u_dir), np.dot(vec, self.v_dir))).T
         uv = prod / self.pixel_size + 0.5 * np.array(self.size)
         return uv
@@ -294,7 +294,7 @@ class RegArrayDetector2d(Detector2d):
         :return tuple (x, y, z): the laboratory coordinates.
         '''
         if type(u) == np.ndarray:
-            # use bradcasting
+            # use broadcasting
             assert len(u) == len(v)
             n = len(u)
             r = (u.reshape((n, 1)) - 0.5 * self.size[0]) * self.u_dir + (v.reshape((n, 1)) - 0.5 * self.size[1]) * self.v_dir

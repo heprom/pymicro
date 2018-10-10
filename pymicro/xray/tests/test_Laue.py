@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from pymicro.crystal.lattice import Lattice, HklDirection, HklPlane, SlipSystem
 from pymicro.crystal.microstructure import Orientation
-from pymicro.xray.laue import select_lambda, diffracted_vector, gnomonic_projection_point, index
+from pymicro.xray.laue import select_lambda, diffracted_vector, gnomonic_projection_point, gnomonic_projection, index
 from pymicro.xray.detectors import RegArrayDetector2d
 
 
@@ -12,6 +12,14 @@ class LaueTests(unittest.TestCase):
         self.ni = Lattice.from_symbol('Ni')
         self.al = Lattice.face_centered_cubic(0.40495)
         self.g4 = Orientation.from_rodrigues([0.0499199, -0.30475322, 0.10396082])
+        self.spots = np.array([[ 76, 211], [ 77, 281], [ 86, 435], [ 90, 563], [112, 128], [151, 459], [151, 639],
+                               [161, 543], [170, 325], [176, 248], [189,  70], [190, 375], [213, 670], [250, 167],
+                               [294,  54], [310, 153], [323, 262], [358, 444], [360, 507], [369, 163], [378, 535],
+                               [384,  86], [402, 555], [442, 139], [444, 224], [452, 565], [476, 292], [496,  88],
+                               [501, 547], [514, 166], [522, 525], [531, 433], [536, 494], [559, 264], [581,  57],
+                               [625, 168], [663, 607], [679,  69], [686, 363], [694, 240], [703, 315], [728, 437],
+                               [728, 518], [743, 609], [756, 128], [786, 413], [789, 271], [790, 534], [791, 205],
+                               [818, 123]])
 
     def test_angle_zone(self):
         """Verify the angle between X and a particular zone axis expressed
@@ -21,10 +29,10 @@ class LaueTests(unittest.TestCase):
         phi = 92.0
         phi2 = 86.8
         orientation = Orientation.from_euler([phi1, phi, phi2])
-        Bt = orientation.orientation_matrix().transpose()
+        gt = orientation.orientation_matrix().transpose()
         # zone axis
         uvw = HklDirection(1, 0, 5, self.ni)
-        ZA = Bt.dot(uvw.direction())
+        ZA = gt.dot(uvw.direction())
         if ZA[0] < 0:
             ZA *= -1  # make sur the ZA vector is going forward
         psi0 = np.arccos(np.dot(ZA, np.array([1., 0., 0.])))
@@ -84,6 +92,34 @@ class LaueTests(unittest.TestCase):
                 self.assertAlmostEqual(hkl_normal2[i], p2.normal()[i], 6)
             angle_gp = 180 / np.pi * np.arccos(np.dot(hkl_normal1, hkl_normal2))
             self.assertAlmostEqual(angle, angle_gp, 6)
+
+    def test_gnomonic_projection(self):
+        """Testing the gnomonic_projection function on a complete image."""
+        # incident beam
+        ksi = 0.4  # deg
+        Xu = np.array([np.cos(ksi * np.pi / 180), 0., np.sin(ksi * np.pi / 180)])
+
+        # create our detector
+        detector = RegArrayDetector2d(size=(919, 728), u_dir=[0, -1, 0], v_dir=[0, 0, -1])
+        detector.pixel_size = 0.254  # mm binning 2x2
+        detector.ucen = 445
+        detector.vcen = 380
+        detector.ref_pos = np.array([127.8, 0., 0.]) + \
+                           (detector.size[0] / 2 - detector.ucen) * detector.u_dir * detector.pixel_size + \
+                           (detector.size[1] / 2 - detector.vcen) * detector.v_dir * detector.pixel_size  # mm
+        OC = detector.project_along_direction(Xu)  # C is the intersection of the direct beam with the detector
+        # create test image
+        pattern = np.zeros(detector.size, dtype=np.uint8)
+        for i in range(self.spots.shape[0]):
+            # light corresponding pixels
+            pattern[self.spots[i, 0], self.spots[i, 1]] = 255
+        detector.data = pattern
+        gnom = gnomonic_projection(detector, pixel_size=4, OC=OC)
+        import os
+        test_dir = os.path.dirname(os.path.realpath(__file__))
+        ref_gnom_data = np.load(os.path.join(test_dir, 'ref_gnom_data.npy'))
+        self.assertTrue(np.array_equal(gnom.data, ref_gnom_data))
+        pass
 
     def test_indexation(self):
         """Verify indexing solution from a known Laue pattern."""

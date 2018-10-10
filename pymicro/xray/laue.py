@@ -4,7 +4,7 @@ import numpy as np
 from math import cos, sin, tan, atan2, pi
 from pymicro.crystal.lattice import HklPlane, Lattice
 from pymicro.crystal.microstructure import Orientation
-from pymicro.xray.xray_utils import lambda_nm_to_keV
+from pymicro.xray.xray_utils import lambda_nm_to_keV, lambda_keV_to_nm
 from pymicro.xray.dct import add_to_image
 
 
@@ -213,7 +213,7 @@ def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
 
 def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1., 0., 0.]), spectrum=None, spectrum_thr=0.,
                          r_spot=5, color_field='constant', inverted=False, show_direct_beam=False, verbose=False):
-    '''
+    """
     Compute a transmission Laue pattern. The data array of the given
     `Detector2d` instance is initialized with the result.
     
@@ -236,8 +236,8 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
     :param bool inverted: A flag to control if the pattern needs to be inverted.
     :param bool show_direct_beam: A flag to control if the direct beam is shown.
     :param bool verbose: activate verbose mode (False by default).
-    :returns: the computed pattern as a numpy array.
-    '''
+    :return: the computed pattern as a numpy array.
+    """
     detector.data = np.zeros(detector.size, dtype=np.float32)
     # create a small square image for one spot
     spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=np.uint8)
@@ -267,7 +267,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
             continue  # skip diffraction // to the detector
 
         R = detector.project_along_direction(K, origin=[0., 0., 0.])
-        (u, v) = detector.lab_to_pixel(R)
+        (u, v) = detector.lab_to_pixel(R)[0]
         if verbose and u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
             print('* %d%d%d reflexion' % hkl.miller_indices())
             print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], u, v))
@@ -320,7 +320,6 @@ def gnomonic_projection_point(data, OC=None):
         data_gp[:, 1] = - data[:, 1] * p / r
         data_gp[:, 2] = - data[:, 2] * p / r
     else:
-        from math import cos, sin, pi, atan2
         data_gp = np.zeros_like(data)  # mm
         data_gp[:, 0] = data[:, 0]
         for i in range(data.shape[0]):
@@ -339,39 +338,33 @@ def gnomonic_projection_point(data, OC=None):
     return data_gp
 
 
-def gnomonic_projection(detector, pixel_size=None, OC=None):
-    '''This function carries out the gnomonic projection of the detector image.
+def gnomonic_projection(detector, pixel_size=None, OC=None, verbose=False):
+    """This function carries out the gnomonic projection of the detector image.
     
     The data must be of uint8 type (between 0 and 255) with diffraction spots equals to 255.
     The function create a new detector instance (think of it as a virtual detector) located at the same position 
     as the given detector and with an inverse pixel size. The gnomonic projection is stored into this new detector data.
+    The gnomonic projection of each white pixel (value at 255) is computed. The projection is carried out with respect 
+    to the center detector (ucen, vcen) point.
     
     :param RegArrayDetector2d detector: the detector instance with the data from which to compute the projection.
     :param float pixel_size: pixel size to use in the virtual detector for the gnomonic projection.
-    :param ndarray OC: coordinates of the center of the gnomonic projection in the laboratory frame.
+    :param tuple OC: coordinates of the center of the gnomonic projection in the laboratory frame.
+    :param bool verbose: flag to activate verbose mode.
     :returns RegArrayDetector2d gnom: A virtual detector with the gnomonic projection as its data.
-    '''
+    """
     assert detector.data.dtype == np.uint8
-    dif = detector.data == 255
-    u = np.linspace(0, detector.size[0] - 1, detector.size[0])
-    v = np.linspace(0, detector.size[1] - 1, detector.size[1])
-    vv, uu = np.meshgrid(v, u)
-    r_pxl = np.sqrt((uu - detector.ucen) ** 2 + (vv - detector.vcen) ** 2)  # pixel
-    r = r_pxl * detector.pixel_size  # distance from the incident beam to the pxl in mm
-    theta = 0.5 * np.arctan(r / detector.ref_pos[0])  # bragg angle rad
-    p = detector.ref_pos[0] * np.tan(pi / 2 - theta)  # distance from the incident beam to the gnomonic projection mm
+    dif = detector.data == 255  # boolean array used to select pixels with diffracted intensity
+    dif_indices = np.where(dif)  # (ui, vi) tuple with 1D arrays of the coordinates u and v
+    n = dif_indices[0].shape
+    if verbose:
+        print('%d points in the gnomonic projection' % n)
+        print('center of the projection: %s' % OC)
+    uv_mm = detector.pixel_to_lab(dif_indices[0], dif_indices[1])
+    uvg_mm = gnomonic_projection_point(uv_mm, OC)  # mm
+    print(uvg_mm.shape)
 
-    # compute gnomonic projection coordinates in mm
-    u_dif = (uu[dif] - detector.ucen) * detector.pixel_size  # mm, wrt detector center
-    v_dif = (vv[dif] - detector.vcen) * detector.pixel_size  # mm, wrt detector center
-    ug_mm = - u_dif * p[dif] / r[dif]  # mm, wrt detector center
-    vg_mm = - v_dif * p[dif] / r[dif]  # mm, wrt detector center
-    print('first projected spot in uv (mm):', (ug_mm[0], vg_mm[0]))
-    print('last projected spot in uv (mm):', (ug_mm[-1], vg_mm[-1]))
-    print('first projected vector in XYZ (mm):', (detector.ref_pos[0], -ug_mm[0], -vg_mm[0]))
-    print('last projected vector in XYZ (mm):', (detector.ref_pos[0], -ug_mm[-1], -vg_mm[-1]))
-
-    # create 2d image of the gnomonic projection because the gnomonic projection is bigger than the pattern
+    # create the new virtual detector
     from pymicro.xray.detectors import RegArrayDetector2d
     gnom = RegArrayDetector2d(size=np.array(detector.size))
     gnom.ref_pos = detector.ref_pos  # same ref position as the actual detector
@@ -379,42 +372,19 @@ def gnomonic_projection(detector, pixel_size=None, OC=None):
         gnom.pixel_size = 1. / detector.pixel_size  # mm
     else:
         gnom.pixel_size = pixel_size  # mm
-    gnom.ucen = gnom.size[0] / 2 - gnom.ref_pos[1] / gnom.pixel_size  # should include u_dir
-    gnom.vcen = gnom.size[1] / 2 - gnom.ref_pos[2] / gnom.pixel_size  # should include v_dir
+    gnom.ucen = detector.ucen
+    gnom.vcen = detector.vcen
 
+    # create the gnom.data array (zeros with pixels set to 1 for gnomonic projection points)
     gnom.data = np.zeros(gnom.size, dtype=np.uint8)
-    u_gnom = np.linspace(0, gnom.size[0] - 1, gnom.size[0])
-    v_gnom = np.linspace(0, gnom.size[1] - 1, gnom.size[1])
-
-    # TODO use a function to go from mm to pixel coordinates
-    ug_px = gnom.ucen + ug_mm / gnom.pixel_size  # pixel, wrt (top left corner of gnom detector)
-    vg_px = gnom.vcen + vg_mm / gnom.pixel_size  # pixel, wrt (top left corner of gnom detector)
-
-    # remove pixel outside of the ROI (TODO use masked numpy array)
-    vg_px[ug_px > gnom.size[0] - 1] = gnom.vcen  # change vg_px first when testing on ug_px
-    ug_px[ug_px > gnom.size[0] - 1] = gnom.ucen
-    vg_px[ug_px < 0] = gnom.vcen
-    ug_px[ug_px < 0] = gnom.ucen
-
-    ug_px[vg_px > gnom.size[1] - 1] = gnom.ucen  # change ug_px first when testing on vg_px
-    vg_px[vg_px > gnom.size[1] - 1] = gnom.vcen
-    ug_px[vg_px < 0] = gnom.ucen
-    vg_px[vg_px < 0] = gnom.vcen
-
-    print(ug_px.min())
-    assert (ug_px.min() >= 0)
-    assert (ug_px.max() < gnom.size[0])
-    assert (vg_px.min() >= 0)
-    assert (vg_px.max() < gnom.size[1])
-
-    # convert pixel coordinates to integer
-    ug_px = ug_px.astype(np.uint16)
-    vg_px = vg_px.astype(np.uint16)
-    print('after conversion to uint16:')
-    print(ug_px)
-    print(vg_px)
-
-    gnom.data[ug_px, vg_px] = 1
+    # uvg_px = gnom.lab_to_pixel(uvg_mm)
+    uvg_px = np.zeros((uvg_mm.shape[0], 2), dtype=np.int)
+    for i in range(uvg_mm.shape[0]):
+        uvg_px[i, :] = gnom.lab_to_pixel(uvg_mm[i, :])
+    # filter out point outside the virtual detector
+    detin = (uvg_px[:, 0] >= 0) & (uvg_px[:, 0] <= gnom.size[0] - 1) & \
+            (uvg_px[:, 1] >= 0) & (uvg_px[:, 1] <= gnom.size[1] - 1)
+    gnom.data[uvg_px[detin, 0], uvg_px[detin, 1]] = 1
     return gnom
 
 

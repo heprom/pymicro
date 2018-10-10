@@ -280,7 +280,7 @@ class RegArrayDetector2d(Detector2d):
             points = np.reshape(points, (1, 3))
         vec = points - np.array(self.ref_pos)
         # check that each point is on the detector plane
-        assert np.count_nonzero(np.dot(vec, self.w_dir)) == 0
+        assert np.count_nonzero(np.dot(vec, self.w_dir) > np.finfo(np.float32).eps) == 0
         prod = np.vstack((np.dot(vec, self.u_dir), np.dot(vec, self.v_dir))).T
         uv = prod / self.pixel_size + 0.5 * np.array(self.size)
         return uv

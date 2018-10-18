@@ -268,27 +268,38 @@ class RegArrayDetector2d(Detector2d):
         p = origin + d * direction
         return p
 
-    def lab_to_pixel(self, p):
-        '''Compute the pixel number corresponding to a physical point in space.
+    def lab_to_pixel(self, points):
+        '''Compute the pixel numbers corresponding to a series physical point in space on the detector.
+        The points can be given as an array of size (n, 3) for n points or just as a 3 elements tuple for 
+        a single point.
 
-        :param tuple p: the coordinate of the point in the laboratory frame.
-        :return tuple (u, v): the detector coordinates of the given point.
+        :param ndarray points: the coordinates of the points in the laboratory frame.
+        :return ndarray uv: the detector coordinates of the given points as an array of size (n, 2).
         '''
-        # check if the point is on the detector plane
-        vec = np.array(p) - np.array(self.ref_pos)
-        assert np.dot(self.w_dir, vec) < 1.e-6
-        u = 0.5 * self.size[0] + np.dot(self.u_dir, vec) / self.pixel_size
-        v = 0.5 * self.size[1] + np.dot(self.v_dir, vec) / self.pixel_size
-        return u, v
+        if len(points) == 3:
+            points = np.reshape(points, (1, 3))
+        vec = points - np.array(self.ref_pos)
+        # check that each point is on the detector plane
+        assert np.count_nonzero(np.dot(vec, self.w_dir) > np.finfo(np.float32).eps) == 0
+        prod = np.vstack((np.dot(vec, self.u_dir), np.dot(vec, self.v_dir))).T
+        uv = prod / self.pixel_size + 0.5 * np.array(self.size)
+        return uv
 
     def pixel_to_lab(self, u, v):
-        '''Compute the laboratory coordinates of a given pixel.
+        '''Compute the laboratory coordinates of a given pixel. , if the pixels coordinates are given using 1D arrays 
+        of length n, a numpy array of size (n, 3) with the laboratory coordinates is returned. 
 
-        :param int u: the given pixel number along the first direction.
-        :param int v: the given pixel number along the second direction.
+        :param int u: the given pixel number along the first direction (can be 1D array).
+        :param int v: the given pixel number along the second direction (can be 1D array).
         :return tuple (x, y, z): the laboratory coordinates.
         '''
-        r = (u - 0.5 * self.size[0]) * self.u_dir + (v - 0.5 * self.size[1]) * self.v_dir
+        if type(u) == np.ndarray:
+            # use broadcasting
+            assert len(u) == len(v)
+            n = len(u)
+            r = (u.reshape((n, 1)) - 0.5 * self.size[0]) * self.u_dir + (v.reshape((n, 1)) - 0.5 * self.size[1]) * self.v_dir
+        else:
+            r = (u - 0.5 * self.size[0]) * self.u_dir + (v - 0.5 * self.size[1]) * self.v_dir
         p = self.ref_pos + r * self.pixel_size
         return p
 

@@ -342,7 +342,7 @@ class Lattice:
         A `Lattice` instance corresponding to a body centered cubic
         lattice.
         '''
-        return Lattice.from_parameters(a, a, a, 90, 90, 90, 'I')
+        return Lattice.from_parameters(a, a, a, 90, 90, 90, centering='I')
 
     @staticmethod
     def face_centered_cubic(a):
@@ -358,7 +358,7 @@ class Lattice:
         A `Lattice` instance corresponding to a face centered cubic
         lattice.
         '''
-        return Lattice.from_parameters(a, a, a, 90, 90, 90, 'F')
+        return Lattice.from_parameters(a, a, a, 90, 90, 90, centering='F')
 
     @staticmethod
     def tetragonal(a, c):
@@ -394,7 +394,7 @@ class Lattice:
         A `Lattice` instance corresponding to a body centered tetragonal
         lattice.
         '''
-        return Lattice.from_parameters(a, a, c, 90, 90, 90, 'I')
+        return Lattice.from_parameters(a, a, c, 90, 90, 90, centering='I')
 
     @staticmethod
     def orthorhombic(a, b, c):
@@ -422,7 +422,7 @@ class Lattice:
         A `Lattice` instance corresponding to a based centered orthorombic
         lattice.
         '''
-        return Lattice.from_parameters(a, b, c, 90, 90, 90, 'C')
+        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='C')
 
     @staticmethod
     def body_centered_orthorhombic(a, b, c):
@@ -442,7 +442,7 @@ class Lattice:
         A `Lattice` instance corresponding to a body centered orthorombic
         lattice.
         '''
-        return Lattice.from_parameters(a, b, c, 90, 90, 90, 'I')
+        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='I')
 
     @staticmethod
     def face_centered_orthorhombic(a, b, c):
@@ -462,7 +462,7 @@ class Lattice:
         A `Lattice` instance corresponding to a face centered orthorombic
         lattice.
         '''
-        return Lattice.from_parameters(a, b, c, 90, 90, 90, 'F')
+        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='F')
 
     @staticmethod
     def hexagonal(a, c):

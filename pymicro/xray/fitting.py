@@ -82,6 +82,27 @@ def fit(y, x=None, expression=None, nb_params=None, init=None):
     return F
 
 
+def lin_reg(xi, yi):
+    """Apply linear regression to a series of points.
+    
+    This function return the best linear fit in the least square sense.
+    :param ndarray xi: a 1D array of the x coordinate.
+    :param ndarray yi: a 1D array of the y coordinate.
+    :return tuple: the linear intercept, slope and correlation coefficient.
+    """
+    n = len(xi)
+    assert (n == len(yi))
+    sx = np.sum(xi)
+    sy = np.sum(yi)
+    sxx = np.sum(xi ** 2)
+    sxy = np.sum(xi * yi)
+    syy = np.sum(yi ** 2)
+    beta = (n * sxy - sx * sy) / (n * sxx - sx ** 2)
+    alpha = 1. / n * sy - 1. / n * sx * beta
+    r = (n * sxy - sx * sy) / np.sqrt((n * sxx - sx ** 2) * (n * syy - sy ** 2))
+    return alpha, beta, r
+
+
 class Parameter:
     '''A class to handle modiable parameters.'''
 

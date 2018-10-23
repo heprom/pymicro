@@ -2,7 +2,7 @@
 """
 import numpy as np
 from math import cos, sin, tan, atan2, pi
-from pymicro.crystal.lattice import HklPlane, Lattice
+from pymicro.crystal.lattice import HklPlane, Lattice, HklDirection, HklObject
 from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import lambda_nm_to_keV, lambda_keV_to_nm
 from pymicro.xray.dct import add_to_image
@@ -642,3 +642,41 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crysta
                 from pymicro.crystal.texture import PoleFigure
                 PoleFigure.plot(final_orientation, axis='Z')
         return final_orientation_matrix, ci
+
+def zone_axis_list(angle, orientation, lattice,  max_miller=5,  Xu=np.array([1., 0., 0.]), verbose=False):
+    """
+    This function allows to get easily the Miller indices of zone axis present in a pattern.
+
+    :param float list angle: the angle max or the zone axis angle range admissible around the detector center.
+    :param orientation: The orientation of the crystal lattice.
+    :param lattice: The corresponding crystal lattice, instance of Lattice.
+    :param int max_miller: Maximal value allowed of Miller indices direction.
+    :param array Xu: The unit vector of the incident X-ray beam (default along the X-axis).
+    :param bool verbose: activate verbose mode (default False).
+    :return: A list of HklDirection instance of all zone axis in the angle range.
+    """
+    ZA_list = []
+    if len(angle) == 1:
+        angle_max = angle[0] * np.pi / 180.
+        angle_min = 0.
+    if len(angle) == 2:
+        angle_max = max(angle) * np.pi / 180.
+        angle_min = min(angle) * np.pi / 180.
+        print("Get the indices of directions between [%d, %d] degrees" %(min(angle), max(angle)))
+    indices = range(-max_miller, max_miller+1)
+    for h in indices:
+        for k in indices:
+            for l in indices:
+                if h == k == l == 0:  # skip (0, 0, 0)
+                    continue
+                uvw = HklDirection(h, k, l, lattice)
+                # compute the direction in the lab frame
+                ZA = np.dot(orientation.orientation_matrix().transpose(), uvw.direction())
+                psi = np.arccos(np.dot(ZA, Xu))
+                if angle_min < psi < angle_max:
+                    if verbose == True:
+                        print('found zone axis [%d%d%d] at %.1f deg from incident beam' % (h,k,l,(psi*180/pi)))
+                    ZA_list.append(uvw) #zones axis list which are inferior with max angle
+    ZA_list = HklObject.skip_higher_order(ZA_list)
+    return ZA_list
+

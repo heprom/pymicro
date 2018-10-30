@@ -433,7 +433,7 @@ def identify_hkl_from_list(hkl_list):
     return [hkl_list[i] for i in ids]
 
 
-def triplet_indexing(OP, angles_exp, angles_th, tol=1.0):
+def triplet_indexing(OP, angles_exp, angles_th, tol=1.0, verbose=False):
     '''
     evaluate each triplet composed by 3 diffracted points.
     the total number of triplet is given by the binomial coefficient (n, 3) = n*(n-1)*(n-2)/6
@@ -470,10 +470,12 @@ def triplet_indexing(OP, angles_exp, angles_th, tol=1.0):
                                         angles_th['hkl1'][cj], angles_th['hkl2'][cj],
                                         angles_th['hkl1'][ck], angles_th['hkl2'][ck]]
                             # look how many unique planes are in the list (should be 3 for a triplet)
-                            print('- candidates with indices %s correspond to %s' % ([ci, cj, ck], hkl_list))
+                            if verbose:
+                                print('- candidates with indices %s correspond to %s' % ([ci, cj, ck], hkl_list))
                             unique_indices = np.unique(hkl_list)
                             if len(unique_indices) != 3:
-                                print('not a real triplet, skipping this one')
+                                if verbose:
+                                    print('not a real triplet, skipping this one')
                                 continue
                             print('this is a triplet: %s' % unique_indices)
                             # the points can now be identified from the hkl_list ordering
@@ -680,3 +682,34 @@ def zone_axis_list(angle, orientation, lattice,  max_miller=5,  Xu=np.array([1.,
     ZA_list = HklObject.skip_higher_order(ZA_list)
     return ZA_list
 
+def get_gnomonic_edges(detector, gnom, OC=None, num_points=21):
+    """
+    This function allows to get the blind area of the gnomonic projection.
+
+    :param RegArrayDetector2d detector: the detector instance with the data from which to compute the projection.
+    :param RegArrayDetector2d gnom: A virtual detector with the gnomonic projection as its data.
+    :param ndarray OC: coordinates of the center of the gnomonic projection in the laboratory frame.
+    :param int num_points: number of points to describe an edge (minimum 2)
+    :return: ndarray of gnomonic blind area edges coordinates.
+    """
+    # Get detector pixel edges
+    uv_detector_edges = detector.get_edges(num_points=num_points, verbose=False)  # pixels
+    # Compute edges position in the lab coordinates
+    detector_edges_mm = np.zeros((uv_detector_edges.shape[0], 3))
+    for i in range(detector_edges_mm.shape[0]):
+        detector_edges_mm[i, :] = detector.pixel_to_lab(uv_detector_edges[i, 0], uv_detector_edges[i, 1])
+    # Apply the gnomonic projection  in the lab coordinates
+    detector_edges_gp = gnomonic_projection_point(detector_edges_mm, OC=OC)  # mm
+    # Compute the gnomonic projected point on the detector coordinates
+    detector_edges_gp_px = np.zeros((detector_edges_gp.shape[0], 2))
+    for j in range(detector_edges_gp.shape[0]):
+        detector_edges_gp_px[j] = gnom.lab_to_pixel(detector_edges_gp[j, :])
+    return detector_edges_gp_px
+
+def diffracting_normals_vector(gnom):
+    uv_g = np.argwhere(gnom.data == 1)  # points on the gnomonic projection
+    OP = [gnom.pixel_to_lab(uv_g[i, 0], uv_g[i, 1]).tolist() for i in range(len(uv_g))]
+    hkl_normals = [(n / np.linalg.norm(n)).tolist() for n in OP]  # normalized list of vectors
+    print('%d normals found in the gnomonic projection' % len(hkl_normals))
+
+    return hkl_normals

@@ -6,6 +6,7 @@ from pymicro.crystal.lattice import HklPlane, Lattice, HklDirection, HklObject
 from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import lambda_nm_to_keV, lambda_keV_to_nm
 from pymicro.xray.dct import add_to_image
+import os
 
 
 def select_lambda(hkl, orientation, Xu=(1., 0., 0.), verbose=False):

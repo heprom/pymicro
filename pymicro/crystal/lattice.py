@@ -1026,8 +1026,11 @@ class HklPlane(HklObject):
         if not len(hkl) == 3:
             raise ValueError('warning, family not supported: %s' % hkl)
         family = []
-        l = list(hkl)
-        l.sort()  # miller indices are now sorted by increasing order
+        hkl_list = list(hkl)
+        hkl_list.sort()  # miller indices are now sorted by increasing order
+        h = int(hkl[0])
+        k = int(hkl[1])
+        l = int(hkl[2])
         if hkl == '001' or hkl == '010' or hkl == '100':
             family.append(HklPlane(1, 0, 0, lattice))
             family.append(HklPlane(0, 1, 0, lattice))
@@ -1083,6 +1086,19 @@ class HklPlane(HklObject):
             family.append(HklPlane(-1, 3, 3, lattice))
             family.append(HklPlane(1, -3, 3, lattice))
             family.append(HklPlane(1, 3, -3, lattice))
+        elif hkl in ['662', '626', '266']:
+            family.append(HklPlane(6, 6, 2, lattice))
+            family.append(HklPlane(-6, 6, 2, lattice))
+            family.append(HklPlane(6, -6, 2, lattice))
+            family.append(HklPlane(6, 6, -2, lattice))
+            family.append(HklPlane(6, 2, 6, lattice))
+            family.append(HklPlane(-6, 2, 6, lattice))
+            family.append(HklPlane(6, -2, 6, lattice))
+            family.append(HklPlane(6, 2, -6, lattice))
+            family.append(HklPlane(2, 6, 6, lattice))
+            family.append(HklPlane(-2, 6, 6, lattice))
+            family.append(HklPlane(2, -6, 6, lattice))
+            family.append(HklPlane(2, 6, -6, lattice))
         elif hkl == '002':
             family.append(HklPlane(2, 0, 0, lattice))
             family.append(HklPlane(0, 2, 0, lattice))
@@ -1119,6 +1135,46 @@ class HklPlane(HklObject):
             family.append(HklPlane(-3, 2, 1, lattice))
             family.append(HklPlane(3, -2, 1, lattice))
             family.append(HklPlane(3, 2, -1, lattice))
+        elif len(np.unique(hkl_list)) == 2 and hkl_list[0] == hkl_list[1] and not '0' in hkl:
+            # 2 different ints, hhl type -> 12 planes
+            family.append(HklPlane(h, h, l, lattice))
+            family.append(HklPlane(-h, h, l, lattice))
+            family.append(HklPlane(h, -h, l, lattice))
+            family.append(HklPlane(h, h, -l, lattice))
+            family.append(HklPlane(h, l, h, lattice))
+            family.append(HklPlane(-h, l, h, lattice))
+            family.append(HklPlane(h, -l, h, lattice))
+            family.append(HklPlane(h, l, -h, lattice))
+            family.append(HklPlane(l, h, h, lattice))
+            family.append(HklPlane(-l, h, h, lattice))
+            family.append(HklPlane(l, -h, h, lattice))
+            family.append(HklPlane(l, h, -h, lattice))
+        elif len(np.unique(list(hkl))) == 3 and not '0' in hkl:
+            # 3 different ints, all nonzeros -> 24 planes
+            family.append(HklPlane(h, k, l, lattice))
+            family.append(HklPlane(-h, k, l, lattice))
+            family.append(HklPlane(h, -k, l, lattice))
+            family.append(HklPlane(h, k, -l, lattice))
+            family.append(HklPlane(l, h, k, lattice))
+            family.append(HklPlane(-l, h, k, lattice))
+            family.append(HklPlane(l, -h, k, lattice))
+            family.append(HklPlane(l, h, -k, lattice))
+            family.append(HklPlane(k, l, h, lattice))
+            family.append(HklPlane(-k, l, h, lattice))
+            family.append(HklPlane(k, -l, h, lattice))
+            family.append(HklPlane(k, l, -h, lattice))
+            family.append(HklPlane(h, l, k, lattice))
+            family.append(HklPlane(-h, l, k, lattice))
+            family.append(HklPlane(h, -l, k, lattice))
+            family.append(HklPlane(h, l, -k, lattice))
+            family.append(HklPlane(k, h, l, lattice))
+            family.append(HklPlane(-k, h, l, lattice))
+            family.append(HklPlane(k, -h, l, lattice))
+            family.append(HklPlane(k, h, -l, lattice))
+            family.append(HklPlane(l, k, h, lattice))
+            family.append(HklPlane(-l, k, h, lattice))
+            family.append(HklPlane(l, -k, h, lattice))
+            family.append(HklPlane(l, k, -h, lattice))
         else:
             raise ValueError('warning, family not supported: %s' % hkl)
         return family

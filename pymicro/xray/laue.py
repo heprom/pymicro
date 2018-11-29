@@ -243,7 +243,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
     :param detector: An instance of the Detector2d class.
     :param list hkl_planes: A list of the lattice planes to include in the pattern.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
-    :param bool use_friedel_pair: also consider the Friedel pairs of the lattice planes in the list as candidates for diffraction. 
+    :param bool use_friedel_pair: also consider the Friedel pair of each lattice plane in the list as candidate for diffraction. 
     :param spectrum: A two columns array of the spectrum to use for the calculation.
     :param float spectrum_thr: The threshold to use to determine if a wave length is contributing or not.
     :param int r_spot: Size of the spots on the detector in pixel (5 by default)
@@ -272,12 +272,21 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
 
     for hkl in hkl_planes:
         (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=False)
+        if the_energy < 0:
+            if use_friedel_pair:
+                if verbose:
+                    print('switching to Friedel pair')
+                hkl = hkl.friedel_pair()
+                (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu_moy, verbose=False)
+            else:
+                continue
+        assert(the_energy >= 0)
         if spectrum is not None:
             if the_energy < E_min or the_energy > E_max:
                 #print('skipping reflection {0:s} which would diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
                 continue
                 #print('including reflection {0:s} which will diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
-        K = diffracted_vector(hkl, orientation, Xu=Xu, use_friedel_pair=use_friedel_pair, verbose=verbose)
+        K = diffracted_vector(hkl, orientation, Xu=Xu, use_friedel_pair=False, verbose=verbose)
         if K is None or np.dot(Xu, K) == 0:
             continue  # skip diffraction // to the detector
         d = np.dot((detector.ref_pos - np.array([0., 0., 0.])), detector.w_dir) / np.dot(K, detector.w_dir)

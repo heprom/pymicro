@@ -1135,6 +1135,12 @@ class HklPlane(HklObject):
             family.append(HklPlane(-3, 2, 1, lattice))
             family.append(HklPlane(3, -2, 1, lattice))
             family.append(HklPlane(3, 2, -1, lattice))
+        elif len(np.unique(list(hkl))) == 1 and not '0' in hkl:
+            # hhh planes -> 4 planes
+            family.append(HklPlane(h, h, h, lattice))
+            family.append(HklPlane(-h, h, h, lattice))
+            family.append(HklPlane(h, -h, h, lattice))
+            family.append(HklPlane(h, h, -h, lattice))
         elif len(np.unique(hkl_list)) == 2 and hkl_list[0] == hkl_list[1] and not '0' in hkl:
             # 2 different ints, hhl type -> 12 planes
             family.append(HklPlane(h, h, l, lattice))
@@ -1149,6 +1155,20 @@ class HklPlane(HklObject):
             family.append(HklPlane(-l, h, h, lattice))
             family.append(HklPlane(l, -h, h, lattice))
             family.append(HklPlane(l, h, -h, lattice))
+        elif len(np.unique(hkl_list)) == 2 and hkl_list[1] == hkl_list[2] and not '0' in hkl:
+            # 2 different ints, hkk type -> 12 planes
+            family.append(HklPlane(k, k, h, lattice))
+            family.append(HklPlane(-k, k, h, lattice))
+            family.append(HklPlane(k, -k, h, lattice))
+            family.append(HklPlane(k, k, -h, lattice))
+            family.append(HklPlane(k, h, k, lattice))
+            family.append(HklPlane(-k, h, k, lattice))
+            family.append(HklPlane(k, -h, k, lattice))
+            family.append(HklPlane(k, h, -k, lattice))
+            family.append(HklPlane(h, k, k, lattice))
+            family.append(HklPlane(-h, k, k, lattice))
+            family.append(HklPlane(h, -k, k, lattice))
+            family.append(HklPlane(h, k, -k, lattice))
         elif len(np.unique(list(hkl))) == 3 and not '0' in hkl:
             # 3 different ints, all nonzeros -> 24 planes
             family.append(HklPlane(h, k, l, lattice))

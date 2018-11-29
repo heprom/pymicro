@@ -277,7 +277,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
                 if verbose:
                     print('switching to Friedel pair')
                 hkl = hkl.friedel_pair()
-                (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu_moy, verbose=False)
+                (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=False)
             else:
                 continue
         assert(the_energy >= 0)

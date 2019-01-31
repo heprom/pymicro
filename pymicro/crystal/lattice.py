@@ -962,34 +962,6 @@ class HklPlane(HklObject):
         """Convert three to four index representation of a slip plane (used for hexagonal crystal lattice)."""
         return u, v, -(u + v), w
 
-    @staticmethod
-    def auto_family(hkl, lattice=None, include_friedel_pair=False):
-        if not len(hkl) == 3:
-            raise ValueError('warning, family not supported: %s' % hkl)
-        family = []
-        l = list(hkl)
-        l.sort()  # miller indices are now sorted by increasing order
-        (h, k, l) = (int(l[0]), int(l[1]), int(l[2]))
-        if not include_friedel_pair:
-            hkl_list = [(h, k, l), (k, l, h), (l, h, k), (h, l, k), (k, h, l), (l, k, h)]
-        else:
-            hkl_list = [(h, k, l), (k, l, h), (l, h, k), (h, l, k), (k, h, l), (l, k, h),
-                        (-h, -k, -l), (-k, -l, -h), (-l, -h, -k), (-h, -l, -k), (-k, -h, -l), (-l, -k, -h)]
-        for (h, k, l) in hkl_list:
-            plane = HklPlane(h, k, l, lattice)
-            if not plane.is_in_list(family, not include_friedel_pair):
-                family.append(plane)
-            plane = HklPlane(-h, k, l, lattice)
-            if not plane.is_in_list(family, not include_friedel_pair):
-                family.append(plane)
-            plane = HklPlane(h, -k, l, lattice)
-            if not plane.is_in_list(family, not include_friedel_pair):
-                family.append(plane)
-            plane = HklPlane(h, k, -l, lattice)
-            if not plane.is_in_list(family, not include_friedel_pair):
-                family.append(plane)
-        return family
-
     def is_in_list(self, hkl_planes, friedel_pair=False):
         """Check if the hkl plane is in the given list.
 
@@ -1005,23 +977,62 @@ class HklPlane(HklObject):
             return self in hkl_planes or self.friedel_pair() in hkl_planes
 
     @staticmethod
-    def get_family(hkl, lattice=None):
-        '''Static method to obtain a list of the different crystallographic
+    def is_same_family(hkl1, hkl2, crystal_structure='cubic'):
+        """Static method to test if both lattice planes belongs to the same family.
+        
+        A family {hkl} is composed by all planes that are equivalent to (hkl) using the symmetry of the lattice. 
+        The lattice assoiated with `hkl2`is not taken into account here.
+        """
+        return hkl1.is_in_list(HklPlane.get_family(hkl2.miller_indices(), lattice=hkl1._lattice,
+                                                   crystal_structure=crystal_structure))
+
+    @staticmethod
+    def get_family(hkl, lattice=None, include_friedel_pairs=False, crystal_structure='cubic'):
+        """Static method to obtain a list of the different crystallographic
         planes in a particular family.
 
         :param str hkl: a string of 3 numbers corresponding to the miller indices.
         :param Lattice lattice: The reference crystal lattice (default None).
+        :param bool include_friedel_pairs: Flag to include the Friedel pairs in the list (False by default).
+        :param str crystal_structure: A string descibing the crystal structure (cubic by default). 
         :raise ValueError: if the given string does not correspond to a supported family.
         :returns list: a list of the :py:class:`~pymicro.crystal.lattice.HklPlane` in the given hkl family.
 
         .. note::
 
-          We could build any family with 3 integers automatically:
-          * 1 int nonzero -> 3 planes, eg (001)
-          * 2 equal ints nonzero -> 6 planes, eg (011)
-          * 3 equal ints nonzero -> 4 planes, eg (111)
-          * 2 different ints, all nonzeros -> 12 planes, eg (112)
-          * 3 different ints, all nonzeros -> 24 planes, eg (123)
+          The method account for the lattice symmetry to create a list of equivalent lattice plane from the point 
+          of view of the point group symmetry. A flag can be used to include or not the Friedel pairs. If not, the 
+          family is contstructed using the miller indices limited the number of minus signs. For instance  (1,0,0) 
+          will be in the list and not (-1,0,0).
+        """
+        if not len(hkl) == 3:
+            raise ValueError('warning, family not supported: %s' % hkl)
+        hkl_list = list(hkl)
+        h = int(hkl[0])
+        k = int(hkl[1])
+        l = int(hkl[2])
+        family = []
+        # construct lattice plane family from symmetry operators
+        syms = Lattice.symmetry(crystal_structure)
+        for sym in syms:
+            n_sym = np.dot(sym, np.array([h, k, l])).astype(np.int)
+            hkl_sym = HklPlane(n_sym[0], n_sym[1], n_sym[2], lattice=lattice)
+            if not hkl_sym.is_in_list(family, friedel_pair=True):  # not include_friedel_pairs):
+                family.append(hkl_sym)
+            if include_friedel_pairs:
+                hkl_sym = HklPlane(-n_sym[0], -n_sym[1], -n_sym[2], lattice=lattice)
+                if not hkl_sym.is_in_list(family, friedel_pair=False):  # not include_friedel_pairs):
+                    family.append(hkl_sym)
+        if not include_friedel_pairs:
+            # for each hkl plane chose between (h, k, l) and (-h, -k, -l) to have the less minus signs
+            for i in range(len(family)):
+                hkl = family[i]
+                (h, k, l) = hkl.miller_indices()
+                if np.where(np.array([h, k, l]) < 0)[0].size > 0 and np.where(np.array([h, k, l]) <= 0)[0].size >= 2:
+                    family[i] = hkl.friedel_pair()
+                    print('replacing plane (%d%d%d) by its pair: (%d%d%d)' % (h, k, l, -h, -k, -l))
+
+
         '''
         if not len(hkl) == 3:
             raise ValueError('warning, family not supported: %s' % hkl)
@@ -1197,6 +1208,7 @@ class HklPlane(HklObject):
             family.append(HklPlane(l, k, -h, lattice))
         else:
             raise ValueError('warning, family not supported: %s' % hkl)
+        '''
         return family
 
     def slip_trace(self, orientation, n_int=np.array([0, 0, 1]), view_up=np.array([0, 1, 0]), trace_size=100, verbose=False):

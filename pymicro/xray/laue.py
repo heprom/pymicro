@@ -131,7 +131,8 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     but not lying on the great axis. Point A and N still lie on the major axis, so the translation can be determined. 
     '''
     NX = np.linalg.norm(ON) * tan(psi - nu)
-    print('****************** NX = %.1f' % NX)
+    if verbose:
+        print('****************** NX = %.1f' % NX)
     data[0] += (a - NX) * np.cos(eta)
     data[1] += (a - NX) * np.sin(eta)
     #data[0] += ON[1] + a * np.cos(eta)
@@ -401,6 +402,7 @@ def gnomonic_projection(detector, pixel_size=None, OC=None, verbose=False):
         gnom.pixel_size = 1. / detector.pixel_size  # mm
     else:
         gnom.pixel_size = pixel_size  # mm
+    # TODO remove the next two lines
     gnom.ucen = detector.ucen
     gnom.vcen = detector.vcen
 
@@ -724,16 +726,11 @@ def get_gnomonic_edges(detector, gnom, OC=None, num_points=21):
     # Get detector pixel edges
     uv_detector_edges = detector.get_edges(num_points=num_points, verbose=False)  # pixels
     # Compute edges position in the lab coordinates
-    detector_edges_mm = np.zeros((uv_detector_edges.shape[0], 3))
-    for i in range(detector_edges_mm.shape[0]):
-        detector_edges_mm[i, :] = detector.pixel_to_lab(uv_detector_edges[i, 0], uv_detector_edges[i, 1])
+    detector_edges_mm = detector.pixel_to_lab(uv_detector_edges[:, 0], uv_detector_edges[:, 1])
     # Apply the gnomonic projection  in the lab coordinates
     detector_edges_gp = gnomonic_projection_point(detector_edges_mm, OC=OC)  # mm
-    # Compute the gnomonic projected point on the detector coordinates
-    detector_edges_gp_px = np.zeros((detector_edges_gp.shape[0], 2))
-    for j in range(detector_edges_gp.shape[0]):
-        detector_edges_gp_px[j] = gnom.lab_to_pixel(detector_edges_gp[j, :])
-    return detector_edges_gp_px
+    # return the gnomonic projected point on the detector (pixel coordinates)
+    return gnom.lab_to_pixel(detector_edges_gp)
 
 def diffracting_normals_vector(gnom):
     uv_g = np.argwhere(gnom.data == 1)  # points on the gnomonic projection

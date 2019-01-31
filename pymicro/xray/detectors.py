@@ -286,12 +286,13 @@ class RegArrayDetector2d(Detector2d):
         return uv
 
     def pixel_to_lab(self, u, v):
-        '''Compute the laboratory coordinates of a given pixel. , if the pixels coordinates are given using 1D arrays 
+        """Compute the laboratory coordinates of a given pixel. , if the pixels coordinates are given using 1D arrays 
         of length n, a numpy array of size (n, 3) with the laboratory coordinates is returned. 
 
         :param int u: the given pixel number along the first direction (can be 1D array).
         :param int v: the given pixel number along the second direction (can be 1D array).
         :return tuple (x, y, z): the laboratory coordinates.
+        """
         '''
         if type(u) == np.ndarray:
             # use broadcasting
@@ -300,6 +301,12 @@ class RegArrayDetector2d(Detector2d):
             r = (u.reshape((n, 1)) - 0.5 * self.size[0]) * self.u_dir + (v.reshape((n, 1)) - 0.5 * self.size[1]) * self.v_dir
         else:
             r = (u - 0.5 * self.size[0]) * self.u_dir + (v - 0.5 * self.size[1]) * self.v_dir
+        '''
+        try:
+            n = len(u)
+        except TypeError:
+            n = 1
+        r = (np.reshape(u, (n, 1)) - 0.5 * self.size[0]) * self.u_dir + (np.reshape(v, (n, 1)) - 0.5 * self.size[1]) * self.v_dir
         p = self.ref_pos + r * self.pixel_size
         return p
 

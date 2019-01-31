@@ -560,12 +560,12 @@ class Lattice:
         return Lattice([vector_a, vector_b, vector_c], centering)
 
     def volume(self):
-        '''Compute the volume of the unit cell.'''
+        """Compute the volume of the unit cell."""
         m = self._matrix
         return abs(np.dot(np.cross(m[0], m[1]), m[2]))
 
     def get_hkl_family(self, hkl):
-        '''Get a list of the hkl planes composing the given family for
+        """Get a list of the hkl planes composing the given family for
         this crystal lattice.
 
         *Parameters*
@@ -575,8 +575,8 @@ class Lattice:
         *Returns*
 
         A list of the hkl planes in the given family.
-        '''
-        planes = HklPlane.get_family(hkl, self)
+        """
+        planes = HklPlane.get_family(hkl, lattice=self)
         return planes
 
 
@@ -1210,6 +1210,10 @@ class HklPlane(HklObject):
             raise ValueError('warning, family not supported: %s' % hkl)
         '''
         return family
+
+    def multiplicity(self, symmetry='cubic'):
+        """compute the general multiplicity for this `HklPlane` and the given symmetry."""
+        return len(HklPlane.get_family(self.miller_indices(), include_friedel_pairs=True, crystal_structure=symmetry))
 
     def slip_trace(self, orientation, n_int=np.array([0, 0, 1]), view_up=np.array([0, 1, 0]), trace_size=100, verbose=False):
         """

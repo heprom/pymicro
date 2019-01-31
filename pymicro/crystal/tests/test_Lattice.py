@@ -112,9 +112,10 @@ class HklDirectionTests(unittest.TestCase):
         self.assertEqual(T, -1)
         self.assertEqual(W, 0)
 
+
 class HklPlaneTests(unittest.TestCase):
     def setUp(self):
-        print 'testing the HklPlane class'
+        print('testing the HklPlane class')
 
     def test_equality(self):
         p1 = HklPlane(1, 1, 1)
@@ -146,6 +147,29 @@ class HklPlaneTests(unittest.TestCase):
         self.assertEqual(len(HklPlane.get_family('010', crystal_structure='tetragonal', include_friedel_pairs=True)), 4)
         self.assertEqual(len(HklPlane.get_family('100', crystal_structure='tetragonal')), 2)
         self.assertEqual(len(HklPlane.get_family('100', crystal_structure='tetragonal', include_friedel_pairs=True)), 4)
+        self.assertEqual(len(HklPlane.get_family([1, 0, 2], crystal_structure='tetragonal', include_friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_family([-1, 0, 2], crystal_structure='tetragonal', include_friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_family([0, 1, 2], crystal_structure='tetragonal', include_friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_family([0, -1, 2], crystal_structure='tetragonal', include_friedel_pairs=True)), 8)
+
+    def test_multiplicity(self):
+        """Int Tables of Crystallography Vol. 1 p 32."""
+        self.assertEqual(HklPlane(1, 0, 0).multiplicity(symmetry='cubic'), 6)
+        for h in range(1, 4):
+            self.assertEqual(HklPlane(h, 0, 0).multiplicity(symmetry='tetragonal'), 4)
+            self.assertEqual(HklPlane(0, h, 0).multiplicity(symmetry='tetragonal'), 4)
+            self.assertEqual(HklPlane(h, h, 0).multiplicity(symmetry='tetragonal'), 4)
+            self.assertEqual(HklPlane(-h, h, 0).multiplicity(symmetry='tetragonal'), 4)
+            self.assertEqual(HklPlane(h, h, 1).multiplicity(symmetry='tetragonal'), 8)
+            self.assertEqual(HklPlane(-h, h, 1).multiplicity(symmetry='tetragonal'), 8)
+        self.assertEqual(HklPlane(0, 0, 1).multiplicity(symmetry='tetragonal'), 2)
+        self.assertEqual(HklPlane(1, 0, 2).multiplicity(symmetry='tetragonal'), 8)
+        self.assertEqual(HklPlane(-1, 0, 2).multiplicity(symmetry='tetragonal'), 8)
+        self.assertEqual(HklPlane(0, 1, 2).multiplicity(symmetry='tetragonal'), 8)
+        self.assertEqual(HklPlane(0, -1, 2).multiplicity(symmetry='tetragonal'), 8)
+        self.assertEqual(HklPlane(1, 2, 0).multiplicity(symmetry='tetragonal'), 8)
+        self.assertEqual(HklPlane(-1, 2, 0).multiplicity(symmetry='tetragonal'), 8)
+        self.assertEqual(HklPlane(1, 2, 3).multiplicity(symmetry='tetragonal'), 16)
 
     def test_HklPlane_normal(self):
         ZrO2 = Lattice.tetragonal(3.64, 5.27)

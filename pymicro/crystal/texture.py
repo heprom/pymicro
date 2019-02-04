@@ -172,8 +172,6 @@ class PoleFigure:
         '''Function to plot a crystal direction on a pole figure.
 
         :param c_dir: A vector describing the crystal direction.
-        :param mk: marker used to plot the pole (disc by default).
-        :param col: color used to plot the pole (black by default).
         :param ax: a reference to a pyplot ax to draw the pole.
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
         :param str lab: Label to use in the legend of the plot ('' by default).
@@ -190,11 +188,11 @@ class PoleFigure:
             # cp = np.cross(c, self.z)
         else:
             raise ValueError('Error, unsupported projection type', self.proj)
-        mk = kwargs.get('marker', 'o')
-        col = kwargs.get('markeredgecolor', 'k')
-        face = kwargs.get('markerfacecolor', 'k')
-        ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=face, marker=mk,
-                markeredgecolor=col, markersize=self.mksize, label=lab)
+        mk = kwargs.get('mk', 'o')
+        edge_col = kwargs.get('markeredgecolor', 'k')
+        col = kwargs.get('col', 'k')
+        ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk,
+                markeredgecolor=edge_col, markersize=self.mksize, label=lab)
         # Next 3 lines are necessary in case c_dir[2]=0, as for Euler angles [45, 45, 0]
         if c_dir[2] < 0.000001:
             ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk,
@@ -280,9 +278,9 @@ class PoleFigure:
                 c_rot = gt.dot(c)
                 if self.verbose:
                     h, k, l = hkl_plane.miller_indices()
-                    print('plotting (%d%d%d) with normal %s in sample CS (corrected for pf axis): %s' %(h, k, l, c, c_rot))
+                    print('plotting (%d%d%d) with normal %s in sample CS (corrected for pf axis): %s' % (h, k, l, c, c_rot))
                 col = self.get_color_from_field(grain)
-                self.plot_pf_dir(c_rot, mk=mk, col=col, ax=ax, ann=ann, lab=label)
+                self.plot_pf_dir(c_rot, ax=ax, mk=mk, col=col, ann=ann, lab=label)
         ax.axis([-1.1, 1.1, -1.1, 1.1])
         if self.pflegend and self.map_field == 'grain_id':
             ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, prop={'size': 10})
@@ -304,8 +302,8 @@ class PoleFigure:
         '''
         # discretise the angular space (azimuth and altitude)
         ang_step *= np.pi / 180  # change to radians
-        n_phi = 1 + 2 * np.pi / ang_step
-        n_psi = 1 + 0.5 * np.pi / ang_step
+        n_phi = int(1 + 2 * np.pi / ang_step)
+        n_psi = int(1 + 0.5 * np.pi / ang_step)
         phis = np.linspace(0, 2 * np.pi, n_phi)
         psis = np.linspace(0, np.pi / 2, n_psi)
         xv, yv = np.meshgrid(phis, psis)
@@ -390,15 +388,17 @@ class PoleFigure:
             elif self.map_field == 'ipf':
                 col = grain.orientation.get_ipf_colour()
             else:
+                # retreive the position of the grain in the list
+                rank = self.microstructure.grains.index(grain)
                 if type(self.lut) is str:
                     # get the color map from pyplot
                     color_map = cm.get_cmap(self.lut, 256)
-                    # use the field value for this grain
-                    color = int(255 * (self.field[grain.id] - self.field_min_level) / float(
-                        self.field_max_level - self.field_min_level))
+                    # use the field value for this grain and the field range bounds
+                    color = int(255 * max(min((self.field[rank] - self.field_min_level) / float(
+                        self.field_max_level - self.field_min_level), 1.0), 0.0))
                     col = color_map(np.arange(256))[color]
                 else:
-                    col = self.lut[self.field[grain.id]]  # directly access the color
+                    col = self.lut[self.field[rank]]  # directly access the color
             return col
         else:
             return np.array([0., 0., 0.])

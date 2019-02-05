@@ -1,5 +1,6 @@
 from pymicro.crystal.microstructure import *
 from pymicro.crystal.texture import *
+from matplotlib import pyplot as plt, colors, colorbar, cm
 
 if __name__ == '__main__':
     '''This example demonstrate how a field can be used to color each
@@ -20,13 +21,19 @@ if __name__ == '__main__':
     pf.set_map_field('strain', strain_field, field_min_level=0.015, field_max_level=0.025)
     fig = plt.figure()
     # direct PF
-    ax1 = fig.add_subplot(111, aspect='equal')
+    ax1 = fig.add_axes([0.05, 0.05, 0.8, 0.9], aspect='equal')
     pf.plot_pf(ax=ax1)
     plt.title('111 pole figure, cubic elasticity')
-    plt.savefig('%s_pole_figure.png' % micro.name, format='png')
+
+    # to add the color bar
+    ax2 = fig.add_axes([0.8, 0.05, 0.05, 0.9])
+    norm = colors.Normalize(vmin=0.015, vmax=0.025)
+    cb = colorbar.ColorbarBase(ax2, cmap=cm.hot, norm=norm, orientation='vertical')
+    cb.set_label('Average strain (mm/mm)')
 
     image_name = os.path.splitext(__file__)[0] + '.png'
-    print 'writting %s' % image_name
+    print('writting %s' % image_name)
+    plt.savefig('%s' % image_name, format='png')
 
     from matplotlib import image
 

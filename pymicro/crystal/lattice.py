@@ -77,6 +77,112 @@ class Symmetry(enum.Enum):
         else:
             return None
 
+    def symmetry_operators(self):
+        """Define the equivalent crystal symmetries.
+
+        Those come from Randle & Engler, 2000. For instance in the cubic
+        crystal struture, for instance there are 24 equivalent cube orientations.
+
+        :returns array: A numpy array of shape (n, 3, 3) where n is the \
+        number of symmetries of the given crystal structure.
+        """
+        if self is Symmetry.cubic:
+            sym = np.zeros((24, 3, 3), dtype=np.float)
+            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+            sym[1] = np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]])
+            sym[2] = np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]])
+            sym[3] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
+            sym[4] = np.array([[0., 0., 1.], [0., 1., 0.], [-1., 0., 0.]])
+            sym[5] = np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]])
+            sym[6] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
+            sym[7] = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]])
+            sym[8] = np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])
+            sym[9] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
+            sym[10] = np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]])
+            sym[11] = np.array([[0., 0., 1.], [1., 0., 0.], [0., 1., 0.]])
+            sym[12] = np.array([[0., 1., 0.], [0., 0., 1.], [1., 0., 0.]])
+            sym[13] = np.array([[0., 0., -1.], [-1., 0., 0.], [0., 1., 0.]])
+            sym[14] = np.array([[0., -1., 0.], [0., 0., 1.], [-1., 0., 0.]])
+            sym[15] = np.array([[0., 1., 0.], [0., 0., -1.], [-1., 0., 0.]])
+            sym[16] = np.array([[0., 0., -1.], [1., 0., 0.], [0., -1., 0.]])
+            sym[17] = np.array([[0., 0., 1.], [-1., 0., 0.], [0., -1., 0.]])
+            sym[18] = np.array([[0., -1., 0.], [0., 0., -1.], [1., 0., 0.]])
+            sym[19] = np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]])
+            sym[20] = np.array([[-1., 0., 0.], [0., 0., 1.], [0., 1., 0.]])
+            sym[21] = np.array([[0., 0., 1.], [0., -1., 0.], [1., 0., 0.]])
+            sym[22] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
+            sym[23] = np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]])
+        elif self is Symmetry.hexagonal:
+            sym = np.zeros((12, 3, 3), dtype=np.float)
+            s60 = np.sin(60 * np.pi / 180)
+            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+            sym[1] = np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]])
+            sym[2] = np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]])
+            sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
+            sym[4] = np.array([[-0.5, -s60, 0.], [s60, -0.5, 0.], [0., 0., 1.]])
+            sym[5] = np.array([[0.5, -s60, 0.], [s60, 0.5, 0.], [0., 0., 1.]])
+            sym[6] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
+            sym[7] = np.array([[0.5, s60, 0.], [s60, -0.5, 0.], [0., 0., -1.]])
+            sym[8] = np.array([[-0.5, s60, 0.], [s60, 0.5, 0.], [0., 0., -1.]])
+            sym[9] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
+            sym[10] = np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]])
+            sym[11] = np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]])
+        elif self is Symmetry.orthorhombic:
+            sym = np.zeros((4, 3, 3), dtype=np.float)
+            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+            sym[1] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
+            sym[2] = np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]])
+            sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
+        elif self is Symmetry.tetragonal:
+            sym = np.zeros((8, 3, 3), dtype=np.float)
+            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+            sym[1] = np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])
+            sym[2] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
+            sym[3] = np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]])
+            sym[4] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
+            sym[5] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
+            sym[6] = np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]])
+            sym[7] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
+        elif self is Symmetry.triclinic:
+            sym = np.zeros((1, 3, 3), dtype=np.float)
+            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+        else:
+            raise ValueError('warning, symmetry not supported: %s' % self)
+        return sym
+
+    def move_rotation_to_FZ(self, g, verbose=False):
+        """
+        Compute the rotation matrix in the Fundamental Zone of a given `Symmetry` instance.
+
+        :param g: a 3x3 matrix representing the rotation 
+        :param verbose: flag for verbose mode
+        :return: a new 3x3 matrix for the rotation in the fundamental zone.
+        """
+        omegas = []  # list to store all the rotation angles
+        syms = self.symmetry_operators()
+        for sym in syms:
+            # apply the symmetry operator
+            om = np.dot(sym, g)
+            if verbose:
+                print(om)
+                print(om.trace())
+            # compute the Rodrigues vector of the corresponding orientation matrix
+            # from pymicro.crystal.microstructure import Orientation
+            # r = Orientation.OrientationMatrix2Rodrigues(om)
+            # print(r)
+            # and then the rotation angle
+            # omega = 2 * np.arctan(np.linalg.norm(r)) * 180 / np.pi
+            # todo: check if we can avoid computing the R vector
+            cw = 0.5 * (om.trace() - 1)
+            omega = np.arccos(cw)
+            omegas.append(omega)
+        index = np.argmin(omegas)
+        if verbose:
+            print(omegas)
+            print('moving to FZ, index = %d' % index)
+        return np.dot(syms[index], g)
+
+
 class Lattice:
     '''
     The Lattice class to create one of the 14 Bravais lattices.
@@ -183,40 +289,6 @@ class Lattice:
     def matrix(self):
         '''Returns a copy of matrix representing the Lattice.'''
         return np.copy(self._matrix)
-
-    @staticmethod
-    def move_rotation_to_FZ(g, crystal_structure='cubic', verbose=False):
-        """
-        Compute the rotation matrix in the Fundamental Zone of a given crystal structure.
-        
-        :param g: a 3x3 matrix representing the rotation 
-        :param str crystal_structure: a string describing the crystal structure 
-        :param verbose: flag for verbose mode
-        :return: a new 3x3 matrix for the rotation in the fundamental zone.
-        """
-        omegas = []  # list to store all the rotation angles
-        syms = Lattice.symmetry(crystal_structure)
-        for sym in syms:
-            # apply the symmetry operator
-            om = np.dot(sym, g)
-            if verbose:
-                print(om)
-                print(om.trace())
-            # compute the Rodrigues vector of the corresponding orientation matrix
-            #from pymicro.crystal.microstructure import Orientation
-            #r = Orientation.OrientationMatrix2Rodrigues(om)
-            #print(r)
-            # and then the rotation angle
-            #omega = 2 * np.arctan(np.linalg.norm(r)) * 180 / np.pi
-            # todo: check if we can avoid computing the R vector
-            cw = 0.5 * (om.trace() - 1)
-            omega = np.arccos(cw)
-            omegas.append(omega)
-        index = np.argmin(omegas)
-        if verbose:
-            print(omegas)
-            print('moving to FZ, index = %d' % index)
-        return np.dot(syms[index], g)
 
     @staticmethod
     def symmetry(crystal_structure=Symmetry.cubic):

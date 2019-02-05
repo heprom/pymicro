@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from pymicro.crystal.lattice import Lattice, HklDirection, HklPlane, SlipSystem
+from pymicro.crystal.lattice import Lattice, HklDirection, HklPlane, Symmetry
 from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.laue import select_lambda, diffracted_vector, gnomonic_projection_point, gnomonic_projection, index
 from pymicro.xray.detectors import RegArrayDetector2d
@@ -150,7 +150,7 @@ class LaueTests(unittest.TestCase):
             hkl_planes.append(HklPlane(h, k, l, self.ni))
         solutions = index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=3.0)
         final_orientation = Orientation(solutions[0])
-        angle, ax1, ax2 = final_orientation.disorientation(orientation, crystal_structure='cubic')
+        angle, ax1, ax2 = final_orientation.disorientation(orientation, crystal_structure=Symmetry.cubic)
         self.assertLess(angle * 180 / np.pi, 1.0)
 
 

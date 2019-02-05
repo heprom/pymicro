@@ -2,7 +2,7 @@
 """
 import numpy as np
 from math import cos, sin, tan, atan2, pi
-from pymicro.crystal.lattice import HklPlane, Lattice, HklDirection, HklObject
+from pymicro.crystal.lattice import HklPlane, Symmetry, HklDirection, HklObject
 from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import lambda_nm_to_keV, lambda_keV_to_nm
 from pymicro.xray.dct import add_to_image
@@ -611,7 +611,7 @@ def poll_system(g_list, dis_tol=1.0, verbose=False):
     return final_orientation_matrix, result_vote, ci, vote_field
 
 
-def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crystal_structure='cubic', display=False):
+def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, symmetry=Symmetry.cubic, display=False):
     # angles between normal from the gnomonic projection
     angles_exp = np.zeros((len(hkl_normals), len(hkl_normals)), dtype=float)
     print('\nlist of angles between points on the detector')
@@ -658,7 +658,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crysta
                 hkl_planes[normal_indexed[i][pos[j][2]]], hkl_planes[normal_indexed[i][pos[j][3]]],
                 hkl_normals[normal_indexed[i][pos[j][0]]], hkl_normals[normal_indexed[i][pos[j][1]]])
         # move to the fundamental zone
-        om_fz = Lattice.move_rotation_to_FZ(orientation_matrix, crystal_structure=crystal_structure)  # we only add the third one
+        om_fz = symmetry.move_rotation_to_FZ(orientation_matrix)  # we only add the third one
         g_indexation.append(om_fz)
     final_orientation_matrix, vote, ci, vote_field = poll_system(g_indexation, dis_tol=tol_disorientation)
     if final_orientation_matrix == 0:

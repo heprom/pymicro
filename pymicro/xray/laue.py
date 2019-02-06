@@ -154,7 +154,7 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     return yz_data
 
 
-def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, verbose=False):
+def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, use_friedel_pair=True, verbose=False):
     """Compute the diffraction vector for a given reflection of a crystal.
 
     This method compute the diffraction vector.
@@ -164,6 +164,7 @@ def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, verbose=
     :param orientation: an instance of the `Orientation` class.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param float min_theta: the minimum considered Bragg angle (in radian).
+    :param bool use_friedel_pair: also consider the Friedel pairs of the lattice plane. 
     :param bool verbose: a flag to activate verbose mode.
     :return: the diffraction vector as a numpy array.
     """
@@ -171,7 +172,18 @@ def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, verbose=
     (h, k, l) = hkl.miller_indices()
     # this hkrrr(960, 768)l plane will select a particular lambda
     (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=verbose)
-    if abs(theta) < min_theta * pi / 180:  # skip angles < min_theta deg
+    if the_energy < 0:
+        if use_friedel_pair:
+            # use the Friedel pair of this lattice plane
+            hkl = hkl.friedel_pair()
+            (h, k, l) = hkl.miller_indices()
+            if verbose:
+                print('switched to friedel pair (%d,%d,%d)' % (h, k, l))
+            (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=verbose)
+        else:
+            return None
+    assert(theta >= 0)
+    if theta < min_theta * pi / 180:  # skip angles < min_theta deg
         return None
     lambda_nm = 1.2398 / the_energy
     X = np.array(Xu) / lambda_nm
@@ -223,8 +235,9 @@ def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
     return I
 
 
-def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1., 0., 0.]), spectrum=None, spectrum_thr=0.,
-                         r_spot=5, color_field='constant', inverted=False, show_direct_beam=False, verbose=False):
+def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1., 0., 0.]), use_friedel_pair=False,
+                         spectrum=None, spectrum_thr=0., r_spot=5, color_field='constant', inverted=False,
+                         show_direct_beam=False, verbose=False):
     """
     Compute a transmission Laue pattern. The data array of the given
     `Detector2d` instance is initialized with the result.
@@ -241,6 +254,7 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
     :param detector: An instance of the Detector2d class.
     :param list hkl_planes: A list of the lattice planes to include in the pattern.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
+    :param bool use_friedel_pair: also consider the Friedel pair of each lattice plane in the list as candidate for diffraction. 
     :param spectrum: A two columns array of the spectrum to use for the calculation.
     :param float spectrum_thr: The threshold to use to determine if a wave length is contributing or not.
     :param int r_spot: Size of the spots on the detector in pixel (5 by default)
@@ -257,7 +271,6 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
     direct_beam_lab = detector.project_along_direction(Xu)
     direct_beam_pix = detector.lab_to_pixel(direct_beam_lab)[0]
     if show_direct_beam:
-        #add_to_image(detector.data, max_val * 3 * spot, (detector.ucen, detector.vcen))
         add_to_image(detector.data, max_val * 3 * spot, (direct_beam_pix[0], direct_beam_pix[1]))
     if spectrum is not None:
         print('using spectrum')
@@ -271,14 +284,28 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
 
     for hkl in hkl_planes:
         (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=False)
+        if the_energy < 0:
+            if use_friedel_pair:
+                if verbose:
+                    print('switching to Friedel pair')
+                hkl = hkl.friedel_pair()
+                (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=False)
+            else:
+                continue
+        assert(the_energy >= 0)
         if spectrum is not None:
-            if abs(the_energy) < E_min or abs(the_energy) > E_max:
+            if the_energy < E_min or the_energy > E_max:
                 #print('skipping reflection {0:s} which would diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
                 continue
                 #print('including reflection {0:s} which will diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
-        K = diffracted_vector(hkl, orientation, Xu=Xu)
-        if K is None or np.dot([1., 0., 0.], K) == 0:
+        K = diffracted_vector(hkl, orientation, Xu=Xu, use_friedel_pair=False, verbose=verbose)
+        if K is None or np.dot(Xu, K) == 0:
             continue  # skip diffraction // to the detector
+        d = np.dot((detector.ref_pos - np.array([0., 0., 0.])), detector.w_dir) / np.dot(K, detector.w_dir)
+        if d < 0:
+            if verbose:
+                print('skipping diffraction not towards the detector')
+            continue
 
         R = detector.project_along_direction(K, origin=[0., 0., 0.])
         (u, v) = detector.lab_to_pixel(R)[0]

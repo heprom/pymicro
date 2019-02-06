@@ -38,3 +38,32 @@ class DetectorsTests(unittest.TestCase):
         self.assertEqual(int(v), 28)
         RR = self.detector.pixel_to_lab(u, v)
         self.assertListEqual(RR.tolist(), R.tolist())
+
+    def test_detector_tilt(self):
+        """Verify the tilted coordinate frame """
+        for tilt in [1, 5, 10, 15]:
+            # Detector tilt alpha/X ; beta/Y ; gamma/Z
+            alpha = np.radians(tilt)  # degree to rad, rotate around X axis
+            beta =  np.radians(tilt)  # degree to rad, rotate around Y axis
+            gamma = np.radians(tilt)  # degree to rad, rotate around Z axis
+
+
+            u1 = np.sin(gamma) * np.cos(beta)
+            u2 = - np.cos(gamma) * np.cos(alpha) + np.sin(gamma) * np.sin(beta) * np.sin(alpha)
+            u3 = - np.cos(gamma) * np.sin(alpha) - np.sin(gamma) * np.sin(beta) * np.cos(alpha)
+
+            v1 = - np.sin(beta)
+            v2 = np.cos(beta) * np.sin(alpha)
+            v3 = - np.cos(beta) * np.cos(alpha)
+
+            det_tilt = RegArrayDetector2d(size=(487, 619),
+                        u_dir=[u1, u2, u3], v_dir=[v1, v2, v3])
+
+            # compute w using trigonometry
+            w1 = np.cos(gamma) * np.cos(beta)
+            w2 = np.cos(gamma) * np.sin(beta) * np.sin(alpha) + np.sin(gamma) * np.cos(alpha)
+            w3 = np.sin(gamma) * np.sin(alpha) - np.cos(gamma) * np.sin(beta) * np.cos(alpha)
+
+            self.assertAlmostEqual(w1, det_tilt.w_dir[0], 7)
+            self.assertAlmostEqual(w2, det_tilt.w_dir[1], 7)
+            self.assertAlmostEqual(w3, det_tilt.w_dir[2], 7)

@@ -7,7 +7,7 @@ if __name__ == '__main__':
     '''
     A pole figure plotted using contours.
     '''
-    eulers = Orientation.read_euler_txt('../data/pp100', data_type='euler')
+    eulers = Orientation.read_orientations('../data/pp100', data_type='euler')
     micro = Microstructure(name='test')
     for i in range(100):
         micro.grains.append(Grain(i + 1, eulers[i + 1]))

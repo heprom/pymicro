@@ -2,7 +2,7 @@
 """
 import numpy as np
 from math import cos, sin, tan, atan2, pi
-from pymicro.crystal.lattice import HklPlane, Lattice, HklDirection, HklObject
+from pymicro.crystal.lattice import HklPlane, Symmetry, HklDirection, HklObject
 from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import lambda_nm_to_keV, lambda_keV_to_nm
 from pymicro.xray.dct import add_to_image
@@ -413,6 +413,7 @@ def gnomonic_projection(detector, pixel_size=None, OC=None, verbose=False):
         gnom.pixel_size = 1. / detector.pixel_size  # mm
     else:
         gnom.pixel_size = pixel_size  # mm
+    # TODO remove the next two lines
     gnom.ucen = detector.ucen
     gnom.vcen = detector.vcen
 
@@ -621,7 +622,7 @@ def poll_system(g_list, dis_tol=1.0, verbose=False):
     return final_orientation_matrix, result_vote, ci, vote_field
 
 
-def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crystal_structure='cubic', display=False):
+def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, symmetry=Symmetry.cubic, display=False):
     # angles between normal from the gnomonic projection
     angles_exp = np.zeros((len(hkl_normals), len(hkl_normals)), dtype=float)
     print('\nlist of angles between points on the detector')
@@ -668,7 +669,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, crysta
                 hkl_planes[normal_indexed[i][pos[j][2]]], hkl_planes[normal_indexed[i][pos[j][3]]],
                 hkl_normals[normal_indexed[i][pos[j][0]]], hkl_normals[normal_indexed[i][pos[j][1]]])
         # move to the fundamental zone
-        om_fz = Lattice.move_rotation_to_FZ(orientation_matrix, crystal_structure=crystal_structure)  # we only add the third one
+        om_fz = symmetry.move_rotation_to_FZ(orientation_matrix)  # we only add the third one
         g_indexation.append(om_fz)
     final_orientation_matrix, vote, ci, vote_field = poll_system(g_indexation, dis_tol=tol_disorientation)
     if final_orientation_matrix == 0:
@@ -736,16 +737,11 @@ def get_gnomonic_edges(detector, gnom, OC=None, num_points=21):
     # Get detector pixel edges
     uv_detector_edges = detector.get_edges(num_points=num_points, verbose=False)  # pixels
     # Compute edges position in the lab coordinates
-    detector_edges_mm = np.zeros((uv_detector_edges.shape[0], 3))
-    for i in range(detector_edges_mm.shape[0]):
-        detector_edges_mm[i, :] = detector.pixel_to_lab(uv_detector_edges[i, 0], uv_detector_edges[i, 1])
+    detector_edges_mm = detector.pixel_to_lab(uv_detector_edges[:, 0], uv_detector_edges[:, 1])
     # Apply the gnomonic projection  in the lab coordinates
     detector_edges_gp = gnomonic_projection_point(detector_edges_mm, OC=OC)  # mm
-    # Compute the gnomonic projected point on the detector coordinates
-    detector_edges_gp_px = np.zeros((detector_edges_gp.shape[0], 2))
-    for j in range(detector_edges_gp.shape[0]):
-        detector_edges_gp_px[j] = gnom.lab_to_pixel(detector_edges_gp[j, :])
-    return detector_edges_gp_px
+    # return the gnomonic projected point on the detector (pixel coordinates)
+    return gnom.lab_to_pixel(detector_edges_gp)
 
 def diffracting_normals_vector(gnom):
     uv_g = np.argwhere(gnom.data == 1)  # points on the gnomonic projection

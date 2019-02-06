@@ -2,7 +2,7 @@ import unittest
 import os
 import numpy as np
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
-from pymicro.crystal.lattice import Lattice, HklPlane, HklDirection, SlipSystem
+from pymicro.crystal.lattice import Symmetry, Lattice, HklPlane, HklDirection, SlipSystem
 from pymicro.xray.xray_utils import lambda_keV_to_nm
 
 
@@ -73,13 +73,13 @@ class OrientationTests(unittest.TestCase):
     def test_misorientation_angle(self):
         o1 = Orientation.from_euler((0., 0., 0.))
         o2 = Orientation.from_euler((60., 0., 0.))
-        self.assertAlmostEqual(180 / np.pi * o1.disorientation(o2, crystal_structure='none')[0], 60)
-        self.assertAlmostEqual(180 / np.pi * o1.disorientation(o2, crystal_structure='cubic')[0], 30)
+        self.assertAlmostEqual(180 / np.pi * o1.disorientation(o2, crystal_structure=Symmetry.triclinic)[0], 60)
+        self.assertAlmostEqual(180 / np.pi * o1.disorientation(o2, crystal_structure=Symmetry.cubic)[0], 30)
 
     def test_misorientation_axis(self):
         o1 = Orientation.copper()
         o2 = Orientation.s3()
-        (angle, axis, axis_xyz) = o1.disorientation(o2, crystal_structure='none')
+        (angle, axis, axis_xyz) = o1.disorientation(o2, crystal_structure=Symmetry.triclinic)
         self.assertAlmostEqual(180 / np.pi * angle, 19.38, 2)  # check value of 19.576
         val = np.array([-0.71518544, -0.60383062, -0.35199199])
         for i in range(3):
@@ -184,16 +184,16 @@ class OrientationTests(unittest.TestCase):
     def test_in_fundamental_zone(self):
         rod = [0.1449, -0.0281, 0.0616]
         o = Orientation.from_rodrigues(rod)
-        self.assertTrue(o.inFZ(symmetry='cubic'))
+        self.assertTrue(o.inFZ(symmetry=Symmetry.cubic))
         o = Orientation.from_euler([191.9, 69.9, 138.9])
-        self.assertFalse(o.inFZ(symmetry='cubic'))
+        self.assertFalse(o.inFZ(symmetry=Symmetry.cubic))
 
     def test_move_to_fundamental_zone(self):
         o = Orientation.from_euler([191.9, 69.9, 138.9])
         # move rotation to cubic FZ
-        o_fz = o.move_to_FZ(symmetry='cubic', verbose=False)
+        o_fz = o.move_to_FZ(symmetry=Symmetry.cubic, verbose=False)
         # double check new orientation in is the FZ
-        self.assertTrue(o_fz.inFZ(symmetry='cubic'))
+        self.assertTrue(o_fz.inFZ(symmetry=Symmetry.cubic))
         # verify new Euler angle values
         val = np.array([303.402, 44.955, 60.896])
         for i in range(3):
@@ -206,10 +206,10 @@ class OrientationTests(unittest.TestCase):
         o_12 = Orientation(np.array([[-0.03807341, -0.06932796, -0.99686712],
                                      [-0.0234124, -0.99725469, 0.07024911],
                                      [-0.99900064, 0.02601367, 0.03634576]]))
-        (angle, axis, axis_xyz) = o_ref.disorientation(o_12, crystal_structure='cubic')
+        (angle, axis, axis_xyz) = o_ref.disorientation(o_12, crystal_structure=Symmetry.cubic)
         self.assertAlmostEqual(angle * 180 / np.pi, 7.24, 2)
-        o_ref_fz = o_ref.move_to_FZ(symmetry='cubic', verbose=False)
-        o_12_fz = o_12.move_to_FZ(symmetry='cubic', verbose=False)
+        o_ref_fz = o_ref.move_to_FZ(symmetry=Symmetry.cubic, verbose=False)
+        o_12_fz = o_12.move_to_FZ(symmetry=Symmetry.cubic, verbose=False)
         delta = np.dot(o_ref_fz.orientation_matrix(), o_12_fz.orientation_matrix().T)
         mis_angle = Orientation.misorientation_angle_from_delta(delta)
         self.assertAlmostEqual(mis_angle * 180 / np.pi, 7.24, 2)

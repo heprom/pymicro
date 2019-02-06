@@ -23,7 +23,7 @@ class DetectorsTests(unittest.TestCase):
         (u, v) = self.detector.lab_to_pixel(R)[0]
         self.assertEqual(int(u), 112)
         self.assertEqual(int(v), 56)
-        RR = self.detector.pixel_to_lab(u, v)
+        RR = self.detector.pixel_to_lab(u, v)[0]
         self.assertListEqual(RR.tolist(), R.tolist())
         size_mm_1 = self.detector.get_size_mm()
 
@@ -36,7 +36,7 @@ class DetectorsTests(unittest.TestCase):
         (u, v) = self.detector.lab_to_pixel(R)[0]
         self.assertEqual(int(u), 56)
         self.assertEqual(int(v), 28)
-        RR = self.detector.pixel_to_lab(u, v)
+        RR = self.detector.pixel_to_lab(u, v)[0]
         self.assertListEqual(RR.tolist(), R.tolist())
 
     def test_detector_tilt(self):

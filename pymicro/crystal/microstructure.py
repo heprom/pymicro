@@ -17,6 +17,7 @@ import vtk
 import h5py
 from matplotlib import pyplot as plt, colors, cm
 from xml.dom.minidom import Document, parse
+from pymicro.crystal.lattice import Symmetry
 
 
 class Orientation:
@@ -96,7 +97,7 @@ class Orientation:
         corresponds to euler angle (45, 0, 0)."""
         return Orientation.from_euler((45., 0., 0.))
 
-    def get_ipf_colour(self, axis=np.array([0., 0., 1.])):
+    def get_ipf_colour(self, axis=np.array([0., 0., 1.]), symmetry=Symmetry.cubic):
         """Compute the IPF (inverse pole figure) colour for this orientation.
 
         Given a particular axis expressed in the laboratory coordinate system,
@@ -109,17 +110,10 @@ class Orientation:
           [x_c,y_c,z_c]=u.[0,0,1]+v.[0,1,1]+w.[1,1,1]
 
         and it is used to assign the RGB colour.
-
-        .. warning::
-
-           hard coded for the cubic crystal symmetry for now on, it should
-           be rather straightforward to generalize this to any symmetry
-           making use of the Lattice.symmetry() method.
         """
         axis /= np.linalg.norm(axis)
-        from pymicro.crystal.lattice import Lattice
         # find the axis lying in the fundamental zone
-        for sym in Lattice.symmetry(crystal_structure='cubic'):
+        for sym in symmetry.symmetry_operators():
             Osym = np.dot(sym, self.orientation_matrix())
             Vc = np.dot(Osym, axis)
             if Vc[2] < 0:
@@ -133,7 +127,7 @@ class Orientation:
                 break
         return uvw
 
-    def inFZ(self, symmetry='cubic'):
+    def inFZ(self, symmetry=Symmetry.cubic):
         """Check if the given Orientation lies within the fundamental zone.
         
         For a given crystal symmetry, several rotations can describe the same 
@@ -141,7 +135,7 @@ class Orientation:
         restrict the orientation space accordingly. 
         """
         r = self.rod
-        if symmetry == 'cubic':
+        if symmetry == Symmetry.cubic:
             inFZT23 = np.abs(r).sum() <= 1.0
             # in the cubic symmetry, each component must be < 2 ** 0.5 - 1
             inFZ = inFZT23 and np.abs(r).max() <= 2 ** 0.5 - 1
@@ -149,16 +143,15 @@ class Orientation:
             raise (ValueError('unsupported crystal symmetry: %s' % symmetry))
         return inFZ
 
-    def move_to_FZ(self, symmetry='cubic', verbose=False):
+    def move_to_FZ(self, symmetry=Symmetry.cubic, verbose=False):
         """
         Compute the equivalent crystal orientation in the Fundamental Zone of a given symmetry.
 
-        :param str symmetry: a string describing the crystal symmetry 
+        :param Symmetry symmetry: an instance of the `Symmetry` class 
         :param verbose: flag for verbose mode
         :return: a new Orientation instance which lies in the fundamental zone.
         """
-        from pymicro.crystal.lattice import Lattice
-        om = Lattice.move_rotation_to_FZ(self.orientation_matrix(), crystal_structure=symmetry, verbose=verbose)
+        om = symmetry.move_rotation_to_FZ(self.orientation_matrix(), verbose=verbose)
         return Orientation(om)
 
     @staticmethod
@@ -239,7 +232,7 @@ class Orientation:
         omega = np.arccos(cw)
         return omega
 
-    def disorientation(self, orientation, crystal_structure='cubic'):
+    def disorientation(self, orientation, crystal_structure=Symmetry.triclinic):
         """Compute the disorientation another crystal orientation.
 
         Considering all the possible crystal symmetries, the disorientation
@@ -248,12 +241,11 @@ class Orientation:
         can be used to bring the two lattices into coincidence.
 
         :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
-        :param str crystal_structure: a string describing the crystal structure, 'cubic' by default.
+        :param crystal_structure: an instance of the `Symmetry` class describing the crystal symmetry, triclinic (no symmetry) by default.
         :returns tuple: the misorientation angle in radians, the axis as a numpy vector (crystal coordinates), the axis as a numpy vector (sample coordinates).
         """
         the_angle = np.pi
-        from pymicro.crystal.lattice import Lattice
-        symmetries = Lattice.symmetry(crystal_structure)
+        symmetries = crystal_structure.symmetry_operators()
         (gA, gB) = (self.orientation_matrix(), orientation.orientation_matrix())  # nicknames
         for (g1, g2) in [(gA, gB), (gB, gA)]:
             for j in range(symmetries.shape[0]):

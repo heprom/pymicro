@@ -1117,7 +1117,7 @@ class HklPlane(HklObject):
                                                    crystal_structure=crystal_structure))
 
     @staticmethod
-    def get_family(hkl, lattice=None, include_friedel_pairs=False, crystal_structure='cubic'):
+    def get_family(hkl, lattice=None, include_friedel_pairs=False, crystal_structure=Symmetry.cubic):
         """Static method to obtain a list of the different crystallographic
         planes in a particular family.
 

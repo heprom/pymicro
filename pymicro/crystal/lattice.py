@@ -1107,7 +1107,7 @@ class HklPlane(HklObject):
             return self in hkl_planes or self.friedel_pair() in hkl_planes
 
     @staticmethod
-    def is_same_family(hkl1, hkl2, crystal_structure='cubic'):
+    def is_same_family(hkl1, hkl2, crystal_structure=Symmetry.cubic):
         """Static method to test if both lattice planes belongs to the same family.
         
         A family {hkl} is composed by all planes that are equivalent to (hkl) using the symmetry of the lattice. 
@@ -1117,7 +1117,7 @@ class HklPlane(HklObject):
                                                    crystal_structure=crystal_structure))
 
     @staticmethod
-    def get_family(hkl, lattice=None, include_friedel_pairs=False, crystal_structure='cubic'):
+    def get_family(hkl, lattice=None, include_friedel_pairs=False, crystal_structure=Symmetry.cubic):
         """Static method to obtain a list of the different crystallographic
         planes in a particular family.
 
@@ -1160,7 +1160,7 @@ class HklPlane(HklObject):
                 (h, k, l) = hkl.miller_indices()
                 if np.where(np.array([h, k, l]) < 0)[0].size > 0 and np.where(np.array([h, k, l]) <= 0)[0].size >= 2:
                     family[i] = hkl.friedel_pair()
-                    print('replacing plane (%d%d%d) by its pair: (%d%d%d)' % (h, k, l, -h, -k, -l))
+                    #print('replacing plane (%d%d%d) by its pair: (%d%d%d)' % (h, k, l, -h, -k, -l))
 
 
         '''

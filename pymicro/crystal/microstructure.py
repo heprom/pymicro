@@ -239,6 +239,11 @@ class Orientation:
         is defined as the combination of the minimum misorientation angle
         and the misorientation axis lying in the fundamental zone, which
         can be used to bring the two lattices into coincidence.
+        
+        .. note::
+        
+         Both orientations are supposed to have the same symmetry. This is not necessarily the case in multi-phase 
+         materials.
 
         :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
         :param crystal_structure: an instance of the `Symmetry` class describing the crystal symmetry, triclinic (no symmetry) by default.

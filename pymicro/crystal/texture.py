@@ -493,7 +493,7 @@ class PoleFigure:
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
         :param bool plot_symmetry: if True plot the lines representing the symmetry of the lattice.
         """
-        self.plot_pf_background(ax)
+        self.plot_pf_background(ax, labels=False)
         if plot_symmetry:
             self.plot_ipf_symmetry(ax)
         # now plot the sample axis

@@ -498,14 +498,14 @@ class PoleFigure:
             self.plot_ipf_symmetry(ax)
         # now plot the sample axis
         for grain in self.microstructure.grains:
-            B = grain.orientation_matrix()
+            g = grain.orientation_matrix()
             if self.axis == 'Z':
                 axis = self.z
             elif self.axis == 'Y':
                 axis = self.y
             else:
                 axis = self.x
-            axis_rot = B.dot(axis)
+            axis_rot = g.dot(axis)
             col = self.get_color_from_field(grain)
             self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
             if self.verbose:

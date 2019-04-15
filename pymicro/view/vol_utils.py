@@ -113,6 +113,29 @@ def auto_min_max(data, cut=0.0002, nb_bins=256, verbose=False):
     return val_mini, val_maxi
 
 
+def region_growing(data, seed, min_thr, max_thr, structure=None):
+    """Simple region growing segmentation algorithm.
+
+    This function segment a part of an image by selecting the connected region within a given gray value range.
+    Underneath, the method uses the label function of the ndimage package.
+
+    :param data: the numpy data array to segment.
+    :param tuple seed: the seed point.
+    :param float min_thr: the lower bound of the gray value range.
+    :param float max_thr: the upper bound of the gray value range.
+    :param structure: structuring element, to use (None by default).
+    :returns region: a bool data array with True values for the segmented region.
+    """
+    from scipy import ndimage
+    assert len(seed) == data.ndim
+    data[tuple(seed)] = min_thr
+    thr_img = (data < max_thr) & (data >= min_thr)
+    labels, nb_labels = ndimage.label(thr_img, structure=structure)
+    the_label = labels[tuple(seed)]
+    region = labels == the_label
+    return region
+
+
 def recad(data, mini, maxi):
     """Cast a numpy array into 8 bit data type.
 

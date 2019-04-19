@@ -1327,7 +1327,7 @@ def box_3d(size=(100, 100, 100), line_color=black):
     box.GetProperty().SetColor(line_color)
     return box
 
-def detector3d(detector, image_name, show_axes=False, see_reference=True):
+def detector_3d(detector, image_name, show_axes=False, see_reference=True):
     """
     Create a 3D detector on a 3D scene, using all tilts.
     See_reference allow to plot an empty detector with dashed edge without any tilts.
@@ -1361,9 +1361,10 @@ def detector3d(detector, image_name, show_axes=False, see_reference=True):
                   [-1, 0, 0],
                   [0, -1, 0]])
 
-
-    #apply_rotation_to_actor(plane_actor, np.dot(P, np.array([detector.u_dir, detector.v_dir, detector.w_dir])).T)
-    apply_rotation_to_actor(plane_actor, RotateZ(10))
+    XYZ2uvw = np.array([detector.u_dir, detector.v_dir, detector.w_dir])
+    print(XYZ2uvw)
+    apply_rotation_to_actor(plane_actor, np.dot(P, XYZ2uvw).T)
+    #plane_actor.RotateZ(-10)
     print(plane_actor.GetUserMatrix())
     assembly.AddPart(plane_actor)
 
@@ -1399,8 +1400,6 @@ def detector3d(detector, image_name, show_axes=False, see_reference=True):
         plane_actor_ref.GetProperty().SetLineStipplePattern(0xf0f0)
         assembly.AddPart(plane_actor_ref)
     apply_translation_to_actor(assembly, detector.ref_pos)
-    print('assembly')
-    print(assembly.GetUserMatrix())
     return assembly
 
 def build_line_mesh(points):

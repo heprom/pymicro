@@ -205,9 +205,17 @@ class RegArrayDetector2d(Detector2d):
         self.ref = np.ones(self.size, dtype=self.data_type)
         self.dark = np.zeros(self.size, dtype=self.data_type)
         self.bg = np.zeros(self.size, dtype=self.data_type)
-        #self.u_dir = np.array(u_dir)
-        #self.set_v_dir(v_dir)
-        self.u_dir = np.array([np.sin(delta) * np.sin(omega),
+        """
+        from pymicro.crystal.microstructure import Orientation
+        P = np.array([[0, 0, 1],
+                      [-1, 0, 0],
+                      [0, -1, 0]])
+        om = np.dot(Orientation.from_euler(tilts).orientation_matrix(), P).T
+        self.u_dir = om[0]
+        self.v_dir = om[1]
+        self.w_dir = om[2]
+        """
+        self.u_dir = np.array([np.cos(delta) * np.sin(omega),
                               -np.cos(kappa)*np.cos(omega) + np.sin(kappa)*np.sin(delta)*np.sin(omega),
                               -np.sin(kappa)*np.cos(omega) - np.cos(kappa)*np.sin(delta)*np.sin(omega)])
 

@@ -744,6 +744,12 @@ def get_gnomonic_edges(detector, gnom, OC=None, num_points=21):
     return gnom.lab_to_pixel(detector_edges_gp)
 
 def diffracting_normals_vector(gnom):
+    """
+    This function allows to get easily the diffracting normal vector from the gnomonic projection images.
+
+    :param RegArrayDetector2d gnom: A virtual detector with the gnomonic projection as its data.
+    :return: Normalized normal vector of diffracting plane
+    """
     uv_g = np.argwhere(gnom.data == 1)  # points on the gnomonic projection
     OP = [gnom.pixel_to_lab(uv_g[i, 0], uv_g[i, 1]).tolist() for i in range(len(uv_g))]
     hkl_normals = [(n / np.linalg.norm(n)).tolist() for n in OP]  # normalized list of vectors

@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt, cm
 from matplotlib.colors import colorConverter
 import matplotlib as mpl
+from pymicro.view.vtk_utils import *
 
 
 def hist(data, nb_bins=256, data_range=(0, 255), show=True, save=False, prefix='data', density=False):

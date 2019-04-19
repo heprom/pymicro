@@ -1,7 +1,7 @@
 """The texture module provide some utilities to generate, analyse and plot crystallographic textures.
 """
 import numpy as np
-from pymicro.crystal.lattice import Lattice, HklPlane, SlipSystem
+from pymicro.crystal.lattice import Symmetry, Lattice, HklPlane, SlipSystem
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from matplotlib import pyplot as plt, colors, cm
 
@@ -344,6 +344,38 @@ class PoleFigure:
         ax.axis('off')
         ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
+    def sst_symmetry(self, v):
+        """Transform a given vector according to the lattice symmetry associated with the pole figure.
+
+        This function transform a vector so that it lies in the smallest symmetry equivalent zone.
+
+        :param v: the vector to transform.
+        :return: the transformed vector.
+        """
+        # get the symmetry from the lattice associated with the pole figure
+        symmetry = self.lattice._symmetry
+        if symmetry is Symmetry.cubic:
+            return PoleFigure.sst_symmetry_cubic(v)
+        elif symmetry is Symmetry.hexagonal:
+            syms = symmetry.symmetry_operators()
+            for i in range(syms.shape[0]):
+                sym = syms[i]
+                v_sym = np.dot(sym, v)
+                # look at vectors pointing up
+                if v_sym[2] < 0:
+                    v_sym *= -1
+                # now evaluate if projection is in the sst
+                if v_sym[1] < 0 or v_sym[0] < 0:
+                    continue
+                elif v_sym[1] / v_sym[0] > np.tan(np.pi / 6):
+                    continue
+                else:
+                    break
+            return v_sym
+        else:
+            print('unsupported symmetry for the moment: %s' % symmetry)
+            return None
+
     @staticmethod
     def sst_symmetry_cubic(z_rot):
         '''Transform a given vector according to the cubic symmetry.
@@ -404,37 +436,45 @@ class PoleFigure:
             return np.array([0., 0., 0.])
 
     def plot_sst(self, ax=None, mk='s', ann=False):
-        ''' Create the inverse pole figure in the unit standard triangle.
+        """ Create the inverse pole figure in the unit standard triangle.
 
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
-        '''
-        from pymicro.crystal.lattice import HklDirection
-        c001 = HklDirection(0, 0, 1)
-        c101 = HklDirection(1, 0, 1)
-        c111 = HklDirection(1, 1, 1)
-        self.plot_line_between_crystal_dir(c001.direction(), c101.direction(), ax=ax)
-        self.plot_line_between_crystal_dir(c001.direction(), c111.direction(), ax=ax)
-        self.plot_line_between_crystal_dir(c101.direction(), c111.direction(), ax=ax)
-        # display the crystal axes
-        poles = [c001, c101, c111]
+        """
+        # first draw the boundary of the symmetry domain limited by 3 hkl plane normals, called here A, B and C
+        symmetry = self.lattice._symmetry
+        if symmetry is Symmetry.cubic:
+            sst_poles = [(0, 0, 1), (1, 0, 1), (1, 1, 1)]
+            ax.axis([-0.05, 0.45, -0.05, 0.40])
+        elif symmetry is Symmetry.hexagonal:
+            sst_poles = [(0, 0, 1), (2, -1, 0), (1, 0, 0)]
+            ax.axis([-0.05, 1.05, -0.05, 0.6])
+        else:
+            print('unssuported symmetry: %s' % symmetry)
+        A = HklPlane(*sst_poles[0], lattice=self.lattice)
+        B = HklPlane(*sst_poles[1], lattice=self.lattice)
+        C = HklPlane(*sst_poles[2], lattice=self.lattice)
+        self.plot_line_between_crystal_dir(A.normal(), B.normal(), ax=ax, col='k')
+        self.plot_line_between_crystal_dir(B.normal(), C.normal(), ax=ax, col='k')
+        self.plot_line_between_crystal_dir(C.normal(), A.normal(), ax=ax, col='k')
+        # display the 3 crystal axes
+        poles = [A, B, C]
         v_align = ['top', 'top', 'bottom']
         for i in range(3):
-            uvw = poles[i]
-            c_dir = uvw.direction()
-            print(c_dir.view())
+            hkl = poles[i]
+            c_dir = hkl.normal()
             c = c_dir + self.z
             c /= c[2]  # SP'/SP = r/z with r=1
-            print(c.view())
-            pole_str = '%d%d%d' % uvw.miller_indices()
+            pole_str = '%d%d%d' % hkl.miller_indices()
+            if symmetry is Symmetry.hexagonal:
+                pole_str = '%d%d%d%d' % HklPlane.three_to_four_indices(*hkl.miller_indices())
             ax.annotate(pole_str, (c[0], c[1] - (2 * (i < 2) - 1) * 0.01), xycoords='data',
                         fontsize=12, horizontalalignment='center', verticalalignment=v_align[i])
 
         # now plot the sample axis
         for grain in self.microstructure.grains:
             # move to the fundamental zone
-            #g = Lattice.move_rotation_to_FZ(grain.orientation_matrix())
             g = grain.orientation_matrix()
             # compute axis and apply SST symmetry
             if self.axis == 'Z':
@@ -443,7 +483,7 @@ class PoleFigure:
                 axis = self.y
             else:
                 axis = self.x
-            axis_rot = self.sst_symmetry_cubic(g.dot(axis))
+            axis_rot = self.sst_symmetry(g.dot(axis))
             label = ''
             if self.map_field == 'grain_id':
                 label = 'grain ' + str(grain.id)
@@ -451,42 +491,59 @@ class PoleFigure:
             if self.verbose:
                 print('plotting %s in crystal CS: %s' % (self.axis, axis_rot))
         ax.axis('off')
-        ax.axis([-0.05, 0.45, -0.05, 0.40])
         ax.set_title('%s-axis SST inverse %s projection' % (self.axis, self.proj))
 
-    def plot_ipf(self, ax=None, mk='s', ann=False):
-        ''' Create the inverse pole figure for direction Z.
+    def plot_ipf_symmetry(self, ax):
+        """ Plot the inverse pole figure elements of symmetry.
+        
+        This assume the symmetry from the `Lattice` associated with the first pole.
+        :param ax: a reference to a pyplot ax to draw the poles.
+        """
+        symmetry = self.lattice._symmetry
+        if symmetry is Symmetry.cubic:
+            for c in self.c111s:
+                for i in range(3):
+                    d = c.copy()
+                    d[i] = 0
+                    e = np.zeros_like(c)
+                    e[i] = c[i]
+                    self.plot_line_between_crystal_dir(c, d, ax=ax)
+                    self.plot_line_between_crystal_dir(c, e, ax=ax)
+            markers = ['s', 'o', '^']
+            for i, dirs in enumerate([self.c001s, self.c011s, self.c111s]):
+                [self.plot_crystal_dir(c, mk=markers[i], col='k', ax=ax, ann=False) for c in dirs]
+                # also plot the negative direction of those lying in the plane z==0
+                for c in dirs:
+                    if np.dot(c, self.z) == 0.0:
+                        self.plot_crystal_dir(-c, mk=markers[i], col='k', ax=ax, ann=False)
+        elif symmetry is Symmetry.hexagonal:
+            from math import sin, cos, pi
+            for angle in np.linspace(0, 2 * pi, 12, endpoint=False):
+                ax.plot([0, cos(angle)], [0, sin(angle)], color='k', markersize=self.mksize, linewidth=2)
+        else:
+            print('skipping unsupported symmetry for now')
+
+    def plot_ipf(self, ax=None, mk='s', ann=False, plot_symmetry=False):
+        """ Create the inverse pole figure for direction Z.
 
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
-        '''
-        self.plot_pf_background(ax)
-        for c in self.c111s:
-            for i in range(3):
-                d = c.copy()
-                d[i] = 0
-                e = np.zeros_like(c)
-                e[i] = c[i]
-                self.plot_line_between_crystal_dir(c, d, ax=ax)
-                self.plot_line_between_crystal_dir(c, e, ax=ax)
-        markers = ['s', 'o', '^']
-        for i, dirs in enumerate([self.c001s, self.c011s, self.c111s]):
-            [self.plot_crystal_dir(c, mk=markers[i], col='k', ax=ax, ann=False) for c in dirs]
-            # also plot the negative direction of those lying in the plane z==0
-            for c in dirs:
-                if np.dot(c, self.z) == 0.0:
-                    self.plot_crystal_dir(-c, mk=markers[i], col='k', ax=ax, ann=False)
+        :param bool plot_symmetry: if True plot the lines representing the symmetry of the lattice.
+        """
+        self.plot_pf_background(ax, labels=False)
+        if plot_symmetry:
+            self.plot_ipf_symmetry(ax)
         # now plot the sample axis
         for grain in self.microstructure.grains:
-            B = grain.orientation_matrix()
+            g = grain.orientation_matrix()
             if self.axis == 'Z':
                 axis = self.z
             elif self.axis == 'Y':
                 axis = self.y
             else:
                 axis = self.x
-            axis_rot = B.dot(axis)
+            axis_rot = g.dot(axis)
             col = self.get_color_from_field(grain)
             self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
             if self.verbose:

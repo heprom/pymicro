@@ -15,7 +15,10 @@ if __name__ == '__main__':
     data_dir = '../data'
     scan_name = 'steel_bin_431x431x246_uint8'
     scan_path = os.path.join(data_dir, scan_name)
-    volsize = np.array(HST_info(scan_path + '.raw.info'))
+    infos = HST_info(scan_path + '.raw.info')
+    volsize = np.array([infos['x_dim'], infos['y_dim'], infos['z_dim']])
+
+    print(volsize)
     grid = read_image_data(scan_path + '.raw', volsize, header_size=0, data_type='uint8')
 
     print('setting actors...')

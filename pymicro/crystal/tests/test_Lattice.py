@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+from math import pi, cos, sin, acos, atan
 from pymicro.crystal.lattice import Lattice, Symmetry, HklObject, HklDirection, HklPlane, SlipSystem
 
 
@@ -50,7 +51,7 @@ class LatticeTests(unittest.TestCase):
 
 class HklDirectionTests(unittest.TestCase):
     def setUp(self):
-        print 'testing the HklDirection class'
+        print('testing the HklDirection class')
 
     def test_angle_between_directions(self):
         d111 = HklDirection(1, 1, 1)
@@ -116,6 +117,7 @@ class HklDirectionTests(unittest.TestCase):
 class HklPlaneTests(unittest.TestCase):
     def setUp(self):
         print('testing the HklPlane class')
+        self.hex = Lattice.hexagonal(0.2931, 0.4694)  # nm
 
     def test_equality(self):
         p1 = HklPlane(1, 1, 1)
@@ -220,6 +222,26 @@ class HklPlaneTests(unittest.TestCase):
         Gc = hkl.scattering_vector()
         self.assertAlmostEqual(np.linalg.norm(Gc), 1 / hkl.interplanar_spacing())
 
+    def test_scattering_vector_th(self):
+        """ compute the scattering vector using the formal definition and compare it with the components obtained 
+        using the reciprocal lattice. 
+        The formulae are available in the Laue Atlas p61, one typo in Eq. 6.1 was corrected. """
+        (a, b, c) = self.hex._lengths
+        (alpha, beta, gamma) = np.radians(self.hex._angles)
+        delta = pi / 2 - gamma
+        chi = gamma - atan((cos(alpha) - cos(gamma) * cos(beta)) / (cos(beta) * cos(delta)))
+        epsilon = pi / 2 - acos((cos(alpha) + cos(beta)) / (cos(chi) + cos(gamma - chi)))
+        psi = acos(sin(epsilon) * cos(delta + chi))
+        for (hp, kp, lp) in [(1, 1, 1), [1, 2, 0]]:
+            # compute the h, k, l in the Cartesian coordinate system
+            h = hp / a
+            k = (a / hp - b / kp * cos(gamma)) / (a / hp * b / kp * cos(delta))
+            l = (lp / c - hp / a * cos(beta) - kp / b * cos(psi)) / cos(epsilon)
+            Gc = HklPlane(hp, kp, lp, self.hex).scattering_vector()
+            self.assertAlmostEqual(Gc[0], h, 7)
+            self.assertAlmostEqual(Gc[1], k, 7)
+            self.assertAlmostEqual(Gc[2], l, 7)
+
     def test_bragg_angle(self):
         l = Lattice.cubic(0.287)  # FCC iron
         hkl = HklPlane(2, 0, 0, l)  # 200 reflection at 8 keV is at 32.7 deg
@@ -228,7 +250,7 @@ class HklPlaneTests(unittest.TestCase):
 
 class SlipSystemTests(unittest.TestCase):
     def setUp(self):
-        print 'testing the SlipSystem class'
+        print('testing the SlipSystem class')
 
     def test_get_slip_system(self):
         ss = SlipSystem.get_slip_systems('111')

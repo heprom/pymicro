@@ -239,6 +239,11 @@ class Orientation:
         is defined as the combination of the minimum misorientation angle
         and the misorientation axis lying in the fundamental zone, which
         can be used to bring the two lattices into coincidence.
+        
+        .. note::
+        
+         Both orientations are supposed to have the same symmetry. This is not necessarily the case in multi-phase 
+         materials.
 
         :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
         :param crystal_structure: an instance of the `Symmetry` class describing the crystal symmetry, triclinic (no symmetry) by default.
@@ -1038,13 +1043,23 @@ class Grain:
         self.vtkmesh = mesh
 
     def add_vtk_mesh(self, array, contour=True, verbose=False):
+        """Add a mesh to this grain.
+
+        This method process a labeled array to extract the geometry of the grain. The grain shape is defined by 
+        the pixels with a value of the grain id. A vtkUniformGrid object is created and thresholded or contoured 
+        depending on the value of the flag `contour`. 
+        The resulting mesh is returned, centered on the center of mass of the grain.
+
+        :param ndarray array: a numpy array from which to extract the grain shape.
+        :param bool contour: a flag to use contour mode for the shape.
+        :param bool verbose: activate verbose mode.
+        """
         label = self.id  # we use the grain id here...
         # create vtk structure
         from scipy import ndimage
         from vtk.util import numpy_support
         grain_size = np.shape(array)
         array_bin = (array == label).astype(np.uint8)
-        if verbose: print np.unique(array_bin)
         local_com = ndimage.measurements.center_of_mass(array_bin, array)
         vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array_bin, order='F'), deep=1)
         grid = vtk.vtkUniformGrid()
@@ -1065,13 +1080,13 @@ class Grain:
                 contour.SetInput(grid)
             contour.SetValue(0, 0.5)
             contour.Update()
-            if verbose: print contour.GetOutput()
+            if verbose:
+                print(contour.GetOutput())
             self.SetVtkMesh(contour.GetOutput())
         else:
             grid.SetExtent(0, grain_size[0], 0, grain_size[1], 0, grain_size[2])
             grid.GetCellData().SetScalars(vtk_data_array)
             # threshold selected grain
-            if verbose: print 'thresholding label', label
             thresh = vtk.vtkThreshold()
             thresh.ThresholdBetween(0.5, 1.5)
             # thresh.ThresholdBetween(label-0.5, label+0.5)
@@ -1080,7 +1095,9 @@ class Grain:
             else:
                 thresh.SetInput(grid)
             thresh.Update()
-            if verbose: print thresh.GetOutput()
+            if verbose:
+                print('thresholding label: %d' % label)
+                print(thresh.GetOutput())
             self.SetVtkMesh(thresh.GetOutput())
 
     def to_xml(self, doc, file_name=None):
@@ -1381,6 +1398,56 @@ class Microstructure:
                 if grain_centroid:
                     g.position = centroids[i - offset]
                 micro.grains.append(g)
+        return micro
+
+    @staticmethod
+    def from_dct(data_root='.', vol_file='phase_01_vol.mat', grain_ids=None, verbose=True):
+        """Create a microstructure from a DCT reconstruction.
+
+        DCT reconstructions are stored in hdf5 matlab files. the reconstructed volume file (labeled image) is stored 
+        in the '5_reconstruction' folder and the individual grain files are stored in the '4_grains/phase_01' folder.
+        
+        :param str data_root: the path to the folder containing the data.
+        :param str vol_file: the name of the volume file.
+        :param list grain_ids: a list of grain ids to load into the `Microstructure` instance.
+        :param bool verbose: activate verbose mode.
+        :return: a `Microstructure` instance created from the DCT reconstruction.
+        """
+        from scipy import ndimage
+        micro = Microstructure()
+        micro.data_root = data_root
+        vol_file = os.path.join(data_root, '5_reconstruction', vol_file)
+        with h5py.File(vol_file, 'r') as f:
+            vol = f['vol'].value  # choose weather or not to load the volume into memory here
+            if verbose:
+                print('loaded volume with shape: %d x %d x %d' % (vol.shape[0], vol.shape[1], vol.shape[2]))
+        all_grain_ids = np.unique(vol)
+        if not grain_ids:
+            grain_ids = all_grain_ids
+        else:
+            # check that all requested grain ids are present
+            for label in [x for x in grain_ids if x not in all_grain_ids]:
+                print('warning, requested grain %d is not present in the data file' % label)
+        micro_mesh = vtk.vtkMultiBlockDataSet()
+        micro_mesh.SetNumberOfBlocks(len(grain_ids))
+        for i, label in enumerate(grain_ids):
+            if label <= 0:
+                continue
+            grain_path = os.path.join('4_grains', 'phase_01', 'grain_%04d.mat' % label)
+            grain_file = os.path.join(micro.data_root, grain_path)
+            grain_info = h5py.File(grain_file)
+            g = Grain(label, Orientation.from_rodrigues(grain_info['R_vector'].value))
+            g.position = grain_info['center'].value
+            grain_data = vol[ndimage.find_objects(vol == label)[0]]
+            g.volume = ndimage.measurements.sum(vol == label)
+            # create the vtk representation of the grain
+            g.add_vtk_mesh(grain_data, contour=False)
+            if verbose:
+                print('loading grain %d' % label)
+                print('adding block %d to mesh for grain %d' % (i, label))
+            micro_mesh.SetBlock(i, g.vtkmesh)
+            micro.grains.append(g)
+        micro.SetVtkMesh(micro_mesh)
         return micro
 
     def to_xml(self, doc):

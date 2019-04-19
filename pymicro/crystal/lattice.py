@@ -368,8 +368,8 @@ class Lattice:
 
     def guess_symmetry(self):
         """Guess the lattice symmetry from the geometry."""
-        (a, b, c) = self._lattice._lengths
-        (alpha, beta, gamma) = self._lattice._angles
+        (a, b, c) = self._lengths
+        (alpha, beta, gamma) = self._angles
         return Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
 
     @staticmethod
@@ -1107,7 +1107,7 @@ class HklPlane(HklObject):
             return self in hkl_planes or self.friedel_pair() in hkl_planes
 
     @staticmethod
-    def is_same_family(hkl1, hkl2, crystal_structure='cubic'):
+    def is_same_family(hkl1, hkl2, crystal_structure=Symmetry.cubic):
         """Static method to test if both lattice planes belongs to the same family.
         
         A family {hkl} is composed by all planes that are equivalent to (hkl) using the symmetry of the lattice. 
@@ -1135,17 +1135,20 @@ class HklPlane(HklObject):
           family is contstructed using the miller indices limited the number of minus signs. For instance  (1,0,0) 
           will be in the list and not (-1,0,0).
         """
-        if not len(hkl) == 3:
+        if len(hkl) == 4 and crystal_structure == Symmetry.hexagonal:
+            (h, k, l) = HklPlane.four_to_three_indices(int(hkl[0]), int(hkl[1]), int(hkl[2]), int(hkl[3]))
+        elif not len(hkl) == 3:
             raise ValueError('warning, family not supported: %s' % hkl)
-        hkl_list = list(hkl)
-        h = int(hkl[0])
-        k = int(hkl[1])
-        l = int(hkl[2])
+        else:
+            h = int(hkl[0])
+            k = int(hkl[1])
+            l = int(hkl[2])
+        print(h, k, l)
         family = []
         # construct lattice plane family from symmetry operators
         syms = Lattice.symmetry(crystal_structure)
         for sym in syms:
-            n_sym = np.dot(sym, np.array([h, k, l])).astype(np.int)
+            n_sym = np.dot(sym, np.array([h, k, l]))#.astype(np.int)
             hkl_sym = HklPlane(n_sym[0], n_sym[1], n_sym[2], lattice=lattice)
             if not hkl_sym.is_in_list(family, friedel_pair=True):  # not include_friedel_pairs):
                 family.append(hkl_sym)
@@ -1160,7 +1163,7 @@ class HklPlane(HklObject):
                 (h, k, l) = hkl.miller_indices()
                 if np.where(np.array([h, k, l]) < 0)[0].size > 0 and np.where(np.array([h, k, l]) <= 0)[0].size >= 2:
                     family[i] = hkl.friedel_pair()
-                    print('replacing plane (%d%d%d) by its pair: (%d%d%d)' % (h, k, l, -h, -k, -l))
+                    #print('replacing plane (%d%d%d) by its pair: (%d%d%d)' % (h, k, l, -h, -k, -l))
 
 
         '''

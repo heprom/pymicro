@@ -153,6 +153,14 @@ class HklPlaneTests(unittest.TestCase):
         self.assertEqual(len(HklPlane.get_family([-1, 0, 2], crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 8)
         self.assertEqual(len(HklPlane.get_family([0, 1, 2], crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 8)
         self.assertEqual(len(HklPlane.get_family([0, -1, 2], crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_family('001', crystal_structure=Symmetry.hexagonal)), 1)
+        self.assertEqual(len(HklPlane.get_family('001', crystal_structure=Symmetry.hexagonal, include_friedel_pairs=True)), 2)
+        self.assertEqual(len(HklPlane.get_family('100', crystal_structure=Symmetry.hexagonal)), 3)
+        self.assertEqual(len(HklPlane.get_family('100', crystal_structure=Symmetry.hexagonal, include_friedel_pairs=True)), 6)
+        self.assertEqual(len(HklPlane.get_family((1, 0, -1, 0), crystal_structure=Symmetry.hexagonal)), 3)
+        self.assertEqual(len(HklPlane.get_family((1, 0, -1, 0), crystal_structure=Symmetry.hexagonal, include_friedel_pairs=True)), 6)
+        self.assertEqual(len(HklPlane.get_family('102', crystal_structure=Symmetry.hexagonal)), 6)
+        self.assertEqual(len(HklPlane.get_family('102', crystal_structure=Symmetry.hexagonal, include_friedel_pairs=True)), 12)
 
     def test_multiplicity(self):
         """Int Tables of Crystallography Vol. 1 p 32."""

@@ -127,6 +127,29 @@ class Orientation:
                 break
         return uvw
 
+    def fzDihedral(rod, n):
+        """check if the given Rodrigues vector is in the fundamental zone.
+        
+        After book from Morawiecz.
+        """
+        # top and bottom face at +/-tan(pi/2n)
+        t = np.tan(np.pi / (2 * n))
+        if abs(rod[2]) > t:
+            return False
+
+        # 2n faces distance 1 from origin
+        # y <= ((2+sqrt(2))*t - (1+sqrt(2))) * x + (1+sqrt(2))*(1-t)
+        y, x = sorted([abs(ro[0]), abs(ro[1])])
+        if x > 1:
+            return False
+
+        return {
+            2: True,
+            3: y / (1 + math.sqrt(2)) + (1 - math.sqrt(2 / 3)) * x < 1 - 1 / math.sqrt(3),
+            4: y + x < math.sqrt(2),
+            6: y / (1 + math.sqrt(2)) + (1 - 2 * math.sqrt(2) + math.sqrt(6)) * x < math.sqrt(3) - 1
+        }[n]
+
     def inFZ(self, symmetry=Symmetry.cubic):
         """Check if the given Orientation lies within the fundamental zone.
         
@@ -1418,7 +1441,8 @@ class Microstructure:
         micro.data_root = data_root
         vol_file = os.path.join(data_root, '5_reconstruction', vol_file)
         with h5py.File(vol_file, 'r') as f:
-            vol = f['vol'].value  # choose weather or not to load the volume into memory here
+            # choose weather or not to load the volume into memory here
+            vol = f['vol'].value.transpose(2, 1, 0)  # Because how matlab writes the data, we need to swap X and Z axes in the DCT volume
             if verbose:
                 print('loaded volume with shape: %d x %d x %d' % (vol.shape[0], vol.shape[1], vol.shape[2]))
         all_grain_ids = np.unique(vol)
@@ -1476,7 +1500,7 @@ class Microstructure:
         doc = Document()
         self.to_xml(doc)
         xml_file_name = '%s.xml' % self.name
-        print 'writting ' + xml_file_name
+        print('writing ' + xml_file_name)
         f = open(xml_file_name, 'wb')
         doc.writexml(f, encoding='utf-8')
         f.close()
@@ -1484,7 +1508,7 @@ class Microstructure:
         if self.vtkmesh != None:
             import vtk
             vtk_file_name = '%s.vtm' % self.name
-            print 'writting ' + vtk_file_name
+            print('writing ' + vtk_file_name)
             writer = vtk.vtkXMLMultiBlockDataWriter()
             writer.SetFileName(vtk_file_name)
             if vtk.vtkVersion().GetVTKMajorVersion() > 5:

@@ -113,6 +113,7 @@ class Symmetry(enum.Enum):
             sym[22] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
             sym[23] = np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]])
         elif self is Symmetry.hexagonal:
+            '''
             sym = np.zeros((12, 3, 3), dtype=np.float)
             s60 = np.sin(60 * np.pi / 180)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
@@ -127,6 +128,21 @@ class Symmetry(enum.Enum):
             sym[9] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
             sym[10] = np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]])
             sym[11] = np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]])
+            '''
+            # using the Miller-Bravais representation here
+            sym = np.zeros((12, 4, 4), dtype=np.int)
+            sym[0] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+            sym[1] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
+            sym[2] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+            sym[3] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, -1]])
+            sym[4] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, -1]])
+            sym[5] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, -1]])
+            sym[6] = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+            sym[7] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
+            sym[8] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
+            sym[9] = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, -1]])
+            sym[10] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, -1]])
+            sym[11] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, -1]])
         elif self is Symmetry.orthorhombic:
             sym = np.zeros((4, 3, 3), dtype=np.float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
@@ -302,6 +318,8 @@ class Lattice:
         :returns array: A numpy array of shape (n, 3, 3) where n is the \
         number of symmetries of the given crystal structure.
         """
+        return crystal_structure.symmetry_operators()
+        '''
         if crystal_structure == Symmetry.cubic:
             sym = np.zeros((24, 3, 3), dtype=np.float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
@@ -365,6 +383,7 @@ class Lattice:
         else:
             raise ValueError('warning, crystal structure not supported: %s' % crystal_structure)
         return sym
+        '''
 
     def guess_symmetry(self):
         """Guess the lattice symmetry from the geometry."""
@@ -1121,7 +1140,7 @@ class HklPlane(HklObject):
         """Static method to obtain a list of the different crystallographic
         planes in a particular family.
 
-        :param str hkl: a string of 3 numbers corresponding to the miller indices.
+        :param str hkl: a sequence of 3 (4 for hexagonal) numbers corresponding to the miller indices.
         :param Lattice lattice: The reference crystal lattice (default None).
         :param bool include_friedel_pairs: Flag to include the Friedel pairs in the list (False by default).
         :param str crystal_structure: A string descibing the crystal structure (cubic by default). 
@@ -1135,26 +1154,36 @@ class HklPlane(HklObject):
           family is contstructed using the miller indices limited the number of minus signs. For instance  (1,0,0) 
           will be in the list and not (-1,0,0).
         """
-        if len(hkl) == 4 and crystal_structure == Symmetry.hexagonal:
-            (h, k, l) = HklPlane.four_to_three_indices(int(hkl[0]), int(hkl[1]), int(hkl[2]), int(hkl[3]))
-        elif not len(hkl) == 3:
+        if not (len(hkl) == 3 or (len(hkl) == 4 and crystal_structure == Symmetry.hexagonal)):
             raise ValueError('warning, family not supported: %s' % hkl)
-        else:
+        # handle hexagonal case
+        if len(hkl) == 4:
+            h = int(hkl[0])
+            k = int(hkl[1])
+            i = int(hkl[2])
+            l = int(hkl[3])
+            (h, k, l) = HklPlane.four_to_three_indices(h, k, i, l)
+        else:  # 3 indices
             h = int(hkl[0])
             k = int(hkl[1])
             l = int(hkl[2])
-        print(h, k, l)
+            if crystal_structure == Symmetry.hexagonal:
+                i = -(h + k)
         family = []
-        # construct lattice plane family from symmetry operators
+        # construct lattice plane family from the symmetry operators
         syms = Lattice.symmetry(crystal_structure)
         for sym in syms:
-            n_sym = np.dot(sym, np.array([h, k, l]))#.astype(np.int)
-            hkl_sym = HklPlane(n_sym[0], n_sym[1], n_sym[2], lattice=lattice)
-            if not hkl_sym.is_in_list(family, friedel_pair=True):  # not include_friedel_pairs):
+            if crystal_structure == Symmetry.hexagonal:
+                n_sym = np.dot(sym, np.array([h, k, i, l]))
+                n_sym = HklPlane.four_to_three_indices(*n_sym)
+            else:  # 3 indices
+                n_sym = np.dot(sym, np.array([h, k, l]))
+            hkl_sym = HklPlane(*n_sym, lattice=lattice)
+            if not hkl_sym.is_in_list(family, friedel_pair=True):
                 family.append(hkl_sym)
             if include_friedel_pairs:
                 hkl_sym = HklPlane(-n_sym[0], -n_sym[1], -n_sym[2], lattice=lattice)
-                if not hkl_sym.is_in_list(family, friedel_pair=False):  # not include_friedel_pairs):
+                if not hkl_sym.is_in_list(family, friedel_pair=False):
                     family.append(hkl_sym)
         if not include_friedel_pairs:
             # for each hkl plane chose between (h, k, l) and (-h, -k, -l) to have the less minus signs

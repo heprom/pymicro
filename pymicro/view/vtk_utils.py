@@ -1327,6 +1327,81 @@ def box_3d(size=(100, 100, 100), line_color=black):
     box.GetProperty().SetColor(line_color)
     return box
 
+def detector_3d(detector, image_name, show_axes=False, see_reference=True):
+    """
+    Create a 3D detector on a 3D scene, using all tilts.
+    See_reference allow to plot an empty detector with dashed edge without any tilts.
+
+    :param detector: RegArrayDetector2d
+    :param image_name: str of the image to plot in the 3D detector 'image.png'
+    :return: vtk actor
+    """
+    from pymicro.xray.detectors import RegArrayDetector2d
+    assembly = vtk.vtkAssembly()
+    detector_3d = vtk.vtkPlaneSource()
+    detector_3d.SetOrigin(0., detector.get_size_mm()[0] / 2, -detector.get_size_mm()[1] / 2)
+    detector_3d.SetPoint1(0., -detector.get_size_mm()[0] / 2, -detector.get_size_mm()[1] / 2)
+    detector_3d.SetPoint2(0., detector.get_size_mm()[0] / 2, detector.get_size_mm()[1] / 2)
+
+    planeMapper = vtk.vtkPolyDataMapper()
+    planeMapper.SetInputConnection(detector_3d.GetOutputPort())
+
+    plane_actor = vtk.vtkActor()
+    plane_actor.SetMapper(planeMapper)
+
+    # object to plot in the detector
+    reader = vtk.vtkPNGReader()
+    reader.SetFileName(image_name)
+
+    texture = vtk.vtkTexture()
+    texture.SetInputConnection(reader.GetOutputPort())
+    plane_actor.SetTexture(texture)
+    # rotate the detector according to the tilts angles
+    P = np.array([[0, 0, 1],
+                  [-1, 0, 0],
+                  [0, -1, 0]])
+
+    XYZ2uvw = np.array([detector.u_dir, detector.v_dir, detector.w_dir])
+    print(XYZ2uvw)
+    apply_rotation_to_actor(plane_actor, np.dot(P, XYZ2uvw).T)
+    #plane_actor.RotateZ(-10)
+    print(plane_actor.GetUserMatrix())
+    assembly.AddPart(plane_actor)
+
+    if show_axes:
+        # add detector axes actor
+        axes_detector = axes_actor(15, axisLabels=('u', 'v', 'w'), fontSize=20, color=(0.619, 0.156, 0.886))
+        apply_rotation_to_actor(axes_detector, np.array([detector.u_dir, detector.v_dir, detector.w_dir]).T)
+        apply_translation_to_actor(axes_detector, detector.pixel_to_lab(0, 0)[0] - detector.ref_pos)
+        assembly.AddPart(axes_detector)
+
+    if see_reference:
+        assembly.AddPart(plane_actor)
+        det_ref = RegArrayDetector2d(size=(detector.size[0], detector.size[1]), tilts=(0., 0., 0.))
+        det_ref.pixel_size = detector.pixel_size
+        det_ref.ref_pos = detector.ref_pos
+
+        detector_3d_ref = vtk.vtkPlaneSource()
+        detector_3d_ref.SetOrigin(0., det_ref.get_size_mm()[0] / 2, -det_ref.get_size_mm()[1] / 2)
+        detector_3d_ref.SetPoint1(0., -det_ref.get_size_mm()[0] / 2, -det_ref.get_size_mm()[1] / 2)
+        detector_3d_ref.SetPoint2(0., det_ref.get_size_mm()[0] / 2, det_ref.get_size_mm()[1] / 2)
+
+        extract = vtk.vtkFeatureEdges()
+        extract.SetInputConnection(detector_3d_ref.GetOutputPort())
+
+        planeMapperRef = vtk.vtkPolyDataMapper()
+        planeMapperRef.SetInputConnection(extract.GetOutputPort())
+        planeMapperRef.SetScalarVisibility(0)
+
+        plane_actor_ref = vtk.vtkActor()
+        plane_actor_ref.SetMapper(planeMapperRef)
+        plane_actor_ref.GetProperty().SetColor(0, 0, 0)
+        plane_actor_ref.GetProperty().SetLineWidth(1.0)
+        plane_actor_ref.GetProperty().SetLineStipplePattern(0xf0f0)
+        assembly.AddPart(plane_actor_ref)
+    apply_translation_to_actor(assembly, detector.ref_pos)
+    return assembly
+
 def build_line_mesh(points):
     '''Function to construct a vtkUnstructuredGrid representing a line mesh.
     

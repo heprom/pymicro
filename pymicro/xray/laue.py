@@ -37,7 +37,7 @@ def select_lambda(hkl, orientation, Xu=(1., 0., 0.), verbose=False):
     return the_energy, theta
 
 
-def build_list(lattice=None, max_miller=3, extinction=None):
+def build_list(lattice=None, max_miller=3, extinction=None, Laue_extinction=False, max_keV=120.):
     hklplanes = []
     indices = range(-max_miller, max_miller + 1)
     for h in indices:
@@ -55,6 +55,16 @@ def build_list(lattice=None, max_miller=3, extinction=None):
                     # take plane only if the sum indices is even
                     if ((h**2 + k**2 + l**2) % 2 == 0):
                         hklplanes.append(HklPlane(h, k, l, lattice))
+    if Laue_extinction is True:
+        lam_min = lambda_keV_to_nm(max_keV)
+        val = 2. * lattice._lengths[0] / lam_min # lattice have to be cubic !
+        print 'Limit value is %d' % val
+        for hkl in hklplanes:
+            (h, k, l) = hkl.miller_indices()
+            test = h ** 2 + k ** 2 + l ** 2
+            if val < test: # TODO check the test
+                hklplanes.remove(HklPlane(h, k, l, lattice))
+
     return hklplanes
 
 
@@ -109,14 +119,14 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     #a = abs(0.5 * np.linalg.norm(ON) * np.tan(2 * psi))
     b = a * np.sqrt(1 - e ** 2)
     if verbose:
-        print('angle nu (deg) is %.1f' % (nu * 180 / pi))
-        print('angle psi (deg) is %.1f' % (psi * 180 / pi))
-        print('angle eta (deg) is %.1f' % (eta * 180 / pi))
+        print('angle nu (deg) is %.3f' % (nu * 180 / pi))
+        print('angle psi (deg) is %.3f' % (psi * 180 / pi))
+        print('angle eta (deg) is %.3f' % (eta * 180 / pi))
         print('direct beam crosses the det plane at %s' % OC)
         print('zone axis crosses the det plane at %s' % OA)
         print('zone axis crosses the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (OA[1], OA[2], uc, vc))
         print('ellipse eccentricity is %f' % e)
-        print('ellipsis major and minor half axes are a=%.1f and b=%.1f' % (a, b))
+        print('ellipsis major and minor half axes are a=%.3f and b=%.3f' % (a, b))
     # use a parametric curve to plot the ellipsis
     t = np.linspace(0., 2 * pi, n)
     x = a * np.cos(t)
@@ -160,7 +170,7 @@ def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, use_frie
     """
     gt = orientation.orientation_matrix().transpose()
     (h, k, l) = hkl.miller_indices()
-    # this hkl plane will select a particular lambda
+    # this hkrrr(960, 768)l plane will select a particular lambda
     (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=verbose)
     if the_energy < 0:
         if use_friedel_pair:
@@ -258,9 +268,10 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
     # create a small square image for one spot
     spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=np.uint8)
     max_val = np.iinfo(np.uint8).max  # 255 here
+    direct_beam_lab = detector.project_along_direction(Xu)
+    direct_beam_pix = detector.lab_to_pixel(direct_beam_lab)[0]
     if show_direct_beam:
-        add_to_image(detector.data, max_val * 3 * spot, (detector.ucen, detector.vcen))
-
+        add_to_image(detector.data, max_val * 3 * spot, (direct_beam_pix[0], direct_beam_pix[1]))
     if spectrum is not None:
         print('using spectrum')
         #indices = np.argwhere(spectrum[:, 1] > spectrum_thr)
@@ -733,9 +744,17 @@ def get_gnomonic_edges(detector, gnom, OC=None, num_points=21):
     return gnom.lab_to_pixel(detector_edges_gp)
 
 def diffracting_normals_vector(gnom):
+    """
+    This function allows to get easily the diffracting normal vector from the gnomonic projection images.
+
+    :param RegArrayDetector2d gnom: A virtual detector with the gnomonic projection as its data.
+    :return: Normalized normal vector of diffracting plane
+    """
     uv_g = np.argwhere(gnom.data == 1)  # points on the gnomonic projection
     OP = [gnom.pixel_to_lab(uv_g[i, 0], uv_g[i, 1]).tolist() for i in range(len(uv_g))]
     hkl_normals = [(n / np.linalg.norm(n)).tolist() for n in OP]  # normalized list of vectors
     print('%d normals found in the gnomonic projection' % len(hkl_normals))
 
     return hkl_normals
+
+

@@ -189,27 +189,56 @@ class Detector2d:
 class RegArrayDetector2d(Detector2d):
     '''Generic class to handle a flat detector with a regular grid of pixels.
 
-    The two dimensions of the pixel grid are reffered by u and v. Usually u is the horizontal direction and v the
+    The two dimensions of the pixel grid are refered by u and v. Usually u is the horizontal direction and v the
     vertical one, but both can be controlled by the u_dir and v_dir attributes. This allows to control the detector
     flips and tilts.
+
+    Tilts details:
+    - kappa rotate around X
+    - delta rotate around Y
+    - omega rotate around Z
     '''
 
-    def __init__(self, size=(2048, 2048), data_type=np.uint16, u_dir=[0, -1, 0], v_dir=[0, 0, -1]):
+    def __init__(self, size=(2048, 2048), data_type=np.uint16, tilts=(0., 0., 0.)):
         Detector2d.__init__(self, size=size, data_type=data_type)
+        kappa, delta, omega = np.radians(tilts[0]), np.radians(tilts[1]), np.radians(tilts[2])
         self.ref = np.ones(self.size, dtype=self.data_type)
         self.dark = np.zeros(self.size, dtype=self.data_type)
         self.bg = np.zeros(self.size, dtype=self.data_type)
-        self.u_dir = np.array(u_dir)
-        self.set_v_dir(v_dir)
+        """
+        from pymicro.crystal.microstructure import Orientation
+        P = np.array([[0, 0, 1],
+                      [-1, 0, 0],
+                      [0, -1, 0]])
+        om = np.dot(Orientation.from_euler(tilts).orientation_matrix(), P).T
+        self.u_dir = om[0]
+        self.v_dir = om[1]
+        self.w_dir = om[2]
+        """
+        self.u_dir = np.array([np.cos(delta) * np.sin(omega),
+                              -np.cos(kappa)*np.cos(omega) + np.sin(kappa)*np.sin(delta)*np.sin(omega),
+                              -np.sin(kappa)*np.cos(omega) - np.cos(kappa)*np.sin(delta)*np.sin(omega)])
 
-    def set_u_dir(self, u_dir):
-        '''Set the coordinates of the vector describing the first (horizontal) direction of the pixels.'''
-        self.u_dir = np.array(u_dir)
+        self.v_dir = np.array([-np.sin(delta),
+                                np.sin(kappa)*np.cos(delta),
+                               -np.cos(kappa)*np.cos(delta)])
+
         self.w_dir = np.cross(self.u_dir, self.v_dir)
 
-    def set_v_dir(self, v_dir):
+    def set_u_dir(self, tilts):
+        '''Set the coordinates of the vector describing the first (horizontal) direction of the pixels.'''
+        (kappa, delta, omega) = (np.radians(tilts[0]), np.radians(tilts[1]), np.radians(tilts[2]))
+        self.u_dir = np.array([np.sin(delta)* np.sin(omega),
+                           -np.cos(kappa)*np.cos(omega) + np.sin(kappa)*np.sin(delta)*np.sin(omega),
+                           -np.sin(kappa)*np.cos(omega) - np.cos(kappa)*np.sin(delta)*np.sin(omega)])
+        self.w_dir = np.cross(self.u_dir, self.v_dir)
+
+    def set_v_dir(self, tilts):
         '''Set the coordinates of the vector describing the second (vertical) direction of the pixels.'''
-        self.v_dir = np.array(v_dir)
+        (kappa, delta, omega) = (np.radians(tilts[0]), np.radians(tilts[1]), np.radians(tilts[2]))
+        self.v_dir = np.array([-np.sin(delta),
+                           np.sin(kappa)*np.cos(delta),
+                           -np.cos(kappa)*np.cos(delta)])
         self.w_dir = np.cross(self.u_dir, self.v_dir)
 
     def get_size_mm(self):
@@ -697,3 +726,5 @@ class Xpad(Detector2d):
         self.two_thetas = twoThArray
         self.psis = psiArray
         return twoThArray, psiArray
+
+

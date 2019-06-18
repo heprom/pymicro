@@ -65,7 +65,7 @@ class LaueTests(unittest.TestCase):
         orientation = Orientation.cube()
         p1 = HklPlane(2, 0, -3, olivine)
         p2 = HklPlane(3, -1, -3, olivine)
-        detector = RegArrayDetector2d(size=(512, 512), u_dir=[0, -1, 0], v_dir=[0, 0, -1])
+        detector = RegArrayDetector2d(size=(512, 512))
         detector.pixel_size = 0.200  # mm, 0.1 mm with factor 2 binning
         detector.ucen = 235
         detector.vcen = 297
@@ -100,7 +100,7 @@ class LaueTests(unittest.TestCase):
         Xu = np.array([np.cos(ksi * np.pi / 180), 0., np.sin(ksi * np.pi / 180)])
 
         # create our detector
-        detector = RegArrayDetector2d(size=(919, 728), u_dir=[0, -1, 0], v_dir=[0, 0, -1])
+        detector = RegArrayDetector2d(size=(919, 728))
         detector.pixel_size = 0.254  # mm binning 2x2
         detector.ucen = 445
         detector.vcen = 380

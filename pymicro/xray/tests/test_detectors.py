@@ -6,7 +6,7 @@ class DetectorsTests(unittest.TestCase):
 
     def setUp(self):
         """testing the detectors module:"""
-        self.detector = RegArrayDetector2d(size=(1024, 512), u_dir=[0, -1, 0], v_dir=[0, 0, -1])
+        self.detector = RegArrayDetector2d(size=(1024, 512))
         self.detector.pixel_size = 0.1  # mm
         self.detector.ref_pos = np.array([100., 0., 0.])  # position in the laboratory frame of the middle of the detector
 
@@ -40,30 +40,42 @@ class DetectorsTests(unittest.TestCase):
         self.assertListEqual(RR.tolist(), R.tolist())
 
     def test_detector_tilt(self):
-        """Verify the tilted coordinate frame """
-        for tilt in [1, 5, 10, 15]:
-            # Detector tilt alpha/X ; beta/Y ; gamma/Z
-            alpha = np.radians(tilt)  # degree to rad, rotate around X axis
-            beta =  np.radians(tilt)  # degree to rad, rotate around Y axis
-            gamma = np.radians(tilt)  # degree to rad, rotate around Z axis
-
-
-            u1 = np.sin(gamma) * np.cos(beta)
-            u2 = - np.cos(gamma) * np.cos(alpha) + np.sin(gamma) * np.sin(beta) * np.sin(alpha)
-            u3 = - np.cos(gamma) * np.sin(alpha) - np.sin(gamma) * np.sin(beta) * np.cos(alpha)
-
-            v1 = - np.sin(beta)
-            v2 = np.cos(beta) * np.sin(alpha)
-            v3 = - np.cos(beta) * np.cos(alpha)
-
-            det_tilt = RegArrayDetector2d(size=(487, 619),
-                        u_dir=[u1, u2, u3], v_dir=[v1, v2, v3])
-
-            # compute w using trigonometry
-            w1 = np.cos(gamma) * np.cos(beta)
-            w2 = np.cos(gamma) * np.sin(beta) * np.sin(alpha) + np.sin(gamma) * np.cos(alpha)
-            w3 = np.sin(gamma) * np.sin(alpha) - np.cos(gamma) * np.sin(beta) * np.cos(alpha)
-
+        """Verify the tilted coordinate frame calculation.
+        
+        The local frame is calculated by composing 3 rotations and the definition of the detector-to-pixel conversion.
+        We have verified that:
+        u[0] == np.cos(delta) * np.sin(omega)
+        u[1] == -np.cos(kappa) * np.cos(omega) + np.sin(kappa) * np.sin(delta) * np.sin(omega)
+        u[2] == -np.sin(kappa) * np.cos(omega) - np.cos(kappa) * np.sin(delta) * np.sin(omega)
+        v[0] == -np.sin(delta)
+        v[1] == np.sin(kappa) * np.cos(delta)
+        v[2] == -np.cos(kappa) * np.cos(delta)
+        w[0] == np.cos(omega) * np.cos(delta)
+        w[1] == np.cos(omega) * np.sin(delta) * np.sin(kappa) + np.sin(omega) * np.cos(kappa)
+        w[2] == np.sin(omega) * np.sin(kappa) - np.cos(omega) * np.sin(delta) * np.cos(kappa)
+        
+        so the test chack that the matrix composition gives the final result.
+        """
+        for tilt in [1, 5, 10, 15]:  # degrees
+            # Detector tilt kappa/X ; delta/Y ; omega/Z
+            det_tilt = RegArrayDetector2d(size=(487, 619), tilts=(tilt, tilt, tilt))
+            kappa, delta, omega = np.radians([tilt, tilt, tilt])
+            # compute u, v, w using trigonometry
+            u1 = np.cos(delta) * np.sin(omega)
+            u2 = -np.cos(kappa) * np.cos(omega) + np.sin(kappa) * np.sin(delta) * np.sin(omega)
+            u3 = -np.sin(kappa) * np.cos(omega) - np.cos(kappa) * np.sin(delta) * np.sin(omega)
+            v1 = -np.sin(delta)
+            v2 = np.sin(kappa) * np.cos(delta)
+            v3 = -np.cos(kappa) * np.cos(delta)
+            w1 = np.cos(omega) * np.cos(delta)
+            w2 = np.cos(omega) * np.sin(delta) * np.sin(kappa) + np.sin(omega) * np.cos(kappa)
+            w3 = np.sin(omega) * np.sin(kappa) - np.cos(omega) * np.sin(delta) * np.cos(kappa)
+            self.assertAlmostEqual(u1, det_tilt.u_dir[0], 7)
+            self.assertAlmostEqual(u2, det_tilt.u_dir[1], 7)
+            self.assertAlmostEqual(u3, det_tilt.u_dir[2], 7)
+            self.assertAlmostEqual(v1, det_tilt.v_dir[0], 7)
+            self.assertAlmostEqual(v2, det_tilt.v_dir[1], 7)
+            self.assertAlmostEqual(v3, det_tilt.v_dir[2], 7)
             self.assertAlmostEqual(w1, det_tilt.w_dir[0], 7)
             self.assertAlmostEqual(w2, det_tilt.w_dir[1], 7)
             self.assertAlmostEqual(w3, det_tilt.w_dir[2], 7)

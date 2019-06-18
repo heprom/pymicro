@@ -1327,7 +1327,7 @@ def box_3d(size=(100, 100, 100), line_color=black):
     box.GetProperty().SetColor(line_color)
     return box
 
-def detector_3d(detector, image_name, show_axes=False, see_reference=True):
+def detector_3d(detector, image_name=None, show_axes=False, see_reference=True):
     """
     Create a 3D detector on a 3D scene, using all tilts.
     See_reference allow to plot an empty detector with dashed edge without any tilts.
@@ -1339,6 +1339,8 @@ def detector_3d(detector, image_name, show_axes=False, see_reference=True):
     from pymicro.xray.detectors import RegArrayDetector2d
     assembly = vtk.vtkAssembly()
     detector_3d = vtk.vtkPlaneSource()
+    '''TODO we should define the detector plane with its origin in the top left corner, but currently this would need 
+    to flip the image to fit our geometrical conventions, probably due to the way the texture is rendered.'''
     detector_3d.SetOrigin(0., detector.get_size_mm()[0] / 2, -detector.get_size_mm()[1] / 2)
     detector_3d.SetPoint1(0., -detector.get_size_mm()[0] / 2, -detector.get_size_mm()[1] / 2)
     detector_3d.SetPoint2(0., detector.get_size_mm()[0] / 2, detector.get_size_mm()[1] / 2)
@@ -1349,29 +1351,25 @@ def detector_3d(detector, image_name, show_axes=False, see_reference=True):
     plane_actor = vtk.vtkActor()
     plane_actor.SetMapper(planeMapper)
 
-    # object to plot in the detector
-    reader = vtk.vtkPNGReader()
-    reader.SetFileName(image_name)
+    if image_name is not None:
+        # image to plot in the detector
+        reader = vtk.vtkPNGReader()
+        reader.SetFileName(image_name)
 
-    texture = vtk.vtkTexture()
-    texture.SetInputConnection(reader.GetOutputPort())
-    plane_actor.SetTexture(texture)
+        #TODO: we could use the detector data direclty here
+        texture = vtk.vtkTexture()
+        texture.SetInputConnection(reader.GetOutputPort())
+        plane_actor.SetTexture(texture)
     # rotate the detector according to the tilts angles
-    P = np.array([[0, 0, 1],
-                  [-1, 0, 0],
-                  [0, -1, 0]])
-
-    XYZ2uvw = np.array([detector.u_dir, detector.v_dir, detector.w_dir])
-    print(XYZ2uvw)
-    apply_rotation_to_actor(plane_actor, np.dot(P, XYZ2uvw).T)
-    #plane_actor.RotateZ(-10)
+    apply_rotation_to_actor(plane_actor, detector.R)
     print(plane_actor.GetUserMatrix())
     assembly.AddPart(plane_actor)
 
     if show_axes:
         # add detector axes actor
         axes_detector = axes_actor(15, axisLabels=('u', 'v', 'w'), fontSize=20, color=(0.619, 0.156, 0.886))
-        apply_rotation_to_actor(axes_detector, np.array([detector.u_dir, detector.v_dir, detector.w_dir]).T)
+        XYZ2uvw = np.array([detector.u_dir, detector.v_dir, detector.w_dir])
+        apply_rotation_to_actor(axes_detector, XYZ2uvw.T)
         apply_translation_to_actor(axes_detector, detector.pixel_to_lab(0, 0)[0] - detector.ref_pos)
         assembly.AddPart(axes_detector)
 

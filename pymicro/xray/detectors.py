@@ -1,29 +1,25 @@
 """The detectors module define classes to manipulate X-ray detectors.
 """
-import os, numpy as np
+import os
+import numpy as np
 from matplotlib import pyplot as plt, cm, rcParams
 from pymicro.file.file_utils import HST_read, HST_write
 from pymicro.external.tifffile import TiffFile
 
-#rcParams.update({'font.size': 12})
-#rcParams['text.latex.preamble'] = [r"\usepackage{amsmath}"]
-#rcParams['image.interpolation'] = 'nearest'
-
 
 class Detector2d:
-    '''Class to handle 2D detectors.
+    """Class to handle 2D detectors.
 
-    2D detectors produce array like images and may have different geometries. In particular the pixel arangement may
-    not necessarily be flat or regular.
-    This abstract class regroup the generic method for those kind of detectors.
-    '''
+    2D detectors produce array like images and may have different geometries. In particular the pixel arrangement may
+    not necessarily be flat or regular. This abstract class regroup the generic method for those kind of detectors.
+    """
 
     def __init__(self, size=(2048, 2048), data_type=np.uint16):
-        '''
+        """
         Initialization of a Detector2d instance with a given image size (2048 pixels square array by default).
         The instance can be positioned in the laboratory frame using the ref_pos attribute which is the position in
-        the laboratory frame of the middle of the detector..
-        '''
+        the laboratory frame of the middle of the detector.
+        """
         self.size = size
         self.data_type = data_type
         self.ref_pos = np.array([0., 0., 0.])  # mm
@@ -126,7 +122,7 @@ class Detector2d:
         # assign default values if needed
         if not two_theta_mini: two_theta_mini = self.two_thetas.min()
         if not two_theta_maxi: two_theta_maxi = self.two_thetas.max()
-        if not psi_step: psi_step = 1. / mar.calib
+        if not psi_step: psi_step = 1. / self.calib
         nbOfBins = int((psi_max - psi_min) / psi_step)
         print '* Sagital regroup (psi binning)'
         print '  psi range = [%.1f-%.1f] with a %g deg step (%d bins)' % (psi_min, psi_max, psi_step, nbOfBins)
@@ -187,43 +183,57 @@ class Detector2d:
 
 
 class RegArrayDetector2d(Detector2d):
-    '''Generic class to handle a flat detector with a regular grid of pixels.
+    """Generic class to handle a flat detector with a regular grid of pixels.
 
-    The two dimensions of the pixel grid are refered by u and v. Usually u is the horizontal direction and v the
-    vertical one, but both can be controlled by the u_dir and v_dir attributes. This allows to control the detector
-    flips and tilts.
+    An orthonormal local frame Rc is attached to the detector with its origin located at the center of the detector 
+    array (the `ref_pos` attribute). Tilts can be applied to change the orientation of the detector via a series of 
+    three intrinsic rotations in that order: kappa rotate around X, delta rotate around Y, omega rotate around Z.
 
-    Tilts details:
-    - kappa rotate around X
-    - delta rotate around Y
-    - omega rotate around Z
-    '''
+    The two dimensions of the pixel grid are referred by u and v. Usually u is the horizontal direction and v the
+    vertical one, but both can be controlled by the u_dir and v_dir attributes. An attribute `P` is maintained to 
+    change from the detector coordinate system Rc to the pixel coordinate system which has its origin in the top left 
+    corner of the detector.
+    """
 
-    def __init__(self, size=(2048, 2048), data_type=np.uint16, tilts=(0., 0., 0.)):
+    def __init__(self, size=(2048, 2048), data_type=np.uint16, P=None, tilts=(0., 0., 0.)):
         Detector2d.__init__(self, size=size, data_type=data_type)
-        kappa, delta, omega = np.radians(tilts[0]), np.radians(tilts[1]), np.radians(tilts[2])
         self.ref = np.ones(self.size, dtype=self.data_type)
         self.dark = np.zeros(self.size, dtype=self.data_type)
         self.bg = np.zeros(self.size, dtype=self.data_type)
-        """
-        from pymicro.crystal.microstructure import Orientation
-        P = np.array([[0, 0, 1],
-                      [-1, 0, 0],
-                      [0, -1, 0]])
-        om = np.dot(Orientation.from_euler(tilts).orientation_matrix(), P).T
-        self.u_dir = om[0]
-        self.v_dir = om[1]
-        self.w_dir = om[2]
-        """
-        self.u_dir = np.array([np.cos(delta) * np.sin(omega),
-                              -np.cos(kappa)*np.cos(omega) + np.sin(kappa)*np.sin(delta)*np.sin(omega),
-                              -np.sin(kappa)*np.cos(omega) - np.cos(kappa)*np.sin(delta)*np.sin(omega)])
+        if P is None:
+            self.P = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
+        else:
+            self.P = P
+        self.apply_tilts(tilts)
 
-        self.v_dir = np.array([-np.sin(delta),
-                                np.sin(kappa)*np.cos(delta),
-                               -np.cos(kappa)*np.cos(delta)])
+    @staticmethod
+    def compute_tilt_matrix(tilts):
+        """Compute the rotation matrix of the detector with respect to the laboratory frame. 
+        
+        The three tilt angles define a series of three intrinsic rotations in that order: kappa rotate around X, delta 
+        rotate around Y, omega rotate around Z.
+        """
+        kappa, delta, omega = np.radians(tilts)
+        Rx = np.array([[1, 0, 0], [0, np.cos(kappa), -np.sin(kappa)], [0, np.sin(kappa), np.cos(kappa)]])
+        Ry = np.array([[np.cos(delta), 0, np.sin(delta)], [0, 1, 0], [-np.sin(delta), 0, np.cos(delta)]])
+        Rz = np.array([[np.cos(omega), -np.sin(omega), 0], [np.sin(omega), np.cos(omega), 0], [0, 0, 1]])
+        #R = np.dot(Rz.T, np.dot(Ry.T, Rx.T)).T  # as derived by Alexiane
+        R = np.dot(Rx, np.dot(Ry, Rz))
+        return R
 
-        self.w_dir = np.cross(self.u_dir, self.v_dir)
+    def apply_tilts(self, tilts):
+        self.R = RegArrayDetector2d.compute_tilt_matrix(tilts)
+        # compose the rotation matrix with the detector-to-pixel definition
+        K = np.dot(self.R, self.P).T
+        self.u_dir = K[0]
+        self.v_dir = K[1]
+        self.w_dir = K[2]
+        kappa, delta, omega = np.radians(tilts)
+        #print(np.cos(delta) * np.sin(omega), -np.cos(kappa) * np.cos(omega) + np.sin(kappa) * np.sin(delta) * np.sin(omega), -np.sin(kappa) * np.cos(omega) - np.cos(kappa) * np.sin(delta) * np.sin(omega))
+        #print(self.u_dir)
+        #assert self.u_dir[0] == np.cos(delta) * np.sin(omega)
+        #assert self.u_dir[1] == -np.cos(kappa) * np.cos(omega) + np.sin(kappa) * np.sin(delta) * np.sin(omega)
+        #assert self.u_dir[2] == -np.sin(kappa) * np.cos(omega) - np.cos(kappa) * np.sin(delta) * np.sin(omega)
 
     def set_u_dir(self, tilts):
         '''Set the coordinates of the vector describing the first (horizontal) direction of the pixels.'''

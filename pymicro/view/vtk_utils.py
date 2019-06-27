@@ -1309,21 +1309,24 @@ def data_outline(data, corner=False, color=black):
     return outline
 
 
-def box_3d(size=(100, 100, 100), line_color=black):
-    '''
-    vtk helper function to draw a box of a given size.
-    '''
-    l = Lattice.orthorhombic(size[0], size[1], size[2])
-    grid = lattice_grid(l, origin=[0., 0., 0.])
-    edges = vtk.vtkExtractEdges()
-    if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-        edges.SetInputData(grid)
-    else:
-        edges.SetInput(grid)
+def box_3d(origin=(0, 0, 0), size=(100, 100, 100), line_color=black):
+    """
+    Create a box of a given size.
+        
+    :param tuple origin: the origin of the box in the laboratory frame. 
+    :param tuple size: the size of the box. 
+    :param line_color: the color to use to draw the box.
+    :return: 
+    """
+    box_source = vtk.vtkCubeSource()
+    box_source.SetBounds(origin[0], origin[0] + size[0],
+                         origin[1], origin[1] + size[1],
+                         origin[2], origin[2] + size[2])
     mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputConnection(edges.GetOutputPort())
+    mapper.SetInputConnection(box_source.GetOutputPort())
     box = vtk.vtkActor()
     box.SetMapper(mapper)
+    box.GetProperty().SetRepresentationToWireframe()
     box.GetProperty().SetColor(line_color)
     return box
 

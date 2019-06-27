@@ -9,6 +9,7 @@ class ExperimentTests(unittest.TestCase):
         """testing the experiment module:"""
         self.experiment = Experiment()
         self.experiment.get_sample().set_name('test sample')
+        print(self.experiment.get_sample().geo.geo_type)
 
     def test_add_detector(self):
         detector = RegArrayDetector2d(size=(512, 512))
@@ -33,3 +34,4 @@ class ExperimentTests(unittest.TestCase):
         self.experiment.save()
         self.assertTrue(os.path.exists('experiment.txt'))
         Experiment.load('experiment.txt')
+

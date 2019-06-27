@@ -18,7 +18,7 @@ class Scene3D:
         False a single image is save using the base name.
 
         :param ren_size: a tuple with two value to set the size of the image
-        in pixels (defalut 600x600).
+        in pixels (default 600x600).
 
         :param name: a string to used to describe the scene, it is used in
         particular when saving the scene as an image. If not set, the file
@@ -163,3 +163,28 @@ class Scene3D:
             iren.Start()
         else:
             self.save_frame()
+
+    @staticmethod
+    def from_experiment(experiment, show_lab_frame=True):
+        """Create a 3D scene associated with an experimental setup.
+        
+        :param experiment: an instance of the `Experiment` class with all the setup parameters.
+        :return: a `Scene3d` instance ready to display.
+        """
+        from pymicro.view.vtk_utils import box_3d, axes_actor, apply_translation_to_actor, detector_3d
+        s3d = Scene3D()
+        if show_lab_frame:
+            # display the coordinate axes
+            axes = axes_actor()
+            s3d.add(axes)
+        # display the sample
+        bb = experiment.sample.geo.get_bounding_box()
+        sample_bb = box_3d(origin=bb[0], size=bb[1])
+        apply_translation_to_actor(sample_bb, experiment.sample.position)
+        s3d.add(sample_bb)
+
+        # display the detectors
+        for i in range(experiment.get_number_of_detectors()):
+            det = detector_3d(experiment.detectors[i], show_axes=True, see_reference=False)
+            s3d.add(det)
+        return s3d

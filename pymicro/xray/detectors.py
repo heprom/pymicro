@@ -737,4 +737,3 @@ class Xpad(Detector2d):
         self.psis = psiArray
         return twoThArray, psiArray
 
-

@@ -77,6 +77,24 @@ class Symmetry(enum.Enum):
         else:
             return None
 
+    def to_string(self):
+        if self is Symmetry.cubic:
+            return 'cubic'
+        elif self is Symmetry.hexagonal:
+            return 'hexagonal'
+        elif self is Symmetry.orthorhombic:
+            return 'orthorhombic'
+        elif self is Symmetry.tetragonal:
+            return 'tetragonal'
+        elif self is Symmetry.trigonal:
+            return 'trigonal'
+        elif self is Symmetry.monoclinic:
+            return 'monoclinic'
+        elif self is Symmetry.triclinic:
+            return 'triclinic'
+        else:
+            return None
+
     def symmetry_operators(self):
         """Define the equivalent crystal symmetries.
 

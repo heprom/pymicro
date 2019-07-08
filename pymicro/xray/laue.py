@@ -170,7 +170,7 @@ def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, use_frie
     """
     gt = orientation.orientation_matrix().transpose()
     (h, k, l) = hkl.miller_indices()
-    # this hkrrr(960, 768)l plane will select a particular lambda
+    # this hkl plane will select a particular lambda
     (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=verbose)
     if the_energy < 0:
         if use_friedel_pair:

@@ -22,6 +22,7 @@ class Detector2d:
         """
         self.size = size
         self.data_type = data_type
+        self.data = np.zeros(self.size, dtype=self.data_type)
         self.ref_pos = np.array([0., 0., 0.])  # mm
         self.ucen = self.size[0] // 2
         self.vcen = self.size[1] // 2
@@ -33,6 +34,10 @@ class Detector2d:
         self.save_path = '.'
         self.correction = 'none'  # could be none, bg, flat
         self.orientation = 'horizontal'  # either 'horizontal' or 'vertical'
+
+    def clear_data(self):
+        """Simply set all pixels to zeros."""
+        self.data = np.zeros(self.size, dtype=self.data_type)
 
     def azimuthal_regroup(self, two_theta_mini=None, two_theta_maxi=None, two_theta_step=None,
                           psi_mask=None, psi_min=None, psi_max=None, write_txt=False,

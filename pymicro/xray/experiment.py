@@ -8,8 +8,8 @@ from pymicro.crystal.microstructure import Microstructure, Grain, Orientation
 class ForwardSimulation:
     """Class to represent a Forward Simulation."""
 
-    def __init__(self, fs_type):
-        self.fs_type = fs_type
+    def __init__(self, sim_type):
+        self.sim_type = sim_type
 
 class XraySource:
     """Class to represent a X-ray source."""
@@ -148,18 +148,18 @@ class Experiment:
         """Return the active detector for this experiment."""
         return self.detectors[self.active_detector_id]
     
-    def forward_simulation(self, fs_type='laue', verbose=False, **kwargs):
+    def forward_simulation(self, sim_type='laue', verbose=False, **kwargs):
         """Perform a forward simulation of the X-ray experiment onto the active detector.
         
         This typically sets the detector.data field with the computed image.
 
-        :param str fs_type: The type of simulation to perform (abs, dct or laue).
+        :param str sim_type: The type of simulation to perform (abs, dct or laue).
         :param bool verbose: activate verbose mode.
-        :param **kwargs: additional parameters depending on the `fs_type` chosen.
+        :param **kwargs: additional parameters depending on the `sim_type` chosen.
         """
-        self.fs = ForwardSimulation(fs_type)
+        self.fs = ForwardSimulation(sim_type)
         detector = self.get_active_detector()
-        if self.fs.fs_type == 'laue':
+        if self.fs.sim_type == 'laue':
             from pymicro.xray.laue import build_list
             from pymicro.xray.xray_utils import lambda_nm_to_keV
             assert self.sample.has_grains()

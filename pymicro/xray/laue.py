@@ -758,3 +758,4 @@ def diffracting_normals_vector(gnom):
     return hkl_normals
 
 
+

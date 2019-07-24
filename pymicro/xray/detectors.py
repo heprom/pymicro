@@ -198,13 +198,16 @@ class RegArrayDetector2d(Detector2d):
     vertical one, but both can be controlled by the u_dir and v_dir attributes. An attribute `P` is maintained to 
     change from the detector coordinate system Rc to the pixel coordinate system which has its origin in the top left 
     corner of the detector.
+    
+    This type of detector supports binning.
     """
 
     def __init__(self, size=(2048, 2048), data_type=np.uint16, P=None, tilts=(0., 0., 0.)):
         Detector2d.__init__(self, size=size, data_type=data_type)
-        self.ref = np.ones(self.size, dtype=self.data_type)
-        self.dark = np.zeros(self.size, dtype=self.data_type)
-        self.bg = np.zeros(self.size, dtype=self.data_type)
+        self.binning = 1
+        self.ref_size = self.size
+        self.ref_pixel_size = self.pixel_size
+        self.clear_data()
         if P is None:
             self.P = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
         else:
@@ -240,24 +243,47 @@ class RegArrayDetector2d(Detector2d):
         #assert self.u_dir[1] == -np.cos(kappa) * np.cos(omega) + np.sin(kappa) * np.sin(delta) * np.sin(omega)
         #assert self.u_dir[2] == -np.sin(kappa) * np.cos(omega) - np.cos(kappa) * np.sin(delta) * np.sin(omega)
 
+    def clear_data(self):
+        """Clear all data arrays."""
+        self.data = np.zeros(self.get_size_px(), dtype=self.data_type)
+        self.ref = np.ones(self.get_size_px(), dtype=self.data_type)
+        self.dark = np.zeros(self.get_size_px(), dtype=self.data_type)
+        self.bg = np.zeros(self.get_size_px(), dtype=self.data_type)
+
+    def set_binning(self, binning):
+        """Set the binning factor. This operation clears all the data arrays.
+
+        :param int binning: binning factor
+        """
+        self.binning = binning
+        self.clear_data()
+
     def set_u_dir(self, tilts):
-        '''Set the coordinates of the vector describing the first (horizontal) direction of the pixels.'''
+        """Set the coordinates of the vector describing the first (horizontal) direction of the pixels."""
         (kappa, delta, omega) = (np.radians(tilts[0]), np.radians(tilts[1]), np.radians(tilts[2]))
-        self.u_dir = np.array([np.sin(delta)* np.sin(omega),
-                           -np.cos(kappa)*np.cos(omega) + np.sin(kappa)*np.sin(delta)*np.sin(omega),
-                           -np.sin(kappa)*np.cos(omega) - np.cos(kappa)*np.sin(delta)*np.sin(omega)])
+        self.u_dir = np.array([np.sin(delta) * np.sin(omega),
+                               -np.cos(kappa) * np.cos(omega) + np.sin(kappa) * np.sin(delta) * np.sin(omega),
+                               -np.sin(kappa) * np.cos(omega) - np.cos(kappa) * np.sin(delta) * np.sin(omega)])
         self.w_dir = np.cross(self.u_dir, self.v_dir)
 
     def set_v_dir(self, tilts):
-        '''Set the coordinates of the vector describing the second (vertical) direction of the pixels.'''
+        """Set the coordinates of the vector describing the second (vertical) direction of the pixels."""
         (kappa, delta, omega) = (np.radians(tilts[0]), np.radians(tilts[1]), np.radians(tilts[2]))
         self.v_dir = np.array([-np.sin(delta),
-                           np.sin(kappa)*np.cos(delta),
-                           -np.cos(kappa)*np.cos(delta)])
+                               np.sin(kappa) * np.cos(delta),
+                               -np.cos(kappa) * np.cos(delta)])
         self.w_dir = np.cross(self.u_dir, self.v_dir)
 
+    def get_pixel_size(self):
+        """Return the effective pixel size, accounting for current binning settings."""
+        return self.pixel_size * self.binning
+
+    def get_size_px(self):
+        """Return the size of the detector in pixel, accounting for current binning settings."""
+        return np.array(self.size) // self.binning
+
     def get_size_mm(self):
-        '''Return the size of the detector in millimeters.'''
+        """Return the size of the detector in millimeters."""
         return self.pixel_size * np.array(self.size)
 
     def get_origin(self):
@@ -273,9 +299,9 @@ class RegArrayDetector2d(Detector2d):
         assert num_points > 1
         corners = np.empty((5, 2), dtype=int)
         corners[0] = [0, 0]
-        corners[1] = [0, self.size[1] - 1]
-        corners[2] = [self.size[0] - 1, self.size[1] - 1]
-        corners[3] = [self.size[0] - 1, 0]
+        corners[1] = [0, self.get_size_px()[1] - 1]
+        corners[2] = [self.get_size_px()[0] - 1, self.get_size_px()[1] - 1]
+        corners[3] = [self.get_size_px()[0] - 1, 0]
         corners[4] = [0, 0]
         detector_edges = np.empty((4 * num_points, 2), dtype=float)
         grad = np.linspace(0, 1, num_points, endpoint=True)
@@ -326,7 +352,7 @@ class RegArrayDetector2d(Detector2d):
         # check that each point is on the detector plane
         assert np.count_nonzero(np.dot(vec, self.w_dir) > np.finfo(np.float32).eps) == 0
         prod = np.vstack((np.dot(vec, self.u_dir), np.dot(vec, self.v_dir))).T
-        uv = prod / self.pixel_size + 0.5 * np.array(self.size)
+        uv = prod / self.get_pixel_size() + 0.5 * self.get_size_px()
         return uv
 
     def pixel_to_lab(self, u, v):
@@ -350,8 +376,9 @@ class RegArrayDetector2d(Detector2d):
             n = len(u)
         except TypeError:
             n = 1
-        r = (np.reshape(u, (n, 1)) - 0.5 * self.size[0]) * self.u_dir + (np.reshape(v, (n, 1)) - 0.5 * self.size[1]) * self.v_dir
-        p = self.ref_pos + r * self.pixel_size
+        r = (np.reshape(u, (n, 1)) - 0.5 * self.get_size_px()[0]) * self.u_dir + \
+            (np.reshape(v, (n, 1)) - 0.5 * self.get_size_px()[1]) * self.v_dir
+        p = self.ref_pos + r * self.get_pixel_size()
         return p
 
     def load_image(self, image_path):
@@ -360,8 +387,8 @@ class RegArrayDetector2d(Detector2d):
         if image_path.endswith('.tif'):
             self.data = TiffFile(image_path).asarray().T.astype(np.float32)
         elif image_path.endswith('.raw'):
-            self.data = HST_read(self.image_path, data_type=self.data_type, dims=(self.size[0], self.size[1], 1))[:, :,
-                        0].astype(np.float32)
+            self.data = HST_read(self.image_path, data_type=self.data_type,
+                                 dims=(self.get_size_px()[0], self.get_size_px()[1], 1))[:, :, 0].astype(np.float32)
         else:
             print('unrecognized file format: %s' % image_path)
             return None
@@ -388,8 +415,8 @@ class RegArrayDetector2d(Detector2d):
         inv_deg2rad = 1. / deg2rad
         # distance xpad to sample, in pixel units
         distance = self.calib / np.tan(1.0 * deg2rad)
-        u = np.linspace(0, self.size[0] - 1, self.size[0])
-        v = np.linspace(0, self.size[1] - 1, self.size[1])
+        u = np.linspace(0, self.get_size_px()[0] - 1, self.get_size_px()[0])
+        v = np.linspace(0, self.get_size_px()[1] - 1, self.get_size_px()[1])
         vv, uu = np.meshgrid(v, u)
         r = np.sqrt((uu - self.ucen) ** 2 + (vv - self.vcen) ** 2)
         self.two_thetas = np.arctan(r / distance) * inv_deg2rad

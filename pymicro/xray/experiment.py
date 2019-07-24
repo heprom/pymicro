@@ -51,6 +51,10 @@ class ObjectGeometry:
     def __init__(self, geo_type='point', origin=None):
         self.set_type(geo_type)
         self.set_origin(origin)
+        # the positions are initially set at the origin, this is a lazy behaviour as discretizing the volume can be expensive
+        self.positions = np.array(self.origin)
+        self.array = np.ones((1, 1, 1), dtype=np.uint8)  # unique label set to 1
+        self.size = np.array([0., 0., 0.])
 
     def set_type(self, geo_type):
         assert (geo_type in ['point', 'array', 'cad']) is True
@@ -59,25 +63,35 @@ class ObjectGeometry:
     def set_origin(self, origin):
         if origin is None:
             origin = (0., 0., 0.)
-        self.origin = origin
+        self.origin = np.array(origin)
 
     def get_bounding_box(self):
-        if self.geo_type == 'point':
-            return self.origin, self.origin
-        elif self.geo_type == 'array':
-            return self.origin, self.origin + self.array.shape
+        if self.geo_type in ['point', 'array']:
+            return self.origin - self.size / 2, self.origin + self.size / 2
         elif self.geo_type == 'cad':
             bounds = self.cad.GetBounds()
             return (bounds[0], bounds[2], bounds[4]), (bounds[1], bounds[3], bounds[5])
 
     def get_positions(self):
+        return self.positions
+
+    def discretize_geometry(self):
         if self.geo_type == 'point':
-            return [(0., 0., 0.)]
+            self.positions = np.array(self.origin)
         elif self.geo_type == 'array':
-            return self.array  #FIXME
+            vx, vy, vz = self.array.shape  # number of voxels
+            x_sample = np.linspace(self.get_bounding_box()[0][0], self.get_bounding_box()[1][0], vx)  # mm
+            y_sample = np.linspace(self.get_bounding_box()[0][1], self.get_bounding_box()[1][1], vy)  # mm
+            z_sample = np.linspace(self.get_bounding_box()[0][2], self.get_bounding_box()[1][2], vz)  # mm
+            xx, yy, zz = np.meshgrid(x_sample, y_sample, z_sample, indexing='ij')
+            self.positions = np.empty((vx, vy, vz, 3), dtype=float)
+            self.positions[:, :, :, 0] = xx
+            self.positions[:, :, :, 1] = yy
+            self.positions[:, :, :, 2] = zz
         elif self.geo_type == 'cad':
             print('discretizing CAD geometry is not yet supported')
-            return None
+            self.positions = np.array(self.origin)
+
 
 class Sample:
     """Class to describe a material sample.
@@ -206,7 +220,7 @@ class Experiment:
                 d_spacings = [hkl.interplanar_spacing() for hkl in self.fs.hkl_planes]  # size n_hkl
                 G_vectors = [hkl.scattering_vector() for hkl in self.fs.hkl_planes]  # size n_hkl, with 3 elements items
                 Gs_vectors = [gt.dot(Gc) for Gc in G_vectors]  # size n_hkl, with 3 elements items
-                positions = self.sample.geo.get_positions()  # size n_vox, with 3 elements items
+                positions = self.sample.geo.get_positions().reshape(-1, self.sample.geo.get_positions().shape[-1])  # size n_vox, with 3 elements items
                 n_vox = len(positions)  # total number of discrete positions
                 Xu_vectors = [(pos - self.source.position) / np.linalg.norm(pos - self.source.position)
                               for pos in positions]  # size n_vox

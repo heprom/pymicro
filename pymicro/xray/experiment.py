@@ -35,8 +35,7 @@ class XraySource:
             print('specified min energy must be positive, using 0 keV')
             min_energy = 0.
         if max_energy <= min_energy:
-            print('specified max energy must be larger than min energy')
-            return
+            print('specified max energy must be larger than min energy, using %.1f' % min_energy)
         self.set_min_energy(min_energy)
         self.set_max_energy(max_energy)
 
@@ -113,14 +112,26 @@ class Sample:
         self.set_microstructure(microstructure)
 
     def set_name(self, name):
+        """Set the sample name.
+        
+        :param str name: The sample name.
+        """
         self.name = name
 
     def set_position(self, position):
+        """Set the sample reference position.
+
+        :param tuple position: A vector (tuple or array form) describing the sample position.
+        """
         if position is None:
             position = (0., 0., 0.)
         self.position = np.array(position)
 
     def set_geometry(self, geo):
+        """Set the geometry of this sample.
+
+        :param ObjectGeometry geo: A vector (tuple or array form) describing the sample position.
+        """
         if geo is None:
             geo = ObjectGeometry()
         assert isinstance(geo, ObjectGeometry) is True

@@ -1,8 +1,9 @@
 """The lattice module define the class to handle 3D crystal lattices (the 14 Bravais lattices).
 """
 import os
-from pymicro.external import CifFile
+from pymicro.external import CifFile_module as CifFile
 import enum
+import functools
 import numpy as np
 from numpy import pi, dot, transpose, radians
 from matplotlib import pyplot as plt
@@ -259,7 +260,7 @@ class Lattice:
         m = np.array(matrix, dtype=np.float64).reshape((3, 3))
         lengths = np.sqrt(np.sum(m ** 2, axis=1))
         angles = np.zeros(3)
-        for i in xrange(3):
+        for i in range(3):
             j = (i + 1) % 3
             k = (i + 2) % 3
             angles[i] = dot(m[j], m[k]) / (lengths[j] * lengths[k])
@@ -827,7 +828,7 @@ class SlipSystem:
             slip_systems.append(SlipSystem(HklPlane(2, -1, 1), HklDirection(1, 1, -1)))
             slip_systems.append(SlipSystem(HklPlane(2, 1, -1), HklDirection(1, -1, 1)))
         else:
-            print 'warning only 001, 111 or 112 slip planes supported for the moment!'
+            print('warning only 001, 111 or 112 slip planes supported for the moment!')
         return slip_systems
 
 
@@ -925,17 +926,17 @@ class HklDirection(HklObject):
         return np.arccos(np.dot(self.direction(), hkl.direction()))
 
     @staticmethod
-    def angle_between_directions((h1, k1, l1), (h2, k2, l2), lattice=None):
+    def angle_between_directions(hkl1, hkl2, lattice=None):
         '''Computes the angle between two crystallographic directions (in radian).
 
-        :param tuple (h1, k1, l1): The triplet of the miller indices of the first direction.
-        :param tuple (h2, k2, l2): The triplet of the miller indices of the second direction.
+        :param tuple hkl1: The triplet of the miller indices of the first direction.
+        :param tuple hkl2: The triplet of the miller indices of the second direction.
         :param Lattice lattice: The crystal lattice, will default to cubic if not specified.
 
         :returns float: The angle in radian.
         '''
-        d1 = HklDirection(h1, k1, l1, lattice)
-        d2 = HklDirection(h2, k2, l2, lattice)
+        d1 = HklDirection(*hkl1, lattice=lattice)
+        d2 = HklDirection(*hkl2, lattice=lattice)
         return d1.angle_with_direction(d2)
 
     @staticmethod
@@ -948,21 +949,24 @@ class HklDirection(HklObject):
         """Convert from Miller-Bravais indices to Miller indices. this is used for hexagonal crystal lattice."""
         import fractions
         u, v, w = U - T, V - T, W
-        gcd = reduce(fractions.gcd, (u, v, w))
+        gcd = functools.reduce(fractions.gcd, (u, v, w))
         return u / gcd, v / gcd, w / gcd
 
     @staticmethod
-    def angle_between_4indices_directions((h1, k1, i1, l1), (h2, k2, i2, l2), (a, c)):
+    def angle_between_4indices_directions(hkil1, hkil2, ac):
         """Computes the angle between two crystallographic directions in a hexagonal lattice.
 
         The solution was derived by F. Frank in:
         On Miller - Bravais indices and four dimensional vectors. Acta Cryst. 18, 862-866 (1965)
 
-        :param tuple (h1, k1, i1, l1): The quartet of the indices of the first direction.
-        :param tuple (h2, k2, i2, l2): The quartet of the indices of the second direction.
-        :param tuple (a, c): the lattice parameters of the hexagonal structure.
+        :param tuple hkil1: The quartet of the indices of the first direction.
+        :param tuple hkil2: The quartet of the indices of the second direction.
+        :param tuple ac: the lattice parameters of the hexagonal structure in the form (a, c).
         :returns float: The angle in radian.
         """
+        h1, k1, i1, l1 = hkil1
+        h2, k2, i2, l2 = hkil2
+        a, c = ac
         lambda_square = 2. / 3 * (c / a) ** 2
         value = (h1 * h2 + k1 * k2 + i1 * i2 + lambda_square * l1 * l2) / \
                 (np.sqrt(h1 ** 2 + k1 ** 2 + i1 ** 2 + lambda_square * l1 ** 2) *
@@ -1115,7 +1119,7 @@ class HklPlane(HklObject):
         if verbose:
             theta_deg = 180 * theta / np.pi
             (h, k, l) = self.miller_indices()
-            print '\nBragg angle for %d%d%d at %.1f keV is %.1f deg\n' % (h, k, l, lambda_keV, theta_deg)
+            print('\nBragg angle for %d%d%d at %.1f keV is %.1f deg\n' % (h, k, l, lambda_keV, theta_deg))
         return theta
 
     @staticmethod

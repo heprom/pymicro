@@ -31,7 +31,7 @@ class PlotWidget(QWidget):
             self.on_draw()
 
     def create_main_widget(self):
-        print self.data
+        print(self.data)
         self.fig = Figure((10.0, 8.0), dpi=self.dpi)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setFocusPolicy(Qt.StrongFocus)

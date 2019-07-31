@@ -10,15 +10,21 @@
 #
 # Modified for PyCIFRW by JRH to allow external scanner
 #
+# To maximize python3/python2 compatibility
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+
 """ Detail of JRH modifications.
 
 The compiled module handles all token administration by itself, but
 does not deal with restrictions.  It also effectively removes the
-context-sensitivity of Yapps, as it ignores restrictions, but 
+context-sensitivity of Yapps, as it ignores restrictions, but
 these restrictions turn out to be  unnecessary for CIF.
 
 Interestingly, the module scan function is never called directly
-from python. 
+from python.
 
 """
 
@@ -35,17 +41,24 @@ keeps track of the parse stack.
 
 import sys, re
 
-try:
-    import StarScan
 
-    have_star_scan = True
-except ImportError:
+# For normal installation this module is "CifFile.yapps3_compiled_rt"
+# and StarScan is an extension module within the parent CifFile module.
+if __name__.startswith('CifFile.') or __name__.startswith('pymicro'):
+    try:
+        from . import StarScan
+        have_star_scan = True
+    except ImportError:
+        have_star_scan = False
+# Otherwise assume this is imported from the yapps3/yapps2.py script
+# that is executed from Makefile to generate YappsStarParser sources.
+else:
+    assert sys.argv[0].endswith('yapps2.py'), (
+        "This should be reached only when running yapps2.py in Makefile.")
     have_star_scan = False
 
-
-class SyntaxError(Exception):
+class YappsSyntaxError(Exception):
     """When we run into an unexpected token, this is the exception to use"""
-
     def __init__(self, charpos=-1, msg="Bad Token", context=None):
         Exception.__init__(self)
         self.charpos = charpos
@@ -53,16 +66,12 @@ class SyntaxError(Exception):
         self.context = context
 
     def __str__(self):
-        if self.charpos < 0:
-            return 'SyntaxError'
-        else:
-            return 'SyntaxError@char%s(%s)' % (repr(self.charpos), self.msg)
-
+        if self.charpos < 0: return 'SyntaxError'
+        else: return 'SyntaxError@char%s(%s)' % (repr(self.charpos), self.msg)
 
 class NoMoreTokens(Exception):
     """Another exception object, for when we run out of tokens"""
     pass
-
 
 class Scanner:
     """Yapps scanner.
@@ -73,7 +82,7 @@ class Scanner:
     it is allowed to return.  In context sensitive mode, this restrict
     set guides the scanner.  In context insensitive mode, there is no
     restriction (the set is always the full set of tokens).
-    
+
     """
 
     def __init__(self, patterns, ignore, input, scantype="standard"):
@@ -89,7 +98,7 @@ class Scanner:
         Note that the patterns parameter expects uncompiled regexes,
         whereas the self.patterns field expects compiled regexes.
         """
-        self.tokens = []  # [(begin char pos, end char pos, token name, matched text), ...]
+        self.tokens = [] # [(begin char pos, end char pos, token name, matched text), ...]
         self.restrictions = []
         self.input = input
         self.pos = 0
@@ -102,7 +111,7 @@ class Scanner:
             self.token = self.compiled_token
             self.__del__ = StarScan.cleanup
         elif self.scantype == "flex":
-            print "Warning: using Python scanner"
+            print("WARNING: using Python scanner although C scanner requested")
             self.scantype = "standard"
         if self.scantype != "flex":
             self.scan = self.interp_scan
@@ -112,7 +121,7 @@ class Scanner:
             # Compile the regex strings into regex objects
             self.patterns = []
             for terminal, regex in patterns:
-                self.patterns.append((terminal, re.compile(regex)))
+                self.patterns.append( (terminal, re.compile(regex)) )
 
     def get_token_pos(self):
         """Get the current token position in the input text."""
@@ -136,8 +145,8 @@ class Scanner:
     def get_column_number(self):
         """Get the column number of the current position in the input text."""
         s = self.get_input_scanned()
-        i = s.rfind('\n')  # may be -1, but that's okay in this case
-        return len(s) - (i + 1)
+        i = s.rfind('\n') # may be -1, but that's okay in this case
+        return len(s) - (i+1)
 
     def get_input_scanned(self):
         """Get the portion of the input that has been tokenized."""
@@ -151,14 +160,14 @@ class Scanner:
         """Get the i'th token in the input.
 
         If i is one past the end, then scan for another token.
-        
+
         Args:
 
         restrict : [token, ...] or None; if restrict is None, then any
         token is allowed.  You may call token(i) more than once.
         However, the restrict set may never be larger than what was
         passed in on the first call to token(i).
-        
+
         """
         if i == len(self.tokens):
             self.scan(restrict)
@@ -173,7 +182,7 @@ class Scanner:
             return self.tokens[i]
         raise NoMoreTokens()
 
-    def compiled_token(self, i, restrict=0):
+    def compiled_token(self,i,restrict=0):
         try:
             return StarScan.token(i)
         except IndexError:
@@ -184,11 +193,11 @@ class Scanner:
         output = ''
         if self.scantype != "flex":
             for t in self.tokens[-10:]:
-                output = '%s\n  (@%s)  %s  =  %s' % (output, t[0], t[2], repr(t[3]))
+                output = '%s\n  (@%s)  %s  =  %s' % (output,t[0],t[2],repr(t[3]))
         else:
             out_tokens = StarScan.last_ten()
             for t in out_tokens:
-                output = '%s\n  (~line %s)  %s  =  %s' % (output, t[0], t[2], repr(t[3]))
+                output = '%s\n  (~line %s)  %s  =  %s' % (output,t[0],t[2],repr(t[3]))
         return output
 
     def interp_scan(self, restrict):
@@ -196,24 +205,24 @@ class Scanner:
         and add the restriction to self.restrictions"""
         # Prepare accepted pattern list
         if restrict:
-            # only patterns in the 'restrict' parameter or in self.ignore
-            # are accepted
-            accepted_patterns = []
-            for p_name, p_regexp in self.patterns:
-                if p_name not in restrict and p_name not in self.ignore:
-                    pass
-                else:
-                    accepted_patterns.append((p_name, p_regexp))
+           # only patterns in the 'restrict' parameter or in self.ignore
+           # are accepted
+           accepted_patterns=[]
+           for p_name, p_regexp in self.patterns:
+               if p_name not in restrict and p_name not in self.ignore:
+                   pass
+               else:
+                   accepted_patterns.append((p_name,p_regexp))
         else:
-            # every pattern is good
-            accepted_patterns = self.patterns
+           # every pattern is good
+           accepted_patterns=self.patterns
         # Keep looking for a token, ignoring any in self.ignore
         while 1:
             # Search the patterns for the longest match, with earlier
             # tokens in the list having preference
             best_match = -1
             best_pat = '(error)'
-            for p, regexp in accepted_patterns:
+            for p,regexp in accepted_patterns:
                 m = regexp.match(self.input, self.pos)
                 if m and len(m.group(0)) > best_match:
                     # We got a match that's better than the previous one
@@ -224,14 +233,14 @@ class Scanner:
             if best_pat == '(error)' and best_match < 0:
                 msg = 'Bad Token'
                 if restrict:
-                    msg = 'Trying to find one of ' + ', '.join(restrict)
-                raise SyntaxError(self.pos, msg)
+                    msg = 'Trying to find one of '+', '.join(restrict)
+                raise YappsSyntaxError(self.pos, msg)
 
             # If we found something that isn't to be ignored, return it
             if best_pat not in self.ignore:
                 # Create a token with this data
-                token = (self.pos, self.pos + best_match, best_pat,
-                         self.input[self.pos:self.pos + best_match])
+                token = (self.pos, self.pos+best_match, best_pat,
+                         self.input[self.pos:self.pos+best_match])
                 self.pos = self.pos + best_match
                 # Only add this token if it's not in the list
                 # (to prevent looping)
@@ -243,18 +252,17 @@ class Scanner:
                 # This token should be ignored ..
                 self.pos = self.pos + best_match
 
-    def compiled_scan(self, restrict):
+    def compiled_scan(self,restrict):
         token = StarScan.scan()
-        print "Calling compiled scan, got %s" % `token`
+        print("Calling compiled scan, got %s" % repr(token))
         if token[2] not in restrict:
             msg = "Bad Token"
             if restrict:
-                msg = "Trying to find one of " + join(restrict, ", ")
-            raise SyntaxError(self.pos, msg)
+               msg = "Trying to find one of " + ", ".join(restrict)
+            raise YappsSyntaxError(self.pos,msg)
         self.tokens.append(token)
         self.restrictions.append(restrict)
         return
-
 
 class Parser:
     """Base class for Yapps-generated parsers.
@@ -275,10 +283,9 @@ class Parser:
         """Returns the matched text, and moves to the next token"""
         tok = self._scanner.token(self._pos, [type])
         if tok[2] != type:
-            raise SyntaxError(tok[0], 'Trying to find ' + type + ' :' + ' ,')
+            raise YappsSyntaxError(tok[0], 'Trying to find '+type+' :'+ ' ,')
         self._pos = 1 + self._pos
         return tok[3]
-
 
 class Context:
     """Class to represent the parser's call stack.
@@ -311,7 +318,6 @@ class Context:
         output += self.rule
         return output
 
-
 #
 #  Note that this sort of error printout is useless with the
 #  compiled scanner
@@ -326,8 +332,8 @@ def print_line_with_pointer(text, p):
     # 80-column line to stderr.
 
     # Now try printing part of the line
-    text = text[max(p - 80, 0):p + 80]
-    p = p - max(p - 80, 0)
+    text = text[max(p-80, 0):p+80]
+    p = p - max(p-80, 0)
 
     # Strip to the left
     i = text[:p].rfind('\n')
@@ -335,7 +341,7 @@ def print_line_with_pointer(text, p):
     if i < 0 or (0 <= j < i): i = j
     if 0 <= i < p:
         p = p - i - 1
-        text = text[i + 1:]
+        text = text[i+1:]
 
     # Strip to the right
     i = text.find('\n', p)
@@ -351,9 +357,8 @@ def print_line_with_pointer(text, p):
         p = p - 7
 
     # Now print the string, along with an indicator
-    print >> sys.stderr, '> ', text
-    print >> sys.stderr, '> ', ' ' * p + '^'
-
+    print('> ',text,file=sys.stderr)
+    print('> ',' '*p + '^',file=sys.stderr)
 
 def print_error(input, err, scanner):
     """Print error messages, the parser stack, and the input text -- for human-readable error messages."""
@@ -361,7 +366,7 @@ def print_error(input, err, scanner):
     # Figure out the line number
     line_number = scanner.get_line_number()
     column_number = scanner.get_column_number()
-    print >> sys.stderr, '%d:%d: %s' % (line_number, column_number, err.msg)
+    print('%d:%d: %s' % (line_number, column_number, err.msg),file=sys.stderr)
 
     context = err.context
     if not context:
@@ -369,17 +374,16 @@ def print_error(input, err, scanner):
 
     while context:
         # TODO: add line number
-        print >> sys.stderr, 'while parsing %s%s:' % (context.rule, tuple(context.args))
+        print('while parsing %s%s:' % (context.rule, tuple(context.args)),file=sys.stderr)
         print_line_with_pointer(input, context.scanner.get_prev_char_pos(context.tokenpos))
         context = context.parent
-
 
 def wrap_error_reporter(parser, rule):
     try:
         return getattr(parser, rule)()
-    except SyntaxError, e:
+    except YappsSyntaxError as e:
         input = parser._scanner.input
         print_error(input, e, parser._scanner)
     except NoMoreTokens:
-        print >> sys.stderr, 'Could not complete parsing; stopped around here:'
-        print >> sys.stderr, parser._scanner
+        print('Could not complete parsing; stopped around here:',file=sys.stderr)
+        print(parser._scanner,file=sys.stderr)

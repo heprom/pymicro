@@ -432,12 +432,12 @@ class FE_Mesh():
                 node._z = float(z)
             node._rank = i
             if verbose:
-                print 'adding node', node
+                print('adding node', node)
             fe_mesh._nodes.append(node)
         # build a rank <-> id table
         id_to_rank = fe_mesh.compute_id_to_rank(nodes=True)
         '''
-        print 'id_to_rank table size is %d' % max_node_id
+        print('id_to_rank table size is %d' % max_node_id)
         id_to_rank = numpy.zeros(1+max_node_id, dtype=int)
         for node in fe_mesh._nodes:
           id_to_rank[node._id] = node._rank
@@ -460,19 +460,19 @@ class FE_Mesh():
             el_node_nb = int(el_type[3:].split('_')[0].split('r')[0])
             if (el_type not in ['c2d3', 's3d3', 'c3d4', 'c3d6', 'c3d20', 'c3d20r', 'c3d15', 'c3d13', 'c3d10', 'c3d10_4',
                                 'c3d8', 'c2d4', 'c2d8', 'c2d8r']):
-                print 'error, element type %s is not supported yet' % el_type
+                print('error, element type %s is not supported yet' % el_type)
                 continue
             element = FE_Element(el_id, el_type)
             element._rank = i
             for n in range(el_node_nb):
                 element._nodelist.append(fe_mesh._nodes[id_to_rank[int(tokens[n + 2])]])
             if verbose:
-                print 'adding element', element
+                print('adding element', element)
             fe_mesh._elements.append(element)
         # look for ***group
         while True:
             line = geof.readline().strip()
-            print line
+            print(line)
             if line.startswith('***group'):
                 break
         # look for ***return
@@ -492,20 +492,20 @@ class FE_Mesh():
                         new_elset.append(int(elid))
                 if fe_mesh._elset_names.count(elset_name) == 0:
                     fe_mesh._elset_names.append(elset_name)
-                    print 'adding new elset: %s' % elset_name
+                    print('adding new elset: %s' % elset_name)
                     fe_mesh._elsets.append(new_elset)
                 else:
                     index = fe_mesh._elset_names.index(elset_name)
-                    print 'appending element ids to elset' + elset_name
+                    print('appending element ids to elset' + elset_name)
                     for el_id in new_elset:
                         fe_mesh._elsets[index].append(el_id)
-                print 'nb of elsets currently in mesh:', len(fe_mesh._elsets)
+                print('nb of elsets currently in mesh:', len(fe_mesh._elsets))
             elif line.startswith('**liset'):
                 liset_name = line.split()[1]
                 new_liset = []
                 while True:
                     line = geof.readline()
-                    print len(line), line == '\n', line
+                    print(len(line), line == '\n', line)
                     if line.startswith('*') or line == ('\n'):
                         break  # escape if entering anoter group
                     tokens = line.split()
@@ -515,7 +515,7 @@ class FE_Mesh():
                         new_liset.append([int(tokens[1]), int(tokens[3])])
                 if fe_mesh._liset_names.count(liset_name) == 0:
                     fe_mesh._liset_names.append(liset_name)
-                    print 'adding new liset: %s' % liset_name
+                    print('adding new liset: %s' % liset_name)
                     fe_mesh._lisets.append(new_liset)
             if line.startswith('***return'):
                 break

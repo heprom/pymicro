@@ -629,17 +629,17 @@ class TaylorModel:
         dgammas = np.linalg.lstsq(M, L, rcond=1.e-3)[0]
         '''
         U, s, V = np.linalg.svd(M) # solve by SVD
-        print 'U:\n'
-        print U
-        print 's:\n'
-        print s
-        print 'V:\n'
-        print V
+        print('U:\n')
+        print(U)
+        print('s:\n')
+        print(s)
+        print('V:\n')
+        print(V)
         pinv_svd = np.dot(np.dot(V.T, np.linalg.inv(np.diag(s))), U.T)
         dgammas_svd = np.dot(pinv_svd, L) # solving Ax=b computing x = A^-1*b
-        print 'dgammas (SVD) =', dgammas_svd
+        print('dgammas (SVD) =', dgammas_svd)
         '''
-        print 'dgammas (LST) =', dgammas
+        print('dgammas (LST) =', dgammas)
         if check:
             # check consistency
             Lcheck = np.zeros((3, 3), dtype=np.float)
@@ -648,7 +648,7 @@ class TaylorModel:
                 ms = g.orientation.slip_system_orientation_tensor(s)
                 # ms = g.orientation.slip_system_orientation_strain_tensor(s)
                 Lcheck += dgammas[i] * ms
-            print 'check:', np.sum(Lcheck - self.L), '\n', Lcheck
+            print('check:', np.sum(Lcheck - self.L), '\n', Lcheck)
             if abs(np.sum(Lcheck - self.L)) > 1e-1:
                 raise ValueError(
                     'Problem with solving for plastic slip, trying to increase the number of active slip systems')
@@ -657,5 +657,5 @@ class TaylorModel:
             s = self.slip_systems[ss_rank[i]]
             qs = g.orientation.slip_system_orientation_rotation_tensor(s)
             Wc += dgammas[i] * qs
-        print 'plastic spin:\n', Wc
+        print('plastic spin:\n', Wc)
         return Wc, dgammas

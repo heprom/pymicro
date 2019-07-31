@@ -253,7 +253,7 @@ class wxRadialProfileFrame(wx.Frame):
 
         # do some initialization
         if os.path.exists(self.path + '.par'):
-            print 'found radial profile parameters'
+            print('found radial profile parameters')
             params = open_radial_profile_params(self.path + '.par')
             if params[0] != None: self.rmin_sc.SetValue(params[0])
             if params[1] != None: self.rmax_sc.SetValue(params[1])
@@ -277,7 +277,7 @@ class wxRadialProfileFrame(wx.Frame):
 
     def OnLoadImage(self, im_file):
         self.path = im_file
-        print 'self.path=', self.path
+        print('self.path=', self.path)
         # read diffraction image
         if self.path.endswith('.edf'):
             # self.im = edf_readf(im_file, 2300)
@@ -295,11 +295,11 @@ class wxRadialProfileFrame(wx.Frame):
         self.statusbar.SetStatusText('Image loaded from %s ' % self.path)
 
     def OnCmapSelected(self, event):
-        print self.cmapCombo.GetValue()
+        print(self.cmapCombo.GetValue())
         self.imPanel.SetCmap(self.cmapCombo.GetValue())
 
     def OnColorScaleUpdate(self, event):
-        print self.maxim_sc.GetValue()
+        print(self.maxim_sc.GetValue())
         self.imPanel.SetColorMax(self.maxim_sc.GetValue())
 
     def CtrlDefaults(self):
@@ -341,7 +341,7 @@ class wxRadialProfileFrame(wx.Frame):
         self.CtrlUpdate(event)
 
     def OnSave(self, event):
-        print 'saving radial profile parameters to ' + self.path + '.par'
+        print('saving radial profile parameters to ' + self.path + '.par')
         save_radial_profile_params(self.path + '.par', self.rmin_sc.GetValue(), self.rmax_sc.GetValue(), \
                                    self.xcenter_sc.GetValue(), self.ycenter_sc.GetValue(), \
                                    self.theta1_sc.GetValue(), self.theta2_sc.GetValue(), \
@@ -352,7 +352,6 @@ class wxRadialProfileFrame(wx.Frame):
         self.Close()
 
     def OnProgress(self, progress):
-        # print 'progress:',100*progress
         self.gauge.SetValue(int(progress * 100))
         self.gauge.Update()
 
@@ -380,14 +379,14 @@ class wxRadialProfileFrame(wx.Frame):
                                    self.theta1_sc.GetValue(), self.theta2_sc.GetValue(), \
                                    self.steps_sc.GetValue(), self.im, \
                                    lambda progress: self.OnProgress(progress))
-        print self.profile
+        print(self.profile)
         self.plotPanel.update_profile(self.profile)
 
     def OnClearProfile(self, event):
         self.plotPanel.subplot.cla()
 
     def OnSaveProfile(self, event):
-        print 'saving radial profile to ' + self.path + '.profile'
+        print('saving radial profile to ' + self.path + '.profile')
         if self.plotPanel.pix2angle:
             x = self.profile[0]
             angles = zeros_like(x)

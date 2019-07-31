@@ -50,9 +50,9 @@ class vtkAnimationScene:
     def execute(self, iren, event):
         self.timer_count += self.timer_incr
         if self.verbose:
-            print 'animation scene timer_count=', self.timer_count
+            print('animation scene timer_count=', self.timer_count)
         if self.timer_end > 0 and self.timer_count > self.timer_end:
-            print 'end of animation loop, exiting...'
+            print('end of animation loop, exiting...')
             self.iren.ExitCallback()
         else:
             self.iren.Render()
@@ -89,7 +89,7 @@ class vtkAnimation:
 
     def pre_execute(self):
         if self.verbose:
-            print self.__repr__()
+            print(self.__repr__())
         if self.scene.timer_count < self.time_anim_starts or self.scene.timer_count > self.time_anim_ends:
             return 0
         else:
@@ -120,13 +120,13 @@ class vtkAnimCameraAroundZ(vtkAnimation):
 
         The animation perform a full turn in 36 frames by default.
         '''
-        print 'init vtkAnimCameraAroundZ'
+        print('init vtkAnimCameraAroundZ')
         vtkAnimation.__init__(self, t)
         self.turn = turn
         self.time_anim_ends = t + abs(self.turn) / 10
-        print 'time_anim_starts', self.time_anim_starts
-        print 'time_anim_ends', self.time_anim_ends
-        print 'turn', self.turn
+        print('time_anim_starts', self.time_anim_starts)
+        print('time_anim_ends', self.time_anim_ends)
+        print('turn', self.turn)
         self.camera = cam
 
     def execute(self, iren, event):
@@ -136,7 +136,8 @@ class vtkAnimCameraAroundZ(vtkAnimation):
         t1 = self.time_anim_starts
         t2 = self.time_anim_ends
         r = self.turn / (t2 - t1)
-        if self.scene.verbose: print 'moving azimuth by', r
+        if self.scene.verbose:
+            print('moving azimuth by', r)
         self.camera.Azimuth(r)
         vtkAnimation.post_execute(self, iren, event)
 
@@ -203,7 +204,8 @@ class vtkAnimCameraToZ(vtkAnimation):
         t1 = self.time_anim_starts
         t2 = self.time_anim_ends
         angle = 90 - (t2 - self.scene.timer_count) / float(t2 - t1) * (90 - 15)
-        if self.verbose: print self.scene.timer_count, self.camera.GetPosition(), angle
+        if self.verbose:
+            print(self.scene.timer_count, self.camera.GetPosition(), angle)
         self.camera.SetPosition(0, -2 * np.cos(angle * np.pi / 180.), 2 * np.sin(angle * np.pi / 180.))
         vtkAnimation.post_execute(self, iren, event)
 
@@ -221,7 +223,8 @@ class vtkZoom(vtkAnimation):
         t1 = self.time_anim_starts
         t2 = self.time_anim_ends
         z = 1 + (self.zoom - 1) * (self.scene.timer_count - t1) / float(t2 - t1)
-        if self.verbose: print 'zooming to', z
+        if self.verbose:
+            print('zooming to', z)
         self.camera.Zoom(z)
         vtkAnimation.post_execute(self, iren, event)
 
@@ -250,7 +253,8 @@ class vtkSetVisibility(vtkAnimation):
                     opacity = self.max_opacity * (1 - (t2 - self.scene.timer_count) / float(t2 - t1))
                 else:
                     opacity = self.max_opacity * (t2 - self.scene.timer_count) / float(t2 - t1)
-                if self.verbose: print 'opacity=', opacity
+                if self.verbose:
+                    print('opacity=', opacity)
                 # change the opacity for each actor in the assembly
                 set_opacity(self.actor, opacity)
         vtkAnimation.post_execute(self, iren, event)
@@ -261,7 +265,8 @@ class vtkMoveActor(vtkAnimation):
         vtkAnimation.__init__(self, t)
         self.actor = actor
         if self.actor.GetUserTransform() == None:
-            if self.verbose: print 'setting initial 4x4 matrix'
+            if self.verbose:
+                print('setting initial 4x4 matrix')
             t = vtk.vtkTransform()
             t.Identity()
             self.actor.SetUserTransform(t)
@@ -273,7 +278,8 @@ class vtkMoveActor(vtkAnimation):
         t1 = self.time_anim_starts
         t2 = self.time_anim_ends
         d = self.motion / (t2 - t1)
-        if self.verbose: print 'will move actor by', d
+        if self.verbose:
+            print('will move actor by', d)
         self.actor.GetUserTransform().Translate(d)
         vtkAnimation.post_execute(self, iren, event)
 

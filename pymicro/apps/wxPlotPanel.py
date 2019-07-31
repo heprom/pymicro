@@ -38,7 +38,6 @@ class PlotPanel(wx.Panel):
 
         # initialize matplotlib stuff
         dpi = 72
-        print 'dpi=', dpi
         self.figure = Figure((2.0, 2.0), dpi)
         self.canvas = FigureCanvas(self)  ##, -1, self.figure )
         self.SetColor(color)

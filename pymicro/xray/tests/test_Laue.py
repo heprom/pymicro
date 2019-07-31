@@ -105,8 +105,8 @@ class LaueTests(unittest.TestCase):
         detector.ucen = 445
         detector.vcen = 380
         detector.ref_pos = np.array([127.8, 0., 0.]) + \
-                           (detector.size[0] / 2 - detector.ucen) * detector.u_dir * detector.pixel_size + \
-                           (detector.size[1] / 2 - detector.vcen) * detector.v_dir * detector.pixel_size  # mm
+                           (detector.size[0] // 2 - detector.ucen) * detector.u_dir * detector.pixel_size + \
+                           (detector.size[1] // 2 - detector.vcen) * detector.v_dir * detector.pixel_size  # mm
         OC = detector.project_along_direction(Xu)  # C is the intersection of the direct beam with the detector
         # create test image
         pattern = np.zeros(detector.size, dtype=np.uint8)
@@ -119,7 +119,6 @@ class LaueTests(unittest.TestCase):
         test_dir = os.path.dirname(os.path.realpath(__file__))
         ref_gnom_data = np.load(os.path.join(test_dir, 'ref_gnom_data.npy'))
         self.assertTrue(np.array_equal(gnom.data, ref_gnom_data))
-        pass
 
     def test_indexation(self):
         """Verify indexing solution from a known Laue pattern."""

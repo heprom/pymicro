@@ -9,7 +9,7 @@ from pymicro.view.vtk_utils import lattice_grid, lattice_edges, apply_orientatio
 
 class VtkUtilsTests(unittest.TestCase):
     def setUp(self):
-        print 'testing vtk_utils'
+        print('testing vtk_utils')
 
     def test_apply_orientation_to_actor(self):
         o = Orientation.from_rodrigues([0.0885, 0.3889, 0.3268])
@@ -30,7 +30,7 @@ class VtkUtilsTests(unittest.TestCase):
 
 class VtkNumpyArrayTests(unittest.TestCase):
     def setUp(self):
-        print 'testing numpy to vtk array conversion'
+        print('testing numpy to vtk array conversion')
         self.data = np.linspace(0, 20 * 10 * 5 - 1, 1000).reshape((20, 10, 5)).astype(np.uint8)
         self.vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(self.data, order='F'), deep=1)
 

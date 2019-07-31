@@ -114,7 +114,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     :param bool display: display or save an image of the plot (False by default)
     '''
     path = os.path.dirname(__file__)
-    print path
+    print(path)
     mu_rho = np.genfromtxt(os.path.join(path, 'data', mat + '.txt'), usecols=(0, 1), comments='#')
     print('Data :', mu_rho)
     energy = mu_rho[:, 0]

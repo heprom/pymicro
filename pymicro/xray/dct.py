@@ -60,7 +60,7 @@ def dct_projection(orientations, data, dif_grains, omega, lambda_keV, detector, 
     return full_proj
 
 
-def add_to_image(image, inset, (u, v), verbose=False):
+def add_to_image(image, inset, uv, verbose=False):
     """Add an image to another image at a specified position.
 
     The inset image may be of any size and may only overlap partly on the overall image depending on the location
@@ -68,12 +68,12 @@ def add_to_image(image, inset, (u, v), verbose=False):
 
     :param np.array image: the master image taht will be modified.
     :param np.array inset: the inset to add to the image.
-    :param tuple (u,v): the location (center) where to add the inset.
+    :param tuple uv: the location (center) where to add the inset in the form (u, v).
     :param bool verbose: activate verbose mode (False by default).
     """
     # round the center to the closest integer value
-    u = int(u)
-    v = int(v)
+    u = int(uv[0])
+    v = int(uv[1])
     spot_size = inset.shape
     u_start = 0
     u_end = spot_size[0]

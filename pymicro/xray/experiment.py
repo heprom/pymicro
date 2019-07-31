@@ -248,7 +248,8 @@ class Experiment:
                 else:
                     energy_in = [the_energies[k] > self.source.min_energy and the_energies[k] < self.source.max_energy
                              for k in range(len(the_energies))]
-                uv_in = [uv[k][0] > 0 and uv[k][0] < detector.size[0] and uv[k][1] > 0 and uv[k][1] < detector.size[1]
+                uv_in = [uv[k][0] > 0 and uv[k][0] < detector.get_size_px()[0] and
+                         uv[k][1] > 0 and uv[k][1] < detector.get_size_px()[1]
                          for k in range(len(uv))]  # size n, diffraction located on the detector
                 spot_in = [uv_in[k] and energy_in[k] for k in range(len(uv))]
                 if verbose:

@@ -94,7 +94,7 @@ class TiffTests(unittest.TestCase):
 
     def test_imread(self):
         image = imread('temp.tif')
-        print 'image size is', np.shape(image)
+        print('image size is', np.shape(image))
         np.testing.assert_array_equal(image, self.data)
 
     def tearDown(self):

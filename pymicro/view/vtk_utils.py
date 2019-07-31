@@ -65,11 +65,11 @@ def pv_rand_cmap(N=256, first_is_black=False):
     rand_colors = np.random.rand(N, 3)
     if first_is_black:
         rand_colors[0] = [0., 0., 0.]  # enforce black background
-    print '<ColorMap name="random" space="RGB">'
+    print('<ColorMap name="random" space="RGB">')
     for i in range(N):
-        print '<Point x="%d" o="1" r="%8.6f" g="%8.6f" b="%8.6f"/>' % (
-            i, rand_colors[i][0], rand_colors[i][1], rand_colors[i][2])
-    print '</ColorMap>'
+        print('<Point x="%d" o="1" r="%8.6f" g="%8.6f" b="%8.6f"/>' %
+              (i, rand_colors[i][0], rand_colors[i][1], rand_colors[i][2]))
+    print('</ColorMap>')
 
 
 def gray_cmap(table_range=(0, 255)):
@@ -369,7 +369,7 @@ def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
     mapper.ScalarVisibilityOff()  # we use the grain id for chosing the color
     lut = rand_cmap(N, first_is_black=True, table_range=(0, N - 1))
     grain_actor = vtk.vtkActor()
-    print grain.id
+    print(grain.id)
     print(lut.GetTableValue(grain.id)[0:3])
     grain_actor.GetProperty().SetColor(lut.GetTableValue(grain.id)[0:3])
     grain_actor.GetProperty().SetOpacity(0.3)
@@ -398,7 +398,7 @@ def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
 def add_grain_to_3d_scene(grain, hklplanes, show_orientation=False):
     assembly = vtk.vtkAssembly()
     # create mapper
-    print 'creating grain actor'
+    print('creating grain actor')
     mapper = vtk.vtkDataSetMapper()
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:
         mapper.SetInputData(grain.vtkmesh)
@@ -832,7 +832,7 @@ def crystal_vertices(crystal, origin=(0., 0., 0.), m=1, n=1, p=1, hide_outside=T
 def crystal_3d(crystal, origin=(0., 0., 0.), m=1, n=1, p=1, \
                sphereRadius=0.1, tubeRadius=0.02, sphereColor=blue, tubeColor=grey, hide_outside=True):
     assembly = vtk.vtkAssembly()
-    print crystal
+    print(crystal)
     grid = lattice_grid(crystal._lattice, origin, m, n, p)
     (a, b, c) = crystal._lattice._lengths
     edges = lattice_edges(grid, tubeRadius=tubeRadius * a, tubeColor=tubeColor)
@@ -1220,7 +1220,8 @@ def load_STL_actor(name, ext='STL', verbose=False, color=grey, feature_edges=Fal
     :param bool feature_edges: show boundary edges (default False).
     :return: the 3d solid in the form of a vtk actor.
     '''
-    if verbose: print 'adding part: %s' % name
+    if verbose:
+        print('adding part: %s' % name)
     part = vtk.vtkSTLReader()
     part.SetFileName(name + '.' + ext)
     part.Update()
@@ -1272,8 +1273,8 @@ def read_image_data(file_name, size, header_size=0, data_type='uint8', verbose=F
     '''
     vtk_type = to_vtk_type(data_type)
     if verbose:
-        print 'reading scan %s with size %dx%dx%d using vtk type %d' % \
-              (file_name, size[0], size[1], size[2], vtk_type)
+        print('reading scan %s with size %dx%dx%d using vtk type %d' %
+              (file_name, size[0], size[1], size[2], vtk_type))
     reader = vtk.vtkImageReader2()  # 2 is faster
     reader.SetDataScalarType(vtk_type)
     reader.SetFileDimensionality(3)
@@ -1571,19 +1572,19 @@ def volren(data, alpha_channel=None, color_function=None):
     return volume
 
 
-def elevationFilter(data, value, (low, high), low_point=None, high_point=None):
+def elevationFilter(data, value, low_high_range, low_point=None, high_point=None):
     '''Create an isosurface and map it with an elevation filter.
 
     :param data: the dataset to map, in VTK format.
     :param float value: the value to use to create the isosurface.
-    :param tuple (low, high): range to use in the elevation filter. \
-    :param tuple low_point: lower point defining the axis from which to \
-    compute the elevation. If not specified, (0, 0, low) is assumed.
-    :param tuple high_point: lower point defining the axis from which to \
-    compute the elevation. If not specified, (0, 0, high) is assumed.
-    :returns vtkActor: The method return an actor that can be directly \
-    added to a renderer.
+    :param tuple low_high_range: range to use in the elevation filter in the form (low, high).
+    :param tuple low_point: lower point defining the axis from which to compute the elevation.
+    If not specified, (0, 0, low) is assumed.
+    :param tuple high_point: lower point defining the axis from which to compute the elevation.
+    If not specified, (0, 0, high) is assumed.
+    :returns vtkActor: The method return an actor that can be directly added to a renderer.
     '''
+    low, high = low_high_range
     lut = vtk.vtkLookupTable()
     lut.SetHueRange(0.6, 0)
     lut.SetSaturationRange(1.0, 0)
@@ -2266,7 +2267,7 @@ def grid_vol_view(scan):
     lut = rand_cmap(N=2048, first_is_black=True, table_range=(0, 2047))
     extract = extract_poly_data(grid)
     # create mapper
-    print 'creating actors'
+    print('creating actors')
     mapper = vtk.vtkDataSetMapper()
     mapper.SetLookupTable(lut)
     mapper.SetInput(extract.GetOutput())
@@ -2303,7 +2304,7 @@ def grid_vol_view(scan):
     renWin.Render()
     iren.Initialize()
     iren.Start()
-    print 'done'
+    print('done')
 
 
 def vol_view(scan):
@@ -2311,8 +2312,8 @@ def vol_view(scan):
     s_size = scan[:-4].split('_')[-2].split('x')
     s_type = scan[:-4].split('_')[-1]
     size = [int(s_size[0]), int(s_size[1]), int(s_size[2])]
-    print 'reading scan %s with size %dx%dx%d using type %d' % \
-          (scan, size[0], size[1], size[2], to_vtk_type(s_type))
+    print('reading scan %s with size %dx%dx%d using type %d' %
+          (scan, size[0], size[1], size[2], to_vtk_type(s_type)))
     reader = vtk.vtkImageReader2()  # 2 is faster
     reader.SetDataScalarType(to_vtk_type(s_type))
     reader.SetFileDimensionality(3)
@@ -2325,7 +2326,7 @@ def vol_view(scan):
     reader.SetFileName(scan)
     data = reader.GetOutput()
     # threshold to remove background
-    print 'thresholding to remove background'
+    print('thresholding to remove background')
     thresh = vtk.vtkThreshold()
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:
         thresh.SetInputData(data)
@@ -2338,7 +2339,7 @@ def vol_view(scan):
     # create random lut
     lut = rand_cmap(N=2048, first_is_black=True, table_range=(0, 2047))
     # create mapper
-    print 'creating actors'
+    print('creating actors')
     mapper = vtk.vtkDataSetMapper()
     mapper.SetLookupTable(lut)
     mapper.SetInputConnection(thresh.GetOutputPort())
@@ -2375,18 +2376,18 @@ def vol_view(scan):
     renWin.Render()
     iren.Initialize()
     iren.Start()
-    print 'done'
+    print('done')
 
 
 def ask_for_map_file(dir, scan_name):
     list = {};
     i = 0
-    print 'no map file was specified, please chose from the following file available'
+    print('no map file was specified, please chose from the following file available')
     for file in os.listdir(dir):
         if file.startswith(scan_name + '.'):
             i += 1
             list[i] = file
-            print ' * ', file, '[', i, ']'
+            print(' * ', file, '[', i, ']')
     if i == 0:
         sys.exit('no matching map file could be located, exiting...')
     r = raw_input('chose file by entering the coresponding number [1]: ')

@@ -124,17 +124,13 @@ class OrientationTests(unittest.TestCase):
         C = -2 * a * np.sin(theta) ** 2 / lambda_nm  # the minus sign comes from the main equation
         Delta = 4 * (A ** 2 + B ** 2 - C ** 2)
         self.assertEqual(Delta > 0, True)
-        # print 'A=',A
-        # print 'B=',B
-        # print 'C=',C
-        # print 'Delta=',Delta
         t1 = (B - 0.5 * np.sqrt(Delta)) / (A + C)
         t2 = (B + 0.5 * np.sqrt(Delta)) / (A + C)
-        # print 'verifying Acos(w)+Bsin(w)=C:'
+        # verifying A cos(w) + B sin(w) = C:'
         for t in (t1, t2):
             x = A * (1 - t ** 2) / (1 + t ** 2) + B * 2 * t / (1 + t ** 2)
             self.assertAlmostEqual(x, C, 2)
-        # print 'verifying (A+C)*t**2-2*B*t+(C-A)=0'
+        # verifying (A + C) * t**2 - 2 * B * t + (C - A) = 0'
         for t in (t1, t2):
             self.assertAlmostEqual((A + C) * t ** 2 - 2 * B * t + (C - A), 0.0, 2)
         (w1, w2) = o.dct_omega_angles(hkl, lambda_keV, verbose=False)

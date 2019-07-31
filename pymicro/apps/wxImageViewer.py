@@ -93,7 +93,7 @@ class wxImageViewerFrame(wx.Frame):
 
     def OnLoadImage(self, im_file):
         self.path = im_file
-        print 'self.path=', self.path
+        print('self.path=', self.path)
         # read image depending on file extension (only .png .tif and .edf supported)
         if self.path.endswith('.edf'):
             self.im = edf_read(im_file).transpose()
@@ -104,8 +104,8 @@ class wxImageViewerFrame(wx.Frame):
         else:
             print('Only png, tif and edf images are supported for the moment')
             sys.exit(1)
-        print 'min in image= %d, max in image=%d' % (np.min(self.im), np.max(self.im))
-        print np.shape(self.im)
+        print('min in image= %d, max in image=%d' % (np.min(self.im), np.max(self.im)))
+        print(np.shape(self.im))
         self.cur_image_name.SetLabel(im_file)
         self.imPanel.SetImage(self.im)
 
@@ -123,7 +123,7 @@ class ImageViewer(wx.App):
         for file in os.listdir(self.wdir):
             if re.search(pattern, file):
                 self.images.append(os.path.join(wdir, file))
-        print self.images
+        print(self.images)
         if not self.images:
             print('No image found, please verify your pattern or your working directory')
             sys.exit(1)

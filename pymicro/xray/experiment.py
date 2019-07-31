@@ -217,7 +217,7 @@ class Experiment:
             self.fs.use_energy_limits = kwargs.get('use_energy_limits', False)
             # set the lattice planes to use in the simulation
             self.fs.max_miller = kwargs.get('max_miller', 5)
-            if kwargs.has_key('hkl_planes'):
+            if 'hkl_planes' in kwargs:
                 self.fs.hkl_planes = kwargs['hkl_planes']
             else:
                 self.fs.hkl_planes = build_list(lattice=self.sample.material, max_miller=self.fs.max_miller)
@@ -289,18 +289,18 @@ class Experiment:
         sample = Sample()
         sample.set_name(dict_exp['Sample']['Name'])
         sample.set_position(dict_exp['Sample']['Position'])
-        if dict_exp['Sample'].has_key('Geometry'):
+        if 'Geometry' in dict_exp['Sample']:
             sample_geo = ObjectGeometry()
             sample_geo.set_type(dict_exp['Sample']['Geometry']['Type'])
             sample.set_geometry(sample_geo)
-        if dict_exp['Sample'].has_key('Material'):
+        if 'Material' in dict_exp['Sample']:
             a, b, c = dict_exp['Sample']['Material']['Lengths']
             alpha, beta, gamma = dict_exp['Sample']['Material']['Angles']
             centering = dict_exp['Sample']['Material']['Centering']
             symmetry = Symmetry.from_string(dict_exp['Sample']['Material']['Symmetry'])
             material = Lattice.from_parameters(a, b, c, alpha, beta, gamma, centering=centering, symmetry=symmetry)
             sample.set_material(material)
-        if dict_exp['Sample'].has_key('Microstructure'):
+        if 'Microstructure' in dict_exp['Sample']:
             micro = Microstructure(dict_exp['Sample']['Microstructure']['Name'])
             for i in range(len(dict_exp['Sample']['Microstructure']['Grains'])):
                 dict_grain = dict_exp['Sample']['Microstructure']['Grains'][i]

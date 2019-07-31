@@ -76,9 +76,9 @@ class Detector2d:
         intensityResult /= counts
 
         if output_image:
-            print self.image_path
-            print os.path.basename(self.image_path)
-            print os.path.splitext(os.path.basename(self.image_path))
+            print(self.image_path)
+            print(os.path.basename(self.image_path))
+            print(os.path.splitext(os.path.basename(self.image_path)))
             output_image_path = os.path.join(self.save_path, \
                                              'AR_%s.pdf' % os.path.splitext(os.path.basename(self.image_path))[0])
             plt.figure()
@@ -129,8 +129,8 @@ class Detector2d:
         if not two_theta_maxi: two_theta_maxi = self.two_thetas.max()
         if not psi_step: psi_step = 1. / self.calib
         nbOfBins = int((psi_max - psi_min) / psi_step)
-        print '* Sagital regroup (psi binning)'
-        print '  psi range = [%.1f-%.1f] with a %g deg step (%d bins)' % (psi_min, psi_max, psi_step, nbOfBins)
+        print('* Sagital regroup (psi binning)')
+        print('  psi range = [%.1f-%.1f] with a %g deg step (%d bins)' % (psi_min, psi_max, psi_step, nbOfBins))
 
         bin_edges = np.linspace(psi_min, psi_max, 1 + nbOfBins)
         psi_values = bin_edges[:-1] + 0.5 * psi_step
@@ -150,13 +150,13 @@ class Detector2d:
         for ii in range(nbOfBins):
             intensityResult[ii] = self.corr_data[binIndices == ii].sum()
             counts[ii] = (binIndices == ii).sum()
-        print counts
+        print(counts)
         intensityResult /= counts
 
         if output_image:
-            print self.image_path
-            print os.path.basename(self.image_path)
-            print os.path.splitext(os.path.basename(self.image_path))
+            print(self.image_path)
+            print(os.path.basename(self.image_path))
+            print(os.path.splitext(os.path.basename(self.image_path)))
             output_image_path = os.path.join(self.save_path, \
                                              'AR_%s.pdf' % os.path.splitext(os.path.basename(self.image_path))[0])
             plt.figure()
@@ -176,7 +176,7 @@ class Detector2d:
                 self.save_path = os.path.dirname(self.image_path)
             txt_path = os.path.join(self.save_path,
                                     'Int_%s_psi_profile.txt' % os.path.splitext(os.path.basename(self.image_path))[0])
-            print "writing text file"
+            print("writing text file")
             if int(np.__version__.split('.')[1]) > 6:
                 np.savetxt(txt_path, (psi_values, intensityResult, counts), \
                            header='psi (deg) -- norm intensity -- points counted', \
@@ -648,10 +648,10 @@ class Xpad(Detector2d):
                 xold = newX_array[x]
                 Ifactor = newX_Ifactor_array[x]
                 if (Ifactor > 0):
-                    # print "pos"
+                    # print("pos")
                     thisCorrectedImage[y, x] = self.corr_data[yold, xold] * Ifactor
                 if (Ifactor < 0):
-                    # print "neg"
+                    # print("neg")
                     thisCorrectedImage[y, x] = (self.corr_data[yold, xold - 1] + self.corr_data[
                         yold, xold + 1]) / 2.0 / self.factorIdoublePixel
 

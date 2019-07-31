@@ -419,7 +419,7 @@ class Orientation:
         from pymicro.xray.xray_utils import lambda_keV_to_nm
         lambda_nm = lambda_keV_to_nm(lambda_keV)
         X = np.array([1., 0., 0.]) / lambda_nm
-        print 'magnitude of X', np.linalg.norm(X)
+        print('magnitude of X', np.linalg.norm(X))
         gt = self.orientation_matrix().transpose()
         (h, k, l) = hkl.miller_indices()
         theta = hkl.bragg_angle(lambda_keV) * 180. / np.pi
@@ -439,22 +439,22 @@ class Orientation:
             Gl = R.dot(Gs)
             print('scattering vector in laboratory CS', Gl)
             n = R.dot(gt.dot(hkl.normal()))
-            print 'plane normal:', hkl.normal()
-            print R
-            print 'rotated plane normal:', n, ' with a norm of', np.linalg.norm(n)
+            print('plane normal:', hkl.normal())
+            print(R)
+            print('rotated plane normal:', n, ' with a norm of', np.linalg.norm(n))
             G = n / hkl.interplanar_spacing()  # here G == N
-            print 'G vector:', G, ' with a norm of', np.linalg.norm(G)
+            print('G vector:', G, ' with a norm of', np.linalg.norm(G))
             K = X + G
-            print 'X + G vector', K
+            print('X + G vector', K)
             magnitude_K.append(np.linalg.norm(K))
-            print 'magnitude of K', np.linalg.norm(K)
+            print('magnitude of K', np.linalg.norm(K))
             alpha = np.arccos(np.dot(-X, G) / (np.linalg.norm(-X) * np.linalg.norm(G))) * 180 / np.pi
-            print 'angle between -X and G', alpha
+            print('angle between -X and G', alpha)
             alphas.append(alpha)
             twotheta = np.arccos(np.dot(K, X) / (np.linalg.norm(K) * np.linalg.norm(X))) * 180 / np.pi
-            print 'angle (deg) between K and X', twotheta
+            print('angle (deg) between K and X', twotheta)
             twothetas.append(twotheta)
-        print 'min alpha angle is ', min(alphas)
+        print('min alpha angle is ', min(alphas))
 
         # compute omega_1 and omega_2 to verify graphically
         (w1, w2) = self.dct_omega_angles(hkl, lambda_keV, verbose=False)
@@ -988,7 +988,6 @@ class Orientation:
         n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
         slip = slip_system.get_slip_direction().direction()
         slip_rot = np.dot(gt, slip)
-        # print n_rot, load_direction, slip_rot
         SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
         return SF
 
@@ -1169,7 +1168,8 @@ class Grain:
         grain.position = np.array([xg, yg, zg])
         grain_mesh = grain_node.childNodes[3]
         grain_mesh_file = grain_mesh.childNodes[0].nodeValue
-        if verbose: print grain_mesh_file
+        if verbose:
+            print(grain_mesh_file)
         grain.load_vtk_repr(grain_mesh_file, verbose)
         return grain
 
@@ -1180,7 +1180,7 @@ class Grain:
         import vtk
         if not file_name:
             file_name = self.vtk_file_name()
-        print 'writting ' + file_name
+        print('writting ' + file_name)
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(file_name)
         writer.SetInput(self.vtkmesh)
@@ -1188,7 +1188,8 @@ class Grain:
 
     def load_vtk_repr(self, file_name, verbose=False):
         import vtk
-        if verbose: print 'reading ' + file_name
+        if verbose:
+            print('reading ' + file_name)
         reader = vtk.vtkXMLUnstructuredGridReader()
         reader.SetFileName(file_name)
         reader.Update()
@@ -1276,7 +1277,8 @@ class Microstructure:
         It is possible to restrict the grains which are loaded by providing
         the list of ids of the grains of interest.
         """
-        if verbose and grain_ids: print 'loading only grain ids %s' % grain_ids
+        if verbose and grain_ids:
+            print('loading only grain ids %s' % grain_ids)
         micro = Microstructure()
         dom = parse(xml_file_name)
         root = dom.childNodes[0]
@@ -1285,7 +1287,8 @@ class Microstructure:
         grains = root.childNodes[1]
         for node in grains.childNodes:
             if grain_ids and not (int(node.childNodes[0].childNodes[0].nodeValue) in grain_ids): continue
-            if verbose: print node
+            if verbose:
+                print(node)
             micro.grains.append(Grain.from_xml(node, verbose))
         return micro
 
@@ -1361,7 +1364,7 @@ class Microstructure:
         cryst_structure.attrs['ObjectType'] = np.string_('DataArray<uint32_t>')
         cryst_structure.attrs['Tuple Axis Dimensions'] = np.string_('x=2')
         cryst_structure.attrs['TupleDimensions'] = np.uint64(2)
-        mat_name = ed.create_dataset('MaterialName', data=['Invalid Phase', 'Unknown'])
+        mat_name = ed.create_dataset('MaterialName', data=[a.encode('utf8') for a in ['Invalid Phase', 'Unknown']])
         mat_name.attrs['ComponentDimensions'] = np.uint64(1)
         mat_name.attrs['DataArrayVersion'] = np.int32(2)
         mat_name.attrs['ObjectType'] = np.string_('StringDataArray')
@@ -1533,8 +1536,8 @@ class Microstructure:
         x_max = np.ceil(max(data_abs.shape[0], data_abs.shape[1]) * 2 ** 0.5)
         proj = np.zeros((np.shape(data_abs)[2], x_max), dtype=np.float)
         if verbose:
-            print 'diffracting grains', dif_grains
-            print 'proj size is ', np.shape(proj)
+            print('diffracting grains', dif_grains)
+            print('proj size is ', np.shape(proj))
         # handle each grain in Bragg condition
         for (gid, (h, k, l)) in dif_grains:
             mask_dif = (data == gid)
@@ -1545,13 +1548,13 @@ class Microstructure:
         # create the detector image (larger than the FOV) by padding the transmission image with zeros
         full_proj = np.zeros(det_npx / ds, dtype=np.float)
         if verbose:
-            print 'full proj size is ', np.shape(full_proj)
-            print 'max proj', proj.max()
+            print('full proj size is ', np.shape(full_proj))
+            print('max proj', proj.max())
             # here we could use np.pad with numpy version > 1.7
-            print int(0.5 * det_npx[0] / ds - proj.shape[0] / 2.)
-            print int(0.5 * det_npx[0] / ds + proj.shape[0] / 2.)
-            print int(0.5 * det_npx[1] / ds - proj.shape[1] / 2.)
-            print int(0.5 * det_npx[1] / ds + proj.shape[1] / 2.)
+            print(int(0.5 * det_npx[0] / ds - proj.shape[0] / 2.))
+            print(int(0.5 * det_npx[0] / ds + proj.shape[0] / 2.))
+            print(int(0.5 * det_npx[1] / ds - proj.shape[1] / 2.))
+            print(int(0.5 * det_npx[1] / ds + proj.shape[1] / 2.))
         # let's moderate the direct beam so we see nicely the spots with a 8 bits scale
         att = 6.0 / ds  # 1.0
         full_proj[int(0.5 * det_npx[0] / ds - proj.shape[0] / 2.):int(0.5 * det_npx[0] / ds + proj.shape[0] / 2.), \
@@ -1573,16 +1576,16 @@ class Microstructure:
             (up, vp) = (0.5 * det_npx[0] / ds + u_mic / (ps * ds),
                         0.5 * det_npx[1] / ds + v_mic / (ps * ds))  # unit is pixel on the detector
             if verbose:
-                print 'plane normal:', p.normal()
-                print R
-                print 'rotated plane normal:', n
-                print 'scattering vector:', G
-                print 'K = X + G vector', K
-                print 'lenght X', np.linalg.norm(X)
-                print 'lenght K', np.linalg.norm(K)
-                print 'angle between X and K', np.arccos(
-                    np.dot(K, X) / (np.linalg.norm(K) * np.linalg.norm(X))) * 180 / np.pi
-                print 'diffracted beam will hit the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (u, v, up, vp)
+                print('plane normal:', p.normal())
+                print(R)
+                print('rotated plane normal:', n)
+                print('scattering vector:', G)
+                print('K = X + G vector', K)
+                print('lenght X', np.linalg.norm(X))
+                print('lenght K', np.linalg.norm(K))
+                print('angle between X and K', np.arccos(
+                    np.dot(K, X) / (np.linalg.norm(K) * np.linalg.norm(X))) * 180 / np.pi)
+                print('diffracted beam will hit the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (u, v, up, vp))
             grain_data = np.where(data == gid, 1, 0)
             data_dif = grain_data[ndimage.find_objects(data == gid)[0]]
             x_max = np.ceil(max(data_dif.shape[0], data_dif.shape[1]) * 2 ** 0.5)
@@ -1591,12 +1594,12 @@ class Microstructure:
                 a = radon(data_dif[:, :, i], [omega])
                 proj_dif[i, :] = a[:, 0]
             if verbose:
-                print '* proj_dif size is ', np.shape(proj_dif)
-                print int(up - proj_dif.shape[0] / 2.)
-                print int(up + proj_dif.shape[0] / 2.)
-                print int(vp - proj_dif.shape[1] / 2.)
-                print int(vp + proj_dif.shape[1] / 2.)
-                print 'max proj_dif', proj_dif.max()
+                print('* proj_dif size is ', np.shape(proj_dif))
+                print(int(up - proj_dif.shape[0] / 2.))
+                print(int(up + proj_dif.shape[0] / 2.))
+                print(int(vp - proj_dif.shape[1] / 2.))
+                print(int(vp + proj_dif.shape[1] / 2.))
+                print('max proj_dif', proj_dif.max())
             # add diffraction spot to the image detector
             try:
                 # warning full_proj image is transposed (we could fix that and plot with .T since pyplot plots images like (y,x))
@@ -1605,7 +1608,7 @@ class Microstructure:
                 # full_proj[int(up - proj_dif.shape[0]/2.):int(up + proj_dif.shape[0]/2.), \
                 #        int(vp - proj_dif.shape[1]/2.):int(vp + proj_dif.shape[1]/2.)] += proj_dif
             except:
-                print 'error occured'  # grain diffracts outside the detector
+                print('error occured')  # grain diffracts outside the detector
                 pass
             plt.imsave('proj_dif/proj_dif_grain%d_omega=%05.1f.png' % (gid, omega), proj_dif, cmap=cm.gray,
                        origin='lower')
@@ -1617,7 +1620,7 @@ class Microstructure:
                               (3, 3, 2)]:
                 hkl = HklPlane(h, k, l, lattice)
                 theta = hkl.bragg_angle(lambda_keV)
-                print 'bragg angle for %s reflection is %.2f deg' % (hkl.miller_indices(), theta * 180. / np.pi)
+                print('bragg angle for %s reflection is %.2f deg' % (hkl.miller_indices(), theta * 180. / np.pi))
                 t = np.linspace(0.0, 2 * np.pi, num=37)
                 L = d * 1000 / ps / ds * np.tan(2 * theta)  # 2 theta distance on the detector
                 ax.plot(0.5 * det_npx[0] / ds + L * np.cos(t), 0.5 * det_npx[1] / ds + L * np.sin(t), 'g--')

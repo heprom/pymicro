@@ -58,7 +58,7 @@ def build_list(lattice=None, max_miller=3, extinction=None, Laue_extinction=Fals
     if Laue_extinction is True:
         lam_min = lambda_keV_to_nm(max_keV)
         val = 2. * lattice._lengths[0] / lam_min # lattice have to be cubic !
-        print 'Limit value is %d' % val
+        print('Limit value is %d' % val)
         for hkl in hklplanes:
             (h, k, l) = hkl.miller_indices()
             test = h ** 2 + k ** 2 + l ** 2
@@ -637,7 +637,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, symmet
         (h, k, l) = p.miller_indices()
         hkl_str.append('(%d%d%d)' % (h, k, l))
     # compute theoretical angle between each plane normal, store the results using a structured array
-    angles_th = np.empty(len(hkl_planes) * (len(hkl_planes) - 1) / 2,
+    angles_th = np.empty(len(hkl_planes) * (len(hkl_planes) - 1) // 2,
                          dtype=[('angle', 'f4'), ('hkl1', 'i4'), ('hkl2', 'i4')])
     index = 0
     for i in range(len(hkl_planes)):
@@ -680,8 +680,8 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, symmet
             print('- SOLUTION %d -' % (n + 1))
             final_orientation = Orientation(final_orientation_matrix[n])
             print(final_orientation.inFZ())
-            print ('- Cristal orientation in Fundamental Zone \n {0:s} \n'.format(final_orientation.euler))
-            print('- Rodrigues vector in the fundamental Zone \n {0:s} \n'.format(final_orientation.rod))
+            print('- Cristal orientation in Fundamental Zone \n {} \n'.format(final_orientation.euler))
+            print('- Rodrigues vector in the fundamental Zone \n {} \n'.format(final_orientation.rod))
             if display:
                 from pymicro.crystal.texture import PoleFigure
                 PoleFigure.plot(final_orientation, axis='Z')

@@ -98,13 +98,13 @@ class wxVolumeViewerFrame(wx.Frame):
 
     def OnLoadImage(self, im_file):
         self.path = im_file
-        print 'self.path=', self.path
+        print('self.path=', self.path)
         # read 3d image
         h, self.vol = edf_read(im_file, header_size=0, verbose=True, \
                                autoparse_filename=True, return_header=True)
-        print 'min in image= %d, max in image=%d' % (np.min(self.vol), np.max(self.vol))
+        print('min in image= %d, max in image=%d' % (np.min(self.vol), np.max(self.vol)))
         self.maxim_sc.SetRange(0, np.shape(self.vol)[2] - 1)
-        print np.shape(self.vol)
+        print(np.shape(self.vol))
         self.imPanel.SetImage(self.vol[:, :, 0])
 
     def OnCmapSelected(self, event):
@@ -114,7 +114,7 @@ class wxVolumeViewerFrame(wx.Frame):
         self.imPanel.SetImage(self.vol[:, :, self.maxim_sc.GetValue()])
 
     def On3dView(self, event):
-        print 'launching 3d vol viewer'
+        print('launching 3d vol viewer')
         # grid_vol_view(self.path)
         vol_view(self.path)
 

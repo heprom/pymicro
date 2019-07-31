@@ -196,7 +196,7 @@ class FitFunction:
             global it
             p = self.get_parameters()
             if verbose:
-                print 'iteration %d, trying parameters:' % it, p
+                print('iteration %d, trying parameters:' % it, p)
                 it += 1
                 '''
                 from matplotlib import pyplot as plt

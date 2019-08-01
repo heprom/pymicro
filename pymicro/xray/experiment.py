@@ -314,6 +314,10 @@ class Experiment:
         exp.set_sample(sample)
         source = XraySource()
         source.set_position(dict_exp['Source']['Position'])
+        if 'Min Energy (keV)' in dict_exp['Source']:
+            source.set_min_energy(dict_exp['Source']['Min Energy (keV)'])
+        if 'Max Energy (keV)' in dict_exp['Source']:
+            source.set_max_energy(dict_exp['Source']['Max Energy (keV)'])
         exp.set_source(source)
         for i in range(len(dict_exp['Detectors'])):
             dict_det = dict_exp['Detectors'][i]
@@ -324,6 +328,7 @@ class Experiment:
                 det = RegArrayDetector2d(size=dict_det['Size (pixels)'])
                 det.pixel_size = dict_det['Pixel Size (mm)']
                 det.ref_pos = dict_det['Reference Position (mm)']
+                det.set_binning(dict_det['Binning'])
                 det.u_dir = np.array(dict_det['u_dir'])
                 det.v_dir = np.array(dict_det['v_dir'])
                 det.w_dir = np.array(dict_det['w_dir'])
@@ -360,6 +365,7 @@ class ExperimentEncoder(json.JSONEncoder):
             dict_det['Pixel Size (mm)'] = o.pixel_size
             dict_det['Data Type'] = str(o.data_type)
             dict_det['Reference Position (mm)'] = o.ref_pos.tolist()
+            dict_det['Binning'] = o.binning
             dict_det['u_dir'] = o.u_dir.tolist()
             dict_det['v_dir'] = o.v_dir.tolist()
             dict_det['w_dir'] = o.w_dir.tolist()
@@ -374,6 +380,10 @@ class ExperimentEncoder(json.JSONEncoder):
         if isinstance(o, XraySource):
             dict_source = {}
             dict_source['Position'] = o.position.tolist()
+            if o.min_energy is not None:
+                dict_source['Min Energy (keV)'] = o.min_energy
+            if o.max_energy is not None:
+                dict_source['Max Energy (keV)'] = o.max_energy
             return dict_source
         if isinstance(o, Microstructure):
             dict_micro = {}

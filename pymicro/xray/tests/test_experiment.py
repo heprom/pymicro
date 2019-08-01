@@ -9,6 +9,7 @@ class ExperimentTests(unittest.TestCase):
         """testing the experiment module:"""
         self.experiment = Experiment()
         self.experiment.get_sample().set_name('test sample')
+        self.experiment.get_source().set_max_energy(120.)
         print(self.experiment.get_sample().geo.geo_type)
 
     def test_add_detector(self):
@@ -33,5 +34,6 @@ class ExperimentTests(unittest.TestCase):
         self.experiment.active_detector_id = 0
         self.experiment.save()
         self.assertTrue(os.path.exists('experiment.txt'))
-        Experiment.load('experiment.txt')
+        exp = Experiment.load('experiment.txt')
+        self.assertTrue(exp.get_source().max_energy == 120.)
 

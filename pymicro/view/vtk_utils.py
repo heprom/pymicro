@@ -988,7 +988,7 @@ def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, plane_colors=
         plane = vtk.vtkPlane()
         plane.SetOrigin(mid)
         plane.SetNormal(hklplane.normal())
-        plane_color = None
+        plane_color = grey
         if plane_colors:
             plane_color = plane_colors[i]
         hklplaneActor = add_plane_to_grid(plane, grid, mid, color=plane_color, opacity=plane_opacity)

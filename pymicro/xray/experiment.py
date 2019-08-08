@@ -257,10 +257,9 @@ class Experiment:
                 if self.source.min_energy is None and self.source.max_energy is None:
                     energy_in = [True for k in range(len(the_energies))]
                 else:
-                    energy_in = [the_energies[k] > self.source.min_energy and the_energies[k] < self.source.max_energy
-                             for k in range(len(the_energies))]
-                uv_in = [uv[k][0] > 0 and uv[k][0] < detector.get_size_px()[0] and
-                         uv[k][1] > 0 and uv[k][1] < detector.get_size_px()[1]
+                    energy_in = [self.source.min_energy < the_energies[k] < self.source.max_energy
+                                 for k in range(len(the_energies))]
+                uv_in = [0 < uv[k][0] < detector.get_size_px()[0] and 0 < uv[k][1] < detector.get_size_px()[1]
                          for k in range(len(uv))]  # size n, diffraction located on the detector
                 spot_in = [uv_in[k] and energy_in[k] for k in range(len(uv))]
                 if verbose:
@@ -328,7 +327,8 @@ class Experiment:
                 det = RegArrayDetector2d(size=dict_det['Size (pixels)'])
                 det.pixel_size = dict_det['Pixel Size (mm)']
                 det.ref_pos = dict_det['Reference Position (mm)']
-                det.set_binning(dict_det['Binning'])
+                if 'Binning' in dict_det:
+                    det.set_binning(dict_det['Binning'])
                 det.u_dir = np.array(dict_det['u_dir'])
                 det.v_dir = np.array(dict_det['v_dir'])
                 det.w_dir = np.array(dict_det['w_dir'])

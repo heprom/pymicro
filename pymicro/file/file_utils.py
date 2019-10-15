@@ -277,7 +277,7 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
                 pack_binary = True
                 data_type = np.uint8
             else:
-                data_type = np.dtype(infos['data_type'])  # overwrite defaults with .info file value
+                data_type = np.dtype(infos['data_type'].lower())  # overwrite defaults with .info file value
     else:
         (nx, ny, nz) = dims
     if zrange is None:

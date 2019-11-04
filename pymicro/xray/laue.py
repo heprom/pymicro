@@ -114,9 +114,12 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     2.a / ON = tan(nu) + tan(psi - nu) + sin(psi) / (cos(nu) * cos(psi + nu))
     this reduces when nu = psi to 2.a / ON = np.tan(2.psi)
     '''
-    factor = tan(nu) + tan(psi - nu) + sin(psi) / (cos(nu) * cos(psi + nu))
-    a = 0.5 * np.linalg.norm(ON) * factor
-    #a = abs(0.5 * np.linalg.norm(ON) * np.tan(2 * psi))
+    #factor = tan(nu) + tan(psi - nu) + sin(psi) / (cos(nu) * cos(psi + nu))
+    #a = 0.5 * np.linalg.norm(ON) * factor
+    # a = abs(0.5 * np.linalg.norm(ON) * np.tan(2 * psi))
+    # use the factorized version of the factor calculated in the article
+    factor = cos(psi) * sin(psi) / (cos(psi + nu) * cos(psi - nu))
+    a = np.linalg.norm(ON) * factor
     b = a * np.sqrt(1 - e ** 2)
     if verbose:
         print('angle nu (deg) is %.3f' % (nu * 180 / pi))

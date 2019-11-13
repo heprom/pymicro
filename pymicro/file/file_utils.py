@@ -242,7 +242,7 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
              header_size=0, autoparse_filename=False, dims=None, mmap=False, pack_binary=False):
     '''Read a volume file stored as a concatenated stack of binary images.
 
-    The volume size must be specified by dims=(nx,ny,nz) unless an associated
+    The volume size must be specified by dims=(nx, ny, nz) unless an associated
     .info file is present in the same location to determine the volume
     size. The data type is unsigned short (8 bits) by default but can be set
     to any numpy type (32 bits float for example).
@@ -261,6 +261,15 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
       matlab in +y+x+z convention (column major order), you may want to
       use: np.swapaxes(HST_read('file.edf', ...), 0, 1)
 
+    :param str scan_name: path to the binary file to read.
+    :param zrange: range of slices to use.
+    :param data_type: numpy data type to use.
+    :param bool verbose: flag to activate verbose mode.
+    :param int header_size: number of bytes to skeep before reading the payload.
+    :param bool autoparse_filename: flag to parse the file name to retreive the dims and data_type automatically.
+    :param tuple dims: a tuple containing the array dimensions.
+    :param bool mmap: activate the memory mapping mode.
+    :param bool pack_binary: this flag should be true when reading a file written with the binary packing mode.
     '''
     if autoparse_filename:
         s_type = scan_name[:-4].split('_')[-1]

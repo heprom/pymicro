@@ -764,6 +764,19 @@ class Orientation:
             return I + np.sin(theta) * omega + (1 - np.cos(theta)) * omega.dot(omega)
 
     @staticmethod
+    def Rodrigues2Axis(rod):
+        """
+        Compute the axis/angle representation from the Rodrigues vector.
+
+        :param rod: The Rodrigues vector as a 3 components array.
+        :returns: A tuple in the (axis, angle) form.
+        """
+        r = np.linalg.norm(rod)
+        axis = rod / r
+        angle = 2 * np.arctan(r)
+        return axis, angle
+
+    @staticmethod
     def Axis2OrientationMatrix(axis, angle):
         """
         Compute the (passive) orientation matrix associated the rotation defined by the given (axis, angle) pair.

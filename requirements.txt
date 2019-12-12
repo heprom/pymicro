@@ -1,6 +1,6 @@
 numpy
 scipy
-skimage
+scikit-image
 matplotlib
 vtk
 h5py

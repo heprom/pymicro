@@ -2,7 +2,6 @@ import os, numpy as np
 from matplotlib import pyplot as plt
 from skimage.transform import radon
 from math import *
-from skimage.external import tifffile
 
 densities = {'Li': 0.533,  # Z = 3
              'Be': 1.8450,  # Z = 4

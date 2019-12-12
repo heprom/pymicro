@@ -7,6 +7,15 @@ xray Package
    :undoc-members:
    :show-inheritance:
 
+:mod:`dct` Module
+-----------------
+
+.. automodule:: pymicro.xray.dct
+   :members:
+   :special-members: __init__
+   :undoc-members:
+   :show-inheritance:
+
 :mod:`detectors` Module
 -----------------------
 
@@ -16,8 +25,17 @@ xray Package
    :undoc-members:
    :show-inheritance:
 
-:mod:`fitting` Module
+:mod:`experiment` Module
 ------------------------
+
+.. automodule:: pymicro.xray.experiment
+   :members:
+   :special-members: __init__
+   :undoc-members:
+   :show-inheritance:
+
+:mod:`fitting` Module
+---------------------
 
 .. automodule:: pymicro.xray.fitting
    :members:

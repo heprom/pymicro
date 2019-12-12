@@ -78,7 +78,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'pymicro'
-copyright = u'2013-2018, Henry Proudhon'
+copyright = u'2013-2019, Henry Proudhon'
 
 
 # The project version is extracted from the main __init__.py
@@ -137,7 +137,8 @@ pygments_style = 'sphinx'
 # -- Options for HTML output ---------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.
-if not os.environ.has_key('READTHEDOCS'):  # if building locally
+print(os.environ)
+if not 'READTHEDOCS' in os.environ.keys():  # if building locally
     html_theme = 'sphinx_rtd_theme'
     html_theme_path = ["../../sphinx_rtd_theme"] # the theme should be installed aside the pymicro folder
 

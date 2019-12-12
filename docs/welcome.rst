@@ -22,13 +22,13 @@ You can grab a copy of the latest version on the git repository at Centre des Ma
 
 ::
 
-  git clone git://vcs/pymicro
+  git clone http://github.com/heprom/pymicro
 
-This will create a pymicro folder. Then you must add the folder containing pymicro to the PYTHONPATH environement variable. To do this you can add this line to your .cshrc file:
+This will create a pymicro folder containing the source code (another pymicro folder), the documentation and the examples. Then you must add this folder to the PYTHONPATH environement variable. To do this you can add this line to your .cshrc file:
 
 ::
 
-  setenv PYTHONPATH /path/to/folder/containing/pymicro
+  setenv PYTHONPATH /path/to/source/folder/pymicro
 
 Then you will be able to use pymicro (you may have to source the .cshrc or restart the terminal). For instance after starting a ipython shell:
 
@@ -41,7 +41,7 @@ If you want to use pymicro interactively and import all modules at ipython start
 Dependencies
 ============
 
-1. Python 2.6+ required. Tested with 2.6 and 2.7, please report any problem.
+1. Python 2.6+ or 3.5+ required. Tested with 2.7 and 3.5, please report any problem.
 2. numpy - For array, matrix and other numerical manipulations. Used extensively
    by all modules.
 3. scipy 0.10+, mainly used for ndimage filters.

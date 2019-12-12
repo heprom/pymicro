@@ -4,7 +4,7 @@
    :target: https://readthedocs.org/projects/pymicro/?badge=latest
    :alt: Read the Docs
 
-.. image:: https://travis-ci.org/pymicro/pymicro.svg?branch=master
+.. image:: https://travis-ci.org/heprom/pymicro.svg?branch=master
    :target: https://travis-ci.org/heprom/pymicro
    :alt: Travis CI
 

@@ -8,3 +8,7 @@
    :target: https://travis-ci.org/heprom/pymicro
    :alt: Travis CI
 
+.. image:: https://img.shields.io/badge/License-MIT-blue.svg
+   :target: https://opensource.org/licenses/MIT
+   :alt: License MIT
+

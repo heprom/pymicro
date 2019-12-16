@@ -1,0 +1,6 @@
+numpy
+scipy
+scikit-image
+matplotlib
+vtk
+h5py

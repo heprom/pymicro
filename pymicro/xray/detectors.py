@@ -434,6 +434,31 @@ class RegArrayDetector2d(Detector2d):
         v = self.vcen - r * np.sin(psi_values)
         return u, v
 
+    @staticmethod
+    def from_poni(size, poni_path):
+        """Create a new detector using settings from a poni file (PyFAI convention).
+
+        :param tuple size: the size of the 2D detector to create.
+        :param str poni_path: the path to the ascii poni file to read.
+        :return: a new instance of `RegArrayDetector2d`.
+        """
+        # load data from poni file, convert to mm
+        poni = np.genfromtxt(poni_path)
+        pixel_size = poni[0, 1] * 1000  # mm
+        D = poni[2, 1] * 1000  # mm
+        poni1 = poni[3, 1] * 1000  # mm
+        poni2 = poni[4, 1] * 1000  # mm
+        rot1 = poni[5, 1]  # rad, around -Z
+        rot2 = poni[6, 1]  # rad, around Y
+        rot3 = poni[7, 1]  # rad, around X
+        detector = RegArrayDetector2d(size=size, tilts=(rot3, rot2, -rot1))
+        detector.pixel_size = pixel_size
+        # the position of the detector center can be computed
+        detector.ref_pos = [D,
+                            -0.5 * detector.size[0] * detector.pixel_size + poni2 - D * np.tan(rot1),
+                            -0.5 * detector.size[1] * detector.pixel_size + poni1 + D * np.tan(rot2)]
+        return detector
+
 
 class Varian2520(RegArrayDetector2d):
     '''Class to handle a Varian Paxscan 2520 detector.

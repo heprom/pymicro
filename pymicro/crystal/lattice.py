@@ -1395,8 +1395,12 @@ class HklPlane(HklObject):
         '''
         return family
 
-    def multiplicity(self, symmetry='cubic'):
-        """compute the general multiplicity for this `HklPlane` and the given symmetry."""
+    def multiplicity(self, symmetry=Symmetry.cubic):
+        """compute the general multiplicity for this `HklPlane` and the given `Symmetry`.
+
+        :param Symmetry symmetry: The crystal symmetry to take into account.
+        :return: the number of equivalent planes in the family.
+        """
         return len(HklPlane.get_family(self.miller_indices(), include_friedel_pairs=True, crystal_structure=symmetry))
 
     def slip_trace(self, orientation, n_int=np.array([0, 0, 1]), view_up=np.array([0, 1, 0]), trace_size=100, verbose=False):

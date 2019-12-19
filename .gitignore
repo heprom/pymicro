@@ -13,5 +13,10 @@ docs/_build
 docs/auto_examples
 docs/sphinxext/*.py[cod]
 
+# Distribution / packaging
+pymicro.egg-info/
+dist/
+build/
+
 # pycharm stuff
 .idea

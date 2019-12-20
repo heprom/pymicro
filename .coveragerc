@@ -1,0 +1,7 @@
+[run]
+branch = True
+source = pymicro
+
+[report]
+source = pymicro
+ignore_errors = True

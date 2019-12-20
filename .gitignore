@@ -18,5 +18,8 @@ pymicro.egg-info/
 dist/
 build/
 
+# Code coverage report
+.coverage
+
 # pycharm stuff
 .idea

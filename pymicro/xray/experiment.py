@@ -39,6 +39,13 @@ class XraySource:
         self.set_min_energy(min_energy)
         self.set_max_energy(max_energy)
 
+class SlitsGeometry:
+    """Class to represent the 4 blades slit"""
+    def __init__(self, position=None):
+        self.set_position(position) # central position of the aperture (On Xu direction)
+        self.width = None
+        self.height = None
+
 class ObjectGeometry:
     """Class to represent any object geometry.
     
@@ -401,3 +408,6 @@ class ExperimentEncoder(json.JSONEncoder):
             dict_orientation = {}
             dict_orientation['Euler Angles (degrees)'] = o.euler.tolist()
             return dict_orientation
+
+
+

@@ -41,10 +41,16 @@ class XraySource:
 
 class SlitsGeometry:
     """Class to represent the 4 blades slit"""
+
     def __init__(self, position=None):
         self.set_position(position) # central position of the aperture (On Xu direction)
         self.width = None
         self.height = None
+
+    def set_position(self, position):
+        if position is None:
+            position = (0., 0., 0.)
+        self.position = np.array(position)
 
 class ObjectGeometry:
     """Class to represent any object geometry.
@@ -167,6 +173,7 @@ class Experiment:
     def __init__(self):
         self.source = XraySource()
         self.sample = Sample(name='dummy')
+        self.slits = SlitsGeometry()
         self.detectors = []
         self.active_detector_id = -1
 
@@ -183,6 +190,13 @@ class Experiment:
 
     def get_source(self):
         return self.source
+
+    def set_slits(self, slits):
+        assert isinstance(slits, SlitsGeometry) is True
+        self.slits = slits
+
+    def get_slits(self):
+        return self.slits
 
     def add_detector(self, detector, set_as_active=True):
         """Add a detector to this experiment.

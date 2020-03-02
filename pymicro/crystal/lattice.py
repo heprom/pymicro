@@ -96,7 +96,7 @@ class Symmetry(enum.Enum):
         else:
             return None
 
-    def symmetry_operators(self):
+    def symmetry_operators(self, use_miller_bravais=False):
         """Define the equivalent crystal symmetries.
 
         Those come from Randle & Engler, 2000. For instance in the cubic
@@ -132,36 +132,36 @@ class Symmetry(enum.Enum):
             sym[22] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
             sym[23] = np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]])
         elif self is Symmetry.hexagonal:
-            '''
-            sym = np.zeros((12, 3, 3), dtype=np.float)
-            s60 = np.sin(60 * np.pi / 180)
-            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
-            sym[1] = np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]])
-            sym[2] = np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]])
-            sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
-            sym[4] = np.array([[-0.5, -s60, 0.], [s60, -0.5, 0.], [0., 0., 1.]])
-            sym[5] = np.array([[0.5, -s60, 0.], [s60, 0.5, 0.], [0., 0., 1.]])
-            sym[6] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
-            sym[7] = np.array([[0.5, s60, 0.], [s60, -0.5, 0.], [0., 0., -1.]])
-            sym[8] = np.array([[-0.5, s60, 0.], [s60, 0.5, 0.], [0., 0., -1.]])
-            sym[9] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
-            sym[10] = np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]])
-            sym[11] = np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]])
-            '''
-            # using the Miller-Bravais representation here
-            sym = np.zeros((12, 4, 4), dtype=np.int)
-            sym[0] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-            sym[1] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
-            sym[2] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
-            sym[3] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, -1]])
-            sym[4] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, -1]])
-            sym[5] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, -1]])
-            sym[6] = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
-            sym[7] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
-            sym[8] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
-            sym[9] = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, -1]])
-            sym[10] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, -1]])
-            sym[11] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, -1]])
+            if use_miller_bravais:
+              # using the Miller-Bravais representation here
+              sym = np.zeros((12, 4, 4), dtype=np.int)
+              sym[0] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+              sym[1] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
+              sym[2] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+              sym[3] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, -1]])
+              sym[4] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, -1]])
+              sym[5] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, -1]])
+              sym[6] = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+              sym[7] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
+              sym[8] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
+              sym[9] = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, -1]])
+              sym[10] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, -1]])
+              sym[11] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, -1]])
+            else:
+              sym = np.zeros((12, 3, 3), dtype=np.float)
+              s60 = np.sin(60 * np.pi / 180)
+              sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+              sym[1] = np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]])
+              sym[2] = np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]])
+              sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
+              sym[4] = np.array([[-0.5, -s60, 0.], [s60, -0.5, 0.], [0., 0., 1.]])
+              sym[5] = np.array([[0.5, -s60, 0.], [s60, 0.5, 0.], [0., 0., 1.]])
+              sym[6] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
+              sym[7] = np.array([[0.5, s60, 0.], [s60, -0.5, 0.], [0., 0., -1.]])
+              sym[8] = np.array([[-0.5, s60, 0.], [s60, 0.5, 0.], [0., 0., -1.]])
+              sym[9] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
+              sym[10] = np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]])
+              sym[11] = np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]])
         elif self is Symmetry.orthorhombic:
             sym = np.zeros((4, 3, 3), dtype=np.float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
@@ -326,7 +326,7 @@ class Lattice:
         return np.copy(self._matrix)
 
     @staticmethod
-    def symmetry(crystal_structure=Symmetry.cubic):
+    def symmetry(crystal_structure=Symmetry.cubic, use_miller_bravais=False):
         """Define the equivalent crystal symmetries.
 
         Those come from Randle & Engler, 2000. For instance in the cubic
@@ -337,7 +337,7 @@ class Lattice:
         :returns array: A numpy array of shape (n, 3, 3) where n is the \
         number of symmetries of the given crystal structure.
         """
-        return crystal_structure.symmetry_operators()
+        return crystal_structure.symmetry_operators(use_miller_bravais=use_miller_bravais)
         '''
         if crystal_structure == Symmetry.cubic:
             sym = np.zeros((24, 3, 3), dtype=np.float)
@@ -1184,7 +1184,7 @@ class HklPlane(HklObject):
             k = int(hkl[1])
             i = int(hkl[2])
             l = int(hkl[3])
-            (h, k, l) = HklPlane.four_to_three_indices(h, k, i, l)
+            (h, k, l) = HklPlane.four_to_three_indices(h, k, i, l)  # useless as it just drops i
         else:  # 3 indices
             h = int(hkl[0])
             k = int(hkl[1])
@@ -1193,7 +1193,10 @@ class HklPlane(HklObject):
                 i = -(h + k)
         family = []
         # construct lattice plane family from the symmetry operators
-        syms = Lattice.symmetry(crystal_structure)
+        if crystal_structure == Symmetry.hexagonal:
+          syms = Lattice.symmetry(crystal_structure, use_miller_bravais=True)  # use 4x4 symmetry operators
+        else:
+          syms = Lattice.symmetry(crystal_structure)
         for sym in syms:
             if crystal_structure == Symmetry.hexagonal:
                 n_sym = np.dot(sym, np.array([h, k, i, l]))

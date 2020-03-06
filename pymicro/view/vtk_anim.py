@@ -5,7 +5,7 @@ import vtk
 import os
 import numpy as np
 
-from vtk_utils import set_opacity
+from pymicro.view.vtk_utils import set_opacity
 
 class vtkAnimationScene:
     def __init__(self, ren, ren_size=(600, 600)):

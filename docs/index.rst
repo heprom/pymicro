@@ -5,6 +5,10 @@
    :alt: pymicro
    :align: center
 
+
+.. include:: ../../README.rst
+
+
 Introduction
 ============
 

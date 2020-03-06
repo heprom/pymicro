@@ -1,8 +1,3 @@
-import os
-import sys
-import numpy as np
-import vtk
-
 from pymicro.view.scene3d import Scene3D
 from pymicro.view.vtk_utils import *
 from pymicro.crystal.microstructure import Grain, Orientation
@@ -16,6 +11,7 @@ class View:
     A 3D scene is then created with default settings and the actor added to the scene.
     The following types are supported:
 
+     * str: the `load_STL_actor` method is called to create the actor;
      * Grain: the `grain_3d` method is called to create the actor;
      * Orientation: A cube is created and rotated according to the passive orientation matrix;
      * Lattice: the `lattice_3d` method is called to create the actor;
@@ -25,49 +21,47 @@ class View:
     The key_pressed_callback is activated so it is possible to save an image using the 's' key.
     """
 
-    def __init__(self, args):
-        '''Init a new View window.'''
-        #print(args)
+    def __init__(self, arg):
+        """Init a new View window.
+
+        :param arg: a descriptor of the object to view, it can be an instance of `Grain`, `Orientation`, `Lattice`,
+        a vtkActor, a 3D numpy array or the path to a STL file.
+        """
         # create the 3D scene
         s3d = Scene3D(display=True, ren_size=(800, 800))
-        if isinstance(args, list):
-            if len(args) == 1:
-                print('Please specify the file representing the 3D object to view')
-                sys.exit(1)
-            elif len(args) == 2:
-                file_path = args[1]
-            else:
-                print('Please use only one parameter (the path to the file representing the 3D object to view)')
-                sys.exit(1)
-            (path, ext) = os.path.splitext(file_path)
+        if isinstance(arg, str):
+            (path, ext) = os.path.splitext(arg)
             ext = ext.strip('.')
             print(ext)
             if ext in ['stl', 'STL']:
                 actor = load_STL_actor(path, ext)
             else:
-                print('Unrecognized file extenstion: %s' % ext)
+                print('Unrecognized file extension: %s' % ext)
                 sys.exit(1)
-        elif isinstance(args, Grain):
-            actor = grain_3d(args)
-        elif isinstance(args, Orientation):
+        elif isinstance(arg, Grain):
+            actor = grain_3d(arg)
+        elif isinstance(arg, Orientation):
             l = Lattice.cubic(1.0)
             (a, b, c) = l._lengths
             grid = lattice_grid(l)
             actor = lattice_edges(grid)
             actor.SetOrigin(a / 2, b / 2, c / 2)
             actor.AddPosition(-a / 2, -b / 2, -c / 2)
-            apply_orientation_to_actor(actor, args)
-        elif isinstance(args, Lattice):
-            (a, b, c) = args._lengths
-            actor = lattice_3d(args)
+            apply_orientation_to_actor(actor, arg)
+        elif isinstance(arg, Lattice):
+            (a, b, c) = arg._lengths
+            actor = lattice_3d(arg)
             actor.SetOrigin(a / 2, b / 2, c / 2)
             actor.AddPosition(-a / 2, -b / 2, -c / 2)
-        elif isinstance(args, np.ndarray):
-            actor = show_array(args)
-        elif isinstance(args, vtk.vtkActor):
-            actor = args
+        elif isinstance(arg, np.ndarray):
+            if arg.ndim != 3:
+                print('Only 3D arrays can be viewed with this method.')
+                sys.exit(1)
+            actor = show_array(arg)
+        elif isinstance(arg, vtk.vtkActor):
+            actor = arg
         else:
-            raise ValueError('unsupported object type: {0}'.format(type(args)))
+            raise ValueError('unsupported object type: {0}'.format(type(arg)))
         bounds = actor.GetBounds()
         size = (bounds[1] - bounds[0], bounds[3] - bounds[2], bounds[5] - bounds[4])  # bounds[1::2]
         print(size)
@@ -81,4 +75,7 @@ class View:
 
 
 if __name__ == "__main__":
-    View(sys.argv)
+    if len(sys.argv) > 2:
+        print('Please use only one parameter (the path to the STL file representing the 3D object to view)')
+        sys.exit(1)
+    View(sys.argv[1])

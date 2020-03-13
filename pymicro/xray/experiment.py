@@ -47,6 +47,7 @@ class SlitsGeometry:
         self.width = None
         self.height = None
 
+
     def set_position(self, position):
         if position is None:
             position = (0., 0., 0.)

@@ -18,6 +18,7 @@ import h5py
 from matplotlib import pyplot as plt, colors, cm
 from xml.dom.minidom import Document, parse
 from pymicro.crystal.lattice import Symmetry
+from math import atan2, pi
 
 
 class Orientation:
@@ -842,6 +843,52 @@ class Orientation:
         r2 = np.tan(0.5 * Phi) * np.sin(a) / np.cos(b)
         r3 = np.tan(b)
         return np.array([r1, r2, r3])
+
+
+    @staticmethod
+    def Quaternion2Euler(quat, convention):
+        """
+        Compute Euler angles (in radians) from Quaternions
+        :param quat: 4 values defining a quaternion
+        :param convention: 'A' for active, 'P' for passive rotations
+        :return: 3 Euler angles (in radians, Bunge convention)
+        """
+        (q0, q1, q2, q3) = quat
+        if convention == 'A':
+            #Uses active rotation convention like in EMSphInx
+            P = 1.
+        elif convention == 'P':
+            #Uses passive rotation convention
+            P = -1.
+        q03 = q0**2 + q3**2
+        q12 = q1**2 + q2**2
+        chi = np.sqrt(q03 * q12)
+        if chi == 0.:
+            if q12 == 0.:
+                phi_1 = atan2(-2 * P * q0 * q3, q0**2 - q3**2)
+                Phi = 0.
+            else:
+                phi_1 = atan2(-2 * q1 * q2, q1**2 - q2**2)
+                Phi = pi
+            phi_2 = 0.
+        else:
+            phi_1 = atan2((q1 * q3 - P * q0 * q2) / chi, (-P * q0 * q1 - q2 * q3) / chi)
+            Phi = atan2(2 * chi, q03 - q12)
+            phi_2 = atan2((P * q0 * q2 + q1 * q3) / chi, (q2 * q3 - P * q0 * q1) / chi)
+        euler = (phi_1, Phi, phi_2)
+        return (euler)
+
+    @staticmethod
+    def Quaternions2OrientationMatrix(quat):
+        #Passive convention
+        P = -1
+        (q0, q1, q2, q3) = quat
+        qbar = q0**2 - q1**2 - q2**2 - q3**2
+        g = np.array([[qbar + 2 * q1**2, 2 * (q1 * q2 - P * q0 * q3), 2 * (q1 * q3 + P * q0 * q2)],
+                      [2 * (q1 * q2 + P * q0 * q3), qbar + 2 * q2**2, 2 * (q2 * q3 - P * q0 * q1)],
+                      [2 * (q1 * q3 - P * q0 * q2), 2 * (q2 * q3 + P * q0 * q1), qbar + 2 * q3**2]])
+
+        return g
 
     @staticmethod
     def read_euler_txt(txt_path):

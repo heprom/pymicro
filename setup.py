@@ -1,7 +1,14 @@
+import sys
+import os
 import setuptools
 
 with open('README.rst', 'r') as f:
     long_description = f.read()
+
+try:
+    from distutils.command.build_py import build_py2to3 as build_py
+except ImportError:
+    from distutils.command.build_py import build_py
 
 setuptools.setup(
     name="pymicro",
@@ -21,4 +28,5 @@ setuptools.setup(
     ],
     python_requires='>=3.5',
     license="MIT license",
+    cmdclass={'build_py':build_py}
 )

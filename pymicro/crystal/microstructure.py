@@ -50,6 +50,7 @@ class Orientation:
         self.euler = Orientation.OrientationMatrix2Euler(g)
         self.rod = Orientation.OrientationMatrix2Rodrigues(g)
 
+
     def orientation_matrix(self):
         """Returns the orientation matrix in the form of a 3x3 numpy array."""
         return self._matrix
@@ -580,6 +581,12 @@ class Orientation:
         return o
 
     @staticmethod
+    def from_quaternion(quat):
+        g = Orientation.Quaternions2OrientationMatrix(quat)
+        o = Orientation(g)
+        return o
+
+    @staticmethod
     def Euler2OrientationMatrix(euler):
         """
         Compute the orientation matrix :math:`\mathbf{g}` associated with the 3 Euler angles 
@@ -747,6 +754,25 @@ class Orientation:
         return np.array([r1, r2, r3])
 
     @staticmethod
+    def OrientationMatrix2Quaternion(g):
+        P = -1  # passif
+        q0 = 0.5 * np.sqrt(1 + g[0, 0] + g[1, 1] + g[2, 2])
+        q1 = P * 0.5 * np.sqrt(1 + g[0, 0] - g[1, 1] - g[2, 2])
+        q2 = P * 0.5 * np.sqrt(1 - g[0, 0] + g[1, 1] - g[2, 2])
+        q3 = P * 0.5 * np.sqrt(1 - g[0, 0] - g[1, 1] + g[2, 2])
+        if g[2, 1] < g[1, 2]:
+            q1 = q1 * -1
+        elif g[0, 2] < g[2, 0]:
+            q2 = q2 * -1
+        elif g[1, 0] < g[0, 1]:
+            q3 = q3 * -1
+
+        qn = np.sqrt(q0 ** 2 + q1 ** 2 + q2 ** 2 + q3 ** 2)
+
+        q = np.array([q0, q1, q2, q3]) / qn
+        return q
+
+    @staticmethod
     def Rodrigues2OrientationMatrix(rod):
         """
         Compute the orientation matrix from the Rodrigues vector.
@@ -851,7 +877,7 @@ class Orientation:
         Compute Euler angles (in radians) from Quaternions
         :param quat: 4 values defining a quaternion
         :param convention: 'A' for active, 'P' for passive rotations
-        :return: 3 Euler angles (in radians, Bunge convention)
+        :return: 3 Euler angles (in degrees, Bunge convention)
         """
         (q0, q1, q2, q3) = quat
         if convention == 'A':
@@ -875,11 +901,11 @@ class Orientation:
             phi_1 = atan2((q1 * q3 - P * q0 * q2) / chi, (-P * q0 * q1 - q2 * q3) / chi)
             Phi = atan2(2 * chi, q03 - q12)
             phi_2 = atan2((P * q0 * q2 + q1 * q3) / chi, (q2 * q3 - P * q0 * q1) / chi)
-        euler = (phi_1, Phi, phi_2)
-        return (euler)
+
+        return np.degrees([phi_1, Phi, phi_2])
 
     @staticmethod
-    def Quaternions2OrientationMatrix(quat):
+    def Quaternion2OrientationMatrix(quat):
         #Passive convention
         P = -1
         (q0, q1, q2, q3) = quat

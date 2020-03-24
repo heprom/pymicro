@@ -163,6 +163,16 @@ class OrientationTests(unittest.TestCase):
         (ut, lt) = o.topotomo_tilts(p, T)
         self.assertAlmostEqual(180 / np.pi * ut, -11.04, 2)
         self.assertAlmostEqual(180 / np.pi * lt, -0.53, 2)
+        # test case from ma3921
+        T = Orientation.compute_instrument_transformation_matrix(-1.2, 0.7, 90)
+        Ti7Al = Lattice.hexagonal(0.2931, 0.4694)  # nm
+        (h, k, l) = HklPlane.four_to_three_indices(-1, 2, -1, 0)
+        p = HklPlane(h, k, l, Ti7Al)
+        o = Orientation.from_rodrigues([0.7531, 0.3537, 0.0621])
+        (ut, lt) = o.topotomo_tilts(p, T)
+        self.assertAlmostEqual(180 / np.pi * ut, 11.275, 2)
+        self.assertAlmostEqual(180 / np.pi * lt, -4.437, 2)
+
 
     def test_IPF_color(self):
         o1 = Orientation.cube()  # 001 // Z

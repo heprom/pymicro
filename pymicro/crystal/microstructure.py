@@ -470,6 +470,7 @@ class Orientation:
         plt.xlim(0, 360)
         plt.ylim(0, 180)
         plt.xticks(np.arange(0, 390, 30))
+
         # add bragg condition
         plt.axhline(90 - theta, xmin=0, xmax=360, linewidth=2)
         plt.annotate('$\pi/2-\\theta_{Bragg}$', xycoords='data', xy=(360, 90 - theta), horizontalalignment='left',
@@ -508,6 +509,34 @@ class Orientation:
             plt.show()
         else:
             plt.savefig('rotating_crystal_plot_%d%d%d.pdf' % (h, k, l))
+
+    @staticmethod
+    def compute_instrument_transformation_matrix(rx_offset, ry_offset, rz_offset):
+        """ Compute the instrument transformation matrix for given rotation offset.
+
+        This function compute a 3x3 rotation matrix (passive convention) that transform the sample coordinate system
+        by rotating around the 3 cartesian axes in this order: rotation around X is applied first, then around Y and
+        finally around Z.
+
+        A sample vector :math:`V_s` is consequently transformed into :math:`V'_s` as:
+
+        .. math::
+
+          V'_s = T^T.V_s
+
+        :param double rx_offset: value to apply for the rotation around X.
+        :param double ry_offset: value to apply for the rotation around Y.
+        :param double rz_offset: value to apply for the rotation around Z.
+        :return: a 3x3 rotation matrix describing the transformation applied by the diffractometer.
+        """
+        angle_zr = np.radians(rz_offset)
+        angle_yr = np.radians(ry_offset)
+        angle_xr = np.radians(rx_offset)
+        Rz = np.array([[np.cos(angle_zr), -np.sin(angle_zr), 0], [np.sin(angle_zr), np.cos(angle_zr), 0], [0, 0, 1]])
+        Ry = np.array([[np.cos(angle_yr), 0, np.sin(angle_yr)], [0, 1, 0], [-np.sin(angle_yr), 0, np.cos(angle_yr)]])
+        Rx = np.array([[1, 0, 0], [0, np.cos(angle_xr), -np.sin(angle_xr)], [0, np.sin(angle_xr), np.cos(angle_xr)]])
+        T = Rz.dot(np.dot(Ry, Rx))
+        return T
 
     def topotomo_tilts(self, hkl, T=None, verbose=False):
         """Compute the tilts for topotomography alignment.

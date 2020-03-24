@@ -1,3 +1,5 @@
+import numpy as np
+
 class Quaternion:
     """Class to describe a Quaternion."""
 
@@ -20,3 +22,9 @@ class Quaternion:
 
     def __repr__(self):
         return str(self.quat)
+
+    def norm(self):
+        (q0, q1, q2, q3) = self.quat
+        qbar = np.sqrt(q0 ** 2 + q1 ** 2 + q2 ** 2 + q3 ** 2)
+        qnorm = np.array([q0, q1, q2, q3]) / qbar
+        return qnorm

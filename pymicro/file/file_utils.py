@@ -38,20 +38,17 @@ def read_image_sequence(data_dir, prefix, num_images, start_index=0, image_forma
     return image_stack
 
 
-def unpack_header(h):
-    '''Unpack an ascii header.
+def unpack_header(header):
+    """Unpack an ascii header.
 
     Form a string with the read binary data and then split it into string
     tokens which are put in a dictionnary.
-    '''
-    nbytes = len(h)
-    nbits = 8 * nbytes
-    s = struct.unpack(str(nbits) + 'c', h)
-    tmp_header = ''
-    for i in range(nbits):
-        tmp_header += s[i]
+
+    :param str header: the ascii header to unpack.
+    :return: a dictionnary with the (key, value) fields contained in the header.
+    """
     header_values = {}
-    for line in tmp_header.split('\n'):
+    for line in header.split('\n'):
         tokens = line.split('=')
         if len(tokens) > 1:
             header_values[tokens[0].strip()] = tokens[1].split(';')[0].strip()
@@ -59,7 +56,7 @@ def unpack_header(h):
 
 
 def edf_info(file_name, header_size=None):
-    '''Read and return informations contained in the header of a .edf file.
+    """Read and return informations contained in the header of a .edf file.
 
     Edf files always start with a header (of variable length) containing
     informations about the file such as acquisition conditions, image
@@ -69,25 +66,25 @@ def edf_info(file_name, header_size=None):
     substracting the data size (read as ascii at the begining of the file)
     to the total file size.
 
-    *Parameters*
-
-    **header_size**: number of bytes to read (None by default).
-
-    Returns a dictionnary containing the file informations.
-    '''
-    f = open(file_name, 'r')
-    if header_size == None:
+    :param str file_name: the name of the edf file to read.
+    :param int header_size: number of bytes to read as a multiple of 512 (None by default).
+    :return: a dictionnary containing the file informations.
+    """
+    try:
+        f = open(file_name, 'r', encoding='latin-1')
+    except TypeError:
+        f = open(file_name, 'r')  # fall back
+    if header_size is None:
         # guess the header size by peeking at the first chunk of 512 bytes
-        h = np.fromstring(f.read(512))
-        header_values = unpack_header(h)
+        header_values = unpack_header(f.read(512))
         total_file_size = os.path.getsize(file_name)
         payload_size = int(header_values['Size'].split('.')[0])
         header_size = total_file_size - payload_size
         print('determined header size is %d bytes' % header_size)
         f.seek(0)
-    h = np.fromstring(f.read(header_size))
+    header = f.read(header_size)
     f.close()
-    return unpack_header(h)
+    return unpack_header(header)
 
 
 def edf_read(file_name):

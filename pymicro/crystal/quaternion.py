@@ -5,7 +5,8 @@ class Quaternion:
 
     def __init__(self, array, convention=1):
         assert len(array) == 4
-        self.quat = array
+        array = np.array(array)
+        self.quat = array / np.sqrt(np.sum(array ** 2))
         self.convention = convention  # active by default
 
     def q0(self):
@@ -24,7 +25,5 @@ class Quaternion:
         return str(self.quat)
 
     def norm(self):
-        (q0, q1, q2, q3) = self.quat
-        qbar = np.sqrt(q0 ** 2 + q1 ** 2 + q2 ** 2 + q3 ** 2)
-        qnorm = np.array([q0, q1, q2, q3]) / qbar
-        return qnorm
+        """Compute the norm of the quaternion (should be 1)."""
+        return np.sqrt(np.sum(self.quat ** 2))

@@ -39,19 +39,20 @@ class XraySource:
         self.set_min_energy(min_energy)
         self.set_max_energy(max_energy)
 
+
 class SlitsGeometry:
-    """Class to represent the 4 blades slit"""
+    """Class to represent the geometry of a 4 blades slits."""
 
     def __init__(self, position=None):
-        self.set_position(position) # central position of the aperture (On Xu direction)
-        self.width = None
-        self.height = None
-
+        self.set_position(position)  # central position of the aperture (On Xu direction)
+        self.hgap = None  # horizontal opening
+        self.vgap = None  # vertical opening
 
     def set_position(self, position):
         if position is None:
             position = (0., 0., 0.)
         self.position = np.array(position)
+
 
 class ObjectGeometry:
     """Class to represent any object geometry.
@@ -329,6 +330,8 @@ class Experiment:
                 grain = Grain(dict_grain['Id'], Orientation.from_euler(dict_grain['Orientation']['Euler Angles (degrees)']))
                 grain.position = np.array(dict_grain['Position'])
                 grain.volume = dict_grain['Volume']
+                if dict_grain.has_key('uv_exp'):
+                    grain.uv_exp = dict_grain['uv_exp']
                 micro.grains.append(grain)
             sample.set_microstructure(micro)
         exp = Experiment()
@@ -418,6 +421,8 @@ class ExperimentEncoder(json.JSONEncoder):
             dict_grain['Position'] = o.position.tolist()
             dict_grain['Orientation'] = o.orientation
             dict_grain['Volume'] = o.volume
+            if hasattr(o, 'uv_exp'):
+                dict_grain['uv_exp'] = o.uv_exp
             return dict_grain
         if isinstance(o, Orientation):
             dict_orientation = {}

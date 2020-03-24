@@ -509,23 +509,28 @@ class Orientation:
         else:
             plt.savefig('rotating_crystal_plot_%d%d%d.pdf' % (h, k, l))
 
-    def topotomo_tilts(self, hkl, verbose=False):
+    def topotomo_tilts(self, hkl, T=None, verbose=False):
         """Compute the tilts for topotomography alignment.
 
         :param hkl: the hkl plane, an instance of :py:class:`~pymicro.crystal.lattice.HklPlane`
+        :param ndarray T: transformation matrix representing the diffractometer direction at omega=0.
         :param bool verbose: activate verbose mode (False by default).
         :returns tuple: (ut, lt) the two values of tilts to apply (in radians).
         """
+        if T is None:
+            T = np.eye(3)  # identity be default
         gt = self.orientation_matrix().transpose()
         Gc = hkl.scattering_vector()
         Gs = gt.dot(Gc)  # in the cartesian sample CS
+        # apply instrument specific settings
+        Gs = np.dot(T.T, Gs)
         # find topotomo tilts
-        ut = np.arctan(-Gs[0] / Gs[2])
-        lt = np.arctan(Gs[1] / (-Gs[0] * np.sin(ut) + Gs[2] * np.cos(ut)))
+        ut = np.arctan(Gs[1] / Gs[2])
+        lt = np.arctan(-Gs[0] / (Gs[1] * np.sin(ut) + Gs[2] * np.cos(ut)))
         if verbose:
-            print('up tilt (samry) should be %.3f' % (ut * 180 / np.pi))
-            print('low tilt (samrx) should be %.3f' % (lt * 180 / np.pi))
-        return (ut, lt)
+            print('up tilt (samrx) should be %.3f' % (ut * 180 / np.pi))
+            print('low tilt (samry) should be %.3f' % (lt * 180 / np.pi))
+        return ut, lt
 
     def to_xml(self, doc):
         """

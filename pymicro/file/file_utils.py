@@ -127,7 +127,7 @@ def edf_read(file_name):
     # now read binary data
     header_size = os.path.getsize(file_name) - payload_size
     f.seek(header_size)
-    payload = np.fromstring(f.read(payload_size), data_type)
+    payload = np.fromfile(f, dtype=data_type)
     if dim_1 and dim_2 and dim_3:
         data = np.reshape(payload, (dim_3, dim_2, dim_1)).transpose(2, 1, 0)
     elif dim_1 and dim_2:

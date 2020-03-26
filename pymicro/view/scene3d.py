@@ -84,7 +84,10 @@ class Scene3D:
         writer.SetWriteToMemory(1)
         writer.SetInputConnection(w2i.GetOutputPort())
         writer.Write()
-        data = str(buffer(writer.GetResult()))
+        try:
+            data = str(buffer(writer.GetResult()))
+        except NameError:
+            data = bytes(memoryview(writer.GetResult()))
         self.renWin.SetOffScreenRendering(0)
         return data
 

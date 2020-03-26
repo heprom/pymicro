@@ -1299,7 +1299,10 @@ class Grain:
         print('writting ' + file_name)
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(file_name)
-        writer.SetInput(self.vtkmesh)
+        if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+            writer.SetInputData(self.vtkmesh)
+        else:
+            writer.SetInput(self.vtkmesh)
         writer.Write()
 
     def load_vtk_repr(self, file_name, verbose=False):

@@ -147,20 +147,32 @@ class OrientationTests(unittest.TestCase):
 
 
     def test_topotomo_tilts(self):
+        # tests cases from ma2285 experiment on id11, omega offset = -90
+        T = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
         al = Lattice.from_symbol('Al')
         p = HklPlane(0, 0, 2, lattice=al)
         rod = [0.1449, -0.0281, 0.0616]
         o = Orientation.from_rodrigues(rod)
-        (ut, lt) = o.topotomo_tilts(p)
+        (ut, lt) = o.topotomo_tilts(p, T)
         self.assertAlmostEqual(180 / np.pi * ut, 2.236, 3)
-        self.assertAlmostEqual(180 / np.pi * lt, -16.615, 3)
+        self.assertAlmostEqual(180 / np.pi * lt, 16.615, 3)
         # use test case from AlLi_sam8_dct_cen_
         p = HklPlane(2, 0, 2, lattice=al)
         rod = [0.0499, -0.3048, 0.1040]
         o = Orientation.from_rodrigues(rod)
-        (ut, lt) = o.topotomo_tilts(p)
+        (ut, lt) = o.topotomo_tilts(p, T)
         self.assertAlmostEqual(180 / np.pi * ut, -11.04, 2)
-        self.assertAlmostEqual(180 / np.pi * lt, 0.53, 2)
+        self.assertAlmostEqual(180 / np.pi * lt, -0.53, 2)
+        # test case from ma3921
+        T = Orientation.compute_instrument_transformation_matrix(-1.2, 0.7, 90)
+        Ti7Al = Lattice.hexagonal(0.2931, 0.4694)  # nm
+        (h, k, l) = HklPlane.four_to_three_indices(-1, 2, -1, 0)
+        p = HklPlane(h, k, l, Ti7Al)
+        o = Orientation.from_rodrigues([0.7531, 0.3537, 0.0621])
+        (ut, lt) = o.topotomo_tilts(p, T)
+        self.assertAlmostEqual(180 / np.pi * ut, 11.275, 2)
+        self.assertAlmostEqual(180 / np.pi * lt, -4.437, 2)
+
 
     def test_IPF_color(self):
         o1 = Orientation.cube()  # 001 // Z

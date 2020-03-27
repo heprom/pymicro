@@ -55,7 +55,7 @@ def unpack_header(header):
     return header_values
 
 
-def edf_info(file_name, header_size=None):
+def edf_info(file_name, header_size=None, verbose=False):
     """Read and return informations contained in the header of a .edf file.
 
     Edf files always start with a header (of variable length) containing
@@ -68,6 +68,7 @@ def edf_info(file_name, header_size=None):
 
     :param str file_name: the name of the edf file to read.
     :param int header_size: number of bytes to read as a multiple of 512 (None by default).
+    :param bool verbose: flag to activate verbose mode.
     :return: a dictionnary containing the file informations.
     """
     try:
@@ -80,14 +81,15 @@ def edf_info(file_name, header_size=None):
         total_file_size = os.path.getsize(file_name)
         payload_size = int(header_values['Size'].split('.')[0])
         header_size = total_file_size - payload_size
-        print('determined header size is %d bytes' % header_size)
+        if verbose:
+            print('determined header size is %d bytes' % header_size)
         f.seek(0)
     header = f.read(header_size)
     f.close()
     return unpack_header(header)
 
 
-def edf_read(file_name):
+def edf_read(file_name, verbose=False):
     """Read an edf file.
 
     edf stands for ESRF data file. It has a variable header size which is
@@ -104,25 +106,29 @@ def edf_read(file_name):
       (2048, 2048)
 
     :param str file_name: the name of the edf file to read.
+    :param bool verbose: flag to activate verbose mode.
     :return: a numpy array containing the data
     """
-    header_values = edf_info(file_name)
+    header_values = edf_info(file_name, verbose=verbose)
     f = open(file_name, 'r')
     data_type = esrf_to_numpy_datatype(header_values['DataType'])
-    print(header_values['DataType'], data_type)
+    if verbose:
+        print(header_values['DataType'], data_type)
     # get the payload size
     payload_size = int(header_values['Size'].split('.')[0])
     # get the image size from the ascii header
     dim_1 = int(header_values['Dim_1'].split('.')[0])
     try:
         dim_2 = int(header_values['Dim_2'].split('.')[0])
-    except:
-        print('Dim_2 not defined in header')
+    except KeyError:
+        if verbose:
+            print('Dim_2 not defined in header')
         dim_2 = None
     try:
         dim_3 = int(header_values['Dim_3'].split('.')[0])
-    except:
-        print('Dim_3 not defined in header')
+    except KeyError:
+        if verbose:
+            print('Dim_3 not defined in header')
         dim_3 = None
     # now read binary data
     header_size = os.path.getsize(file_name) - payload_size

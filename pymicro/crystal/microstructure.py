@@ -254,7 +254,7 @@ class Orientation:
         """
         cw = 0.5 * (delta.trace() - 1)
         if cw > 1. and cw - 1. < 10 * np.finfo('float32').eps:
-            print('cw=%.20f, rounding to 1.' % cw)
+            #print('cw=%.20f, rounding to 1.' % cw)
             cw = 1.
         omega = np.arccos(cw)
         return omega
@@ -287,9 +287,9 @@ class Orientation:
                     sym_i = symmetries[i]
                     oi = np.dot(sym_i, g2)
                     delta = np.dot(oi, oj.T)
-                    print('delta={}'.format(delta))
+                    #print('delta={}'.format(delta))
                     mis_angle = Orientation.misorientation_angle_from_delta(delta)
-                    print(np.degrees(mis_angle))
+                    #print(np.degrees(mis_angle))
                     if mis_angle < the_angle:
                         # now compute the misorientation axis, should check if it lies in the fundamental zone
                         mis_axis = Orientation.misorientation_axis_from_delta(delta)

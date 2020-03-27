@@ -25,6 +25,15 @@ class file_utils_Tests(unittest.TestCase):
         f.write('NUM_Z = 104\n')
         f.close()
 
+    def test_edf_info(self):
+        infos = edf_info('../../../examples/data/sam8_dct0_cen_full0000.edf')
+        self.assertEqual(infos['DataType'], 'FloatValue')
+
+    def test_edf_read(self):
+        im = edf_read('../../../examples/data/sam8_dct0_cen_full0000.edf')
+        self.assertEqual(im.shape[0], 2048)
+        self.assertEqual(im.shape[1], 2048)
+
     def test_HST_info(self):
         infos = HST_info('temp_20x30x10_uint8.raw.info')
         self.assertEqual(infos['x_dim'], 20)

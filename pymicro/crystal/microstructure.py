@@ -473,6 +473,7 @@ class Orientation:
         plt.xlim(0, 360)
         plt.ylim(0, 180)
         plt.xticks(np.arange(0, 390, 30))
+
         # add bragg condition
         plt.axhline(90 - theta, xmin=0, xmax=360, linewidth=2)
         plt.annotate('$\pi/2-\\theta_{Bragg}$', xycoords='data', xy=(360, 90 - theta), horizontalalignment='left',
@@ -512,23 +513,56 @@ class Orientation:
         else:
             plt.savefig('rotating_crystal_plot_%d%d%d.pdf' % (h, k, l))
 
-    def topotomo_tilts(self, hkl, verbose=False):
+    @staticmethod
+    def compute_instrument_transformation_matrix(rx_offset, ry_offset, rz_offset):
+        """ Compute the instrument transformation matrix for given rotation offset.
+
+        This function compute a 3x3 rotation matrix (passive convention) that transform the sample coordinate system
+        by rotating around the 3 cartesian axes in this order: rotation around X is applied first, then around Y and
+        finally around Z.
+
+        A sample vector :math:`V_s` is consequently transformed into :math:`V'_s` as:
+
+        .. math::
+
+          V'_s = T^T.V_s
+
+        :param double rx_offset: value to apply for the rotation around X.
+        :param double ry_offset: value to apply for the rotation around Y.
+        :param double rz_offset: value to apply for the rotation around Z.
+        :return: a 3x3 rotation matrix describing the transformation applied by the diffractometer.
+        """
+        angle_zr = np.radians(rz_offset)
+        angle_yr = np.radians(ry_offset)
+        angle_xr = np.radians(rx_offset)
+        Rz = np.array([[np.cos(angle_zr), -np.sin(angle_zr), 0], [np.sin(angle_zr), np.cos(angle_zr), 0], [0, 0, 1]])
+        Ry = np.array([[np.cos(angle_yr), 0, np.sin(angle_yr)], [0, 1, 0], [-np.sin(angle_yr), 0, np.cos(angle_yr)]])
+        Rx = np.array([[1, 0, 0], [0, np.cos(angle_xr), -np.sin(angle_xr)], [0, np.sin(angle_xr), np.cos(angle_xr)]])
+        T = Rz.dot(np.dot(Ry, Rx))
+        return T
+
+    def topotomo_tilts(self, hkl, T=None, verbose=False):
         """Compute the tilts for topotomography alignment.
 
         :param hkl: the hkl plane, an instance of :py:class:`~pymicro.crystal.lattice.HklPlane`
+        :param ndarray T: transformation matrix representing the diffractometer direction at omega=0.
         :param bool verbose: activate verbose mode (False by default).
         :returns tuple: (ut, lt) the two values of tilts to apply (in radians).
         """
+        if T is None:
+            T = np.eye(3)  # identity be default
         gt = self.orientation_matrix().transpose()
         Gc = hkl.scattering_vector()
         Gs = gt.dot(Gc)  # in the cartesian sample CS
+        # apply instrument specific settings
+        Gs = np.dot(T.T, Gs)
         # find topotomo tilts
-        ut = np.arctan(-Gs[0] / Gs[2])
-        lt = np.arctan(Gs[1] / (-Gs[0] * np.sin(ut) + Gs[2] * np.cos(ut)))
+        ut = np.arctan(Gs[1] / Gs[2])
+        lt = np.arctan(-Gs[0] / (Gs[1] * np.sin(ut) + Gs[2] * np.cos(ut)))
         if verbose:
-            print('up tilt (samry) should be %.3f' % (ut * 180 / np.pi))
-            print('low tilt (samrx) should be %.3f' % (lt * 180 / np.pi))
-        return (ut, lt)
+            print('up tilt (samrx) should be %.3f' % (ut * 180 / np.pi))
+            print('low tilt (samry) should be %.3f' % (lt * 180 / np.pi))
+        return ut, lt
 
     def to_xml(self, doc):
         """
@@ -1265,7 +1299,10 @@ class Grain:
         print('writting ' + file_name)
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(file_name)
-        writer.SetInput(self.vtkmesh)
+        if vtk.vtkVersion().GetVTKMajorVersion() > 5:
+            writer.SetInputData(self.vtkmesh)
+        else:
+            writer.SetInput(self.vtkmesh)
         writer.Write()
 
     def load_vtk_repr(self, file_name, verbose=False):

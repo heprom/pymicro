@@ -231,7 +231,7 @@ class PoleFigure:
         :param bool labels: add lables to axes (True by default).
         '''
         an = np.linspace(0, 2 * np.pi, 100)
-        plt.hold('on')
+        #plt.hold('on')
         ax.plot(np.cos(an), np.sin(an), 'k-')
         ax.plot([-1, 1], [0, 0], 'k-')
         ax.plot([0, 0], [-1, 1], 'k-')

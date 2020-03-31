@@ -330,7 +330,7 @@ class Experiment:
                 grain = Grain(dict_grain['Id'], Orientation.from_euler(dict_grain['Orientation']['Euler Angles (degrees)']))
                 grain.position = np.array(dict_grain['Position'])
                 grain.volume = dict_grain['Volume']
-                if dict_grain.has_key('uv_exp'):
+                if 'uv_exp' in dict_grain:
                     grain.uv_exp = dict_grain['uv_exp']
                 micro.grains.append(grain)
             sample.set_microstructure(micro)

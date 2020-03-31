@@ -330,8 +330,7 @@ class Experiment:
                 grain = Grain(dict_grain['Id'], Orientation.from_euler(dict_grain['Orientation']['Euler Angles (degrees)']))
                 grain.position = np.array(dict_grain['Position'])
                 grain.volume = dict_grain['Volume']
-                if 'uv_exp' in dict_grain:
-                    grain.uv_exp = dict_grain['uv_exp']
+                grain.hkl_planes = dict_grain['hkl_planes']
                 micro.grains.append(grain)
             sample.set_microstructure(micro)
         exp = Experiment()
@@ -352,6 +351,8 @@ class Experiment:
                 det = RegArrayDetector2d(size=dict_det['Size (pixels)'])
                 det.pixel_size = dict_det['Pixel Size (mm)']
                 det.ref_pos = dict_det['Reference Position (mm)']
+                if 'Min Energy (keV)' in dict_exp['Detectors']:
+                    det.tilt = dict_det['Tilts (deg)']
                 if 'Binning' in dict_det:
                     det.set_binning(dict_det['Binning'])
                 det.u_dir = np.array(dict_det['u_dir'])
@@ -421,8 +422,8 @@ class ExperimentEncoder(json.JSONEncoder):
             dict_grain['Position'] = o.position.tolist()
             dict_grain['Orientation'] = o.orientation
             dict_grain['Volume'] = o.volume
-            if hasattr(o, 'uv_exp'):
-                dict_grain['uv_exp'] = o.uv_exp
+            if hasattr(o, 'hkl_planes'):
+                dict_grain['hkl_planes'] = o.hkl_planes
             return dict_grain
         if isinstance(o, Orientation):
             dict_orientation = {}

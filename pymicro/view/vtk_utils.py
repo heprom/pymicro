@@ -1964,11 +1964,16 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
     '''
     if type(data) == np.ndarray:
         grid = numpy_array_to_vtk_grid(data, cell_data=True)
+        print(grid)
         if hide_zero_values:
-            visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
-            #FIXME this method seems not to be available anymore in vtk 6.3
-            grid.SetCellVisibilityArray(visible)
-            # grid.SetPointVisibilityArray(visible)
+            #workaround as SetCellVisibilityArray is not available anymore after vtk 6.3
+            if (vtk.vtkVersion().GetVTKMajorVersion() > 6) | (vtk.vtkVersion().GetVTKMajorVersion() == 6 and vtk.vtkVersion().GetVTKMinorVersion() > 2):
+                ids_to_blank = np.argwhere(data.transpose(2, 1, 0).flatten() == 0)
+                [grid.BlankCell(i) for i in ids_to_blank]
+            else:
+                visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
+                grid.SetCellVisibilityArray(visible)
+                #grid.SetPointVisibilityArray(visible)
         size = data.shape
     else:
         grid = data

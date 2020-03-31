@@ -1141,6 +1141,7 @@ class Grain:
         self.position = np.array([0., 0., 0.])
         self.volume = 0  # warning not implemented
         self.vtkmesh = None
+        self.hkl_planes = []
 
     def __repr__(self):
         """Provide a string representation of the class."""

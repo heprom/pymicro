@@ -760,5 +760,103 @@ def diffracting_normals_vector(gnom):
 
     return hkl_normals
 
+from pymicro.xray.experiment import ForwardSimulation, Experiment
 
+class LaueForwardSimulation(ForwardSimulation):
+    """Class to represent a Forward Simulation."""
+
+    def __init__(self, verbose=False):
+        super(LaueForwardSimulation, self).__init__('laue', verbose=verbose)
+        self.hkl_planes = []
+        self.max_miller = 5
+        self.use_energy_limits = False
+        self.exp = Experiment()
+
+    def set_experiment(self, experiment):
+        """Attach an X-ray experiment to this simulation."""
+        self.exp = experiment
+
+    def set_use_energy_limits(self, use_energy_limits):
+        """Activate or deactivate the use of energy limits."""
+        self.use_energy_limits = use_energy_limits
+
+    def set_hkl_planes(self, hkl_planes):
+        self.hkl_planes = hkl_planes
+
+    def setup(self, include_grains=None):
+        """Setup the forward simulation."""
+        pass
+
+    def fsim_grain(self, gid=1):
+        self.grain = self.exp.get_sample().get_microstructure().get_grain(gid)
+        sample = self.exp.get_sample()
+        lattice = sample.get_material()
+        source = self.exp.get_source()
+        detector = self.exp.get_active_detector()
+        data = np.zeros_like(detector.data)
+        if self.verbose:
+            print('Forward Simulation for grain %d' % self.grain.id)
+        # TODO use either the hkl planes for this grain or the ones defined for the whole simulation
+        if hasattr(self.grain, 'hkl_planes') and len(self.grain.hkl_planes) > 0:
+            print('using hkl from the grain')
+            hkl_planes = [HklPlane(h, k, l, lattice) for (h, k, l) in self.grain.hkl_planes]
+        else:
+            if len(self.hkl_planes) == 0:
+                print('warning: no reflection defined for this simulation, using all planes with max miller=%d' % self.max_miller)
+                self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
+            hkl_planes = self.hkl_planes
+        n_hkl = len(hkl_planes)
+        gt = self.grain.orientation_matrix().transpose()
+
+        # here we use list comprehension to avoid for loops
+        d_spacings = [hkl.interplanar_spacing() for hkl in hkl_planes]  # size n_hkl
+        G_vectors = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
+        Gs_vectors = [gt.dot(Gc) for Gc in G_vectors]  # size n_hkl, with 3 elements items
+        positions = sample.geo.get_positions().reshape(-1, sample.geo.get_positions().shape[-1])  # size n_vox, with 3 elements items
+        n_vox = len(positions)  # total number of discrete positions
+        Xu_vectors = [(pos - source.position) / np.linalg.norm(pos - source.position)
+                      for pos in positions]  # size n_vox
+        thetas = [np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
+                  for Xu in Xu_vectors
+                  for Gs in Gs_vectors]  # size n_vox * n_hkl
+        the_energies = [lambda_nm_to_keV(2 * d_spacings[i_hkl] * np.sin(thetas[i_Xu * n_hkl + i_hkl]))
+                        for i_Xu in range(n_vox)
+                        for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
+        X_vectors = [np.array(Xu_vectors[i_Xu]) / 1.2398 * the_energies[i_Xu * n_hkl + i_hkl]
+                     for i_Xu in range(n_vox)
+                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
+        K_vectors = [X_vectors[i_Xu * n_hkl + i_hkl] + Gs_vectors[i_hkl]
+                     for i_Xu in range(n_vox)
+                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
+        OR_vectors = [detector.project_along_direction(origin=positions[i_vox],
+                                                       direction=K_vectors[i_vox * n_hkl + i_hkl])
+                      for i_vox in range(n_vox)
+                      for i_hkl in range(n_hkl)]  # size nb_vox * n_hkl
+        uv = [detector.lab_to_pixel(OR)[0].astype(np.int)
+              for OR in OR_vectors]
+        # now construct a boolean list to select the diffraction spots
+        if source.min_energy is None and source.max_energy is None:
+            # TODO use the use_energy_limits attribute
+            energy_in = [True for k in range(len(the_energies))]
+        else:
+            energy_in = [source.min_energy < the_energies[k] < source.max_energy
+                         for k in range(len(the_energies))]
+        uv_in = [0 < uv[k][0] < detector.get_size_px()[0] and 0 < uv[k][1] < detector.get_size_px()[1]
+                 for k in range(len(uv))]  # size n, diffraction located on the detector
+        spot_in = [uv_in[k] and energy_in[k] for k in range(len(uv))]
+        if self.verbose:
+            print('%d diffraction events on the detector among %d' % (sum(spot_in), len(uv)))
+
+        # now sum the counts on the detector individual pixels
+        for k in range(len(uv)):
+            if spot_in[k]:
+                data[uv[k][0], uv[k][1]] += 1
+        return data
+
+    def fsim(self):
+        """run the forward simulation."""
+        full_data = np.zeros_like(self.exp.get_active_detector().data)
+        for grain in self.exp.get_sample().get_microstructure().grains:
+            full_data += self.fsim_grain(gid=grain.id)
+        return full_data
 

@@ -5,30 +5,46 @@ from pymicro.xray.detectors import Detector2d, RegArrayDetector2d
 from pymicro.crystal.lattice import Lattice, Symmetry
 from pymicro.crystal.microstructure import Microstructure, Grain, Orientation
 
+
 class ForwardSimulation:
     """Class to represent a Forward Simulation."""
 
-    def __init__(self, sim_type):
+    def __init__(self, sim_type, verbose=False):
         self.sim_type = sim_type
+        self.verbose = verbose
+
 
 class XraySource:
     """Class to represent a X-ray source."""
 
     def __init__(self, position=None):
         self.set_position(position)
-        self.min_energy = None
-        self.max_energy = None
+        self._min_energy = None
+        self._max_energy = None
 
     def set_position(self, position):
         if position is None:
             position = (0., 0., 0.)
         self.position = np.array(position)
 
+    @property
+    def min_energy(self):
+        return self._min_energy
+
+    @property
+    def max_energy(self):
+        return self._max_energy
+
     def set_min_energy(self, min_energy):
-        self.min_energy = min_energy
+        self._min_energy = min_energy
 
     def set_max_energy(self, max_energy):
-        self.max_energy = max_energy
+        self._max_energy = max_energy
+
+    def set_energy(self, energy):
+        """Set the energy (monochromatic case)."""
+        self.set_min_energy(energy)
+        self.set_max_energy(energy)
 
     def set_energy_range(self, min_energy, max_energy):
         if min_energy < 0:
@@ -121,10 +137,12 @@ class Sample:
 
     def __init__(self, name=None, position=None, geo=None, material=None, microstructure=None):
         self.name = name
+        self.data_dir = '.'
         self.set_position(position)
         self.set_geometry(geo)
         self.set_material(material)
         self.set_microstructure(microstructure)
+        self.grain_ids_path = None
 
     def set_name(self, name):
         """Set the sample name.
@@ -152,10 +170,16 @@ class Sample:
         assert isinstance(geo, ObjectGeometry) is True
         self.geo = geo
 
+    def get_material(self):
+        return self.material
+
     def set_material(self, material):
         if material is None:
             material = Lattice.cubic(1.0)
         self.material = material
+
+    def get_microstructure(self):
+        return self.microstructure
 
     def set_microstructure(self, microstructure):
         if microstructure is None:
@@ -164,6 +188,22 @@ class Sample:
 
     def has_grains(self):
         return len(self.microstructure.grains) > 0
+
+    def get_grain_ids(self):
+        if not hasattr(self, 'grain_ids'):
+            # try to load grain map
+            #try:
+            import h5py
+            import os
+            full_path = os.path.join(self.data_dir, self.grain_ids_path)
+            print('loading grain_ids field from %s' % full_path)
+            f = h5py.File(full_path)
+            print('successfully loaded grain_ids with shape {}'.format(f['vol'].shape))
+            self.grain_ids = f['vol'][()].transpose(2, 1, 0)  # now we have [x, y, z] representation just like matlab
+            f.close()
+            #except AttributeError:
+            #    print('failed to load grain_ids, please set the grain_ids path for this sample')
+        return self.grain_ids
 
 class Experiment:
     """Class to represent an actual or a virtual X-ray experiment.
@@ -311,6 +351,7 @@ class Experiment:
             dict_exp = json.load(f)
         sample = Sample()
         sample.set_name(dict_exp['Sample']['Name'])
+        sample.data_dir = dict_exp['Sample']['Data Dir']
         sample.set_position(dict_exp['Sample']['Position'])
         if 'Geometry' in dict_exp['Sample']:
             sample_geo = ObjectGeometry()
@@ -333,6 +374,8 @@ class Experiment:
                 grain.hkl_planes = dict_grain['hkl_planes']
                 micro.grains.append(grain)
             sample.set_microstructure(micro)
+        # lazy behaviour, we load only the grain_ids path, the actual array is loaded in memory if needed
+        sample.grain_ids_path = dict_exp['Sample']['Grain Ids Path']
         exp = Experiment()
         exp.set_sample(sample)
         source = XraySource()
@@ -379,10 +422,12 @@ class ExperimentEncoder(json.JSONEncoder):
         if isinstance(o, Sample):
             dict_sample = {}
             dict_sample['Name'] = o.name
+            dict_sample['Data Dir'] = o.data_dir
             dict_sample['Position'] = o.position.tolist()
             dict_sample['Geometry'] = o.geo
             dict_sample['Material'] = o.material
             dict_sample['Microstructure'] = o.microstructure
+            dict_sample['Grain Ids Path'] = o.grain_ids_path
             return dict_sample
         if isinstance(o, RegArrayDetector2d):
             dict_det = {}

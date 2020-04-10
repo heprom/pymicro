@@ -49,7 +49,6 @@ class PoleFigure:
         self.set_hkl_poles(hkl)
         self.verbose = verbose
         self.mksize = 12
-        self.color_by_grain_id = False
         self.pflegend = False
         self.x = np.array([1., 0., 0.])
         self.y = np.array([0., 1., 0.])

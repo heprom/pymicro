@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 from scipy import ndimage
 from matplotlib import pyplot as plt, cm
-from pymicro.xray.experiment import ForwardSimulation, Experiment
+from pymicro.xray.experiment import ForwardSimulation
 from pymicro.crystal.lattice import HklPlane
 from pymicro.xray.xray_utils import lambda_keV_to_nm, radiograph, radiographs
 from pymicro.crystal.microstructure import Grain, Orientation
@@ -20,11 +20,6 @@ class DctForwardSimulation(ForwardSimulation):
         self.check = 1  # grain id to display infos in verbose mode
         self.omegas = None
         self.reflections = []
-        self.exp = Experiment()
-
-    def set_experiment(self, experiment):
-        """Attach an X-ray experiment to this simulation."""
-        self.exp = experiment
 
     def set_hkl_planes(self, hkl_planes):
         self.hkl_planes = hkl_planes

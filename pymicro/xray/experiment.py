@@ -12,6 +12,11 @@ class ForwardSimulation:
     def __init__(self, sim_type, verbose=False):
         self.sim_type = sim_type
         self.verbose = verbose
+        self.exp = Experiment()
+
+    def set_experiment(self, experiment):
+        """Attach an X-ray experiment to this simulation."""
+        self.exp = experiment
 
 
 class XraySource:
@@ -261,77 +266,26 @@ class Experiment:
         """Return the active detector for this experiment."""
         return self.detectors[self.active_detector_id]
     
-    def forward_simulation(self, sim_type='laue', verbose=False, **kwargs):
+    def forward_simulation(self, fs, set_result_to_detector=True):
         """Perform a forward simulation of the X-ray experiment onto the active detector.
         
         This typically sets the detector.data field with the computed image.
 
-        :param str sim_type: The type of simulation to perform (abs, dct or laue).
-        :param bool verbose: activate verbose mode.
-        :param **kwargs: additional parameters depending on the `sim_type` chosen.
+        :param bool set_result_to_detector: if True, the result is assigned to the current detector.
+        :param fs: An instance of `ForwardSimulation` or its derived class.
         """
-        self.fs = ForwardSimulation(sim_type)
-        detector = self.get_active_detector()
-        if self.fs.sim_type == 'laue':
-            from pymicro.xray.laue import build_list
-            from pymicro.xray.xray_utils import lambda_nm_to_keV
-            assert self.sample.has_grains()
-            # check flag to use the source energy limits
-            self.fs.use_energy_limits = kwargs.get('use_energy_limits', False)
-            # set the lattice planes to use in the simulation
-            self.fs.max_miller = kwargs.get('max_miller', 5)
-            if 'hkl_planes' in kwargs:
-                self.fs.hkl_planes = kwargs['hkl_planes']
-            else:
-                self.fs.hkl_planes = build_list(lattice=self.sample.material, max_miller=self.fs.max_miller)
-            n_hkl = len(self.fs.hkl_planes)
-            for grain in self.sample.microstructure.grains:
-                if verbose:
-                    print('FS for grain %d' % grain.id)
-                gt = grain.orientation_matrix().transpose()
-
-                # here we use list comprehension to avoid for loops
-                d_spacings = [hkl.interplanar_spacing() for hkl in self.fs.hkl_planes]  # size n_hkl
-                G_vectors = [hkl.scattering_vector() for hkl in self.fs.hkl_planes]  # size n_hkl, with 3 elements items
-                Gs_vectors = [gt.dot(Gc) for Gc in G_vectors]  # size n_hkl, with 3 elements items
-                positions = self.sample.geo.get_positions().reshape(-1, self.sample.geo.get_positions().shape[-1])  # size n_vox, with 3 elements items
-                n_vox = len(positions)  # total number of discrete positions
-                Xu_vectors = [(pos - self.source.position) / np.linalg.norm(pos - self.source.position)
-                              for pos in positions]  # size n_vox
-                thetas = [np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
-                          for Xu in Xu_vectors
-                          for Gs in Gs_vectors]  # size n_vox * n_hkl
-                the_energies = [lambda_nm_to_keV(2 * d_spacings[i_hkl] * np.sin(thetas[i_Xu * n_hkl + i_hkl]))
-                                for i_Xu in range(n_vox)
-                                for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-                X_vectors = [np.array(Xu_vectors[i_Xu]) / 1.2398 * the_energies[i_Xu * n_hkl + i_hkl]
-                             for i_Xu in range(n_vox)
-                             for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-                K_vectors = [X_vectors[i_Xu * n_hkl + i_hkl] + Gs_vectors[i_hkl]
-                             for i_Xu in range(n_vox)
-                             for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-                OR_vectors = [detector.project_along_direction(origin=positions[i_vox],
-                                                               direction=K_vectors[i_vox * n_hkl + i_hkl])
-                              for i_vox in range(n_vox)
-                              for i_hkl in range(n_hkl)]  # size nb_vox * n_hkl
-                uv = [detector.lab_to_pixel(OR)[0].astype(np.int)
-                      for OR in OR_vectors]
-                # now construct a boolean list to select the diffraction spots
-                if self.source.min_energy is None and self.source.max_energy is None:
-                    energy_in = [True for k in range(len(the_energies))]
-                else:
-                    energy_in = [self.source.min_energy < the_energies[k] < self.source.max_energy
-                                 for k in range(len(the_energies))]
-                uv_in = [0 < uv[k][0] < detector.get_size_px()[0] and 0 < uv[k][1] < detector.get_size_px()[1]
-                         for k in range(len(uv))]  # size n, diffraction located on the detector
-                spot_in = [uv_in[k] and energy_in[k] for k in range(len(uv))]
-                if verbose:
-                    print('%d diffraction events on the detector among %d' % (sum(spot_in), len(uv)))
-
-                # now sum the counts on the detector individual pixels
-                for k in range(len(uv)):
-                    if spot_in[k]:
-                        detector.data[uv[k][0], uv[k][1]] += 1
+        if fs.sim_type == 'laue':
+            fs.set_experiment(self)
+            result = fs.fsim()
+        elif fs.sim_type == 'dct':
+            fs.set_experiment(self)
+            result = fs.dct_projection()
+        else:
+            print('wrong type of simulation: %s' % fs.sim_type)
+            return None
+        if set_result_to_detector:
+            self.get_active_detector().data = result
+        return result
 
     def save(self, file_path='experiment.txt'):
         """Export the parameters to describe the current experiment to a file using json."""

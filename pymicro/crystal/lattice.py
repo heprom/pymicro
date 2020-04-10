@@ -322,8 +322,12 @@ class Lattice:
 
     @property
     def matrix(self):
-        '''Returns a copy of matrix representing the Lattice.'''
+        """Returns a copy of matrix representing the Lattice."""
         return np.copy(self._matrix)
+
+    def get_symmetry(self):
+        """Returns the type of `Symmetry` of the Lattice."""
+        return self._symmetry
 
     @staticmethod
     def symmetry(crystal_structure=Symmetry.cubic, use_miller_bravais=False):
@@ -844,6 +848,29 @@ class HklObject:
         self._k = k
         self._l = l
 
+    @property
+    def lattice(self):
+        return self._lattice
+
+    def set_lattice(self, lattice):
+        """Assign a new `Lattice` to this instance.
+
+        :param lattice: the new crystal lattice.
+        """
+        self._lattice = lattice
+
+    @property
+    def h(self):
+        return self._h
+
+    @property
+    def k(self):
+        return self._k
+
+    @property
+    def l(self):
+        return self._l
+
     def miller_indices(self):
         '''
         Returns an immutable tuple of the plane Miller indices.
@@ -1177,7 +1204,7 @@ class HklPlane(HklObject):
           will be in the list and not (-1,0,0).
         """
         if not (len(hkl) == 3 or (len(hkl) == 4 and crystal_structure == Symmetry.hexagonal)):
-            raise ValueError('warning, family not supported: %s' % hkl)
+            raise ValueError('warning, family not supported: {}'.format(hkl))
         # handle hexagonal case
         if len(hkl) == 4:
             h = int(hkl[0])

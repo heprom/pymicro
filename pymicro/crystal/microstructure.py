@@ -1653,7 +1653,7 @@ class Microstructure:
         omegar = omega * np.pi / 180
         R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
         data_abs = np.where(data > 0, 1, 0)
-        x_max = np.ceil(max(data_abs.shape[0], data_abs.shape[1]) * 2 ** 0.5)
+        x_max = int(np.ceil(max(data_abs.shape[0], data_abs.shape[1]) * 2 ** 0.5))
         proj = np.zeros((np.shape(data_abs)[2], x_max), dtype=np.float)
         if verbose:
             print('diffracting grains', dif_grains)
@@ -1711,7 +1711,7 @@ class Microstructure:
             x_max = np.ceil(max(data_dif.shape[0], data_dif.shape[1]) * 2 ** 0.5)
             proj_dif = np.zeros((np.shape(data_dif)[2], x_max), dtype=np.float)
             for i in range(np.shape(data_dif)[2]):
-                a = radon(data_dif[:, :, i], [omega])
+                a = radon(data_dif[:, :, i], [omega], circle=False)
                 proj_dif[i, :] = a[:, 0]
             if verbose:
                 print('* proj_dif size is ', np.shape(proj_dif))

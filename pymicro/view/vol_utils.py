@@ -297,6 +297,7 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
         plt.show()
     return full_im
 
+
 def compute_affine_transform(fixed, moving):
     '''Compute the affine transform by point set registration.
 
@@ -328,36 +329,3 @@ def compute_affine_transform(fixed, moving):
     linear_map = np.linalg.inv(variance).dot(covariance).T
     translation = fixed_centroid - linear_map.dot(moving_centroid)
     return translation, linear_map
-
-
-class AxShowPixelValue:
-    '''A simple class that wraps a pyplot ax and modify its coordinate
-    formatter to show the pixel value.'''
-
-    def __init__(self, ax):
-        '''Create a new AxShowPixelValue instance with a reference to the
-        given pyplot ax.'''
-        self.ax = ax
-        self.ax.format_coord = self.format_coord
-
-    def imshow(self, array, **kwargs):
-        '''Wraps pyplot imshow function for the ax selected and modify
-        the coordinate formatter to show the pixel value as well.
-        All the usual parameters can be passed to imshow.
-        '''
-        self.array = array
-        self.ax.imshow(self.array, **kwargs)
-
-    def format_coord(self, x, y):
-        '''A function to modify the coordinate formatter of pyplot to
-        display the pixel value. This is usually called when moving the
-        mouse above the plotted image.
-        '''
-        n_rows, n_cols = self.array.shape
-        col = int(x + 0.5)
-        row = int(y + 0.5)
-        if col >= 0 and col < n_cols and row >= 0 and row < n_rows:
-            z = self.array[row, col]
-            return 'x=%1.1f, y=%1.1f, z=%1.1f' % (x, y, z)
-        else:
-            return 'x=%1.1f, y=%1.1f' % (x, y)

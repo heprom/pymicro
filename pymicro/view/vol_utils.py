@@ -6,7 +6,7 @@ from pymicro.view.vtk_utils import *
 
 
 def hist(data, nb_bins=256, data_range=(0, 255), show=True, save=False, prefix='data', density=False):
-    '''Histogram of a data array.
+    """Histogram of a data array.
 
     Compute and plot the gray level histogram of the provided data array.
 
@@ -36,7 +36,7 @@ def hist(data, nb_bins=256, data_range=(0, 255), show=True, save=False, prefix='
         :align: center
 
         Gray level histogram computed on a 512x512x512 8 bits image.
-    '''
+    """
     print('computing gray level histogram')
     hist, bin_edges = np.histogram(data, bins=nb_bins, range=data_range, density=density)
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
@@ -55,13 +55,13 @@ def hist(data, nb_bins=256, data_range=(0, 255), show=True, save=False, prefix='
 
 
 def flat(img, ref, dark):
-    '''Apply flat field correction to an image.
+    """Apply flat field correction to an image.
 
     :param np.array img: A 2D array representing the image to correct.
     :param np.array ref: The reference image (without the sample), same shape as the image to correct.
     :param np.array dark: A 2D numpy array representing the dark image (thermal noise of the camera).
     :returns np.array float: the flat field corrected image (between 0 and 1) as a float32 numpy array.
-    '''
+    """
     flat = (img - dark).astype(np.float32) / (ref - dark).astype(np.float32)
     return flat
 
@@ -154,7 +154,7 @@ def recad(data, mini, maxi):
 
 
 def alpha_cmap(color='red', opacity=1.0):
-    '''Creating a particular colormap with transparency.
+    """Creating a particular colormap with transparency.
 
     Only values equal to 255 will have a non zero alpha channel.
     This is typically used to overlay a binary result on initial data.
@@ -162,7 +162,7 @@ def alpha_cmap(color='red', opacity=1.0):
     :param color: the color to use for non transparent values (ie. 255).
     :param float opacity: opacity value to use for visible pixels.
     :returns mycmap: a fully transparent colormap except for 255 values.
-    '''
+    """
     color1 = colorConverter.to_rgba('white')
     color2 = colorConverter.to_rgba(color)
     mycmap = mpl.colors.LinearSegmentedColormap.from_list('my_cmap', [color1, color2], 256)
@@ -175,7 +175,7 @@ def alpha_cmap(color='red', opacity=1.0):
 
 def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_bc=False, adjust_bc_nbins=256,
            verbose=False, show=True, save=False, save_name='stitch', save_ds=1, check=None):
-    '''Stich a series of images together.
+    """Stich a series of images together.
     
     :param list image_stack: a list of the images to stitch.
     :param int nh: number of images to stitch horizontally.
@@ -192,7 +192,7 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
     :param int save_ds: downsampling factor using when saving the stitched image (1 by default).
     :param int check: trigger plotting for the given image if set.
     :returns full_im: the stitched image in [x, y] form.
-    '''
+    """
     assert pattern in ['E', 'S']
     # is motion not set, assume the full size of the first image
     if hmove is None:
@@ -299,7 +299,7 @@ def stitch(image_stack, nh=2, nv=1, pattern='E', hmove=None, vmove=None, adjust_
 
 
 def compute_affine_transform(fixed, moving):
-    '''Compute the affine transform by point set registration.
+    """Compute the affine transform by point set registration.
 
     The affine transform is the composition of a translation and a linear map.
     The two ordered lists of points must be of the same length larger or equal to 3.
@@ -315,7 +315,7 @@ def compute_affine_transform(fixed, moving):
     :returns translation, linear_map: the computed translation and linear map affine transform. 
 
     Thanks to Will Lenthe for helping with this code.
-    '''
+    """
     assert len(fixed) == len(moving)
     assert len(fixed) >= 3
     fixed_centroid = np.average(fixed, 0)

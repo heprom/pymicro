@@ -1443,6 +1443,59 @@ class Microstructure:
     def SetVtkMesh(self, mesh):
         self.vtkmesh = mesh
 
+    @staticmethod
+    def match_grains(micro1, micro2, crystal_structure, use_grain_ids=None, verbose=False):
+        return micro1.match_grains(micro2, crystal_structure, use_grain_ids, verbose)
+
+    def match_grains(self, micro2, crystal_structure, use_grain_ids=None, verbose=False):
+        """Match grains from a second microstructure to this microstructure.
+
+        This function try to find pair of grains based on their orientations.
+
+        :param micro2: the second instance of `Microstructure` from which to match grains.
+        :param crystal_structure: an instance of the `Symmetry` class describing the crystal symmetry.
+        :param bool use_grain_ids: a list of ids to restrict the grains in which to search for matches.
+        :param bool verbose: activate verbose mode.
+        :returns tuple: A tuple of three lists holding respectively the matches, the candidates for each match and
+        the grains that were unmatched.
+        """
+        mis_tol = 1  # degrees
+        candidates = []
+        matched = []  # np.zeros(len(micro1.grains), dtype=int)
+        unmatched = []  # grain that were not matched within the given tolerance
+        # restrict the grain ids to match if needed
+        if use_grain_ids:
+            grains_to_match = [self.get_grain(gid) for gid in use_grain_ids]
+        else:
+            grains_to_match = self.grains
+        # look at each grain
+        for i, g1 in enumerate(grains_to_match):
+            cands_for_g1 = []
+            best_mis = mis_tol
+            best_match = -1
+            for g2 in micro2.grains:
+                # compute disorientation
+                mis, _, _ = g1.orientation.disorientation(g2.orientation, crystal_structure=crystal_structure)
+                misd = np.degrees(mis)
+                if misd < mis_tol:
+                    if verbose:
+                        print('grain %3d -- candidate: %3d, misorientation: %.2f deg' % (g1.id, g2.id, misd))
+                    # add this grain to the list of candidates
+                    cands_for_g1.append(g2.id)
+                    if misd < best_mis:
+                        best_mis = misd
+                        best_match = g2.id
+            # add our best match or mark this grain as unmatched
+            if best_match > 0:
+                matched.append([g1.id, best_match])
+            else:
+                unmatched.append(g1.id)
+            candidates.append(cands_for_g1)
+        if verbose:
+            print('done with matching')
+            print('%d/%d grains were matched ' % (len(matched), len(grains_to_match)))
+        return matched, candidates, unmatched
+
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """
         Outputs the material block corresponding to this microstructure for

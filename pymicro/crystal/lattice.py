@@ -342,71 +342,27 @@ class Lattice:
         number of symmetries of the given crystal structure.
         """
         return crystal_structure.symmetry_operators(use_miller_bravais=use_miller_bravais)
-        '''
-        if crystal_structure == Symmetry.cubic:
-            sym = np.zeros((24, 3, 3), dtype=np.float)
-            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
-            sym[1] = np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]])
-            sym[2] = np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]])
-            sym[3] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
-            sym[4] = np.array([[0., 0., 1.], [0., 1., 0.], [-1., 0., 0.]])
-            sym[5] = np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]])
-            sym[6] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
-            sym[7] = np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]])
-            sym[8] = np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])
-            sym[9] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
-            sym[10] = np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]])
-            sym[11] = np.array([[0., 0., 1.], [1., 0., 0.], [0., 1., 0.]])
-            sym[12] = np.array([[0., 1., 0.], [0., 0., 1.], [1., 0., 0.]])
-            sym[13] = np.array([[0., 0., -1.], [-1., 0., 0.], [0., 1., 0.]])
-            sym[14] = np.array([[0., -1., 0.], [0., 0., 1.], [-1., 0., 0.]])
-            sym[15] = np.array([[0., 1., 0.], [0., 0., -1.], [-1., 0., 0.]])
-            sym[16] = np.array([[0., 0., -1.], [1., 0., 0.], [0., -1., 0.]])
-            sym[17] = np.array([[0., 0., 1.], [-1., 0., 0.], [0., -1., 0.]])
-            sym[18] = np.array([[0., -1., 0.], [0., 0., -1.], [1., 0., 0.]])
-            sym[19] = np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]])
-            sym[20] = np.array([[-1., 0., 0.], [0., 0., 1.], [0., 1., 0.]])
-            sym[21] = np.array([[0., 0., 1.], [0., -1., 0.], [1., 0., 0.]])
-            sym[22] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
-            sym[23] = np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]])
-        elif crystal_structure == Symmetry.hexagonal:
-            sym = np.zeros((12, 3, 3), dtype=np.float)
-            s60 = np.sin(60 * np.pi / 180)
-            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
-            sym[1] = np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]])
-            sym[2] = np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]])
-            sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
-            sym[4] = np.array([[-0.5, -s60, 0.], [s60, -0.5, 0.], [0., 0., 1.]])
-            sym[5] = np.array([[0.5, -s60, 0.], [s60, 0.5, 0.], [0., 0., 1.]])
-            sym[6] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
-            sym[7] = np.array([[0.5, s60, 0.], [s60, -0.5, 0.], [0., 0., -1.]])
-            sym[8] = np.array([[-0.5, s60, 0.], [s60, 0.5, 0.], [0., 0., -1.]])
-            sym[9] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
-            sym[10] = np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]])
-            sym[11] = np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]])
-        elif crystal_structure == Symmetry.orthorhombic:
-            sym = np.zeros((4, 3, 3), dtype=np.float)
-            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
-            sym[1] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
-            sym[2] = np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]])
-            sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
-        elif crystal_structure == Symmetry.tetragonal:
-            sym = np.zeros((8, 3, 3), dtype=np.float)
-            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
-            sym[1] = np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])
-            sym[2] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
-            sym[3] = np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]])
-            sym[4] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
-            sym[5] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
-            sym[6] = np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]])
-            sym[7] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
-        elif crystal_structure == Symmetry.triclinic:
-            sym = np.zeros((1, 3, 3), dtype=np.float)
-            sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+
+    def get_lattice_parameters(self):
+        """This function create a list of the independent lattice parameters depending on the symmetry.
+
+        :return: a list of the lattice parameters.
+        """
+        sym = self.get_symmetry()
+        (a, b, c) = self._lengths
+        (alpha, beta, gamma) = self._angles
+        # craft a list of the lattice parameters
+        if sym is Symmetry.cubic:
+            parameters = [a]
+        elif sym in [Symmetry.hexagonal, Symmetry.trigonal, Symmetry.tetragonal]:
+            parameters = [a, c]
+        elif sym is Symmetry.orthorhombic:
+            parameters = [a, b, c]
+        elif sym is Symmetry.monoclinic:
+            parameters = [a, b, c, alpha]
         else:
-            raise ValueError('warning, crystal structure not supported: %s' % crystal_structure)
-        return sym
-        '''
+            parameters = [a, b, c, alpha, beta, gamma]
+        return parameters
 
     def guess_symmetry(self):
         """Guess the lattice symmetry from the geometry."""
@@ -695,6 +651,43 @@ class Lattice:
            method.
         '''
         return Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=Symmetry.triclinic)
+
+    @staticmethod
+    def from_symmetry(symmetry, parameters):
+        """Create a new lattice based on a type of symmetry and a list of lattice parameters.
+
+        The type of symmetry should be an instance of `Symmetry` and the list of parameters should contain the
+        appropriate number: 1 for cubic, 2 for hexagonal, tetragonal or trigonal, 3 for orthorhombic, 4 for monoclinic
+        or 6 for triclinic.
+
+        :param symmetry: an instance of `Symmetry`.
+        :param list parameters: a list of the lattice parameters.
+        :return: the newly created `Lattice` instance.
+        """
+        if symmetry is Symmetry.cubic:
+            if len(parameters) != 1:
+                raise(ValueError('The number of parameters for %s symmetry should be 1, got %d' % (symmetry, len(parameters))))
+            return Lattice.cubic(parameters[0])
+        elif symmetry in [Symmetry.hexagonal, Symmetry.trigonal]:
+            if len(parameters) != 2:
+                raise(ValueError('The number of parameters for %s symmetry should be 2, got %d' % (symmetry, len(parameters))))
+            return Lattice.hexagonal(parameters[0], parameters[1])
+        elif symmetry is Symmetry.orthorhombic:
+            if len(parameters) != 3:
+                raise(ValueError('The number of parameters for %s symmetry should be 3, got %d' % (symmetry, len(parameters))))
+            return Lattice.orthorhombic(parameters[0], parameters[1], parameters[2])
+        elif symmetry is Symmetry.tetragonal:
+            if len(parameters) != 2:
+                raise(ValueError('The number of parameters for %s symmetry should be 2, got %d' % (symmetry, len(parameters))))
+            return Lattice.tetragonal(parameters[0], parameters[1])
+        elif symmetry is Symmetry.monoclinic:
+            if len(parameters) != 4:
+                raise(ValueError('The number of parameters for %s symmetry should be 4, got %d' % (symmetry, len(parameters))))
+            return Lattice.monoclinic(parameters[0], parameters[1], parameters[2], parameters[3])
+        else:
+            if len(parameters) != 6:
+                raise(ValueError('The number of parameters for triclinic symmetry should be 6, got %d' % len(parameters)))
+            return Lattice.triclinic(*parameters)
 
     @staticmethod
     def from_parameters(a, b, c, alpha, beta, gamma, x_aligned_with_a=True, centering='P', symmetry=Symmetry.triclinic):

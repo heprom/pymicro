@@ -1589,6 +1589,7 @@ class Microstructure:
         """read a microstructure object from a HDF5 file.
 
         :param str file_path: the path to the file to read.
+        :return: the new `Microstructure` instance created from the file.
         """
         with h5py.File(file_path, 'r') as f:
             micro = Microstructure(name=f.attrs['microstructure_name'])

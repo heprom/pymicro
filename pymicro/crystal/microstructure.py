@@ -1542,7 +1542,7 @@ class Microstructure:
                     grain_prefix, g.id, mat_file, o.phi1(), o.Phi(), o.phi2()))
         f.close()
 
-    def to_h5(self):
+    def to_dream3d(self):
         """Write the microstructure as a hdf5 file compatible with DREAM3D."""
         import time
         f = h5py.File('%s.h5' % self.name, 'w')
@@ -1593,7 +1593,7 @@ class Microstructure:
         f.close()
 
     @staticmethod
-    def from_h5(file_path, main_key='DataContainers', data_container='DataContainer', grain_data='FeatureData',
+    def from_dream3d(file_path, main_key='DataContainers', data_container='DataContainer', grain_data='FeatureData',
                 grain_orientations='AvgEulerAngles', orientation_type='euler', grain_centroid='Centroids'):
         """Read a microstructure from a hdf5 file.
         

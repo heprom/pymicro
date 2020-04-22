@@ -1346,7 +1346,7 @@ class Microstructure:
     def __init__(self, name='empty', lattice=None):
         self.name = name
         if lattice is None:
-            lattice = Lattice()
+            lattice = Lattice.cubic(1.0)
         self._lattice = lattice
         self.grains = []
         self.vtkmesh = None
@@ -1356,6 +1356,10 @@ class Microstructure:
 
         For the moment only one phase is supported, so this function simply returns 1."""
         return 1
+
+    def get_number_of_grains(self):
+        """Return the number of grains in this microstructure."""
+        return len(self.grains)
 
     def set_lattice(self, lattice):
         """Set the crystallographic lattice associated with this microstructure.
@@ -1542,6 +1546,83 @@ class Microstructure:
                     grain_prefix, g.id, mat_file, o.phi1(), o.Phi(), o.phi2()))
         f.close()
 
+    from pymicro import __version__ as pymicro_version
+
+    def to_h5(self):
+        """Write the microstructure as a hdf5 file."""
+        import time
+        from pymicro import __version__ as pymicro_version
+
+        print('opening file %s.h5 for writing' % self.name)
+        f = h5py.File('%s.h5' % self.name, 'w')
+        f.attrs['Pymicro_Version'] = np.string_(pymicro_version)
+        f.attrs['HDF5_Version'] = h5py.version.hdf5_version
+        f.attrs['h5py_version'] = h5py.version.version
+        f.attrs['file_time'] = time.time()
+        f.attrs['microstructure_name'] = self.name
+        f.attrs['data_dir'] = self.data_dir
+        # ensemble data
+        ed = f.create_group('EnsembleData')
+        cs = ed.create_group('CrystalStructure')
+        sym = self.get_lattice().get_symmetry()
+        cs.attrs['symmetry'] = sym.to_string()
+        lp = cs.create_dataset('LatticeParameters',
+                               data=np.array(self.get_lattice().get_lattice_parameters(), dtype=np.float32))
+        # feature data
+        fd = f.create_group('FeatureData')
+        grain_ids = fd.create_dataset('grain_ids',
+                                      data=np.array([g.id for g in self.grains], dtype=np.int))
+        avg_rods = fd.create_dataset('R_vectors',
+                                     data=np.array([g.orientation.rod for g in self.grains], dtype=np.float32))
+        centers = fd.create_dataset('centers',
+                                    data=np.array([g.center for g in self.grains], dtype=np.float32))
+        # cell data
+        cd = f.create_group('CellData')
+        if hasattr(self, 'grain_map'):
+            cd.create_dataset('grain_ids', data=self.grain_map, compression='gzip', compression_opts=9)
+        if hasattr(self, 'mask'):
+            cd.create_dataset('mask', data=self.mask, compression='gzip', compression_opts=9)
+        print('done writing')
+        f.close()
+
+    def from_h5(file_path):
+        """read a microstructure object from a HDF5 file.
+
+        :param str file_path: the path to the file to read.
+        """
+        with h5py.File(file_path, 'r') as f:
+            micro = Microstructure(name=f.attrs['microstructure_name'])
+            if 'symmetry' in f['EnsembleData/CrystalStructure'].attrs:
+                sym = f['EnsembleData/CrystalStructure'].attrs['symmetry']
+                parameters = f['EnsembleData/CrystalStructure/LatticeParameters'][()]
+                micro.set_lattice(Lattice.from_symmetry(Symmetry.from_string(sym), parameters))
+            if 'data_dir' in f.attrs:
+                micro.data_dir = f.attrs['data_dir']
+            # load feature data
+            if 'R_vectors' in f['FeatureData']:
+                print('some grains')
+                avg_rods = f['FeatureData/R_vectors'][()]
+                print(avg_rods.shape)
+                if 'grain_ids' in f['FeatureData']:
+                    grain_ids = f['FeatureData/grain_ids'][()]
+                else:
+                    grain_ids = range(1, 1 + avg_rods.shape[0])
+                if 'centers' in f['FeatureData']:
+                    centers = f['FeatureData/centers'][()]
+                else:
+                    centers = np.zeros_like(avg_rods)
+                for i in range(avg_rods.shape[0]):
+                    g = Grain(grain_ids[i], Orientation.from_rodrigues(avg_rods[i, :]))
+                    g.position = centers[i]
+                    g.center = centers[i]
+                    micro.grains.append(g)
+            # load cell data
+            if 'grain_ids' in f['CellData']:
+                micro.grain_map = f['CellData/grain_ids'][()]
+            if 'mask' in f['CellData']:
+                micro.mask = f['CellData/mask'][()]
+            return micro
+
     def to_dream3d(self):
         """Write the microstructure as a hdf5 file compatible with DREAM3D."""
         import time
@@ -1722,117 +1803,3 @@ class Microstructure:
             else:
                 writer.SetInput(self.vtkmesh)
             writer.Write()
-
-    def dct_projection(self, data, lattice, omega, dif_grains, lambda_keV, d, ps, det_npx=np.array([2048, 2048]), ds=1,
-                       display=False, verbose=False):
-        """Compute the detector image in dct configuration.
-
-        :params np.ndarray data: The 3d data set from which to compute the projection.
-        :params lattice: The crystal lattice of the material.
-        :params float omega: The rotation angle at which the projection is computed.
-        """
-        lambda_nm = 1.2398 / lambda_keV
-        # prepare rotation matrix
-        omegar = omega * np.pi / 180
-        R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
-        data_abs = np.where(data > 0, 1, 0)
-        x_max = int(np.ceil(max(data_abs.shape[0], data_abs.shape[1]) * 2 ** 0.5))
-        proj = np.zeros((np.shape(data_abs)[2], x_max), dtype=np.float)
-        if verbose:
-            print('diffracting grains', dif_grains)
-            print('proj size is ', np.shape(proj))
-        # handle each grain in Bragg condition
-        for (gid, (h, k, l)) in dif_grains:
-            mask_dif = (data == gid)
-            data_abs[mask_dif] = 0  # remove this grain from the absorption
-        from skimage.transform import radon
-        for i in range(np.shape(data_abs)[2]):
-            proj[i, :] = radon(data_abs[:, :, i], [omega])[:, 0]
-        # create the detector image (larger than the FOV) by padding the transmission image with zeros
-        full_proj = np.zeros(det_npx / ds, dtype=np.float)
-        if verbose:
-            print('full proj size is ', np.shape(full_proj))
-            print('max proj', proj.max())
-            # here we could use np.pad with numpy version > 1.7
-            print(int(0.5 * det_npx[0] / ds - proj.shape[0] / 2.))
-            print(int(0.5 * det_npx[0] / ds + proj.shape[0] / 2.))
-            print(int(0.5 * det_npx[1] / ds - proj.shape[1] / 2.))
-            print(int(0.5 * det_npx[1] / ds + proj.shape[1] / 2.))
-        # let's moderate the direct beam so we see nicely the spots with a 8 bits scale
-        att = 6.0 / ds  # 1.0
-        full_proj[int(0.5 * det_npx[0] / ds - proj.shape[0] / 2.):int(0.5 * det_npx[0] / ds + proj.shape[0] / 2.), \
-        int(0.5 * det_npx[1] / ds - proj.shape[1] / 2.):int(0.5 * det_npx[1] / ds + proj.shape[1] / 2.)] += proj / att
-        # add diffraction spots
-        from pymicro.crystal.lattice import HklPlane
-        from scipy import ndimage
-        for (gid, (h, k, l)) in dif_grains:
-            # compute scattering vector
-            gt = self.get_grain(gid).orientation_matrix().transpose()
-            p = HklPlane(h, k, l, lattice)
-            X = np.array([1., 0., 0.]) / lambda_nm
-            n = R.dot(gt.dot(p.normal()))
-            G = n / p.interplanar_spacing()  # also G = R.dot(gt.dot(h*astar + k*bstar + l*cstar))
-            K = X + G
-            # TODO explain the - signs, account for grain position in the rotated sample
-            (u, v) = (d * K[1] / K[0], d * K[2] / K[0])  # unit is mm
-            (u_mic, v_mic) = (1000 * u, 1000 * v)  # unit is micron
-            (up, vp) = (0.5 * det_npx[0] / ds + u_mic / (ps * ds),
-                        0.5 * det_npx[1] / ds + v_mic / (ps * ds))  # unit is pixel on the detector
-            if verbose:
-                print('plane normal:', p.normal())
-                print(R)
-                print('rotated plane normal:', n)
-                print('scattering vector:', G)
-                print('K = X + G vector', K)
-                print('lenght X', np.linalg.norm(X))
-                print('lenght K', np.linalg.norm(K))
-                print('angle between X and K', np.arccos(
-                    np.dot(K, X) / (np.linalg.norm(K) * np.linalg.norm(X))) * 180 / np.pi)
-                print('diffracted beam will hit the detector at (%.3f,%.3f) mm or (%d,%d) pixels' % (u, v, up, vp))
-            grain_data = np.where(data == gid, 1, 0)
-            data_dif = grain_data[ndimage.find_objects(data == gid)[0]]
-            x_max = np.ceil(max(data_dif.shape[0], data_dif.shape[1]) * 2 ** 0.5)
-            proj_dif = np.zeros((np.shape(data_dif)[2], x_max), dtype=np.float)
-            for i in range(np.shape(data_dif)[2]):
-                a = radon(data_dif[:, :, i], [omega], circle=False)
-                proj_dif[i, :] = a[:, 0]
-            if verbose:
-                print('* proj_dif size is ', np.shape(proj_dif))
-                print(int(up - proj_dif.shape[0] / 2.))
-                print(int(up + proj_dif.shape[0] / 2.))
-                print(int(vp - proj_dif.shape[1] / 2.))
-                print(int(vp + proj_dif.shape[1] / 2.))
-                print('max proj_dif', proj_dif.max())
-            # add diffraction spot to the image detector
-            try:
-                # warning full_proj image is transposed (we could fix that and plot with .T since pyplot plots images like (y,x))
-                full_proj[int(vp - proj_dif.shape[0] / 2.):int(vp + proj_dif.shape[0] / 2.), \
-                int(up - proj_dif.shape[1] / 2.):int(up + proj_dif.shape[1] / 2.)] += proj_dif
-                # full_proj[int(up - proj_dif.shape[0]/2.):int(up + proj_dif.shape[0]/2.), \
-                #        int(vp - proj_dif.shape[1]/2.):int(vp + proj_dif.shape[1]/2.)] += proj_dif
-            except:
-                print('error occured')  # grain diffracts outside the detector
-                pass
-            plt.imsave('proj_dif/proj_dif_grain%d_omega=%05.1f.png' % (gid, omega), proj_dif, cmap=cm.gray,
-                       origin='lower')
-        if display:
-            fig = plt.figure(figsize=(10, 10))
-            ax = fig.add_subplot(111)
-            ax.imshow(full_proj[:, ::-1], cmap=cm.gray, vmin=0, vmax=255, origin='lower')  # check origin
-            for (h, k, l) in [(1, 1, 0), (2, 0, 0), (2, 1, 1), (2, 2, 0), (2, 2, 2), (3, 1, 0), (3, 2, 1), (3, 3, 0),
-                              (3, 3, 2)]:
-                hkl = HklPlane(h, k, l, lattice)
-                theta = hkl.bragg_angle(lambda_keV)
-                print('bragg angle for %s reflection is %.2f deg' % (hkl.miller_indices(), theta * 180. / np.pi))
-                t = np.linspace(0.0, 2 * np.pi, num=37)
-                L = d * 1000 / ps / ds * np.tan(2 * theta)  # 2 theta distance on the detector
-                ax.plot(0.5 * det_npx[0] / ds + L * np.cos(t), 0.5 * det_npx[1] / ds + L * np.sin(t), 'g--')
-                ax.annotate(str(h) + str(k) + str(l), xy=(0.5 * det_npx[0] / ds, 0.5 * det_npx[1] / ds + L),
-                            xycoords='data', color='green', horizontalalignment='center', verticalalignment='bottom',
-                            fontsize=16)
-            plt.xlim(0, det_npx[0] / ds)
-            plt.ylim(0, det_npx[1] / ds)
-            plt.show()
-        else:
-            # save projection image with origin = lower since Z-axis is upwards
-            plt.imsave('proj/proj_omega=%05.1f.png' % omega, full_proj, cmap=cm.gray, vmin=0, vmax=100, origin='lower')

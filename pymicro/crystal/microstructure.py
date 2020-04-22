@@ -17,7 +17,7 @@ import vtk
 import h5py
 from matplotlib import pyplot as plt, colors, cm
 from xml.dom.minidom import Document, parse
-from pymicro.crystal.lattice import Symmetry
+from pymicro.crystal.lattice import Lattice, Symmetry
 from pymicro.crystal.quaternion import Quaternion
 from math import atan2, pi
 
@@ -1343,10 +1343,33 @@ class Microstructure:
     It is typically defined as a list of grains objects.
     """
 
-    def __init__(self, name='empty'):
+    def __init__(self, name='empty', lattice=None):
         self.name = name
+        if lattice is None:
+            lattice = Lattice()
+        self._lattice = lattice
         self.grains = []
         self.vtkmesh = None
+
+    def get_number_of_phases(self):
+        """Return the number of phases in this microstructure.
+
+        For the moment only one phase is supported, so this function simply returns 1."""
+        return 1
+
+    def set_lattice(self, lattice):
+        """Set the crystallographic lattice associated with this microstructure.
+
+        :param Lattice lattice: an instance of the `Lattice class`.
+        """
+        self._lattice = lattice
+
+    def get_lattice(self):
+        """Get the crystallographic lattice associated with this microstructure.
+
+        :return: an instance of the `Lattice class`.
+        """
+        return self._lattice
 
     @staticmethod
     def random_texture(n=100):
@@ -1444,22 +1467,29 @@ class Microstructure:
         self.vtkmesh = mesh
 
     @staticmethod
-    def match_grains(micro1, micro2, crystal_structure, use_grain_ids=None, verbose=False):
-        return micro1.match_grains(micro2, crystal_structure, use_grain_ids, verbose)
+    def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
+        return micro1.match_grains(micro2, use_grain_ids, verbose)
 
-    def match_grains(self, micro2, crystal_structure, mis_tol=1, use_grain_ids=None, verbose=False):
+    def match_grains(self, micro2, mis_tol=1, use_grain_ids=None, verbose=False):
         """Match grains from a second microstructure to this microstructure.
 
         This function try to find pair of grains based on their orientations.
 
+        .. warning::
+
+          This function works only for microstructures with the same symmetry.
+
         :param micro2: the second instance of `Microstructure` from which to match grains.
-        :param crystal_structure: an instance of the `Symmetry` class describing the crystal symmetry.
         :param float mis_tol: the tolerance is misorientation to use to detect matches (in degrees).
         :param bool use_grain_ids: a list of ids to restrict the grains in which to search for matches.
         :param bool verbose: activate verbose mode.
+        :raise ValueError: if the microstructures do not have the same symmetry.
         :returns tuple: A tuple of three lists holding respectively the matches, the candidates for each match and
         the grains that were unmatched.
         """
+        if not self.get_lattice().get_symmetry() == micro2.get_lattice().get_symmetry():
+            raise ValueError('warning, microstructure should have the same symmetry, got: {} and {}'.
+                             format(self.get_lattice().get_symmetry(), micro2.get_lattice().get_symmetry()))
         candidates = []
         matched = []
         unmatched = []  # grain that were not matched within the given tolerance

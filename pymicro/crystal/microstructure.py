@@ -1472,7 +1472,7 @@ class Microstructure:
 
     @staticmethod
     def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
-        return micro1.match_grains(micro2, use_grain_ids, verbose)
+        return micro1.match_grains(micro2, use_grain_ids=use_grain_ids, verbose=verbose)
 
     def match_grains(self, micro2, mis_tol=1, use_grain_ids=None, verbose=False):
         """Match grains from a second microstructure to this microstructure.
@@ -1509,7 +1509,7 @@ class Microstructure:
             best_match = -1
             for g2 in micro2.grains:
                 # compute disorientation
-                mis, _, _ = g1.orientation.disorientation(g2.orientation, crystal_structure=crystal_structure)
+                mis, _, _ = g1.orientation.disorientation(g2.orientation, crystal_structure=self.get_lattice().get_symmetry())
                 misd = np.degrees(mis)
                 if misd < mis_tol:
                     if verbose:
@@ -1560,7 +1560,8 @@ class Microstructure:
         f.attrs['h5py_version'] = h5py.version.version
         f.attrs['file_time'] = time.time()
         f.attrs['microstructure_name'] = self.name
-        f.attrs['data_dir'] = self.data_dir
+        if hasattr(self, 'data_dir'):
+            f.attrs['data_dir'] = self.data_dir
         # ensemble data
         ed = f.create_group('EnsembleData')
         cs = ed.create_group('CrystalStructure')
@@ -1804,3 +1805,280 @@ class Microstructure:
             else:
                 writer.SetInput(self.vtkmesh)
             writer.Write()
+
+    @staticmethod
+    def merge_microstructures(micros, overlap, voxel_size, plot=False):
+        """Merge two `Microstructure` instances together.
+
+        The function works for two microstructures with grain maps and an overlap between them. Temporarily
+        `Microstructures` restricted to the overlap regions are created and grains are matched between the two based
+        on a disorientation tolerance.
+
+        :param list micros: a list containing the two microstructures to merge.
+        :param int overlap: the overlap to use.
+        :param float voxel_size: the voxel size for the grain maps.
+        :param bool plot: a flag to plot some results.
+        :return: a new `Microstructure`instance containing the merged microstructure.
+        """
+        from scipy import ndimage
+
+        # perform some sanity checks
+        for i in range(2):
+            if not hasattr(micros[i], 'grain_map'):
+                raise ValueError('microstructure instance %s must have an associated grain_map attribute' % micros[i].name)
+        if micros[0].get_lattice() != micros[1].get_lattice():
+            raise ValueError('both microstructure must have the same crystal lattice')
+        lattice = micros[0].get_lattice()
+
+        # create two microstructure of the overlapping regions: end slices in first scan and first slices in second scan
+        grain_ids_ol1 = micros[0].grain_map[:, :, micros[0].grain_map.shape[2] - overlap:]
+        grain_ids_ol2 = micros[1].grain_map[:, :, :overlap]
+        dims_ol1 = np.array(grain_ids_ol1.shape)
+        print(dims_ol1)
+        dims_ol2 = np.array(grain_ids_ol2.shape)
+        print(dims_ol2)
+
+        # build a microstructure for the overlap region in each volumes
+        grain_ids_ols = [grain_ids_ol1, grain_ids_ol2]
+        micros_ol = []
+        for i in range(2):
+            grain_ids_ol = grain_ids_ols[i]
+            ids_ol = np.unique(grain_ids_ol)
+            print(ids_ol)
+
+            # difference due to the crop (restricting the grain map to the overlap region)
+            #offset_mm =  (2 * i - 1) * voxel_size * np.array([0., 0., grain_ids_ol.shape[2] - 0.5 * micros[i].grain_map.shape[2]])
+            # here we use an ad-hoc offset to voxel (0, 0, 0) in the full volume: offset is zero for the second volume
+            offset_px = (i - 1) * np.array([0., 0., grain_ids_ol.shape[2] - micros[i].grain_map.shape[2]])
+            offset_mm = voxel_size * offset_px
+            print('offset [px] is {}'.format(offset_px))
+            print('offset [mm] is {}'.format(offset_mm))
+
+            # make the microstructure
+            micro_ol = Microstructure(name='%sol_' % micros[i].name)
+            print('* building microstructure %s' % micro_ol.name)
+            micro_ol.set_lattice(lattice)
+            micro_ol.grain_map = grain_ids_ol
+            for gid in ids_ol:
+                if gid < 1:
+                    print('skipping %d' % gid)
+                    continue
+                g = Grain(gid, micros[i].get_grain(gid).orientation)
+                # recalculate position as we look at a truncated volume
+
+                array_bin = (grain_ids_ol == gid).astype(np.uint8)
+                local_com = ndimage.measurements.center_of_mass(array_bin, grain_ids_ol)
+                #print('local_com = {}'.format(local_com))
+                com_px = (local_com + offset_px - 0.5 * np.array(micros[i].grain_map.shape))
+                #print('com [px] = {}'.format(com_px))
+                com_mm = voxel_size * com_px
+                print('grain %2d position: %6.3f, %6.3f, %6.3f' % (gid, com_mm[0], com_mm[1], com_mm[2]))
+
+                #array_bin = (grain_ids_ol == gid).astype(np.uint8)
+                #local_com = ndimage.measurements.center_of_mass(array_bin, grain_ids_ol)
+                #com_mm = voxel_size * (local_com - 0.5 * np.array(grain_ids_ol.shape)) + offset
+                #print('grain %2d position: %6.3f, %6.3f, %6.3f' % (gid, com_mm[0], com_mm[1], com_mm[2]))
+                g.position = com_mm
+                g.center = com_mm
+                micro_ol.grains.append(g)
+            # add the overlap microstructure to the list
+            micros_ol.append(micro_ol)
+
+        # match grain from micros_ol[1] to micros_ol[0] (the reference)
+        matched, _, unmatched = micros_ol[0].match_grains(micros_ol[1], verbose=True)
+
+        from pymicro.view.vol_utils import compute_affine_transform
+
+        # compute the affine transform
+        n_points = len(matched)
+        fixed = np.zeros((n_points, 3))
+        moving = np.zeros((n_points, 3))
+        moved = np.zeros_like(moving)
+
+        # markers in ref grain map
+        for i in range(n_points):
+            fixed[i] = micros_ol[0].get_grain(matched[i][0]).center
+            moving[i] = micros_ol[1].get_grain(matched[i][1]).center
+
+        # call the registration method
+        translation, transformation = compute_affine_transform(fixed, moving)
+        invt = np.linalg.inv(transformation)
+
+        # check what are now the points after transformation
+        fixed_centroid = np.average(fixed, axis=0)
+        moving_centroid = np.average(moving, axis=0)
+        print('fixed centroid: {}'.format(fixed_centroid))
+        print('moving centroid: {}'.format(moving_centroid))
+
+        for j in range(n_points):
+            moved[j] = fixed_centroid + np.dot(transformation, moving[j] - moving_centroid)
+            print('point %d will move to (%6.3f, %6.3f, %6.3f) to be compared with (%6.3f, %6.3f, %6.3f)' % (
+                j, moved[j, 0], moved[j, 1], moved[j, 2], fixed[j, 0], fixed[j, 1], fixed[j, 2]))
+        print('transformation is:')
+        print(invt)
+
+        # offset and translation, here we only look for rigid body translation
+        offset = -np.dot(invt, translation)
+        print(translation, offset)
+        translation_voxel = (translation / voxel_size).astype(int)
+        print(translation_voxel)
+
+        # look at ids in the reference volume
+        ids_ref = np.unique(micros[0].grain_map)
+        ids_ref_list = ids_ref.tolist()
+        ids_ref_list.remove(-1)  # grain overlap
+        ids_ref_list.remove(0)  # background
+        print(ids_ref_list)
+        id_offset = max(ids_ref_list)
+        print('grain ids in volume %s will be offset by %d' % (micros[1].name, id_offset))
+
+        # gather ids in the merging volume (will be modified)
+        ids_mrg = np.unique(micros[1].grain_map)
+        ids_mrg_list = ids_mrg.tolist()
+        ids_mrg_list.remove(-1)  # grain overlap
+        ids_mrg_list.remove(0)  # background
+        print(ids_mrg_list)
+
+        # prepare a volume with the same size as the second grain map, with grain ids renumbered and (X, Y) translations applied.
+        grain_map_translated = micros[1].grain_map.copy()
+        print('renumbering grains in the overlap region of volume %s' % micros[1].name)
+        for match in matched:
+            ref_id, other_id = match
+            print('replacing %d by %d' % (other_id, ref_id))
+            ids_mrg_list.remove(other_id)
+            grain_map_translated[micros[1].grain_map == other_id] = ref_id
+            #TODO should flag those grains so their center can be recomputed
+        # also renumber the rest using the offset
+        renumbered_grains = []
+        for i, other_id in enumerate(ids_mrg_list):
+            new_id = id_offset + i + 1
+            grain_map_translated[micros[1].grain_map == other_id] = new_id
+            print('replacing %d by %d' % (other_id, new_id))
+            renumbered_grains.append([other_id, new_id])
+
+        # apply translation along the (X, Y) axes
+        grain_map_translated = np.roll(grain_map_translated, translation_voxel[:2], (0, 1))
+
+        check = overlap // 2
+        print(grain_map_translated.shape)
+        print(overlap)
+        print(translation_voxel[2] + check)
+        if plot:
+            fig = plt.figure(figsize=(15, 7))
+            ax1 = fig.add_subplot(1, 3, 1)
+            ax1.imshow(micros[0].grain_map[:, :, translation_voxel[2] + check].T, vmin=0)
+            plt.axis('off')
+            plt.title('micros[0].grain_map (ref)')
+            ax2 = fig.add_subplot(1, 3, 2)
+            ax2.imshow(grain_map_translated[:, :, check].T, vmin=0)
+            plt.axis('off')
+            plt.title('micros[1].grain_map (renumbered)')
+            ax3 = fig.add_subplot(1, 3, 3)
+            same = micros[0].grain_map[:, :, translation_voxel[2] + check] == grain_map_translated[:, :, check]
+            ax3.imshow(same.T, vmin=0, vmax=2)
+            plt.axis('off')
+            plt.title('voxels that are identicals')
+            plt.savefig('merging_check1.pdf')
+
+        # start the merging: the first volume is the reference
+        overlap = micros[0].grain_map.shape[2] - translation_voxel[2]
+        print('overlap is %d voxels' % overlap)
+        z_shape = micros[0].grain_map.shape[2] + micros[1].grain_map.shape[2] - overlap
+        print('vertical size will be: %d + %d + %d = %d' % (
+            micros[0].grain_map.shape[2] - overlap, overlap, micros[1].grain_map.shape[2] - overlap, z_shape))
+        shape_merged = np.array(micros[0].grain_map.shape) + [0, 0, micros[1].grain_map.shape[2] - overlap]
+        print('initializing volume with shape {}'.format(shape_merged))
+        grain_ids_merged = np.zeros(shape_merged, dtype=np.int16)
+        print(micros[0].grain_map.shape)
+        print(micros[1].grain_map.shape)
+
+        # add the non-overlapping part of the 2 volumes as is
+        grain_ids_merged[:, :, :micros[0].grain_map.shape[2] - overlap] = micros[0].grain_map[:, :, :-overlap]
+        grain_ids_merged[:, :, micros[0].grain_map.shape[2]:] = grain_map_translated[:, :, overlap:]
+
+        # look at vertices with the same label
+        print(micros[0].grain_map[:, :, translation_voxel[2]:].shape)
+        print(grain_map_translated[:, :, :overlap].shape)
+        print('translation_voxel[2] = %d' % translation_voxel[2])
+        print('micros[0].grain_map.shape[2] - overlap = %d' % (micros[0].grain_map.shape[2] - overlap))
+        same_voxel = micros[0].grain_map[:, :, translation_voxel[2]:] == grain_map_translated[:, :, :overlap]
+        print(same_voxel.shape)
+        grain_ids_merged[:, :, translation_voxel[2]:micros[0].grain_map.shape[2]] = grain_map_translated[:, :, :overlap] * same_voxel
+
+        # look at vertices with a single label
+        single_voxels_0 = (micros[0].grain_map[:, :, translation_voxel[2]:] > 0) & (grain_map_translated[:, :, :overlap] == 0)
+        print(single_voxels_0.shape)
+        grain_ids_merged[:, :, translation_voxel[2]:micros[0].grain_map.shape[2]] += micros[0].grain_map[:, :, translation_voxel[2]:] * single_voxels_0
+        single_voxels_1 = (grain_map_translated[:, :, :overlap] > 0) & (micros[0].grain_map[:, :, translation_voxel[2]:] == 0)
+        print(single_voxels_1.shape)
+        grain_ids_merged[:, :, translation_voxel[2]:micros[0].grain_map.shape[2]] += grain_map_translated[:, :,
+                                                                                     :overlap] * single_voxels_1
+
+        if plot:
+            fig = plt.figure(figsize=(14, 10))
+            ax1 = fig.add_subplot(1, 2, 1)
+            ax1.imshow(grain_ids_merged[:, 320, :].T)
+            plt.axis('off')
+            plt.title('XZ slice')
+            ax2 = fig.add_subplot(1, 2, 2)
+            ax2.imshow(grain_ids_merged[320, :, :].T)
+            plt.axis('off')
+            plt.title('YZ slice')
+            plt.savefig('merging_check2.pdf')
+
+        if hasattr(micros[0], 'mask') and hasattr(micros[1], 'mask'):
+            mask_translated = np.roll(micros[1].mask, translation_voxel[:2], (0, 1))
+
+            # merging the masks
+            mask_merged = np.zeros(shape_merged, dtype=np.uint8)
+            # add the non-overlapping part of the 2 volumes as is
+            mask_merged[:, :, :micros[0].mask.shape[2] - overlap] = micros[0].mask[:, :, :-overlap]
+            mask_merged[:, :, micros[0].grain_map.shape[2]:] = mask_translated[:, :, overlap:]
+
+            # look at vertices with the same label
+            same_voxel = micros[0].mask[:, :, translation_voxel[2]:] == mask_translated[:, :, :overlap]
+            print(same_voxel.shape)
+            mask_merged[:, :, translation_voxel[2]:micros[0].mask.shape[2]] = mask_translated[:, :, :overlap] * same_voxel
+
+            # look at vertices with a single label
+            single_voxels_0 = (micros[0].mask[:, :, translation_voxel[2]:] > 0) & (mask_translated[:, :, :overlap] == 0)
+            mask_merged[:, :, translation_voxel[2]:micros[0].mask.shape[2]] += (
+                        micros[0].mask[:, :, translation_voxel[2]:] * single_voxels_0).astype(np.uint8)
+            single_voxels_1 = (mask_translated[:, :, :overlap] > 0) & (micros[0].mask[:, :, translation_voxel[2]:] == 0)
+            mask_merged[:, :, translation_voxel[2]:micros[0].mask.shape[2]] += (
+                        mask_translated[:, :, :overlap] * single_voxels_1).astype(np.uint8)
+
+            if plot:
+                fig = plt.figure(figsize=(14, 10))
+                ax1 = fig.add_subplot(1, 2, 1)
+                ax1.imshow(mask_merged[:, 320, :].T)
+                plt.axis('off')
+                plt.title('XZ slice')
+                ax2 = fig.add_subplot(1, 2, 2)
+                ax2.imshow(mask_merged[320, :, :].T)
+                plt.axis('off')
+                plt.title('YZ slice')
+                plt.savefig('merging_check3.pdf')
+
+        # merging finished, build the new microstructure instance
+        merged_micro = Microstructure(name='%s-%s' % (micros[0].name, micros[1].name))
+        merged_micro.set_lattice(lattice)
+        # add all grains from the reference volume
+        merged_micro.grains = micros[0].grains
+        #TODO recompute center of masses of grains in the overlap region
+        print(renumbered_grains)
+        # add all new grains from the merged volume
+        for i in range(len(renumbered_grains)):
+            other_id, new_id = renumbered_grains[i]
+            g = micros[1].get_grain(other_id)
+            new_g = Grain(new_id, Orientation.from_rodrigues(g.orientation.rod))
+            new_g.position = g.position
+            new_g.center = g.center
+            print('adding grain with new id %d (was %d)' % (new_id, other_id))
+            merged_micro.grains.append(new_g)
+        print('%d grains in merged microstructure' % merged_micro.get_number_of_grains())
+        # add the full grain map
+        merged_micro.grain_map = grain_ids_merged
+        if hasattr(micros[0], 'mask') and hasattr(micros[1], 'mask'):
+            merged_micro.mask = mask_merged
+        return merged_micro

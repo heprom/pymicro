@@ -192,6 +192,9 @@ class Sample:
         self.microstructure = microstructure
 
     def has_grains(self):
+        """Method to see if a sample has at least one grain in the microstructure.
+        
+        :return: True if the sample has at east one grain, False otherwise."""
         return len(self.microstructure.grains) > 0
 
     def get_grain_ids(self):

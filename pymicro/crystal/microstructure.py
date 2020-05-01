@@ -1805,9 +1805,9 @@ class Microstructure:
         mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
         if os.path.exists(mask_path):
             with h5py.File(mask_path, 'r') as f:
-                micro.grain_map = f['vol'].value.transpose(2, 1, 0)
+                micro.mask = f['vol'].value.transpose(2, 1, 0)
                 if verbose:
-                    print('loaded volume with shape: {}'.format(micro.grain_map.shape))
+                    print('loaded volume with shape: {}'.format(micro.mask.shape))
         return micro
 
     def to_xml(self, doc):

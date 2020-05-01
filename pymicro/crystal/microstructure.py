@@ -1335,6 +1335,32 @@ class Grain:
         """
         return self.orientation.dct_omega_angles(hkl, lambda_keV, verbose)
 
+    @staticmethod
+    def from_dct(label=1, data_dir='.'):
+        """Create a `Grain` instance from a DCT grain file.
+
+        :param int label: the grain id.
+        :param str data_dir: the data root from where to fetch data files.
+        :return: A new grain instance.
+        """
+        grain_path = os.path.join(data_dir, '4_grains', 'phase_01', 'grain_%04d.mat' % label)
+        grain_info = h5py.File(grain_path)
+        g = Grain(label, Orientation.from_rodrigues(grain_info['R_vector'].value))
+        g.position = grain_info['center'].value
+        g.center = grain_info['center'].value
+        # add spatial representation of the grain if reconstruction is available
+        grain_map_path = os.path.join(data_dir, '5_reconstruction', 'phase_01_vol.mat')
+        if os.path.exists(grain_map_path):
+            with h5py.File(grain_map_path, 'r') as f:
+                # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
+                vol = f['vol'].value.transpose(2, 1, 0)
+                from scipy import ndimage
+                grain_data = vol[ndimage.find_objects(vol == label)[0]]
+                g.volume = ndimage.measurements.sum(vol == label)
+                # create the vtk representation of the grain
+            g.add_vtk_mesh(grain_data, contour=False)
+        return g
+
 
 class Microstructure:
     """
@@ -1530,6 +1556,18 @@ class Microstructure:
             print('%d/%d grains were matched ' % (len(matched), len(grains_to_match)))
         return matched, candidates, unmatched
 
+    def dilate_grains(self):
+        """Dilate grains to fill the gap beween them.
+
+        This code is based on the gtDilateGrains function from the DCT code.
+        """
+        if not hasattr(self, 'grain_map'):
+            raise ValueError('microstructure %s must have an associated grain_map attribute' % self.name)
+            return
+        zero_voxels = self.grain_map == 0
+        mono_vol = self.grain_map > 0
+
+
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """
         Outputs the material block corresponding to this microstructure for
@@ -1545,8 +1583,6 @@ class Microstructure:
                 '  **elset %s%d *file %s *integration theta_method_a 1.0 1.e-9 150 *rotation %7.3f %7.3f %7.3f\n' % (
                     grain_prefix, g.id, mat_file, o.phi1(), o.Phi(), o.phi2()))
         f.close()
-
-    from pymicro import __version__ as pymicro_version
 
     def to_h5(self):
         """Write the microstructure as a hdf5 file."""
@@ -1713,54 +1749,65 @@ class Microstructure:
         return micro
 
     @staticmethod
-    def from_dct(data_root='.', vol_file='phase_01_vol.mat', grain_ids=None, verbose=True):
+    def from_dct(data_dir='.', grain_file='index.mat', vol_file='phase_01_vol.mat', mask_file='volume_mask.mat', verbose=True):
         """Create a microstructure from a DCT reconstruction.
 
-        DCT reconstructions are stored in hdf5 matlab files. the reconstructed volume file (labeled image) is stored 
-        in the '5_reconstruction' folder and the individual grain files are stored in the '4_grains/phase_01' folder.
+        DCT reconstructions are stored in several files. The indexed grain inforamtions are stored in a matlab file in
+        the '4_grains/phase_01' folder. Then, the reconstructed volume file (labeled image) is stored
+        in the '5_reconstruction' folder as an hdf5 file, possibly stored alongside a mask file coming from the
+        absorption reconstruction.
         
         :param str data_root: the path to the folder containing the data.
+        :param str grain_file: the name of the file containing grains info.
         :param str vol_file: the name of the volume file.
-        :param list grain_ids: a list of grain ids to load into the `Microstructure` instance.
+        :param str mask_file: the name of the mask file.
         :param bool verbose: activate verbose mode.
         :return: a `Microstructure` instance created from the DCT reconstruction.
         """
-        from scipy import ndimage
-        micro = Microstructure()
-        micro.data_root = data_root
-        vol_file = os.path.join(data_root, '5_reconstruction', vol_file)
-        with h5py.File(vol_file, 'r') as f:
-            # choose weather or not to load the volume into memory here
-            vol = f['vol'].value.transpose(2, 1, 0)  # Because how matlab writes the data, we need to swap X and Z axes in the DCT volume
-            if verbose:
-                print('loaded volume with shape: %d x %d x %d' % (vol.shape[0], vol.shape[1], vol.shape[2]))
-        all_grain_ids = np.unique(vol)
-        if not grain_ids:
-            grain_ids = all_grain_ids
-        else:
-            # check that all requested grain ids are present
-            for label in [x for x in grain_ids if x not in all_grain_ids]:
-                print('warning, requested grain %d is not present in the data file' % label)
-        micro_mesh = vtk.vtkMultiBlockDataSet()
-        micro_mesh.SetNumberOfBlocks(len(grain_ids))
-        for i, label in enumerate(grain_ids):
-            if label <= 0:
-                continue
-            grain_path = os.path.join('4_grains', 'phase_01', 'grain_%04d.mat' % label)
-            grain_file = os.path.join(micro.data_root, grain_path)
-            grain_info = h5py.File(grain_file)
-            g = Grain(label, Orientation.from_rodrigues(grain_info['R_vector'].value))
-            g.position = grain_info['center'].value
-            grain_data = vol[ndimage.find_objects(vol == label)[0]]
-            g.volume = ndimage.measurements.sum(vol == label)
-            # create the vtk representation of the grain
-            g.add_vtk_mesh(grain_data, contour=False)
-            if verbose:
-                print('loading grain %d' % label)
-                print('adding block %d to mesh for grain %d' % (i, label))
-            micro_mesh.SetBlock(i, g.vtkmesh)
+        if data_dir == '.':
+            data_dir = os.getcwd()
+        scan = data_dir.split(os.sep)[-1]
+        print('creating microstructure for DCT scan %s' % scan)
+        micro = Microstructure(name=scan)
+        micro.data_dir = data_dir
+        index_path = os.path.join(data_dir, '4_grains', 'phase_01', grain_file)
+        print(index_path)
+        if not os.path.exists(index_path):
+            raise ValueError('%s not found, please specify a valid path to the grain file.' % index_path)
+            return None
+        from scipy.io import loadmat
+        index = loadmat(index_path)
+        # grab the crystal lattice
+        lattice_params = index['cryst'][0][0][3][0]
+        sym = Symmetry.from_string(index['cryst'][0][0][7][0])
+        print('creating crystal lattice {} ({}) with parameters {}'.format(index['cryst'][0][0][0][0], sym, lattice_params))
+        lattice_params[:3] /= 10  # angstrom to nm
+        lattice = Lattice.from_parameters(*lattice_params, symmetry=sym)
+        micro.set_lattice(lattice)
+        # add all grains to the microstructure
+        for i in range(len(index['grain'][0])):
+            gid = index['grain'][0][i][0][0][0][0][0]
+            rod = index['grain'][0][i][0][0][3][0]
+            g = Grain(gid, Orientation.from_rodrigues(rod))
+            g.position = index['grain'][0][i][0][0][15][0]
+            g.center = index['grain'][0][i][0][0][15][0]
             micro.grains.append(g)
-        micro.SetVtkMesh(micro_mesh)
+
+        # load the grain map if available
+        grain_map_path = os.path.join(data_dir, '5_reconstruction', vol_file)
+        if os.path.exists(grain_map_path):
+            with h5py.File(grain_map_path, 'r') as f:
+                # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
+                micro.grain_map = f['vol'].value.transpose(2, 1, 0)
+                if verbose:
+                    print('loaded volume with shape: {}'.format(micro.grain_map.shape))
+        # load the mask if available
+        mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
+        if os.path.exists(mask_path):
+            with h5py.File(mask_path, 'r') as f:
+                micro.grain_map = f['vol'].value.transpose(2, 1, 0)
+                if verbose:
+                    print('loaded volume with shape: {}'.format(micro.grain_map.shape))
         return micro
 
     def to_xml(self, doc):

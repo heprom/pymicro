@@ -276,60 +276,53 @@ def add_to_image(image, inset, uv, verbose=False):
         += inset[u_start:u_end, v_start:v_end]
 
 
-def merge_dct_scans(scan_list, samtz_list, use_mask, lattice, voxel_size, overlap=-1):
-    """Merge two DCT scans. Some code should be refactored to Microstructure class to merge 2 microstructures. """
-    from pymicro.crystal.microstructure import Microstructure, Orientation, Grain
-    from pymicro.xray.experiment import Experiment
+def merge_dct_scans(scan_list, samtz_list, voxel_size, use_mask=False, overlap=-1, root_dir='.', write_to_h5=True):
+    """Merge two DCT scans.
+
+    This function build a `Microstructure` instance for each DCT scan and calls merge_microstructures.
+    The overlap can be deduced from the samtz values or specified directly.
+
+    :param list scan_list: a list with the two DCT scan names.
+    :param list samtz_list: a list with the two samtz value (the order should match the scan names).
+    :param float voxel_size: the voxel size in mm.
+    :param bool use_mask: a flag to also merge the absorption masks.
+    :param int overlap: the value to use for the overlap if not computed automatically.
+    :param str root_dir: the root data folder.
+    :param bool write_to_h5: flag to write the result of the merging operation to an HDF5 file.
+    :return: A new `Microstructure` instance of the 2 merged scans.
+    """
+    from pymicro.crystal.microstructure import Microstructure
     import numpy as np
     import os
     import h5py
-    from scipy import ndimage
 
     scan_shapes = []  # warning, shapes will be in (z, y, x) form
     micros = []
 
     for scan in scan_list:
-        with h5py.File('id11/t5_/%s/5_reconstruction/phase_01_vol.mat' % scan) as f:
+        scan_path = os.path.join(root_dir, scan, '5_reconstruction', 'phase_01_vol.mat')
+        with h5py.File(scan_path) as f:
             scan_shapes.append(f['vol'].shape)
             print(f['vol'].shape)
 
     # figure out the maximum cross section
-    max_shape = np.array(scan_shapes).max(axis=0)
-    print(max_shape)
+    max_shape = np.array(scan_shapes).max(axis=0)[[2, 1, 0]]
 
     for scan in scan_list:
         # read microstructure for this scan
+        dct_analysis_dir = os.path.join(root_dir, scan)
         print('processing scan %s' % scan)
-        data_dir = os.path.join('id11', 't5_', scan)
+        micro = Microstructure.from_dct(data_dir=dct_analysis_dir)
 
-        rod_path = os.path.join(data_dir, '4_grains/phase_01/R_vectors.txt')
-        orientations = Orientation.read_orientations(rod_path, data_type='rodrigues', delimiter=',')
-        center_path = os.path.join(data_dir, '4_grains/phase_01/grain_centers.txt')
-        centers = np.genfromtxt(center_path, delimiter=',')
-        micro = Microstructure(name=scan)
-        micro.set_lattice(lattice)
-        for i in range(len(orientations)):
-            gid = i + 1
-            g = Grain(gid, orientations[gid])
-            g.position = centers[i]
-            g.center = centers[i]
-            micro.grains.append(g)
-
-        # add grain ids field, crop the (X, Y) dims
-        f = h5py.File('id11/t5_/%s/5_reconstruction/phase_01_vol.mat' % scan)
-        print('vol shape is {}'.format(f['vol'].shape))
-        offset = max_shape - f['vol'].shape
-        offset[0] = 0
+        # pad both grain map and mask
+        print('vol shape is {}'.format(micro.grain_map.shape))
+        offset = max_shape - micro.grain_map.shape
+        offset[2] = 0  # do not pad along Z
         padding = [(o // 2, o // 2) for o in offset]
         print('padding is {}'.format(padding))
-        micro.grain_map = np.pad(f['vol'][()], padding, mode='constant').transpose(2, 1, 0)
-        f.close()
+        micro.grain_map = np.pad(micro.grain_map, padding, mode='constant')
         if use_mask:
-            print('using mask')
-            # also load the mask
-            f = h5py.File('id11/t5_/%s/5_reconstruction/volume_mask.mat' % scan)
-            micro.mask = np.pad(f['vol'][()], padding, mode='constant').transpose(2, 1, 0)
-            f.close()
+            micro.mask = np.pad(micro.mask, padding, mode='constant')
         micros.append(micro)
 
     # find out the overlap region (based on the difference in samtz)
@@ -343,8 +336,11 @@ def merge_dct_scans(scan_list, samtz_list, use_mask, lattice, voxel_size, overla
     # we have prepared the 2 microstructures, now merge them
     merged_micro = Microstructure.merge_microstructures(micros, overlap, voxel_size, plot=True)
 
-    # write the result
-    merged_micro.to_h5()
+    if write_to_h5:
+        # write the result
+        merged_micro.to_h5()
+
+    return merged_micro
 
 
 def all_dif_spots(g_proj, g_uv, verbose=False):

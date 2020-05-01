@@ -1556,17 +1556,60 @@ class Microstructure:
             print('%d/%d grains were matched ' % (len(matched), len(grains_to_match)))
         return matched, candidates, unmatched
 
-    def dilate_grains(self):
+    def dilate_grains(self, dilation_steps=1):
         """Dilate grains to fill the gap beween them.
 
-        This code is based on the gtDilateGrains function from the DCT code.
+        This code is based on the gtDilateGrains function from the DCT code. It has been extended to handle both 2D
+        and 3D cases.
+
+        :param int dilation_steps: the umber of dilation steps to apply.
         """
         if not hasattr(self, 'grain_map'):
             raise ValueError('microstructure %s must have an associated grain_map attribute' % self.name)
             return
-        zero_voxels = self.grain_map == 0
-        mono_vol = self.grain_map > 0
 
+        grain_map = self.grain_map.copy()
+        # get rid of overlap regions flaged by -1
+        grain_map[grain_map == -1] = 0
+
+        # carry out dilation in iterative steps
+        for step in range(dilation_steps):
+            grains = (grain_map > 0).astype(np.uint8)
+            from scipy import ndimage
+            grains_dil = ndimage.morphology.binary_dilation(grain_map).astype(np.uint8)
+            if hasattr(self, 'mask'):
+                # only dilate within the mask
+                grains_dil *= self.mask.astype(np.uint8)
+            todo = (grains_dil - grains)
+            # get the list of voxel for this dilation step
+            X, Y, Z = np.where(todo)
+
+            xstart = X - 1
+            xend = X + 1
+            ystart = Y - 1
+            yend = Y + 1
+            zstart = Z - 1
+            zend = Z + 1
+
+            # check bounds
+            xstart[xstart < 0] = 0
+            ystart[ystart < 0] = 0
+            zstart[zstart < 0] = 0
+            xend[xend > grain_map.shape[0] - 1] = grain_map.shape[0] - 1
+            yend[yend > grain_map.shape[1] - 1] = grain_map.shape[1] - 1
+            zend[zend > grain_map.shape[2] - 1] = grain_map.shape[2] - 1
+
+            dilation = np.zeros_like(X).astype(np.int16)
+            print('%d voxels to replace' % len(X))
+            for i in range(len(X)):
+                neighbours = grain_map[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1, zstart[i]:zend[i] + 1]
+                if np.any(neighbours):
+                    # at least one neighboring voxel in non zero
+                    dilation[i] = min(neighbours[neighbours > 0])
+            grain_map[X, Y, Z] = dilation
+            print('dilation step %d done' % (step + 1))
+        # finally assign the dilated grain map to the microstructure
+        self.grain_map = grain_map
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """
@@ -1800,14 +1843,14 @@ class Microstructure:
                 # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
                 micro.grain_map = f['vol'].value.transpose(2, 1, 0)
                 if verbose:
-                    print('loaded volume with shape: {}'.format(micro.grain_map.shape))
+                    print('loaded grain ids volume with shape: {}'.format(micro.grain_map.shape))
         # load the mask if available
         mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
         if os.path.exists(mask_path):
             with h5py.File(mask_path, 'r') as f:
-                micro.mask = f['vol'].value.transpose(2, 1, 0)
+                micro.mask = f['vol'].value.transpose(2, 1, 0).astype(np.uint8)
                 if verbose:
-                    print('loaded volume with shape: {}'.format(micro.mask.shape))
+                    print('loaded mask volume with shape: {}'.format(micro.mask.shape))
         return micro
 
     def to_xml(self, doc):

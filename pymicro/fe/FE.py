@@ -1,14 +1,13 @@
-'''
-   The FE module allows some simple operations on FE calculations.
-   Import/Export are partly supported, in particular from/to the vtk 
-   file format.
-   In addition utilities are available to:
-   * read a .ut file to query the fields stored in .integ and .node files
-   and also the list of the cards available
-   * retreive the field (or single value in result file)
-   integ file is easy to read: cards -> elements -> fields > integ points
-   TODO: add support for elsets nsets... time steps through a vtkModelMetaData instance.
-'''
+"""
+The FE module allows some simple operations on FE calculations.
+Import/Export are partly supported, in particular from/to the vtk
+file format.
+In addition utilities are available to:
+* read a .ut file to query the fields stored in .integ and .node files
+and also the list of the cards available
+* retreive the field (or single value in result file)
+integ file is easy to read: cards -> elements -> fields > integ points
+"""
 import os
 import sys
 import vtk
@@ -274,6 +273,43 @@ class FE_Mesh():
             out += 'list of lisets:' + self._liset_names.__repr__()
         return out
 
+    def locate_element(self, elid):
+        """Locate an element given its id.
+
+        :param int elid: the element id.
+        :return: The `FE_Element` instance.
+        """
+        # first try rank elid -1
+        if self._elements[elid - 1].give_id() == elid:
+            return self._elements[elid - 1]
+        else:
+            for el in self._elements:
+                if el.give_id() == elid:
+                    return el
+        raise ValueError('element %d not found in this mesh' % elid)
+
+    def delete_elset(self, elset_name):
+        """Method to delete elements belonging to an elset.
+
+        After deleting all the element, the ranks are updated.
+
+        :param str elset_name: the name of the elset to delete.
+        """
+        print('deleting elset %s' % elset_name)
+        index = self._elset_names.index(elset_name)
+        elid_to_del = self._elsets[index]
+        for elid in elid_to_del:
+            el = self.locate_element(elid)
+            self._elements.remove(el)
+        print('%d elements deleted' % len(elid_to_del))
+        print('updating ranks')
+        for i, element in enumerate(self._elements):
+            element._rank = i
+        # TODO should remove all the deleted element ids from other elsets
+        self._elsets.pop(index)
+        self._elset_names.pop(index)
+        print(self._elset_names)
+
     @staticmethod
     def make_vtu(path, add_elset_id_field=False, elset_prefix='_ELSET'):
         '''Convert a mesh to vtk format.
@@ -532,7 +568,8 @@ class FE_Mesh():
             the_list = self._elements
         max_id = 0
         for thing in the_list:
-            if thing._id > max_id: max_id = thing._id
+            if thing._id > max_id:
+                max_id = thing._id
         id_to_rank = numpy.zeros(1 + max_id, dtype=int)
         if max_id > 10 ** 8:
             print('maximum id is %d, consider renumbering your mesh entities' % max_id)
@@ -551,7 +588,7 @@ class FE_Mesh():
         :returns: the elset id field as a numpy array.
         '''
         if elset_prefix:
-            elset_list = filter(lambda k: elset_prefix in k, self._elset_names)
+            elset_list = list(filter(lambda k: elset_prefix in k, self._elset_names))
         else:
             elset_list = self._elset_names[1:]
         if len(elset_list) > 255:

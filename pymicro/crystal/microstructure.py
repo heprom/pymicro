@@ -1131,14 +1131,14 @@ class Grain:
 
     A grain has its own crystallographic orientation.
     An optional id for the grain may be specified.
-    The position field is the center of mass of the grain in world coordinates.
+    The center attribute is the center of mass of the grain in world coordinates.
     The volume of the grain is expressed in pixel/voxel unit.
     """
 
     def __init__(self, grain_id, grain_orientation):
         self.id = grain_id
         self.orientation = grain_orientation
-        self.position = np.array([0., 0., 0.])
+        self.center = np.array([0., 0., 0.])
         self.volume = 0  # warning not implemented
         self.vtkmesh = None
         self.hkl_planes = []
@@ -1147,7 +1147,7 @@ class Grain:
         """Provide a string representation of the class."""
         s = '%s\n * id = %d\n' % (self.__class__.__name__, self.id)
         s += ' * %s\n' % (self.orientation)
-        s += ' * position %s\n' % np.array_str(self.position)
+        s += ' * center %s\n' % np.array_str(self.center)
         s += ' * has vtk mesh ? %s\n' % (self.vtkmesh != None)
         return s
 
@@ -1252,15 +1252,15 @@ class Grain:
         grain_position = doc.createElement('Position')
         grain_position_x = doc.createElement('X')
         grain_position.appendChild(grain_position_x)
-        grain_position_x_text = doc.createTextNode('%f' % self.position[0])
+        grain_position_x_text = doc.createTextNode('%f' % self.center[0])
         grain_position_x.appendChild(grain_position_x_text)
         grain_position_y = doc.createElement('Y')
         grain_position.appendChild(grain_position_y)
-        grain_position_y_text = doc.createTextNode('%f' % self.position[1])
+        grain_position_y_text = doc.createTextNode('%f' % self.center[1])
         grain_position_y.appendChild(grain_position_y_text)
         grain_position_z = doc.createElement('Z')
         grain_position.appendChild(grain_position_z)
-        grain_position_z_text = doc.createTextNode('%f' % self.position[2])
+        grain_position_z_text = doc.createTextNode('%f' % self.center[2])
         grain_position_z.appendChild(grain_position_z_text)
         grain.appendChild(grain_position)
         grain_mesh = doc.createElement('Mesh')
@@ -1282,7 +1282,7 @@ class Grain:
         xg = float(grain_position.childNodes[0].childNodes[0].nodeValue)
         yg = float(grain_position.childNodes[1].childNodes[0].nodeValue)
         zg = float(grain_position.childNodes[2].childNodes[0].nodeValue)
-        grain.position = np.array([xg, yg, zg])
+        grain.center = np.array([xg, yg, zg])
         grain_mesh = grain_node.childNodes[3]
         grain_mesh_file = grain_mesh.childNodes[0].nodeValue
         if verbose:
@@ -1346,7 +1346,6 @@ class Grain:
         grain_path = os.path.join(data_dir, '4_grains', 'phase_01', 'grain_%04d.mat' % label)
         grain_info = h5py.File(grain_path)
         g = Grain(label, Orientation.from_rodrigues(grain_info['R_vector'].value))
-        g.position = grain_info['center'].value
         g.center = grain_info['center'].value
         # add spatial representation of the grain if reconstruction is available
         grain_map_path = os.path.join(data_dir, '5_reconstruction', 'phase_01_vol.mat')
@@ -1694,7 +1693,6 @@ class Microstructure:
                     centers = np.zeros_like(avg_rods)
                 for i in range(avg_rods.shape[0]):
                     g = Grain(grain_ids[i], Orientation.from_rodrigues(avg_rods[i, :]))
-                    g.position = centers[i]
                     g.center = centers[i]
                     micro.grains.append(g)
             # load cell data
@@ -1787,7 +1785,7 @@ class Microstructure:
                 elif orientation_type == 'rodrigues':
                     g = Grain(i, Orientation.from_rodrigues(orientations[i]))
                 if grain_centroid:
-                    g.position = centroids[i - offset]
+                    g.center = centroids[i - offset]
                 micro.grains.append(g)
         return micro
 
@@ -1832,7 +1830,6 @@ class Microstructure:
             gid = index['grain'][0][i][0][0][0][0][0]
             rod = index['grain'][0][i][0][0][3][0]
             g = Grain(gid, Orientation.from_rodrigues(rod))
-            g.position = index['grain'][0][i][0][0][15][0]
             g.center = index['grain'][0][i][0][0][15][0]
             micro.grains.append(g)
 
@@ -1962,13 +1959,12 @@ class Microstructure:
                 com_px = (local_com + offset_px - 0.5 * np.array(micros[i].grain_map.shape))
                 #print('com [px] = {}'.format(com_px))
                 com_mm = voxel_size * com_px
-                print('grain %2d position: %6.3f, %6.3f, %6.3f' % (gid, com_mm[0], com_mm[1], com_mm[2]))
+                print('grain %2d center: %6.3f, %6.3f, %6.3f' % (gid, com_mm[0], com_mm[1], com_mm[2]))
 
                 #array_bin = (grain_ids_ol == gid).astype(np.uint8)
                 #local_com = ndimage.measurements.center_of_mass(array_bin, grain_ids_ol)
                 #com_mm = voxel_size * (local_com - 0.5 * np.array(grain_ids_ol.shape)) + offset
                 #print('grain %2d position: %6.3f, %6.3f, %6.3f' % (gid, com_mm[0], com_mm[1], com_mm[2]))
-                g.position = com_mm
                 g.center = com_mm
                 micro_ol.grains.append(g)
             # add the overlap microstructure to the list
@@ -2162,7 +2158,6 @@ class Microstructure:
             other_id, new_id = renumbered_grains[i]
             g = micros[1].get_grain(other_id)
             new_g = Grain(new_id, Orientation.from_rodrigues(g.orientation.rod))
-            new_g.position = g.position
             new_g.center = g.center
             print('adding grain with new id %d (was %d)' % (new_id, other_id))
             merged_micro.grains.append(new_g)

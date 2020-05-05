@@ -4,7 +4,7 @@ import numpy as np
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
 from pymicro.crystal.lattice import Symmetry, Lattice, HklPlane, HklDirection, SlipSystem
 from pymicro.xray.xray_utils import lambda_keV_to_nm
-
+from config import PYMICRO_EXAMPLES_DATA_DIR
 
 class MicrostructureTests(unittest.TestCase):
 
@@ -20,9 +20,16 @@ class MicrostructureTests(unittest.TestCase):
     def test_to_h5(self):
         self.micro.to_h5()
         # read the file we have just written
-        m = Microstructure.from_h5('%s.h5' % self.micro.name, grain_centroid=None)
+        m = Microstructure.from_h5('%s.h5' % self.micro.name)
         self.assertEqual(len(m.grains), len(self.test_eulers))
         os.remove('%s.h5' % self.micro.name)
+
+    def test_from_h5(self):
+        # read a test microstructure
+        m = Microstructure.from_h5(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 't5_dct_slice.h5'))
+        self.assertEqual(len(m.grains), 21)
+        self.assertEqual(hasattr(m, 'grain_map'), True)
+        self.assertEqual(hasattr(m, 'mask'), True)
 
 
 class OrientationTests(unittest.TestCase):

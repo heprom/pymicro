@@ -72,7 +72,6 @@ class DctForwardSimulation(ForwardSimulation):
             g.om_exp = gmat['om_exp'][0, :]
             g.uv_exp = gmat['uv_exp'][:, :]
             g.center = gmat['center'][:, 0]
-            g.position = gmat['center'][:, 0]
             try:
                 ref_included = gmat['proj/included'][0][0]
                 g.included = gmat[ref_included][0, :]
@@ -168,7 +167,7 @@ class DctForwardSimulation(ForwardSimulation):
                 G = np.dot(R, np.dot(gt, plane.scattering_vector()))
                 K = X + G
                 # position of the grain at this rotation angle
-                g_pos_rot = np.dot(R, self.grain.position)
+                g_pos_rot = np.dot(R, self.grain.center)
                 pg = detector.project_along_direction(K, g_pos_rot)
                 (up, vp) = detector.lab_to_pixel(pg)[0]
                 g_uv[:, 2 * i + j] = up, vp

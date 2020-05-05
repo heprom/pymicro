@@ -3,6 +3,7 @@ import numpy as np
 import os
 from pymicro.file.file_utils import *
 from pymicro.external.tifffile import imsave, imread
+from config import PYMICRO_EXAMPLES_DATA_DIR
 
 
 class file_utils_Tests(unittest.TestCase):
@@ -26,11 +27,11 @@ class file_utils_Tests(unittest.TestCase):
         f.close()
 
     def test_edf_info(self):
-        infos = edf_info('../../../examples/data/sam8_dct0_cen_full0000.edf')
+        infos = edf_info(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'sam8_dct0_cen_full0000.edf'))
         self.assertEqual(infos['DataType'], 'FloatValue')
 
     def test_edf_read(self):
-        im = edf_read('../../../examples/data/sam8_dct0_cen_full0000.edf')
+        im = edf_read(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'sam8_dct0_cen_full0000.edf'))
         self.assertEqual(im.shape[0], 2048)
         self.assertEqual(im.shape[1], 2048)
 

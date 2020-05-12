@@ -1440,6 +1440,15 @@ class Microstructure:
         self.grain_map = grain_map
         self.voxel_size = voxel_size
 
+    def set_mask(self, mask, voxel_size):
+        """Set the mask for this microstructure.
+
+        :param ndarray mask: a 2D or 3D numpy array.
+        :param float voxel_size: the size of the voxels in mm unit.
+        """
+        self.mask = mask
+        self.voxel_size = voxel_size
+
     @staticmethod
     def random_texture(n=100):
         """Generate a random texture microstructure.

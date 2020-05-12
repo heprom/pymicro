@@ -1172,6 +1172,32 @@ class Grain:
         SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
         return self.orientation.schmid_factor(slip_system, load_direction)
 
+    def compute_grain_centers(self, voxel_size=None, verbose=False):
+        """Recompute the center of masses of all grains in the microstructure.
+
+        If the voxel size is specified, the grain centeers will be in mm unit, if not in voxel unit.
+
+        .. note::
+
+          A grain map need to be associated with this microstructure instance for the method to run.
+
+        :param float voxel_size: the voxel size in mm unit.
+        :param bool verbose: flag for verbose mode.
+        """
+        from scipy import ndimage
+        if not hasattr(self, 'grain_map'):
+            print('warning: need a grain map to recompute the center of mass of the grains')
+            return
+        for g in self.grains:
+            array_bin = (self.grain_map == g.id).astype(np.uint8)
+            local_com = ndimage.measurements.center_of_mass(array_bin, self.grain_map)
+            com = local_com - 0.5 * np.array(self.grain_map.shape)
+            if voxel_size:
+                com *= voxel_size
+            if verbose:
+                print('grain %2d center: %6.3f, %6.3f, %6.3f' % (g.id, com[0], com[1], com[2]))
+            g.center = com
+
     def SetVtkMesh(self, mesh):
         """Set the VTK mesh of this grain.
 
@@ -1365,7 +1391,9 @@ class Microstructure:
     """
     Class used to manipulate a full microstructure.
 
-    It is typically defined as a list of grains objects.
+    It is typically defined as a list of grains objects, has an associated crystal `Lattice` instance.
+    A grain map and a mask can be added to the microstructure instance. For simplicity a simple field `voxel_size`
+    describe the spatial resolution of teses maps.
     """
 
     def __init__(self, name='empty', lattice=None):
@@ -1374,6 +1402,9 @@ class Microstructure:
             lattice = Lattice.cubic(1.0)
         self._lattice = lattice
         self.grains = []
+        self.grain_map = None
+        self.mask = None
+        self.voxel_size = 1.0  # unit is voxel by default
         self.vtkmesh = None
 
     def get_number_of_phases(self):
@@ -1399,6 +1430,15 @@ class Microstructure:
         :return: an instance of the `Lattice class`.
         """
         return self._lattice
+
+    def set_grain_map(self, grain_map, voxel_size):
+        """Set the grain map for this microstructure.
+
+        :param ndarray grain_map: a 2D or 3D numpy array.
+        :param float voxel_size: the size of the voxels in mm unit.
+        """
+        self.grain_map = grain_map
+        self.voxel_size = voxel_size
 
     @staticmethod
     def random_texture(n=100):
@@ -1657,10 +1697,12 @@ class Microstructure:
                                     data=np.array([g.center for g in self.grains], dtype=np.float32))
         # cell data
         cd = f.create_group('CellData')
-        if hasattr(self, 'grain_map'):
-            cd.create_dataset('grain_ids', data=self.grain_map, compression='gzip', compression_opts=9)
-        if hasattr(self, 'mask'):
-            cd.create_dataset('mask', data=self.mask, compression='gzip', compression_opts=9)
+        if hasattr(self, 'grain_map') and self.grain_map is not None:
+            gm = cd.create_dataset('grain_ids', data=self.grain_map, compression='gzip', compression_opts=9)
+            gm.attrs['voxel_size'] = self.voxel_size
+        if hasattr(self, 'mask') and self.mask is not None:
+            ma = cd.create_dataset('mask', data=self.mask, compression='gzip', compression_opts=9)
+            ma.attrs['voxel_size'] = self.voxel_size
         print('done writing')
         f.close()
 
@@ -1698,8 +1740,10 @@ class Microstructure:
             # load cell data
             if 'grain_ids' in f['CellData']:
                 micro.grain_map = f['CellData/grain_ids'][()]
+                micro.voxel_size = f['CellData/grain_ids'].attrs['voxel_size']
             if 'mask' in f['CellData']:
                 micro.mask = f['CellData/mask'][()]
+                micro.voxel_size = f['CellData/mask'].attrs['voxel_size']
             return micro
 
     def to_dream3d(self):
@@ -2012,8 +2056,10 @@ class Microstructure:
         # look at ids in the reference volume
         ids_ref = np.unique(micros[0].grain_map)
         ids_ref_list = ids_ref.tolist()
-        ids_ref_list.remove(-1)  # grain overlap
-        ids_ref_list.remove(0)  # background
+        if -1 in ids_ref_list:
+            ids_ref_list.remove(-1)  # grain overlap
+        if 0 in ids_ref_list:
+            ids_ref_list.remove(0)  # background
         print(ids_ref_list)
         id_offset = max(ids_ref_list)
         print('grain ids in volume %s will be offset by %d' % (micros[1].name, id_offset))
@@ -2021,8 +2067,10 @@ class Microstructure:
         # gather ids in the merging volume (will be modified)
         ids_mrg = np.unique(micros[1].grain_map)
         ids_mrg_list = ids_mrg.tolist()
-        ids_mrg_list.remove(-1)  # grain overlap
-        ids_mrg_list.remove(0)  # background
+        if -1 in ids_mrg_list:
+            ids_mrg_list.remove(-1)  # grain overlap
+        if 0 in ids_mrg_list:
+            ids_mrg_list.remove(0)  # background
         print(ids_mrg_list)
 
         # prepare a volume with the same size as the second grain map, with grain ids renumbered and (X, Y) translations applied.

@@ -28,6 +28,7 @@ class MicrostructureTests(unittest.TestCase):
         # read a test microstructure
         m = Microstructure.from_h5(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 't5_dct_slice.h5'))
         self.assertEqual(len(m.grains), 21)
+        self.assertEqual(m.voxel_size, 0.0014)
         self.assertEqual(hasattr(m, 'grain_map'), True)
         self.assertEqual(hasattr(m, 'mask'), True)
 

@@ -790,13 +790,14 @@ class LaueForwardSimulation(ForwardSimulation):
     def fsim_grain(self, gid=1):
         self.grain = self.exp.get_sample().get_microstructure().get_grain(gid)
         sample = self.exp.get_sample()
-        lattice = sample.get_material()
+        lattice = sample.get_microstructure().get_lattice()
         source = self.exp.get_source()
         detector = self.exp.get_active_detector()
         data = np.zeros_like(detector.data)
         if self.verbose:
             print('Forward Simulation for grain %d' % self.grain.id)
-        # TODO use either the hkl planes for this grain or the ones defined for the whole simulation
+        sample.geo.discretize_geometry(grain_id=self.grain.id)
+        # we use either the hkl planes for this grain or the ones defined for the whole simulation
         if hasattr(self.grain, 'hkl_planes') and len(self.grain.hkl_planes) > 0:
             print('using hkl from the grain')
             hkl_planes = [HklPlane(h, k, l, lattice) for (h, k, l) in self.grain.hkl_planes]
@@ -812,7 +813,7 @@ class LaueForwardSimulation(ForwardSimulation):
         d_spacings = [hkl.interplanar_spacing() for hkl in hkl_planes]  # size n_hkl
         G_vectors = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
         Gs_vectors = [gt.dot(Gc) for Gc in G_vectors]  # size n_hkl, with 3 elements items
-        positions = sample.geo.get_positions().reshape(-1, sample.geo.get_positions().shape[-1])  # size n_vox, with 3 elements items
+        positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
         n_vox = len(positions)  # total number of discrete positions
         Xu_vectors = [(pos - source.position) / np.linalg.norm(pos - source.position)
                       for pos in positions]  # size n_vox
@@ -854,9 +855,20 @@ class LaueForwardSimulation(ForwardSimulation):
         return data
 
     def fsim(self):
-        """run the forward simulation."""
+        """run the forward simulation.
+
+        If the sample has a CAD type of geometry, a single grain (the first from the list) is assumed. In the other
+        cases all the grains from the microstructure are used. In particular, if the microstructure has a grain map,
+        it can be used to carry out an extended sample simulation.
+        """
         full_data = np.zeros_like(self.exp.get_active_detector().data)
-        for grain in self.exp.get_sample().get_microstructure().grains:
-            full_data += self.fsim_grain(gid=grain.id)
+        micro = self.exp.get_sample().get_microstructure()
+        # for cad geometry we assume only one grain (the first in the list)
+        if self.exp.get_sample().geo.geo_type == 'cad':
+            full_data += self.fsim_grain(gid=micro.grains[0].id)
+        else:
+            # in the other cases, we use all the grains defined in the microstructure
+            for grain in micro.grains:
+                full_data += self.fsim_grain(gid=grain.id)
         return full_data
 

@@ -1248,6 +1248,66 @@ def load_STL_actor(name, ext='STL', verbose=False, color=grey, feature_edges=Fal
         return partActor
 
 
+def is_in_array(cad_path, step, origin=[0., 0., 0.]):
+    """Function to compute the coordinates of the points within a CAD volume, with a given step."""
+
+    part = vtk.vtkSTLReader()
+    part.SetFileName(cad_path)
+    part.Update()
+
+    # get the bounds of the geometry
+    bounds = part.GetOutput().GetBounds()
+    print(bounds)
+
+    # compute the discretization using the given step
+    x_sample = np.arange(bounds[0], bounds[1] + step, step) + origin[0]
+    print(x_sample)
+    y_sample = np.arange(bounds[2], bounds[3] + step, step) + origin[1]
+    z_sample = np.arange(bounds[4], bounds[5] + step, step) + origin[2]
+    n_x = len(x_sample)
+    n_y = len(y_sample)
+    n_z = len(z_sample)
+    print('discretization: %d x %d x %d points' % (n_x, n_y, n_z))
+    n_vox = n_x * n_y * n_z
+    print('total number of voxels is %d' % n_vox)
+
+    xx, yy, zz = np.meshgrid(x_sample, y_sample, z_sample, indexing='ij')
+    all_positions = np.empty((n_x, n_y, n_z, 3), dtype=float)
+    all_positions[:, :, :, 0] = xx
+    all_positions[:, :, :, 1] = yy
+    all_positions[:, :, :, 2] = zz
+    xyz = all_positions.reshape(-1, all_positions.shape[-1])  # numpy array with the point coordinates
+
+    # create our points and the associated cell array
+    points = vtk.vtkPoints()
+    points.SetNumberOfPoints(n_vox)
+    cells = vtk.vtkCellArray()
+    coord = np.zeros((n_vox, 3))
+    for i in range(n_vox):
+        points.InsertPoint(i, xyz[i][0], xyz[i][1], xyz[i][2])
+        cells.InsertNextCell(vtk.VTK_VERTEX)
+        cells.InsertCellPoint(i)
+    select_enclosed_points = vtk.vtkSelectEnclosedPoints()
+
+    # assign points to select_enclosed_points
+    points_poly_data = vtk.vtkPolyData()
+    points_poly_data.SetPoints(points)
+    select_enclosed_points.SetInputData(points_poly_data)
+
+    # assign surface geometry to select_enclosed_points
+    select_enclosed_points.SetSurfaceData(part.GetOutput())
+    select_enclosed_points.Update()
+
+    # select_enclosed_points outputs a vtkPolyData object -> exactly what we need to display
+    polydata = select_enclosed_points.GetOutput()
+    polydata.SetVerts(cells)  # mandatory to see the points
+    polydata.GetPointData().SetActiveScalars('SelectedPoints')
+
+    is_in = numpy_support.vtk_to_numpy(polydata.GetPointData().GetArray('SelectedPoints'))
+    print(is_in)
+    print(is_in.shape)
+    return is_in.reshape((n_x, n_y, n_z)), xyz
+
 def read_image_data(file_name, size, header_size=0, data_type='uint8', verbose=False):
     '''
     vtk helper function to read a 3d data file.

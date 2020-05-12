@@ -421,7 +421,7 @@ class ExperimentEncoder(json.JSONEncoder):
         if isinstance(o, Grain):
             dict_grain = {}
             dict_grain['Id'] = o.id
-            dict_grain['Position'] = o.position.tolist()
+            dict_grain['Position'] = o.center.tolist()
             dict_grain['Orientation'] = o.orientation
             dict_grain['Volume'] = o.volume
             if hasattr(o, 'hkl_planes'):

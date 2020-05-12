@@ -89,11 +89,17 @@ class ObjectGeometry:
         # the positions are initially set at the origin, this is a lazy behaviour as discretizing the volume can be expensive
         self.positions = np.array(self.origin)
         self.array = np.ones((1, 1, 1), dtype=np.uint8)  # unique label set to 1
-        self.size = np.array([0., 0., 0.])
+        self.size = np.array([0., 0., 0.])  # mm units
+        self.cad = None
 
     def set_type(self, geo_type):
         assert (geo_type in ['point', 'array', 'cad']) is True
         self.geo_type = geo_type
+
+    def set_array(self, grain_map, voxel_size):
+        self.array = grain_map
+        self.size = np.array(grain_map.shape) * voxel_size
+        print('size set to {}'.format(self.size))
 
     def set_origin(self, origin):
         if origin is None:
@@ -108,24 +114,54 @@ class ObjectGeometry:
             return (bounds[0], bounds[2], bounds[4]), (bounds[1], bounds[3], bounds[5])
 
     def get_positions(self):
+        """Return an array of the positions within this sample in world coordinates."""
         return self.positions
 
-    def discretize_geometry(self):
+    def discretize_geometry(self, grain_id=None):
+        """Compute the positions of material points inside the sample.
+
+        A array of size (n_vox, 3) is returned where n_vox is the number of positions. The 3 values of each position
+        contain the (x, y, z) coordinates in mm unit. If a grain id is specified, only the positions within this grain
+        are returned.
+
+        This is useful in forward simulation where we need to access all the locations within the sample. Three cases
+        are available:
+
+         * point Laue diffraction: uses sample origin, grains center and orientation
+         * cad Laue diffraction: uses origin, cad file geometry and grains[0] orientation (assumes only one grain)
+         * grain map Laue diffraction: uses origin, array, size, and grains orientations.
+
+         to set the cad geometry must be the path to the STL file.
+        """
         if self.geo_type == 'point':
             self.positions = np.array(self.origin)
         elif self.geo_type == 'array':
             vx, vy, vz = self.array.shape  # number of voxels
-            x_sample = np.linspace(self.get_bounding_box()[0][0], self.get_bounding_box()[1][0], vx)  # mm
-            y_sample = np.linspace(self.get_bounding_box()[0][1], self.get_bounding_box()[1][1], vy)  # mm
-            z_sample = np.linspace(self.get_bounding_box()[0][2], self.get_bounding_box()[1][2], vz)  # mm
-            xx, yy, zz = np.meshgrid(x_sample, y_sample, z_sample, indexing='ij')
-            self.positions = np.empty((vx, vy, vz, 3), dtype=float)
-            self.positions[:, :, :, 0] = xx
-            self.positions[:, :, :, 1] = yy
-            self.positions[:, :, :, 2] = zz
+            print(vx, vy, vz)
+            bb = self.get_bounding_box()
+            print('bounding box is {}'.format(bb))
+            x_sample = np.linspace(bb[0][0], bb[1][0], vx)  # mm
+            y_sample = np.linspace(bb[0][1], bb[1][1], vy)  # mm
+            z_sample = np.linspace(bb[0][2], bb[1][2], vz)  # mm
+            if grain_id:
+                # filter by the given grain id
+                ndx_x, ndx_y, ndx_z = np.where(self.array == grain_id)
+                print('found %d voxels in grain %d' % (len(ndx_x), grain_id))
+                self.positions = np.c_[x_sample[ndx_x], y_sample[ndx_y], z_sample[ndx_z]]
+            else:
+                xx, yy, zz = np.meshgrid(x_sample, y_sample, z_sample, indexing='ij')
+                all_positions = np.empty((vx, vy, vz, 3), dtype=float)
+                all_positions[:, :, :, 0] = xx
+                all_positions[:, :, :, 1] = yy
+                all_positions[:, :, :, 2] = zz
+                self.positions = all_positions.reshape(-1, all_positions.shape[-1])
         elif self.geo_type == 'cad':
-            print('discretizing CAD geometry is not yet supported')
-            self.positions = np.array(self.origin)
+            if self.cad is None:
+                print('you must set the cad attribute (path to the STL file in mm units) for this geometry')
+                return
+            from pymicro.view.vtk_utils import is_in_array
+            is_in, xyz = is_in_array(self.cad, step=0.2, origin=self.origin)
+            self.positions = xyz[np.where(is_in.ravel())]
 
 
 class Sample:

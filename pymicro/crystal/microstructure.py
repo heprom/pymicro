@@ -15,6 +15,7 @@ import numpy as np
 import os
 import vtk
 import h5py
+from scipy import ndimage
 from matplotlib import pyplot as plt, colors, cm
 from xml.dom.minidom import Document, parse
 from pymicro.crystal.lattice import Lattice, Symmetry
@@ -1172,32 +1173,6 @@ class Grain:
         SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
         return self.orientation.schmid_factor(slip_system, load_direction)
 
-    def compute_grain_centers(self, voxel_size=None, verbose=False):
-        """Recompute the center of masses of all grains in the microstructure.
-
-        If the voxel size is specified, the grain centeers will be in mm unit, if not in voxel unit.
-
-        .. note::
-
-          A grain map need to be associated with this microstructure instance for the method to run.
-
-        :param float voxel_size: the voxel size in mm unit.
-        :param bool verbose: flag for verbose mode.
-        """
-        from scipy import ndimage
-        if not hasattr(self, 'grain_map'):
-            print('warning: need a grain map to recompute the center of mass of the grains')
-            return
-        for g in self.grains:
-            array_bin = (self.grain_map == g.id).astype(np.uint8)
-            local_com = ndimage.measurements.center_of_mass(array_bin, self.grain_map)
-            com = local_com - 0.5 * np.array(self.grain_map.shape)
-            if voxel_size:
-                com *= voxel_size
-            if verbose:
-                print('grain %2d center: %6.3f, %6.3f, %6.3f' % (g.id, com[0], com[1], com[2]))
-            g.center = com
-
     def SetVtkMesh(self, mesh):
         """Set the VTK mesh of this grain.
 
@@ -1658,6 +1633,42 @@ class Microstructure:
             print('dilation step %d done' % (step + 1))
         # finally assign the dilated grain map to the microstructure
         self.grain_map = grain_map
+
+    def compute_grain_center(self, gid):
+        """Compute the center of masses of a grain given its id.
+
+        :param int gid: the grain id to consider.
+        :return: a tuple with the center of mass in mm units (or voxel if the voxel_size is not specified).
+        """
+        # isolate the grain within the complete grain map
+        sl = ndimage.find_objects(self.grain_map == gid)[0]
+        offset = np.array([sl[0].start, sl[1].start, sl[2].start])
+        grain_data_bin = (self.grain_map[sl] == gid).astype(np.uint8)
+        local_com = ndimage.measurements.center_of_mass(grain_data_bin)
+        com = self.voxel_size * (offset + local_com - 0.5 * np.array(self.grain_map.shape))
+        return com
+
+    def recompute_grain_centers(self, verbose=False):
+        """Compute and assign the center of all grains in the microstructure using the grain map.
+
+        Each grain center is computed using its center of mass. The value is assigned to the grain.center attribute.
+        If the voxel size is specified, the grain centers will be in mm unit, if not in voxel unit.
+
+        .. note::
+
+          A grain map need to be associated with this microstructure instance for the method to run.
+
+        :param bool verbose: flag for verbose mode.
+        """
+        if not hasattr(self, 'grain_map'):
+            print('warning: need a grain map to recompute the center of mass of the grains')
+            return
+        for g in self.grains:
+            com = self.compute_grain_center(g.id)
+            if verbose:
+                print('grain %d center: %.3f, %.3f, %.3f' % (g.id, com[0], com[1], com[2]))
+            g.center = com
+
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """

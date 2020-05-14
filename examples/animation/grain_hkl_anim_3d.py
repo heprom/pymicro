@@ -1,5 +1,3 @@
-import os, vtk
-import numpy as np
 from scipy import ndimage
 
 from pymicro.file.file_utils import HST_read
@@ -52,8 +50,7 @@ scene.time_anim_ends = 360
 scene.prefix = name
 print('initialize the a vtkRotateActorAroundZAxis instance')
 anim_actor = vtkRotateActorAroundZAxis(0)
-anim_actor.actor = grain_with_planes
-anim_actor.actor_position = grain.position
+anim_actor.set_actor(grain_with_planes)
 anim_actor.time_anim_ends = 360
 scene.add_animation(anim_actor)
 scene.render()

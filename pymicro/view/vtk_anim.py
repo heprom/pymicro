@@ -146,26 +146,39 @@ class vtkRotateActorAroundAxis(vtkAnimation):
 
     def __init__(self, t=0, duration=10, axis=(0., 0., 1.), angle=360):
         vtkAnimation.__init__(self, t, duration)
-        self.actor = None
+        self._actor = None
         self.axis = axis
         self.angle = angle
 
     def set_actor(self, actor):
-        self.actor = actor
+        """Set the actor for this animation.
+
+        This also keep a record of the actor initial transformation matrix.
+
+        :param vtkActor actor: the actor on which to apply the animation.
+        """
+        self._actor = actor
         # keep track of the initial user transform matrix
         transform = actor.GetUserTransform()
         if not transform:
             transform = vtk.vtkTransform()
             transform.Identity()
             actor.SetUserTransform(transform)
-        #self.user_transform_matrix = actor.GetUserTransform().GetMatrix()
+        self.user_transform_matrix = actor.GetUserTransform().GetMatrix()
 
     def execute(self, iren, event):
-        '''instruction block executed when a TimerEvent is captured by the vtkRotateActorAroundAxis.
+        """instruction block executed when a TimerEvent is captured by the vtkRotateActorAroundAxis.
 
-        If the time is not in [start, end] nothing is done. Otherwise the
-        transform matrix corresponding to the 3D rotation is applied to the actor.
-        '''
+        If the time is not in [start, end] nothing is done. Otherwise the transform matrix corresponding
+        to the 3D rotation is applied to the actor.
+
+        The transform matrix for this increment is the result of the multiplication of the rotation matrix
+        for the current angle with the initial 4x4 matrix before any rotation (we keep a record of this in
+        the `user_transform_matrix` attribute).
+
+        :param vtkRenderWindowInteractor iren: the vtk render window interactor.
+        :param event: the captures event.
+        """
         do = vtkAnimation.pre_execute(self)
         if not do:
             return
@@ -179,11 +192,11 @@ class vtkRotateActorAroundAxis(vtkAnimation):
         for j in range(3):
             for i in range(3):
                 m.SetElement(j, i, om[i, j])
+        # compute the transformation matrix for this increment
         t = vtk.vtkTransform()
-        #t.SetMatrix(self.user_transform_matrix)
-        t.SetMatrix(self.actor.GetUserTransform().GetMatrix())
+        t.SetMatrix(self.user_transform_matrix)
         t.Concatenate(m)
-        self.actor.SetUserTransform(t)
+        self._actor.SetUserTransform(t)
         vtkAnimation.post_execute(self, iren, event)
 
 

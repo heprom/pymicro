@@ -1641,7 +1641,10 @@ class Microstructure:
         :return: a tuple with the center of mass in mm units (or voxel if the voxel_size is not specified).
         """
         # isolate the grain within the complete grain map
-        sl = ndimage.find_objects(self.grain_map == gid)[0]
+        slices = ndimage.find_objects(self.grain_map == gid)
+        if not len(slices) > 0:
+            raise ValueError('warning grain %d not found in grain map' % gid)
+        sl = slices[0]
         offset = np.array([sl[0].start, sl[1].start, sl[2].start])
         grain_data_bin = (self.grain_map[sl] == gid).astype(np.uint8)
         local_com = ndimage.measurements.center_of_mass(grain_data_bin)
@@ -1664,7 +1667,11 @@ class Microstructure:
             print('warning: need a grain map to recompute the center of mass of the grains')
             return
         for g in self.grains:
-            com = self.compute_grain_center(g.id)
+            try:
+                com = self.compute_grain_center(g.id)
+            except ValueError:
+                print('skipping grain %d' % g.id)
+                continue
             if verbose:
                 print('grain %d center: %.3f, %.3f, %.3f' % (g.id, com[0], com[1], com[2]))
             g.center = com

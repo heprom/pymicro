@@ -1767,10 +1767,12 @@ class Microstructure:
             # load cell data
             if 'grain_ids' in f['CellData']:
                 micro.grain_map = f['CellData/grain_ids'][()]
-                micro.voxel_size = f['CellData/grain_ids'].attrs['voxel_size']
+                if 'voxel_size' in f['CellData/grain_ids'].attrs:
+                    micro.voxel_size = f['CellData/grain_ids'].attrs['voxel_size']
             if 'mask' in f['CellData']:
                 micro.mask = f['CellData/mask'][()]
-                micro.voxel_size = f['CellData/mask'].attrs['voxel_size']
+                if 'voxel_size' in f['CellData/mask'].attrs:
+                    micro.voxel_size = f['CellData/mask'].attrs['voxel_size']
             return micro
 
     def to_dream3d(self):
@@ -1861,7 +1863,8 @@ class Microstructure:
         return micro
 
     @staticmethod
-    def from_dct(data_dir='.', grain_file='index.mat', vol_file='phase_01_vol.mat', mask_file='volume_mask.mat', verbose=True):
+    def from_dct(data_dir='.', grain_file='index.mat', vol_file='phase_01_vol.mat', mask_file='volume_mask.mat',
+                 use_dct_path=True, verbose=True):
         """Create a microstructure from a DCT reconstruction.
 
         DCT reconstructions are stored in several files. The indexed grain inforamtions are stored in a matlab file in
@@ -1869,10 +1872,12 @@ class Microstructure:
         in the '5_reconstruction' folder as an hdf5 file, possibly stored alongside a mask file coming from the
         absorption reconstruction.
         
-        :param str data_root: the path to the folder containing the data.
+        :param str data_dir: the path to the folder containing the reconstruction data.
         :param str grain_file: the name of the file containing grains info.
         :param str vol_file: the name of the volume file.
         :param str mask_file: the name of the mask file.
+        :param bool use_dct_path: if True, the grain_file should be located in 4_grains/phase_01 folder and the
+        vol_file and mask_file in the 5_reconstruction folder.
         :param bool verbose: activate verbose mode.
         :return: a `Microstructure` instance created from the DCT reconstruction.
         """
@@ -1882,13 +1887,17 @@ class Microstructure:
         print('creating microstructure for DCT scan %s' % scan)
         micro = Microstructure(name=scan)
         micro.data_dir = data_dir
-        index_path = os.path.join(data_dir, '4_grains', 'phase_01', grain_file)
+        if use_dct_path:
+            index_path = os.path.join(data_dir, '4_grains', 'phase_01', grain_file)
+        else:
+            index_path = os.path.join(data_dir, grain_file)
         print(index_path)
         if not os.path.exists(index_path):
             raise ValueError('%s not found, please specify a valid path to the grain file.' % index_path)
             return None
         from scipy.io import loadmat
         index = loadmat(index_path)
+        micro.voxel_size = index['cryst'][0][0][25][0][0]
         # grab the crystal lattice
         lattice_params = index['cryst'][0][0][3][0]
         sym = Symmetry.from_string(index['cryst'][0][0][7][0])
@@ -1905,7 +1914,10 @@ class Microstructure:
             micro.grains.append(g)
 
         # load the grain map if available
-        grain_map_path = os.path.join(data_dir, '5_reconstruction', vol_file)
+        if use_dct_path:
+            grain_map_path = os.path.join(data_dir, '5_reconstruction', vol_file)
+        else:
+            grain_map_path = os.path.join(data_dir, vol_file)
         if os.path.exists(grain_map_path):
             with h5py.File(grain_map_path, 'r') as f:
                 # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
@@ -1913,7 +1925,10 @@ class Microstructure:
                 if verbose:
                     print('loaded grain ids volume with shape: {}'.format(micro.grain_map.shape))
         # load the mask if available
-        mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
+        if use_dct_path:
+            mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
+        else:
+            mask_path = os.path.join(data_dir, mask_file)
         if os.path.exists(mask_path):
             with h5py.File(mask_path, 'r') as f:
                 micro.mask = f['vol'].value.transpose(2, 1, 0).astype(np.uint8)
@@ -1965,16 +1980,19 @@ class Microstructure:
             writer.Write()
 
     @staticmethod
-    def merge_microstructures(micros, overlap, voxel_size, plot=False):
+    def merge_microstructures(micros, overlap, plot=False):
         """Merge two `Microstructure` instances together.
 
         The function works for two microstructures with grain maps and an overlap between them. Temporarily
         `Microstructures` restricted to the overlap regions are created and grains are matched between the two based
         on a disorientation tolerance.
 
+        .. note::
+
+          The two microstructure must have the same crystal lattice and the same voxel_size for this method to run.
+
         :param list micros: a list containing the two microstructures to merge.
         :param int overlap: the overlap to use.
-        :param float voxel_size: the voxel size for the grain maps.
         :param bool plot: a flag to plot some results.
         :return: a new `Microstructure`instance containing the merged microstructure.
         """
@@ -1987,6 +2005,9 @@ class Microstructure:
         if micros[0].get_lattice() != micros[1].get_lattice():
             raise ValueError('both microstructure must have the same crystal lattice')
         lattice = micros[0].get_lattice()
+        if micros[0].voxel_size != micros[1].voxel_size:
+            raise ValueError('both microstructure must have the same voxel size')
+        voxel_size = micros[0].voxel_size
 
         # create two microstructure of the overlapping regions: end slices in first scan and first slices in second scan
         grain_ids_ol1 = micros[0].grain_map[:, :, micros[0].grain_map.shape[2] - overlap:]
@@ -2014,7 +2035,7 @@ class Microstructure:
 
             # make the microstructure
             micro_ol = Microstructure(name='%sol_' % micros[i].name)
-            print('* building microstructure %s' % micro_ol.name)
+            print('* building overlap microstructure %s' % micro_ol.name)
             micro_ol.set_lattice(lattice)
             micro_ol.grain_map = grain_ids_ol
             for gid in ids_ol:
@@ -2022,7 +2043,6 @@ class Microstructure:
                     print('skipping %d' % gid)
                     continue
                 g = Grain(gid, micros[i].get_grain(gid).orientation)
-                # recalculate position as we look at a truncated volume
 
                 array_bin = (grain_ids_ol == gid).astype(np.uint8)
                 local_com = ndimage.measurements.center_of_mass(array_bin, grain_ids_ol)
@@ -2037,7 +2057,14 @@ class Microstructure:
                 #com_mm = voxel_size * (local_com - 0.5 * np.array(grain_ids_ol.shape)) + offset
                 #print('grain %2d position: %6.3f, %6.3f, %6.3f' % (gid, com_mm[0], com_mm[1], com_mm[2]))
                 g.center = com_mm
+
                 micro_ol.grains.append(g)
+            #TODO recalculate position as we look at a truncated volume
+            '''
+            micro_ol.recompute_grain_centers(verbose=True)
+            for g in micro_ol.grains:
+                g.center += offset_mm
+            '''
             # add the overlap microstructure to the list
             micros_ol.append(micro_ol)
 

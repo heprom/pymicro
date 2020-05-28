@@ -24,6 +24,12 @@ class MicrostructureTests(unittest.TestCase):
         self.assertEqual(len(m.grains), len(self.test_eulers))
         os.remove('%s.h5' % self.micro.name)
 
+    def test_from_dct(self):
+        # read a microstructure from a DCT index.mat file
+        m = Microstructure.from_dct(data_dir=PYMICRO_EXAMPLES_DATA_DIR, grain_file='t5_dct_cen_index.mat', use_dct_path=False)
+        self.assertEqual(len(m.grains), 146)
+        self.assertEqual(m.voxel_size, 0.0014)
+
     def test_from_h5(self):
         # read a test microstructure
         m = Microstructure.from_h5(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 't5_dct_slice.h5'))

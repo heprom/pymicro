@@ -11,7 +11,7 @@ except ImportError:
     from distutils.command.build_py import build_py
 
 setuptools.setup(
-    name="pymicro",
+    name="pymicro_heprom",
     version="0.4.4",
     author="Henry Proudhon",
     author_email="henry.proudhon@mines-paristech.fr",
@@ -19,6 +19,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
     url="https://github.com/heprom/pymicro",
+    include_package_data=True,
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

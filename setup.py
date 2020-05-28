@@ -1,6 +1,7 @@
 import sys
 import os
 import setuptools
+import pymicro
 
 with open('README.rst', 'r') as f:
     long_description = f.read()
@@ -12,7 +13,7 @@ except ImportError:
 
 setuptools.setup(
     name="pymicro_heprom",
-    version="0.4.4",
+    version=pymicro.__version__,
     author="Henry Proudhon",
     author_email="henry.proudhon@mines-paristech.fr",
     description="An open-source Python package to work with material microstructures and 3d data sets",

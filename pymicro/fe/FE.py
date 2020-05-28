@@ -305,9 +305,10 @@ class FE_Mesh():
         print('updating ranks')
         for i, element in enumerate(self._elements):
             element._rank = i
-        # TODO should remove all the deleted element ids from other elsets
         self._elsets.pop(index)
         self._elset_names.pop(index)
+        for elset in self._elsets:
+            elset = list(set(elset) - set(elid_to_del))
         print(self._elset_names)
 
     @staticmethod

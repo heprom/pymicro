@@ -4,6 +4,7 @@ pymicro/*/*.py[cod]
 pymicro/*/tests/*.py[cod]
 pymicro/*/__pycache__
 pymicro/*/tests/__pycache__
+__pycache__
 
 # examples
 examples/*/*.py[cod]

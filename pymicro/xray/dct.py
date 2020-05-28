@@ -275,7 +275,7 @@ def add_to_image(image, inset, uv, verbose=False):
         += inset[u_start:u_end, v_start:v_end]
 
 
-def merge_dct_scans(scan_list, samtz_list, voxel_size, use_mask=False, overlap=-1, root_dir='.', write_to_h5=True):
+def merge_dct_scans(scan_list, samtz_list, use_mask=False, overlap=-1, root_dir='.', write_to_h5=True):
     """Merge two DCT scans.
 
     This function build a `Microstructure` instance for each DCT scan and calls merge_microstructures.
@@ -283,7 +283,6 @@ def merge_dct_scans(scan_list, samtz_list, voxel_size, use_mask=False, overlap=-
 
     :param list scan_list: a list with the two DCT scan names.
     :param list samtz_list: a list with the two samtz value (the order should match the scan names).
-    :param float voxel_size: the voxel size in mm.
     :param bool use_mask: a flag to also merge the absorption masks.
     :param int overlap: the value to use for the overlap if not computed automatically.
     :param str root_dir: the root data folder.
@@ -312,6 +311,7 @@ def merge_dct_scans(scan_list, samtz_list, voxel_size, use_mask=False, overlap=-
         dct_analysis_dir = os.path.join(root_dir, scan)
         print('processing scan %s' % scan)
         micro = Microstructure.from_dct(data_dir=dct_analysis_dir)
+        print('voxel_size is {}'.format(micro.voxel_size))
 
         # pad both grain map and mask
         print('vol shape is {}'.format(micro.grain_map.shape))
@@ -325,15 +325,15 @@ def merge_dct_scans(scan_list, samtz_list, voxel_size, use_mask=False, overlap=-
         micros.append(micro)
 
     # find out the overlap region (based on the difference in samtz)
-    overlap_from_samtz = int(((samtz_list[1] + scan_shapes[1][0] // 2 * voxel_size)
-                   - (samtz_list[0] - scan_shapes[0][0] // 2 * voxel_size)) / voxel_size)
+    overlap_from_samtz = int((samtz_list[1] + scan_shapes[1][0] // 2 * micros[1].voxel_size) / micros[1].voxel_size
+                   - (samtz_list[0] - scan_shapes[0][0] // 2 * micros[0].voxel_size) / micros[0].voxel_size)
     print('vertical overlap deduced from samtz positions is %d voxels' % overlap_from_samtz)
     if overlap < 0:
         overlap = overlap_from_samtz
     print('using an actual overlap of %d voxels' % overlap)
 
     # we have prepared the 2 microstructures, now merge them
-    merged_micro = Microstructure.merge_microstructures(micros, overlap, voxel_size, plot=True)
+    merged_micro = Microstructure.merge_microstructures(micros, overlap, plot=True)
 
     if write_to_h5:
         # write the result

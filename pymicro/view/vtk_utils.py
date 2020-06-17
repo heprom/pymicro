@@ -343,7 +343,7 @@ def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20, color=None):
 
 
 def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
-             plane_opacity=1.0, show_orientation=False, N=2048):
+             plane_opacity=1.0, show_orientation=False, N=2048, verbose=False):
     '''Creates a 3d representation of a crystallographic grain.
 
     This method creates a vtkActor object of the surface mesh
@@ -357,6 +357,7 @@ def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
     :param float plane_opacity: set the opacity of the grain actor.
     :param bool show_orientation: show also the grain orientation with a vtkAxesActor placed at the grain center if True.
     :param int N: the number of colors to use in the colormap.
+    :param bool verbose: activate verbose mode.
     :returns: a vtkAssembly of the grain mesh and the optional hkl planes.
     '''
     assembly = vtk.vtkAssembly()
@@ -369,8 +370,9 @@ def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
     mapper.ScalarVisibilityOff()  # we use the grain id for chosing the color
     lut = rand_cmap(N, first_is_black=True, table_range=(0, N - 1))
     grain_actor = vtk.vtkActor()
-    print(grain.id)
-    print(lut.GetTableValue(grain.id)[0:3])
+    if verbose:
+        print(grain.id)
+        print(lut.GetTableValue(grain.id)[0:3])
     grain_actor.GetProperty().SetColor(lut.GetTableValue(grain.id)[0:3])
     grain_actor.GetProperty().SetOpacity(0.3)
     grain_actor.SetMapper(mapper)
@@ -382,7 +384,8 @@ def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
             origin = (0., 0., 0.)
             if plane_origins is not None:
                 origin = plane_origins[i]  # in unit of the 3d scene
-                print('using origin %s' % str(origin))
+                if verbose:
+                    print('using origin %s' % str(origin))
             hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh,
                                                   grain.orientation, origin, opacity=plane_opacity,
                                                   show_normal=show_normal, normal_length=50.)

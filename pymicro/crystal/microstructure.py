@@ -1534,7 +1534,7 @@ class Microstructure:
 
         :param micro2: the second instance of `Microstructure` from which to match grains.
         :param float mis_tol: the tolerance is misorientation to use to detect matches (in degrees).
-        :param bool use_grain_ids: a list of ids to restrict the grains in which to search for matches.
+        :param list use_grain_ids: a list of ids to restrict the grains in which to search for matches.
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
         :returns tuple: A tuple of three lists holding respectively the matches, the candidates for each match and
@@ -1921,7 +1921,7 @@ class Microstructure:
         if os.path.exists(grain_map_path):
             with h5py.File(grain_map_path, 'r') as f:
                 # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
-                micro.grain_map = f['vol'].value.transpose(2, 1, 0)
+                micro.grain_map = f['vol'][()].transpose(2, 1, 0)
                 if verbose:
                     print('loaded grain ids volume with shape: {}'.format(micro.grain_map.shape))
         # load the mask if available
@@ -1931,7 +1931,7 @@ class Microstructure:
             mask_path = os.path.join(data_dir, mask_file)
         if os.path.exists(mask_path):
             with h5py.File(mask_path, 'r') as f:
-                micro.mask = f['vol'].value.transpose(2, 1, 0).astype(np.uint8)
+                micro.mask = f['vol'][()].transpose(2, 1, 0).astype(np.uint8)
                 if verbose:
                     print('loaded mask volume with shape: {}'.format(micro.mask.shape))
         return micro
@@ -2133,9 +2133,13 @@ class Microstructure:
         for match in matched:
             ref_id, other_id = match
             print('replacing %d by %d' % (other_id, ref_id))
-            ids_mrg_list.remove(other_id)
-            grain_map_translated[micros[1].grain_map == other_id] = ref_id
             #TODO should flag those grains so their center can be recomputed
+            grain_map_translated[micros[1].grain_map == other_id] = ref_id
+            try:
+                ids_mrg_list.remove(other_id)
+            except ValueError:
+                # this can happend if a grain in reference volume was matched to more than 1 grain
+                print('%d was not in list anymore' % other_id)
         # also renumber the rest using the offset
         renumbered_grains = []
         for i, other_id in enumerate(ids_mrg_list):

@@ -359,12 +359,21 @@ class Experiment:
             sample.set_material(material)
         if 'Microstructure' in dict_exp['Sample']:
             micro = Microstructure(dict_exp['Sample']['Microstructure']['Name'])
+            # crystal lattice
+            if 'Lattice' in dict_exp['Sample']['Microstructure']:
+                a, b, c = dict_exp['Sample']['Microstructure']['Lattice']['Lengths']
+                alpha, beta, gamma = dict_exp['Sample']['Microstructure']['Lattice']['Angles']
+                centering = dict_exp['Sample']['Microstructure']['Lattice']['Centering']
+                symmetry = Symmetry.from_string(dict_exp['Sample']['Microstructure']['Lattice']['Symmetry'])
+                lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, centering=centering, symmetry=symmetry)
+                micro.set_lattice(lattice)
             for i in range(len(dict_exp['Sample']['Microstructure']['Grains'])):
                 dict_grain = dict_exp['Sample']['Microstructure']['Grains'][i]
-                grain = Grain(dict_grain['Id'], Orientation.from_euler(dict_grain['Orientation']['Euler Angles (degrees)']))
+                grain = Grain(int(dict_grain['Id']), Orientation.from_euler(dict_grain['Orientation']['Euler Angles (degrees)']))
                 grain.position = np.array(dict_grain['Position'])
                 grain.volume = dict_grain['Volume']
-                grain.hkl_planes = dict_grain['hkl_planes']
+                if 'hkl_planes' in dict_grain:
+                    grain.hkl_planes = dict_grain['hkl_planes']
                 micro.grains.append(grain)
             sample.set_microstructure(micro)
         # lazy behaviour, we load only the grain_ids path, the actual array is loaded in memory if needed
@@ -452,11 +461,12 @@ class ExperimentEncoder(json.JSONEncoder):
         if isinstance(o, Microstructure):
             dict_micro = {}
             dict_micro['Name'] = o.name
+            dict_micro['Lattice'] = o.get_lattice()
             dict_micro['Grains'] = o.grains
             return dict_micro
         if isinstance(o, Grain):
             dict_grain = {}
-            dict_grain['Id'] = o.id
+            dict_grain['Id'] = float(o.id)
             dict_grain['Position'] = o.center.tolist()
             dict_grain['Orientation'] = o.orientation
             dict_grain['Volume'] = o.volume

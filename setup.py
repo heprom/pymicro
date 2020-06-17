@@ -12,7 +12,7 @@ except ImportError:
     from distutils.command.build_py import build_py
 
 setuptools.setup(
-    name="pymicro_heprom",
+    name="pymicro",
     version=pymicro.__version__,
     author="Henry Proudhon",
     author_email="henry.proudhon@mines-paristech.fr",

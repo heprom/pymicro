@@ -1,5 +1,5 @@
 import vtk, sys, os
-
+import numpy as np
 
 class Scene3D:
     """A class to manage a 3D scene using VTK actors.
@@ -68,9 +68,36 @@ class Scene3D:
         """
         self.renderer.SetActiveCamera(cam)
 
-    def get_frame(self):
+    def get_frame_as_array(self):
+        """render the 3d scene and export it as a numpy array.
+
+        This can be useful to display the image in a plot for instance. We use the `vtkBMPWriter` to generate the
+        buffer as an array of bytes. The numpy array is then created from this buffer and reshaped to the appropriate
+        RGB image size.
+
+        :return: a numpy array representing the RGB rendered image.
         """
-        Generate a frame from the vtkRenderer instance of the 3d scene.
+        self.renWin.SetOffScreenRendering(1)
+        self.renWin.Render()
+        w2i = vtk.vtkWindowToImageFilter()
+        w2i.SetInput(self.renWin)
+        w2i.Update()
+        bmp_shape = self.renWin.GetSize() + (3,)
+        writer = vtk.vtkBMPWriter()
+        writer.SetWriteToMemory(1)
+        writer.SetInputConnection(w2i.GetOutputPort())
+        writer.Write()
+        data = bytes(memoryview(writer.GetResult()))
+        self.renWin.SetOffScreenRendering(0)
+        # create the numpy array from the bytes buffer (leave off the first 54 bytes corresponding to the BMP header)
+        array_bgr = np.frombuffer(data[54:], dtype=np.uint8).reshape(bmp_shape)
+        b = array_bgr[::-1, :, 0].T
+        g = array_bgr[::-1, :, 1].T
+        r = array_bgr[::-1, :, 2].T
+        return np.array([r, g, b]).transpose(2, 1, 0)
+
+    def get_frame(self):
+        """Generate a frame from the vtkRenderer instance of the 3d scene.
         
         :return: the image as a string buffer.
         """

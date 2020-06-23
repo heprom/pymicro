@@ -1585,13 +1585,14 @@ class Microstructure:
             print('%d/%d grains were matched ' % (len(matched), len(grains_to_match)))
         return matched, candidates, unmatched
 
-    def dilate_grains(self, dilation_steps=1):
+    def dilate_grains(self, dilation_steps=1, dilation_ids=None):
         """Dilate grains to fill the gap beween them.
 
         This code is based on the gtDilateGrains function from the DCT code. It has been extended to handle both 2D
         and 3D cases.
 
         :param int dilation_steps: the umber of dilation steps to apply.
+        :param list dilation_ids: a list to restrict the dilation to the given ids.
         """
         if not hasattr(self, 'grain_map'):
             raise ValueError('microstructure %s must have an associated grain_map attribute' % self.name)
@@ -1603,9 +1604,12 @@ class Microstructure:
 
         # carry out dilation in iterative steps
         for step in range(dilation_steps):
-            grains = (grain_map > 0).astype(np.uint8)
+            if dilation_ids:
+                grains = np.isin(grain_map, dilation_ids)
+            else:
+                grains = (grain_map > 0).astype(np.uint8)
             from scipy import ndimage
-            grains_dil = ndimage.morphology.binary_dilation(grain_map).astype(np.uint8)
+            grains_dil = ndimage.morphology.binary_dilation(grains).astype(np.uint8)
             if hasattr(self, 'mask'):
                 # only dilate within the mask
                 grains_dil *= self.mask.astype(np.uint8)

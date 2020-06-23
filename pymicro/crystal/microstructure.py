@@ -103,6 +103,17 @@ class Orientation:
         corresponds to euler angle (45, 0, 0)."""
         return Orientation.from_euler((45., 0., 0.))
 
+    @staticmethod
+    def random():
+        """Create  a random crystal orientation."""
+        from random import random
+        from math import acos
+        phi1 = random() * 360.
+        Phi = 180. * acos(2 * random() - 1) / np.pi
+        phi2 = random() * 360.
+        return Orientation.from_euler([phi1, Phi, phi2])
+
+
     def get_ipf_colour(self, axis=np.array([0., 0., 1.]), symmetry=Symmetry.cubic):
         """Compute the IPF (inverse pole figure) colour for this orientation.
 
@@ -1432,14 +1443,9 @@ class Microstructure:
 
         *n* The number of grain orientations in the microstructure.
         """
-        from random import random
-        from math import acos
         m = Microstructure(name='random_texture')
         for i in range(n):
-            phi1 = random() * 360.
-            Phi = 180. * acos(2 * random() - 1) / np.pi
-            phi2 = random() * 360.
-            m.grains.append(Grain(i + 1, Orientation.from_euler([phi1, Phi, phi2])))
+            m.grains.append(Grain(i + 1, Orientation.random()))
         return m
 
     @staticmethod
@@ -1867,7 +1873,7 @@ class Microstructure:
                  use_dct_path=True, verbose=True):
         """Create a microstructure from a DCT reconstruction.
 
-        DCT reconstructions are stored in several files. The indexed grain inforamtions are stored in a matlab file in
+        DCT reconstructions are stored in several files. The indexed grain informations are stored in a matlab file in
         the '4_grains/phase_01' folder. Then, the reconstructed volume file (labeled image) is stored
         in the '5_reconstruction' folder as an hdf5 file, possibly stored alongside a mask file coming from the
         absorption reconstruction.
@@ -1883,6 +1889,8 @@ class Microstructure:
         """
         if data_dir == '.':
             data_dir = os.getcwd()
+        if data_dir.endswith(os.sep):
+            data_dir = data_dir[:-1]
         scan = data_dir.split(os.sep)[-1]
         print('creating microstructure for DCT scan %s' % scan)
         micro = Microstructure(name=scan)
@@ -2071,6 +2079,21 @@ class Microstructure:
         # match grain from micros_ol[1] to micros_ol[0] (the reference)
         matched, _, unmatched = micros_ol[0].match_grains(micros_ol[1], verbose=True)
 
+        # the affine transform does not since to work, using a simpler method here
+        delta_avg = np.zeros(3)
+        for i in range(len(matched)):
+            # look at the pair of grains
+            match = matched[i]
+            delta = micros_ol[0].get_grain(match[0]).center - micros_ol[1].get_grain(match[1]).center
+            delta_avg += delta
+        delta_avg /= len(matched)
+        print('average shift (pixels):')
+        print(delta_avg / voxel_size)
+        translation = delta_avg
+        translation_voxel = (delta_avg / voxel_size).astype(int)
+        print('translation is in mm: {}'.format(translation))
+        print('translation is in voxels {}'.format(translation_voxel))
+        """
         from pymicro.view.vol_utils import compute_affine_transform
 
         # compute the affine transform
@@ -2105,6 +2128,7 @@ class Microstructure:
         offset = -np.dot(invt, translation)
         print(translation, offset)
         translation_voxel = (translation / voxel_size).astype(int)
+        """
         print(translation_voxel)
 
         # look at ids in the reference volume
@@ -2166,8 +2190,10 @@ class Microstructure:
             plt.axis('off')
             plt.title('micros[1].grain_map (renumbered)')
             ax3 = fig.add_subplot(1, 3, 3)
-            same = micros[0].grain_map[:, :, translation_voxel[2] + check] == grain_map_translated[:, :, check]
-            ax3.imshow(same.T, vmin=0, vmax=2)
+            same_voxel = micros[0].grain_map[:, :, translation_voxel[2] + check] == grain_map_translated[:, :, check]
+            print(same_voxel)
+            #print(same_voxel.shape)
+            #ax3.imshow(same_voxel.T, vmin=0, vmax=2)
             plt.axis('off')
             plt.title('voxels that are identicals')
             plt.savefig('merging_check1.pdf')

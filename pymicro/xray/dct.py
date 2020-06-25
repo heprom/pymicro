@@ -314,14 +314,19 @@ def merge_dct_scans(scan_list, samtz_list, use_mask=False, overlap=-1, root_dir=
         print('voxel_size is {}'.format(micro.voxel_size))
 
         # pad both grain map and mask
+        print('max shape is {}'.format(max_shape))
         print('vol shape is {}'.format(micro.grain_map.shape))
         offset = max_shape - micro.grain_map.shape
         offset[2] = 0  # do not pad along Z
-        padding = [(o // 2, o // 2) for o in offset]
+        padding = [(o // 2, max_shape[0] - micro.grain_map.shape[0] - o // 2) for o in offset]
         print('padding is {}'.format(padding))
         micro.grain_map = np.pad(micro.grain_map, padding, mode='constant')
+        print('has mask ? {}'.format(hasattr(micro, 'mask')))
         if use_mask:
             micro.mask = np.pad(micro.mask, padding, mode='constant')
+        elif hasattr(micro, 'mask'):
+            print('deleting mask attribute since we do not want to use it')
+            delattr(micro, 'mask')
         micros.append(micro)
 
     # find out the overlap region (based on the difference in samtz)

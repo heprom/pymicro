@@ -1585,13 +1585,29 @@ class Microstructure:
             print('%d/%d grains were matched ' % (len(matched), len(grains_to_match)))
         return matched, candidates, unmatched
 
+    def dilate_grain(self, grain_id, dilation_steps=1, use_mask=False):
+        """Dilate a single grain overwriting the neighbors.
+
+        :param int grain_id: the grain id to dilate.
+        :param int dilation_steps: the number of dilation steps to apply.
+        :param bool use_mask: if True and that this microstructure has a mask, the dilation will be limite by it.
+        """
+        grain_volume_init = (self.grain_map == grain_id).sum()
+        grain_data = self.grain_map == grain_id
+        grain_data = ndimage.binary_dilation(grain_data, iterations=dilation_steps).astype(np.uint8)
+        if use_mask and hasattr(self, 'mask'):
+            grain_data *= self.mask.astype(np.uint8)
+        self.grain_map[grain_data == 1] = grain_id
+        grain_volume_final = (self.grain_map == grain_id).sum()
+        print('grain %s was dilated by %d voxels' % (grain_id, grain_volume_final - grain_volume_init))
+
     def dilate_grains(self, dilation_steps=1, dilation_ids=None):
         """Dilate grains to fill the gap beween them.
 
         This code is based on the gtDilateGrains function from the DCT code. It has been extended to handle both 2D
         and 3D cases.
 
-        :param int dilation_steps: the umber of dilation steps to apply.
+        :param int dilation_steps: the number of dilation steps to apply.
         :param list dilation_ids: a list to restrict the dilation to the given ids.
         """
         if not hasattr(self, 'grain_map'):
@@ -2058,18 +2074,10 @@ class Microstructure:
 
                 array_bin = (grain_ids_ol == gid).astype(np.uint8)
                 local_com = ndimage.measurements.center_of_mass(array_bin, grain_ids_ol)
-                #print('local_com = {}'.format(local_com))
                 com_px = (local_com + offset_px - 0.5 * np.array(micros[i].grain_map.shape))
-                #print('com [px] = {}'.format(com_px))
                 com_mm = voxel_size * com_px
                 print('grain %2d center: %6.3f, %6.3f, %6.3f' % (gid, com_mm[0], com_mm[1], com_mm[2]))
-
-                #array_bin = (grain_ids_ol == gid).astype(np.uint8)
-                #local_com = ndimage.measurements.center_of_mass(array_bin, grain_ids_ol)
-                #com_mm = voxel_size * (local_com - 0.5 * np.array(grain_ids_ol.shape)) + offset
-                #print('grain %2d position: %6.3f, %6.3f, %6.3f' % (gid, com_mm[0], com_mm[1], com_mm[2]))
                 g.center = com_mm
-
                 micro_ol.grains.append(g)
             #TODO recalculate position as we look at a truncated volume
             '''

@@ -538,5 +538,5 @@ def tt_stack(scan_name, data_dir='.', save_edf=False, dark_factor=1.):
 
     # save the data as edf if needed
     if save_edf:
-        edf_write(os.path.join(data_dir, '%sstack.edf' % scan_name))
+        edf_write(tt_stack, os.path.join(data_dir, '%sstack.edf' % scan_name))
     return tt_stack

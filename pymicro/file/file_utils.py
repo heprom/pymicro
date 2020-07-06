@@ -166,30 +166,37 @@ def numpy_to_esrf_datatype(data_type):
         np.int32: 'SignedInteger',
         np.float32: 'FloatValue',
         np.float64: 'DoubleValue',
+        np.dtype('float64'): 'DoubleValue',
+        float: 'DoubleValue',
     }.get(data_type, 'UnsignedShort')
 
 
-def edf_write(data, fname, type=np.uint16, header_size=1024):
-    '''Write a binary edf file with the appropriate header.
+def edf_write(data, file_name, header_size=1024):
+    """Write a binary edf file with the appropriate header.
 
     This function write a (x,y,z) 3D dataset to the disk.
     The file is written as a Z-stack. It means that the first nx*ny bytes
     represent the first slice and so on...
-    '''
+
+    :param ndarray data: the data array to write to the file.
+    :param str file_name: the file name to use.
+    :param int header_size: the size of te header (a multiple of 512).
+    """
     # get current time
     from time import gmtime, strftime
     today = strftime('%d-%b-%Y', gmtime())
     size = np.shape(data)
     print('data size in pixels is ', size)
-    nbytes = np.prod(size) * np.dtype(type).itemsize
-    print('opening', fname, 'for writing')
+    nbytes = np.prod(size) * data.dtype.itemsize
+    print('opening', file_name, 'for writing')
     # craft an ascii header of the appropriate size
-    f = open(fname, 'wb')
+    f = open(file_name, 'wb')
     head = '{\n'
     head += 'HeaderID       = EH:000001:000000:000000 ;\n'
     head += 'Image          = 1 ;\n'
     head += 'ByteOrder      = LowByteFirst ;\n'
-    head += 'DataType       = %13s;\n' % numpy_to_esrf_datatype(type)
+    head += 'DataType       = %13s;\n' % numpy_to_esrf_datatype(data.dtype)
+    print('using data type %s' % numpy_to_esrf_datatype(data.dtype))
     head += 'Dim_1          = %4s;\n' % size[0]
     if len(size) > 1: head += 'Dim_2          = %4s;\n' % size[1]
     if len(size) > 2: head += 'Dim_3          = %4s;\n' % size[2]
@@ -198,13 +205,13 @@ def edf_write(data, fname, type=np.uint16, header_size=1024):
     for i in range(header_size - len(head) - 2):
         head += ' '
     head += '}\n'
-    f.write(head)
+    f.write(head.encode('utf-8'))
     if len(data.shape) == 3:
-        s = np.ravel(data.transpose(2, 1, 0)).astype(type).tostring()
+        s = np.ravel(data.transpose(2, 1, 0)).tostring()
     elif len(data.shape) == 2:
-        s = np.ravel(data.transpose(1, 0)).astype(type).tostring()
+        s = np.ravel(data.transpose(1, 0)).tostring()
     else:
-        s = np.ravel(data).astype(type).tostring()
+        s = np.ravel(data).tostring()
     f.write(s)
     f.close()
 

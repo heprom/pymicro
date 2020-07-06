@@ -484,3 +484,59 @@ def output_tikzpicture(proj_dif, omegas, gid=1, d_uv=[0, 0], suffix=''):
     f.write('\\end{tikzpicture}\n')
     f.write('\\end{document}\n')
     f.close()
+
+
+def tt_stack(scan_name, data_dir='.', save_edf=False, dark_factor=1.):
+    """Build a topotomography stack from raw detector images.
+
+    :param str scan_name: the name of the scan to process.
+    :param str data_dir: the path to the data folder.
+    :param bool save_edf: flag to save the tt stack as an EDF file.
+    :param float dark_factor: a multiplicative factor for the dark image.
+    """
+    from pymicro.file.file_utils import edf_read, edf_write
+    import glob
+    # figure out the number of frames per topograph TOPO_N
+    n_frames = len(glob.glob(os.path.join(data_dir, scan_name, '%s*.edf' % scan_name)))
+    TOPO_N = int(n_frames / 90)
+    print('number of frames to sum for a topograph = %d' % TOPO_N)
+
+    # parse the info file
+    f = open(os.path.join(data_dir, scan_name, '%s.info' % scan_name))
+    infos = dict()
+    for line in f.readlines():
+        tokens = line.split('=')
+        # convert the value into int/float/str depending on the case
+        try:
+            value = int(tokens[1].strip())
+        except ValueError:
+            try:
+                value = float(tokens[1].strip())
+            except ValueError:
+                value = tokens[1].strip()
+        infos[tokens[0]] = value
+    print(infos)
+
+    # load dark image
+    dark = dark_factor * edf_read(os.path.join(data_dir, scan_name, 'darkend0000.edf'))
+
+    # build the stack by combining individual images
+    tt_stack = np.empty((infos['TOMO_N'], infos['Dim_1'], infos['Dim_2']))
+    print(tt_stack[0].shape)
+    for n in range(int(infos['TOMO_N'])):
+        print('building topograph %d' % (n + 1))
+        topograph = np.zeros((infos['Dim_1'], infos['Dim_2']))
+        offset = TOPO_N * n
+        for i in range(TOPO_N):
+            index = offset + i + 1
+            frame_path = os.path.join(data_dir, scan_name, '%s%04d.edf' % (scan_name, index))
+            im = edf_read(frame_path) - dark
+            topograph += im
+        tt_stack[n] = topograph
+    tt_stack = tt_stack.transpose((1, 2, 0))
+    print('done')
+
+    # save the data as edf if needed
+    if save_edf:
+        edf_write(os.path.join(data_dir, '%sstack.edf' % scan_name))
+    return tt_stack

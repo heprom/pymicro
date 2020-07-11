@@ -48,6 +48,7 @@ class PoleFigure:
         self.poles = []
         self.set_hkl_poles(hkl)
         self.verbose = verbose
+        self.resize_markers = False
         self.mksize = 12
         self.pflegend = False
         self.x = np.array([1., 0., 0.])
@@ -167,13 +168,12 @@ class PoleFigure:
         else:
             plt.savefig('%s_pole_figure.%s' % (self.microstructure.name, save_as), format=save_as)
 
-    def plot_crystal_dir(self, c_dir, ax=None, ann=False, lab='', **kwargs):
+    def plot_crystal_dir(self, c_dir, **kwargs):
         '''Function to plot a crystal direction on a pole figure.
 
         :param c_dir: A vector describing the crystal direction.
-        :param ax: a reference to a pyplot ax to draw the pole.
-        :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
-        :param str lab: Label to use in the legend of the plot ('' by default).
+        :param dict kwargs: a dictionnary of keyword/values to control the plot, it should at least contain a reference
+        to a pyplot axes to draw the pole using keywors 'ax'.
         :raise ValueError: if the projection type is not supported
         '''
         if c_dir[2] < 0:
@@ -187,15 +187,22 @@ class PoleFigure:
             # cp = np.cross(c, self.z)
         else:
             raise ValueError('Error, unsupported projection type', self.proj)
+        ax = kwargs.get('ax')
         mk = kwargs.get('mk', 'o')
         edge_col = kwargs.get('markeredgecolor', 'k')
+        ann = kwargs.get('ann', None)
+        lab = kwargs.get('lab', '')
         col = kwargs.get('col', 'k')
-        ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk,
-                markeredgecolor=edge_col, markersize=self.mksize, label=lab)
+        col = col.reshape(1,-1)
+        #ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk,
+        #        markeredgecolor=edge_col, markersize=self.mksize, label=lab)
+        mksize = kwargs.get('mksize', self.mksize)
+        ax.scatter(cp[0], cp[1], linewidth=0, c=col, marker=mk, edgecolors=edge_col, s=mksize, label=lab)
         # Next 3 lines are necessary in case c_dir[2]=0, as for Euler angles [45, 45, 0]
         if c_dir[2] < 0.000001:
-            ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk,
-                    markersize=self.mksize, label=lab)
+            ax.scatter(-cp[0], -cp[1], linewidth=0, c=col, marker=mk, s=mksize, label=lab)
+            #ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk,
+            #        markersize=self.mksize, label=lab)
         if ann:
             ax.annotate(c_dir.view(), (cp[0], cp[1] - 0.1), xycoords='data',
                         fontsize=8, horizontalalignment='center', verticalalignment='center')
@@ -247,7 +254,7 @@ class PoleFigure:
             ax.annotate(axe_labels[v], (0.0, 1.01), xycoords='data', fontsize=16,
                         horizontalalignment='center', verticalalignment='bottom')
 
-    def plot_pf_dir(self, c_dir, ax=None, mk='o', col='k', ann=False, lab=''):
+    def plot_pf_dir(self, c_dir, **kwargs):
         '''Plot a crystal direction in a direct pole figure.'''
         if self.axis == 'Z':
             (h, v, u) = (0, 1, 2)
@@ -258,7 +265,7 @@ class PoleFigure:
         # the direction to plot is given by c_dir[h,v,u]
         if self.verbose:
             print('corrected for pf axis:', c_dir[[h, v, u]])
-        self.plot_crystal_dir(c_dir[[h, v, u]], mk=mk, col=col, ax=ax, ann=ann, lab=lab)
+        self.plot_crystal_dir(c_dir[[h, v, u]], **kwargs)
 
     def plot_pf(self, ax=None, mk='o', ann=False):
         '''Create the direct pole figure.
@@ -268,9 +275,18 @@ class PoleFigure:
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
         '''
         self.plot_pf_background(ax)
-        for grain in self.microstructure.grains:
+        kwargs = {'ax': ax, 'mk': mk, 'ann': ann}
+        if self.resize_markers:
+            # compute a list of the grain volume fractions
+            fracs = self.microstructure.get_grain_volume_fractions()
+            frac_max = max(fracs)
+            print('frac max', frac_max)
+        for ii, grain in enumerate(self.microstructure.grains):
             g = grain.orientation_matrix()
             gt = g.transpose()
+            if self.resize_markers:
+                kwargs['mksize'] = 0.15 * np.sqrt(fracs[ii] / frac_max) * 1000
+
             for i, hkl_plane in enumerate(self.poles):
                 c = hkl_plane.normal()
                 label = ''
@@ -279,7 +295,8 @@ class PoleFigure:
                     h, k, l = hkl_plane.miller_indices()
                     print('plotting (%d%d%d) with normal %s in sample CS (corrected for pf axis): %s' % (h, k, l, c, c_rot))
                 col = self.get_color_from_field(grain)
-                self.plot_pf_dir(c_rot, ax=ax, mk=mk, col=col, ann=ann, lab=label)
+                kwargs['col'] = col
+                self.plot_pf_dir(c_rot, **kwargs)
         ax.axis([-1.1, 1.1, -1.1, 1.1])
         if self.pflegend and self.map_field == 'grain_id':
             ax.legend(bbox_to_anchor=(0.05, 1), loc=1, numpoints=1, prop={'size': 10})
@@ -417,7 +434,13 @@ class PoleFigure:
             if self.map_field == 'grain_id':
                 col = Microstructure.rand_cmap().colors[grain.id]
             elif self.map_field == 'ipf':
-                col = grain.orientation.get_ipf_colour()
+                if self.axis == 'X':
+                    axis = np.array([1., 0., 0.])
+                elif self.axis == 'Y':
+                    axis = np.array([0., 1., 0.])
+                else:
+                    axis = np.array([0., 0., 1.])
+                col = grain.orientation.get_ipf_colour(axis=axis)
             else:
                 # retreive the position of the grain in the list
                 rank = self.microstructure.grains.index(grain)
@@ -434,7 +457,7 @@ class PoleFigure:
         else:
             return np.array([0., 0., 0.])
 
-    def plot_sst(self, ax=None, mk='s', ann=False):
+    def plot_sst(self, **kwargs):
         """ Create the inverse pole figure in the unit standard triangle.
 
         :param ax: a reference to a pyplot ax to draw the poles.
@@ -442,7 +465,8 @@ class PoleFigure:
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
         """
         # first draw the boundary of the symmetry domain limited by 3 hkl plane normals, called here A, B and C
-        symmetry = self.lattice._symmetry
+        symmetry = self.lattice.get_symmetry()
+        ax = kwargs.get('ax')
         if symmetry is Symmetry.cubic:
             sst_poles = [(0, 0, 1), (1, 0, 1), (1, 1, 1)]
             ax.axis([-0.05, 0.45, -0.05, 0.40])
@@ -472,9 +496,14 @@ class PoleFigure:
                         fontsize=12, horizontalalignment='center', verticalalignment=v_align[i])
 
         # now plot the sample axis
-        for grain in self.microstructure.grains:
-            # move to the fundamental zone
+        if self.resize_markers:
+            # compute a list of the grain volume fractions
+            fracs = self.microstructure.get_grain_volume_fractions()
+            frac_max = max(fracs)
+        for ii, grain in enumerate(self.microstructure.grains):
             g = grain.orientation_matrix()
+            if self.resize_markers:
+                kwargs['mksize'] = 0.15 * np.sqrt(fracs[ii] / frac_max) * 1000
             # compute axis and apply SST symmetry
             if self.axis == 'Z':
                 axis = self.z
@@ -486,7 +515,9 @@ class PoleFigure:
             label = ''
             if self.map_field == 'grain_id':
                 label = 'grain ' + str(grain.id)
-            self.plot_crystal_dir(axis_rot, mk=mk, col=self.get_color_from_field(grain), ax=ax, ann=ann, lab=label)
+            kwargs['lab'] = label
+            kwargs['col'] = self.get_color_from_field(grain)
+            self.plot_crystal_dir(axis_rot, **kwargs)
             if self.verbose:
                 print('plotting %s in crystal CS: %s' % (self.axis, axis_rot))
         ax.axis('off')
@@ -498,7 +529,8 @@ class PoleFigure:
         This assume the symmetry from the `Lattice` associated with the first pole.
         :param ax: a reference to a pyplot ax to draw the poles.
         """
-        symmetry = self.lattice._symmetry
+        kwargs = {'ax': ax, 'col': 'k', 'ann': False}
+        symmetry = self.lattice.get_symmetry()
         if symmetry is Symmetry.cubic:
             for c in self.c111s:
                 for i in range(3):
@@ -510,11 +542,12 @@ class PoleFigure:
                     self.plot_line_between_crystal_dir(c, e, ax=ax)
             markers = ['s', 'o', '^']
             for i, dirs in enumerate([self.c001s, self.c011s, self.c111s]):
-                [self.plot_crystal_dir(c, mk=markers[i], col='k', ax=ax, ann=False) for c in dirs]
+                kwargs['mk'] = markers[i]
+                [self.plot_crystal_dir(c, **kwargs) for c in dirs]
                 # also plot the negative direction of those lying in the plane z==0
                 for c in dirs:
                     if np.dot(c, self.z) == 0.0:
-                        self.plot_crystal_dir(-c, mk=markers[i], col='k', ax=ax, ann=False)
+                        self.plot_crystal_dir(-c, **kwargs)
         elif symmetry is Symmetry.hexagonal:
             from math import sin, cos, pi
             for angle in np.linspace(0, 2 * pi, 12, endpoint=False):
@@ -522,14 +555,15 @@ class PoleFigure:
         else:
             print('skipping unsupported symmetry for now')
 
-    def plot_ipf(self, ax=None, mk='s', ann=False, plot_symmetry=False):
+    def plot_ipf(self, plot_symmetry=False, **kwargs):
         """ Create the inverse pole figure for direction Z.
 
+        :param bool plot_symmetry: if True plot the lines representing the symmetry of the lattice.
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
         :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
-        :param bool plot_symmetry: if True plot the lines representing the symmetry of the lattice.
         """
+        ax = kwargs.get('ax')
         self.plot_pf_background(ax, labels=False)
         if plot_symmetry:
             self.plot_ipf_symmetry(ax)
@@ -543,8 +577,8 @@ class PoleFigure:
             else:
                 axis = self.x
             axis_rot = g.dot(axis)
-            col = self.get_color_from_field(grain)
-            self.plot_crystal_dir(axis_rot, mk=mk, col=col, ax=ax, ann=ann)
+            kwargs['col'] = self.get_color_from_field(grain)
+            self.plot_crystal_dir(axis_rot, **kwargs)
             if self.verbose:
                 print('plotting ', self.axis, ' in crystal CS:', axis_rot)
         ax.axis([-1.1, 1.1, -1.1, 1.1])

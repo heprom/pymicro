@@ -127,6 +127,10 @@ class Orientation:
           [x_c,y_c,z_c]=u.[0,0,1]+v.[0,1,1]+w.[1,1,1]
 
         and it is used to assign the RGB colour.
+
+        :param ndarray axis: the direction to use to compute the IPF colour.
+        :param Symmetry symmetry: the symmetry operator to use.
+        :return tuple: a tuple contining the RGB values.
         """
         axis /= np.linalg.norm(axis)
         # find the axis lying in the fundamental zone
@@ -156,7 +160,7 @@ class Orientation:
 
         # 2n faces distance 1 from origin
         # y <= ((2+sqrt(2))*t - (1+sqrt(2))) * x + (1+sqrt(2))*(1-t)
-        y, x = sorted([abs(ro[0]), abs(ro[1])])
+        y, x = sorted([abs(rod[0]), abs(rod[1])])
         if x > 1:
             return False
 
@@ -299,9 +303,7 @@ class Orientation:
                     sym_i = symmetries[i]
                     oi = np.dot(sym_i, g2)
                     delta = np.dot(oi, oj.T)
-                    #print('delta={}'.format(delta))
                     mis_angle = Orientation.misorientation_angle_from_delta(delta)
-                    #print(np.degrees(mis_angle))
                     if mis_angle < the_angle:
                         # now compute the misorientation axis, should check if it lies in the fundamental zone
                         mis_axis = Orientation.misorientation_axis_from_delta(delta)
@@ -310,7 +312,7 @@ class Orientation:
                         the_angle = mis_angle
                         the_axis = mis_axis
                         the_axis_xyz = np.dot(oi.T, the_axis)
-        return (the_angle, the_axis, the_axis_xyz)
+        return the_angle, the_axis, the_axis_xyz
 
     def phi1(self):
         """Convenience methode to expose the first Euler angle."""
@@ -1163,6 +1165,20 @@ class Grain:
         s += ' * has vtk mesh ? %s\n' % (self.vtkmesh != None)
         return s
 
+    def get_volume(self):
+        return self.volume
+
+    def get_volume_fraction(self, total_volume=None):
+        """Compute the grain volume fraction.
+
+        :param float total_volume: the total volume value to use.
+        :return float: the grain volume fraction as a number in the range [0, 1].
+        """
+        if not total_volume:
+            return 1.
+        else:
+            return self.volume / total_volume
+
     def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
         """Compute the Schmid factor of this grain for the given slip system.
 
@@ -1521,6 +1537,29 @@ class Microstructure:
         for g in self.grains:
             s += '* %s' % g.__repr__
         return s
+
+    def get_grain_volume_fractions(self):
+        total_volume = 0.
+        for g in self.grains:
+            total_volume += g.volume
+        return [g.get_volume_fraction(total_volume) for g in self.grains]
+
+    def get_grain_volume_fraction(self, gid, use_total_volume_value=None):
+        """Compute the grain volume fraction.
+
+        :param int gid: the grain id.
+        :param float use_total_volume_value: the total volume value to use.
+        :return float: the grain volume fraction as a number in the range [0, 1].
+        """
+        # compute the total volume
+        if use_total_volume_value:
+            volume = use_total_volume_value
+        else:
+            # sum all the grain volume to compute the total volume
+            volume = 0.
+            for g in self.grains:
+                volume += g.volume
+        return self.get_grain(gid).get_volume_fraction(volume)
 
     def SetVtkMesh(self, mesh):
         self.vtkmesh = mesh
@@ -2103,6 +2142,7 @@ class Microstructure:
         print(delta_avg / voxel_size)
         translation = delta_avg
         translation_voxel = (delta_avg / voxel_size).astype(int)
+        translation_voxel[0] += 2
         print('translation is in mm: {}'.format(translation))
         print('translation is in voxels {}'.format(translation_voxel))
         """

@@ -7,14 +7,16 @@ from matplotlib import pyplot as plt, colors, colorbar, cm
 An inverse pole figure with symboled colored by the grain size.
 '''
 eulers = Orientation.read_orientations('../data/EBSD_20grains.txt', data_type='euler', usecols=[1, 2, 3])
+grain_sizes = np.genfromtxt('../data/EBSD_20grains.txt', usecols=[9])
 micro = Microstructure(name='test')
 for i in range(20):
     micro.grains.append(Grain(i + 1, eulers[i + 1]))
-grain_sizes = np.genfromtxt('../data/EBSD_20grains.txt', usecols=[9])
+    micro.get_grain(i + 1).volume = grain_sizes[i]
 
 # build a custom pole figure
 pf = PoleFigure(microstructure=micro, hkl='001')#, lattice=Ti7Al)
-pf.mksize = 8
+#pf.resize_markers = True
+pf.mksize = 100
 pf.set_map_field('strain', grain_sizes, field_min_level=0.0, field_max_level=1000., lut='jet')
 fig = plt.figure(figsize=(8, 5))
 ax1 = fig.add_axes([0.05, 0.05, 0.8, 0.9], aspect='equal')

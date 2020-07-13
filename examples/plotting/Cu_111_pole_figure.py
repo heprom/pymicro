@@ -22,7 +22,7 @@ if __name__ == '__main__':
     pf.plot_pole_figures(plot_sst=True, display=False, save_as='png')
 
     image_name = os.path.splitext(__file__)[0] + '.png'
-    print 'writting %s' % image_name
+    print('writting %s' % image_name)
 
     from matplotlib import image
 

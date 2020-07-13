@@ -13,7 +13,7 @@ if __name__ == '__main__':
         micro.grains.append(Grain(i + 1, eulers[i + 1]))
 
     pf = PoleFigure(microstructure=micro)
-    pf.mksize = 8
+    pf.mksize = 40
     pf.proj = 'stereo'
     pf.set_hkl_poles('111')
     fig = plt.figure(1, figsize=(12, 5))
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     pf.plot_pf(ax=ax2)
 
     image_name = os.path.splitext(__file__)[0] + '.png'
-    print 'writting %s' % image_name
+    print('writting %s' % image_name)
     plt.savefig(image_name, format='png')
 
     from matplotlib import image

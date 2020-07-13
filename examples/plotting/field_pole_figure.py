@@ -17,7 +17,7 @@ if __name__ == '__main__':
 
     # build custom pole figures
     pf = PoleFigure(microstructure=micro)
-    pf.mksize = 8
+    pf.mksize = 40
     pf.set_map_field('strain', strain_field, field_min_level=0.015, field_max_level=0.025)
     fig = plt.figure()
     # direct PF

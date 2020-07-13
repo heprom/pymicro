@@ -11,15 +11,12 @@ if __name__ == '__main__':
     detector = Varian2520()
     detector.ref_pos = np.array([det_distance, 0., 0.])
     ni = Lattice.face_centered_cubic(0.3524)
-    phi1 = 89.4  # deg
-    phi = 92.0  # deg
-    phi2 = 86.8  # deg
+    phi1, phi, phi2 = (89.4, 92.0, 86.8)  # deg
     orientation = Orientation.from_euler([phi1, phi, phi2])
     uvw = HklDirection(1, 0, 5, ni)
 
     all_planes = build_list(lattice=ni, max_miller=8)
     compute_Laue_pattern(orientation, detector, all_planes, color_field='constant', r_spot=10, inverted=True)
-    print(detector.data.max())
 
     plt.figure()  # new figure
     plt.imshow(detector.data.T, cmap=cm.gray, vmin=0, vmax=255)
@@ -30,8 +27,12 @@ if __name__ == '__main__':
     plt.title("Laue pattern, detector distance = %g" % det_distance)
     plt.plot(detector.ucen, detector.vcen, 'ks', label='diffracted beams')
     uvw_miller = uvw.miller_indices()
-    ellipse = compute_ellipsis(orientation, detector, det_distance, uvw, verbose=True)
-    plt.plot(ellipse[0], ellipse[1], 'r--', label='ellipse zone [%d%d%d]' % uvw_miller)
+    ellipse_mm = compute_ellipsis(orientation, detector, uvw, n=21, verbose=True)
+    # recalculate the ellipis coordinates in pixel to plot it
+    ellipse_px = np.zeros((ellipse_mm.shape[0], 2), dtype=np.float)
+    for i in range(ellipse_mm.shape[0]):
+        ellipse_px[i, :] = detector.lab_to_pixel([det_distance, ellipse_mm[i, 0], ellipse_mm[i, 1]])
+    plt.plot(ellipse_px[:, 0], ellipse_px[:, 1], 'r--', label='ellipse zone [%d%d%d]' % uvw_miller)
     plt.legend(numpoints=1, loc='lower right')
 
     image_name = os.path.splitext(__file__)[0] + '.png'

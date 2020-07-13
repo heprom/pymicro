@@ -1489,6 +1489,30 @@ class Microstructure:
         return colors.ListedColormap(ipf_colors)
 
     @staticmethod
+    def from_grain_file(grain_file_path, col_id=0, col_phi1=1, col_phi=2, col_phi2=3, col_x=4, col_y=5, col_z=None, col_volume=None):
+        """Create a `Microstructure` reading grain infos from a file.
+
+        This file is typically created using EBSD. the usual pattern is: grain_id, phi1, phi, phi2, x, y, volume.
+        The column number are tunable using the function arguments.
+        """
+        # get the file name without extension
+        name = os.path.splitext(os.path.basename(grain_file_path))[0]
+        print('creating microstructure %s' % name)
+        micro = Microstructure(name=name)
+
+        # read grain infos from the grain file
+        grains_EBSD = np.genfromtxt(grain_file_path)
+        for i in range(len(grains_EBSD)):
+            o = Orientation.from_euler([grains_EBSD[i, col_phi1], grains_EBSD[i, col_phi], grains_EBSD[i, col_phi2]])
+            g = Grain(int(grains_EBSD[i, col_id]), o)
+            z = grains_EBSD[i, col_z] if col_z else 0.
+            g.position = np.array([grains_EBSD[i, col_x], grains_EBSD[i, col_y], z])
+            if col_volume:
+                g.volume = grains_EBSD[i, col_volume]
+            micro.grains.append(g)
+        return micro
+
+    @staticmethod
     def from_xml(xml_file_name, grain_ids=None, verbose=False):
         """Load a Microstructure object from an xml file.
 
@@ -1517,13 +1541,8 @@ class Microstructure:
         corresponding to the given id. If the grain is not found, the
         method raises a `ValueError`.
 
-        *Parameters*
-
-        **gid**: the grain id.
-
-        *Returns*
-
-        The method return a `Grain` with the corresponding id.
+        :param int gid: the grain id.
+        :return: The method return a `Grain` with the corresponding id.
         """
         for grain in self.grains:
             if grain.id == gid:
@@ -1538,7 +1557,15 @@ class Microstructure:
             s += '* %s' % g.__repr__
         return s
 
+    def get_grain_positions(self):
+        """Return all te grain positions as a numpy array of shape (n, 3) where n is the number of grains."""
+        positions = np.empty((self.get_number_of_grains(), 3))
+        for i in range(self.get_number_of_grains()):
+            positions[i] = self.grains[i].position
+        return positions
+
     def get_grain_volume_fractions(self):
+        """Compute all grains volume fractions."""
         total_volume = 0.
         for g in self.grains:
             total_volume += g.volume

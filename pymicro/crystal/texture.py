@@ -49,7 +49,7 @@ class PoleFigure:
         self.set_hkl_poles(hkl)
         self.verbose = verbose
         self.resize_markers = False
-        self.mksize = 12
+        self.mksize = 50
         self.pflegend = False
         self.x = np.array([1., 0., 0.])
         self.y = np.array([0., 1., 0.])
@@ -286,10 +286,15 @@ class PoleFigure:
             gt = g.transpose()
             if self.resize_markers:
                 kwargs['mksize'] = 0.15 * np.sqrt(fracs[ii] / frac_max) * 1000
+            label = ''
+            if self.map_field == 'grain_id':
+                label = 'grain ' + str(grain.id)
+            kwargs['lab'] = label
 
             for i, hkl_plane in enumerate(self.poles):
+                if i > 0:
+                    kwargs['lab'] = ''
                 c = hkl_plane.normal()
-                label = ''
                 c_rot = gt.dot(c)
                 if self.verbose:
                     h, k, l = hkl_plane.miller_indices()

@@ -311,6 +311,20 @@ class FE_Mesh():
             elset = list(set(elset) - set(elid_to_del))
         print(self._elset_names)
 
+    def compute_elset_center_of_mass(self, elset_id=0):
+        """Method to compute the center of mass of a given elset.
+
+        :param int elset_id: the id of the elset to consider.
+        :return: the center of mass of this elset.
+        """
+        print('computing center of mass for elset %s' % self._elset_names[elset_id])
+        id_to_rank = self.compute_id_to_rank(nodes=False)
+        com = 0.
+        for i in range(len(self._elsets[elset_id])):
+            com += self._elements[id_to_rank[self._elsets[elset_id][i]]].get_center_of_mass()
+        com /= len(self._elsets[elset_id])
+        return com
+
     @staticmethod
     def make_vtu(path, add_elset_id_field=False, elset_prefix='_ELSET'):
         '''Convert a mesh to vtk format.

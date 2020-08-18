@@ -2045,16 +2045,16 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
 
 
 def show_mesh(grid, map_scalars=False, lut=None, show_edges=False, edge_color=(0., 0., 0.), edge_line_width=1.0):
-    '''Create a 3d actor representing a mesh.
+    """Create a 3d actor representing a mesh.
 
     :param grid: the vtkUnstructuredGrid object.
     :param bool map_scalars: map the scalar in the data array to the created surface (False by default).
     :param lut: a vtk lookup table (colormap) used to map the scalars.
-    :param bool show_edes: display the mesh edges (False by default).
+    :param bool show_edges: display the mesh edges (False by default).
     :param tuple edge_color: color to use for the mesh edges (black by default).
     :param float edge_line_width: width of the edge lines (1.0 by default).
     :return: a vtk actor that can be added to a rendered to show the 3d array.
-    '''
+    """
     mapper = vtk.vtkDataSetMapper()
     mapper.ScalarVisibilityOff()
     if map_scalars:
@@ -2066,18 +2066,6 @@ def show_mesh(grid, map_scalars=False, lut=None, show_edges=False, edge_color=(0
             # default to the usual gray colormap
             lut = gray_cmap()
         mapper.SetLookupTable(lut)
-    '''
-    # we should be able to use the normals ?
-    extract = vtk.vtkGeometryFilter() # from unstructured grid to poly data
-    extract.SetInputData(grid)
-    extract.Update()
-    print('number of points in poly data = %d' % extract.GetOutput().GetNumberOfPoints())
-    mapper = vtk.vtkPolyDataMapper()
-    #normals = vtk.vtkPolyDataNormals()
-    #normals.SetInputConnection(extract.GetOutputPort())
-    #normals.SetFeatureAngle(60.0)
-    mapper.SetInputConnection(extract.GetOutputPort())
-    '''
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:
         mapper.SetInputData(grid)
     else:

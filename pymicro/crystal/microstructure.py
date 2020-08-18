@@ -1651,6 +1651,23 @@ class Microstructure:
             print('%d/%d grains were matched ' % (len(matched), len(grains_to_match)))
         return matched, candidates, unmatched
 
+    def find_neighbors(self, grain_id, distance=1):
+        """Find the neighbor ids of a given grain.
+
+        This function find the ids of the neighboring grains. A mask is constructed by dilating the grain to encompass
+        the immediate neighborhood of the grain. The ids can then be determined using numpy unique function.
+
+        :param int grain_id: the grain id from which the neighbors need to be determined.
+        :param int distance: the distance to use for the dilation (default is 1 voxel).
+        :return: a list (possibly empty) of the neighboring grain ids.
+        """
+        if not hasattr(self, 'grain_map'):
+            return []
+        grain_data = self.grain_map == grain_id
+        grain_data_dil = ndimage.binary_dilation(grain_data, iterations=distance).astype(np.uint8)
+        neighbor_ids = np.unique(self.grain_map[grain_data_dil - grain_data == 1])
+        return neighbor_ids.tolist()
+
     def dilate_grain(self, grain_id, dilation_steps=1, use_mask=False):
         """Dilate a single grain overwriting the neighbors.
 

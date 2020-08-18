@@ -38,6 +38,13 @@ class MicrostructureTests(unittest.TestCase):
         self.assertEqual(hasattr(m, 'grain_map'), True)
         self.assertEqual(hasattr(m, 'mask'), True)
 
+    def test_find_neighbors(self):
+        m = Microstructure.from_h5(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 't5_dct_slice.h5'))
+        neighbors = m.find_neighbors(grain_id=5, distance=3)
+        self.assertEqual(len(neighbors), 9)
+        for gid in [0, 1, 3, 14, 17, 18, 25, 51, 115]:
+            self.assertTrue(gid in neighbors)
+
 
 class OrientationTests(unittest.TestCase):
 

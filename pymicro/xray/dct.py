@@ -486,19 +486,24 @@ def output_tikzpicture(proj_dif, omegas, gid=1, d_uv=[0, 0], suffix=''):
     f.close()
 
 
-def tt_stack(scan_name, data_dir='.', save_edf=False, dark_factor=1.):
+def tt_stack(scan_name, data_dir='.', save_edf=False, TOPO_N=-1, dark_factor=1.):
     """Build a topotomography stack from raw detector images.
+
+    The number of image to sum for a topograph can be determined automatically from the total number of images present
+    in `data_dir` or directly specified using the variable `TOPO_N`.
 
     :param str scan_name: the name of the scan to process.
     :param str data_dir: the path to the data folder.
     :param bool save_edf: flag to save the tt stack as an EDF file.
+    :param int TOPO_N: the number of images to sum for a topograph.
     :param float dark_factor: a multiplicative factor for the dark image.
     """
     from pymicro.file.file_utils import edf_read, edf_write
-    import glob
-    # figure out the number of frames per topograph TOPO_N
-    n_frames = len(glob.glob(os.path.join(data_dir, scan_name, '%s*.edf' % scan_name)))
-    TOPO_N = int(n_frames / 90)
+    if TOPO_N < 0:
+        import glob
+        # figure out the number of frames per topograph TOPO_N
+        n_frames = len(glob.glob(os.path.join(data_dir, scan_name, '%s*.edf' % scan_name)))
+        TOPO_N = int(n_frames / 90)
     print('number of frames to sum for a topograph = %d' % TOPO_N)
 
     # parse the info file

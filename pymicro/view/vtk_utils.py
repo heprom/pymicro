@@ -2,7 +2,7 @@ import os
 import sys
 import vtk
 import numpy as np
-from vtk.util.colors import black, white, grey, blue, orange
+from vtk.util.colors import red, green, black, white, grey, blue, orange
 from vtk.util import numpy_support
 
 # see if some of the stuff needs to be moved to the Microstructure module
@@ -245,8 +245,21 @@ def hot_cmap(table_range=(0, 255)):
     return lut
 
 
-def add_hklplane_to_grain(hkl_plane, grid, orientation, origin=(0, 0, 0),
-                          opacity=1.0, show_normal=False, normal_length=1.0):
+def add_hklplane_to_grain(hkl_plane, grid, orientation, origin=(0, 0, 0), opacity=1.0,
+                          show_normal=False, normal_length=1.0, show_intersection=False, color_intersection=red):
+    """Add a plane describing a crystal lattice plane to a VTK grid.
+
+    :param hkl_plane: an instance of `HklPlane` describing the lattice plane.
+    :param grid: a vtkunstructuredgrid instance representing the geometry of the grain.
+    :param orientation: the grain orientation.
+    :param origin: the origin of the plane in the grain.
+    :param float opacity:
+    :param show_normal: A flag to show the plane normal.
+    :param normal_length: The length of the plane normal.
+    :param show_intersection: A flag to show the intersection of the plane with the grain.
+    :param tuple color_intersection: The color to display the intersection of the plane with the grain.
+    :return: A VTK assembly with the grain, the plane, its normal and edge intersection if requested.
+    """
     # compute the plane normal in the laboratory frame using the grain orientation
     gt = orientation.orientation_matrix().transpose()
     n_rot = np.dot(gt, hkl_plane.normal() / np.linalg.norm(hkl_plane.normal()))
@@ -254,11 +267,13 @@ def add_hklplane_to_grain(hkl_plane, grid, orientation, origin=(0, 0, 0),
     rot_plane.SetOrigin(origin)
     # rotate the plane by setting the normal
     rot_plane.SetNormal(n_rot)
-    return add_plane_to_grid(rot_plane, grid, opacity=opacity, show_normal=show_normal, normal_length=normal_length)
+    return add_plane_to_grid(rot_plane, grid, opacity=opacity, show_normal=show_normal, normal_length=normal_length,
+                             show_intersection=show_intersection, color_intersection=color_intersection)
 
 
-def add_plane_to_grid(plane, grid, origin=None, color=None, opacity=0.3, show_normal=False, normal_length=1.0):
-    '''Add a 3d plane inside another object.
+def add_plane_to_grid(plane, grid, origin=None, color=None, opacity=0.3, show_normal=False, normal_length=1.0,
+                      show_intersection=False, color_intersection=red):
+    """Add a 3d plane inside another object.
 
     This function adds a plane inside another object described by a mesh (vtkunstructuredgrid). 
     The method is to use a vtkCutter with the mesh as input and the plane as the cut function. 
@@ -273,8 +288,12 @@ def add_plane_to_grid(plane, grid, origin=None, color=None, opacity=0.3, show_no
     :param float opacity: Opacity value of the plane actor.
     :param bool show_normal: A flag to display the plane normal.
     :param normal_length: The length of the plane normal vector (1.0 by default).
-    :returns: A VTK actor or assembly with the plane, and its normal if requested.
-    '''
+    :param bool show_intersection: Also add the intersection of the plane with the grid in the assembly.
+    :param tuple color_intersection: The color to display the intersection of the plane with the grid.
+    :returns: A VTK assembly with the mesh, the plane, its normal and edge intersection if requested.
+    """
+    # prepare an assembly for the result
+    assembly = vtk.vtkAssembly()
     # cut the unstructured grid with the plane
     planeCut = vtk.vtkCutter()
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:
@@ -290,17 +309,25 @@ def add_plane_to_grid(plane, grid, origin=None, color=None, opacity=0.3, show_no
     if color:
         cutActor.GetProperty().SetColor(color)
     cutActor.GetProperty().SetOpacity(opacity)
+    assembly.AddPart(cutActor)
     if show_normal:
         # add an arrow to display the normal to the plane
-        assembly = vtk.vtkAssembly()
-        assembly.AddPart(cutActor)
         if origin is None:
             origin = plane.GetOrigin()
         arrowActor = unit_arrow_3d(origin, normal_length * np.array(plane.GetNormal()), make_unit=False)
         assembly.AddPart(arrowActor)
-        return assembly
-    else:
-        return cutActor
+    if show_intersection:
+        extract = vtk.vtkFeatureEdges()
+        extract.SetInputConnection(planeCut.GetOutputPort())
+        edge_mapper = vtk.vtkPolyDataMapper()
+        edge_mapper.SetInputConnection(extract.GetOutputPort())
+        edge_mapper.SetScalarVisibility(0)
+        edge_actor = vtk.vtkActor()
+        edge_actor.SetMapper(edge_mapper)
+        edge_actor.GetProperty().SetColor(color_intersection)
+        edge_actor.GetProperty().SetLineWidth(3.0)
+        assembly.AddPart(edge_actor)
+    return assembly
 
 def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20, color=None):
     '''Build an actor for the cartesian axes.
@@ -344,7 +371,7 @@ def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20, color=None):
 
 def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
              plane_opacity=1.0, show_orientation=False, N=2048, verbose=False):
-    '''Creates a 3d representation of a crystallographic grain.
+    """Creates a 3d representation of a crystallographic grain.
 
     This method creates a vtkActor object of the surface mesh
     representing a Grain object. An optional list of crystallographic
@@ -359,7 +386,7 @@ def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
     :param int N: the number of colors to use in the colormap.
     :param bool verbose: activate verbose mode.
     :returns: a vtkAssembly of the grain mesh and the optional hkl planes.
-    '''
+    """
     assembly = vtk.vtkAssembly()
     # create mapper
     mapper = vtk.vtkDataSetMapper()
@@ -377,25 +404,35 @@ def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
     grain_actor.GetProperty().SetOpacity(0.3)
     grain_actor.SetMapper(mapper)
     assembly.AddPart(grain_actor)
-    # add all hkl planes
-    if hklplanes != None:
-        for i, hklplane in enumerate(hklplanes):
-            # the grain has its center of mass at the origin
-            origin = (0., 0., 0.)
-            if plane_origins is not None:
-                origin = plane_origins[i]  # in unit of the 3d scene
-                if verbose:
-                    print('using origin %s' % str(origin))
-            hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh,
-                                                  grain.orientation, origin, opacity=plane_opacity,
-                                                  show_normal=show_normal, normal_length=50.)
-            assembly.AddPart(hklplaneActor)
     if show_orientation:
         local_orientation = add_local_orientation_axes(grain.orientation, axes_length=30)
         # add local orientation to the grain actor
         assembly.AddPart(local_orientation)
+    # add all hkl planes
+    if hklplanes:
+        from itertools import cycle
+        # colors for the intersection
+        it = cycle([red, green, blue, orange])
+        # look at each hkl plane in the list
+        for i, hklplane in enumerate(hklplanes):
+            # the grain has its center of mass at the origin
+            origin = [(0., 0., 0.)]
+            color = next(it)
+            if plane_origins is not None:
+                origin = plane_origins[i]  # in unit of the 3d scene
+                if verbose:
+                    print('using origin %s' % str(origin))
+                if type(origin) is not list:
+                    origin = [plane_origins[i]]
+            # we will add a series of this plane (one per origin value)
+            for o in origin:
+                hklplaneActor = add_hklplane_to_grain(hklplane, grain.vtkmesh,
+                                                      grain.orientation, origin=o, opacity=plane_opacity,
+                                                      show_normal=show_normal, normal_length=50.,
+                                                      show_intersection=True, color_intersection=color)
+                assembly.AddPart(hklplaneActor)
+            color = next(it)
     return assembly
-
 
 # deprecated, will be removed soon
 def add_grain_to_3d_scene(grain, hklplanes, show_orientation=False):

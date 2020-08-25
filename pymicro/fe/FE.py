@@ -311,6 +311,20 @@ class FE_Mesh():
             elset = list(set(elset) - set(elid_to_del))
         print(self._elset_names)
 
+    def delete_orphan_nodes(self):
+        """Detect and delete node not belonging to any element."""
+        # build a list of all used node ids
+        node_ids = []
+        [node_ids.extend([node.give_id() for node in element._nodelist]) for element in self._elements]
+        node_ids = numpy.unique(node_ids)
+        removed_node_nb = len(self._nodes)
+        # keep only nodes with id in the list
+        self._nodes = [node for node in self._nodes if node.give_id() in node_ids]
+        removed_node_nb -= len(self._nodes)
+        # recompute node rank
+        self.compute_id_to_rank(nodes=True)
+        print('%d nodes were removed' % removed_node_nb)
+
     def compute_elset_center_of_mass(self, elset_id=0):
         """Method to compute the center of mass of a given elset.
 
@@ -557,7 +571,7 @@ class FE_Mesh():
                     fe_mesh._elsets.append(new_elset)
                 else:
                     index = fe_mesh._elset_names.index(elset_name)
-                    print('appending element ids to elset' + elset_name)
+                    print('appending element ids to elset ' + elset_name)
                     for el_id in new_elset:
                         fe_mesh._elsets[index].append(el_id)
                 print('nb of elsets currently in mesh:', len(fe_mesh._elsets))

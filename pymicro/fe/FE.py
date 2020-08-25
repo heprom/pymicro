@@ -385,6 +385,16 @@ class FE_Mesh():
         '''
         return self._nip
 
+    def get_bounds(self):
+        """Return the min and max bounds of the mesh."""
+        xmin = min([node._x for node in self._nodes])
+        ymin = min([node._y for node in self._nodes])
+        zmin = min([node._z for node in self._nodes])
+        xmax = max([node._x for node in self._nodes])
+        ymax = max([node._y for node in self._nodes])
+        zmax = max([node._z for node in self._nodes])
+        return xmin, ymin, zmin, xmax, ymax, zmax
+
     @staticmethod
     def load_from_mesh(mesh_path, verbose=False):
         '''
@@ -575,6 +585,44 @@ class FE_Mesh():
         fe_mesh.update_number_of_gauss_points()
         geof.close()
         return fe_mesh
+
+    def save_to_geof(self, file_name):
+        """Function to save a FE_Mesh instance to Z-set geof ascii format.
+
+        :param str file_name: the name of the file to use.
+        """
+        if not file_name.endswith('.geof'):
+            file_name += '.geof'
+        print('saving mesh to file %s' % file_name)
+        f = open(file_name, 'w')
+        # write nodes
+        f.write('***geometry\n')
+        f.write('**node\n')
+        f.write('%d %d\n' % (len(self._nodes), self._dim))
+        for node in self._nodes:
+            f.write('%d %f %f %f\n' % (node.give_id(), node._x, node._y, node._z))
+        f.write('**element\n')
+        f.write('%d\n' % len(self._elements))
+        # write elements
+        for element in self._elements:
+            s = '%d %s' % (element.give_id(), element._type)
+            for node in element._nodelist:
+                s += ' %d' % node.give_id()
+            s += '\n'
+            f.write(s)
+        # write elsets
+        f.write('***group\n')
+        for i in range(len(self._elset_names)):
+            if self._elset_names[i] == 'ALL_ELEMENT':
+                # skip this one
+                continue
+            elset = self._elsets[i]
+            f.write('**elset %s\n' % self._elset_names[i])
+            for el_id in elset:
+                f.write(' %d' % el_id)
+            f.write('\n')
+        f.write('***return\n')
+        f.close()
 
     def compute_id_to_rank(self, nodes=True):
         if nodes:
@@ -803,7 +851,7 @@ class FE_Node():
         return self._rank
 
     def set_rank(self, r):
-        rself._rank = r
+        self._rank = r
 
 
 class FE_Element():

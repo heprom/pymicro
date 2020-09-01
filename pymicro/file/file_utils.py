@@ -166,6 +166,11 @@ def numpy_to_esrf_datatype(data_type):
         np.int32: 'SignedInteger',
         np.float32: 'FloatValue',
         np.float64: 'DoubleValue',
+        np.dtype('uint8'): 'UnsignedByte',
+        np.dtype('uint16'): 'UnsignedShort',
+        np.dtype('uint32'): 'UnsignedLong',
+        np.dtype('int32'): 'SignedInteger',
+        np.dtype('float32'): 'FloatValue',
         np.dtype('float64'): 'DoubleValue',
         float: 'DoubleValue',
     }.get(data_type, 'UnsignedShort')

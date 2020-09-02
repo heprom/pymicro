@@ -11,8 +11,8 @@ from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QHBoxLayout, QVBoxLayout, QComboBox, QLabel
+from PyQt5.QtCore import Qt
 
 from pymicro.file.file_utils import edf_read
 from pymicro.external.tifffile import TiffFile
@@ -165,11 +165,11 @@ class ImageViewer(QApplication):
             # parse the list of args into a dictionary
             d = dict(map(lambda x: x.split('='), args[start:]))
             print('received args:', d)
-            if d.has_key('wdir'):
+            if 'wdir' in d:
                 self.wdir = d['wdir']
             else:
                 self.wdir = '.'
-            if d.has_key('pattern'):
+            if 'pattern' in d:
                 pattern = d['pattern']
             else:
                 pattern = '.png$'

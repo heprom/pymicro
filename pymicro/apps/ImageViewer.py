@@ -11,7 +11,7 @@ from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 
-from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QHBoxLayout, QVBoxLayout, QComboBox, QLabel
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QHBoxLayout, QVBoxLayout, QComboBox, QLabel, QCheckBox
 from PyQt5.QtCore import Qt
 
 from pymicro.file.file_utils import edf_read
@@ -23,6 +23,8 @@ class PlotWidget(QWidget):
     def __init__(self, parent=None, image=None, toolbar=True):
         QWidget.__init__(self, parent)
         self.data = image
+        self.fliplr = False
+        self.flipud = False
         self.dpi = 100
         self.cmap = 'gray'
         self.toolbar = toolbar
@@ -33,6 +35,7 @@ class PlotWidget(QWidget):
     def create_main_widget(self):
         print(self.data)
         self.fig = Figure((10.0, 8.0), dpi=self.dpi)
+        self.axes = self.fig.add_subplot(111)
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setFocusPolicy(Qt.StrongFocus)
         self.canvas.setFocus()
@@ -46,6 +49,14 @@ class PlotWidget(QWidget):
 
     def set_image(self, image):
         self.data = image
+        self.on_draw()
+
+    def set_fliplr(self, state):
+        self.fliplr = state
+        self.on_draw()
+
+    def set_flipud(self, state):
+        self.flipud = state
         self.on_draw()
 
     def on_key_press(self, event):
@@ -67,9 +78,13 @@ class PlotWidget(QWidget):
         key_press_handler(event, self.canvas, self.mpl_toolbar)
 
     def on_draw(self):
-        if not hasattr(self.fig, 'subplot'):
-            self.axes = self.fig.add_subplot(111)
-        self.axes.imshow(self.data, cmap=self.cmap, origin='upper', interpolation='nearest',
+        # andle image flips
+        data = self.data
+        if self.fliplr:
+            data = np.fliplr(data)
+        if self.flipud:
+            data = np.flipud(data)
+        self.axes.imshow(data, cmap=self.cmap, origin='upper', interpolation='nearest',
                          clim=[np.min(self.data), np.max(self.data)])
         self.canvas.draw()
 
@@ -93,8 +108,22 @@ class ImageViewerForm(QMainWindow):
         print('create_main_frame')
         self.main_frame = QWidget()
         vbox = QVBoxLayout()
+
+        # create the plot widget
         self.plot_widget = PlotWidget(image=image, parent=self, toolbar=True)
         vbox.addWidget(self.plot_widget)
+
+        # create the flip check boxes bar
+        hbox_flips = QHBoxLayout()
+        cblr = QCheckBox('Flip L/R', self)
+        cblr.stateChanged.connect(self.plot_widget.set_fliplr)
+        hbox_flips.addWidget(cblr)
+        cbud = QCheckBox('Flip U/D', self)
+        hbox_flips.addWidget(cbud)
+        cbud.stateChanged.connect(self.plot_widget.set_flipud)
+        vbox.addLayout(hbox_flips)
+
+        # create the color map bar
         hbox = QHBoxLayout()
         self.cmap_label = QLabel('Image color map')
         hbox.addWidget(self.cmap_label)

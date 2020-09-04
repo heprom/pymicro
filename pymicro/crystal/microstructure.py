@@ -1451,6 +1451,24 @@ class Microstructure:
         self.mask = mask
         self.voxel_size = voxel_size
 
+    def view_slice(self, slice=None):
+        """A simple utility method to show one microstructure slice.
+
+        :param int slice: the slice number
+        """
+        if not hasattr(self, 'grain_map'):
+            print('Microstructure instance mush have a grain_map field to use this method')
+            return
+        from pymicro.view.vol_utils import alpha_cmap
+        if not slice or slice > self.grain_map.shape[2] or slice < 0:
+            slice = self.grain_map.shape[2] // 2
+            print('using slice value %d' % slice)
+        grain_cmap = Microstructure.rand_cmap(first_is_black=True)
+        plt.imshow(self.grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
+        if hasattr(self, 'mask'):
+            plt.imshow(self.mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.5))
+        plt.show()
+
     @staticmethod
     def random_texture(n=100):
         """Generate a random texture microstructure.

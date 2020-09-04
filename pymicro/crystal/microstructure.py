@@ -2041,10 +2041,14 @@ class Microstructure:
         else:
             mask_path = os.path.join(data_dir, mask_file)
         if os.path.exists(mask_path):
-            with h5py.File(mask_path, 'r') as f:
-                micro.mask = f['vol'][()].transpose(2, 1, 0).astype(np.uint8)
-                if verbose:
-                    print('loaded mask volume with shape: {}'.format(micro.mask.shape))
+            try:
+                with h5py.File(mask_path, 'r') as f:
+                    micro.mask = f['vol'][()].transpose(2, 1, 0).astype(np.uint8)
+            except:
+                # fallback on matlab format
+                micro.mask = loadmat(mask_path)['vol']
+            if verbose:
+                print('loaded mask volume with shape: {}'.format(micro.mask.shape))
         return micro
 
     def to_xml(self, doc):

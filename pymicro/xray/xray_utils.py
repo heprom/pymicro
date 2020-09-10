@@ -2,12 +2,14 @@ import os, numpy as np
 from matplotlib import pyplot as plt
 from skimage.transform import radon
 from math import *
+from config import PYMICRO_XRAY_DATA_DIR
 
 densities = {'Li': 0.533,  # Z = 3
              'Be': 1.8450,  # Z = 4
              'C': 2.26,  # Z = 6, strongly depends on crystal structure
              'Mg': 1.738,  # Z = 12
              'Al': 2.6941,  # Z = 13
+             'Si': 2.33,  # Z = 14
              'Ti': 4.530,  # Z = 22
              'V': 6.100,  # Z = 23
              'Cr': 7.180,  # Z = 24
@@ -24,16 +26,38 @@ densities = {'Li': 0.533,  # Z = 3
              'WC': 15.63, # Z(W) = 74
              }
 
+
+def f_atom(q, Z):
+    """Empirical function for the atomic form factor f.
+
+    This function implements the empirical function from the paper of Muhammad and Lee
+    to provide value of f for elements in the range Z <= 30.
+    doi:10.1371/journal.pone.0069608.t001
+
+    :param float q: value or series for the momentum transfer, unit is angstrom^-1
+    :param int Z: atomic number, must be lower than 30.
+    :return: the atomic form factor value or series corresponding to q.
+    """
+    if Z > 30:
+        raise ValueError('only atoms with Z<=30 are supported, consider using tabulated data.')
+    a0 = 0.52978  # angstrom, Bohr radius
+    params = np.genfromtxt(os.path.join(PYMICRO_XRAY_DATA_DIR, 'f_atom_params.txt'), names=True)
+    Z, r, a1, b1, a2, b2, a3, b3, _, _, _ = params[int(Z - 1)]
+    print(Z, r, a1, b1, a2, b2, a3, b3)
+    f = (a1 * Z) ** r / ((a1 * Z) ** r + b1 * (2 * pi * a0 * q) ** r) ** r + \
+        (a2 * Z) ** r / ((2 * a2 * Z) ** r + b2 * (2 * pi * a0 * q) ** 2) ** 2 + \
+        (a3 * Z) ** r / ((2 * a3 * Z) ** 2 + b3 * (2 * pi * a0 * q) ** 2) ** 2
+    return f
+
+
 def atom_scat_factor_function(mat='Al', sintheta_lambda_max=12, display=True):
-    '''Compute and display the fit function of the atomic scattering factor.
+    """Compute and display the fit function of the atomic scattering factor.
 
     :param string mat: A string representing the material (e.g. 'Al')
     :param float sintheta_lambda_max: maximal value of sin theta / lambda
     :param bool display: display an image of the plot
-    '''
-
-    data_dir = '../../pymicro/xray/data'
-    param = np.genfromtxt(os.path.join(data_dir, mat + '_fit_fatom'))
+    """
+    param = np.genfromtxt(os.path.join(PYMICRO_XRAY_DATA_DIR, mat + '_fit_fatom'))
     print('Fit coefficient for', param[:,1])
     fit = []
     sintheta_lambda = np.linspace(0.0, sintheta_lambda_max, 100)
@@ -55,43 +79,43 @@ def atom_scat_factor_function(mat='Al', sintheta_lambda_max=12, display=True):
 
 
 def lambda_keV_to_nm(lambda_keV):
-    '''Change the unit of wavelength from keV to nm.
+    """Change the unit of wavelength from keV to nm.
 
     :param float lambda_keV: the wavelength in keV unit.
     :returns: the wavelength in nm unit.
-    '''
+    """
     return 1.2398 / lambda_keV
 
 
 def lambda_keV_to_angstrom(lambda_keV):
-    '''Change the unit of wavelength from keV to angstrom.
+    """Change the unit of wavelength from keV to angstrom.
 
     :param float lambda_keV: the wavelength in keV unit.
     :returns: the wavelength in angstrom unit.
-    '''
+    """
     return 12.398 / lambda_keV
 
 
 def lambda_nm_to_keV(lambda_nm):
-    '''Change the unit of wavelength from nm to keV.
+    """Change the unit of wavelength from nm to keV.
 
     :param float lambda_nm: the wavelength in nm unit.
     :returns: the wavelength in keV unit.
-    '''
+    """
     return 1.2398 / lambda_nm
 
 
 def lambda_angstrom_to_keV(lambda_angstrom):
-    '''Change the unit of wavelength from angstrom to keV.
+    """Change the unit of wavelength from angstrom to keV.
 
     :param float lambda_angstrom: the wavelength in angstrom unit.
     :returns: the wavelength in keV unit.
-    '''
+    """
     return 12.398 / lambda_angstrom
 
 
 def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%.1f', display=True):
-    '''Plot the transmitted intensity of a X-ray beam through a given material.
+    """Plot the transmitted intensity of a X-ray beam through a given material.
 
     This function compute the transmitted intensity from tabulated data of
     the mass attenuation coefficient \mu_\rho (between 1 and 100 keV) and
@@ -111,10 +135,8 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     :param list energy_lim: energy bounds in keV for the plot (1, 100 by default)
     :param string legfmt: string to format the legend plot
     :param bool display: display or save an image of the plot (False by default)
-    '''
-    path = os.path.dirname(__file__)
-    print(path)
-    mu_rho = np.genfromtxt(os.path.join(path, 'data', mat + '.txt'), usecols=(0, 1), comments='#')
+    """
+    mu_rho = np.genfromtxt(os.path.join(PYMICRO_XRAY_DATA_DIR, mat + '.txt'), usecols=(0, 1), comments='#')
     print('Data :', mu_rho)
     energy = mu_rho[:, 0]
     print('Energy :', energy)

@@ -787,6 +787,43 @@ class LaueForwardSimulation(ForwardSimulation):
         """Setup the forward simulation."""
         pass
 
+    @staticmethod
+    def fsim_laue(orientation, hkl_planes, positions, source_position):
+        """Simulate Laue diffraction conditions based on a crystal orientation, a set of lattice planes and physical
+        positions.
+
+        This function is the work horse of the forward model. It uses a set of HklPlane instances and the voxel
+        coordinates to compute the diffraction quantities.
+
+        :param Orientation orientation: the crystal orientation.
+        :param list hkl_planes: a list of `HklPlane` instances.
+        :param list positions: a list of (x, y, z) positions.
+        :param tuple source_position: a (x, y, z) tuple describing the source position.
+        """
+        n_hkl = len(hkl_planes)
+        n_vox = len(positions)
+        gt = orientation.orientation_matrix().transpose()
+
+        # here we use list comprehension to avoid for loops
+        d_spacings = [hkl.interplanar_spacing() for hkl in hkl_planes]  # size n_hkl
+        G_vectors = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
+        Gs_vectors = [gt.dot(Gc) for Gc in G_vectors]  # size n_hkl, with 3 elements items
+        Xu_vectors = [(pos - source_position) / np.linalg.norm(pos - source_position)
+                      for pos in positions]  # size n_vox
+        thetas = [np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
+                  for Xu in Xu_vectors
+                  for Gs in Gs_vectors]  # size n_vox * n_hkl
+        the_energies = [lambda_nm_to_keV(2 * d_spacings[i_hkl] * np.sin(thetas[i_Xu * n_hkl + i_hkl]))
+                        for i_Xu in range(n_vox)
+                        for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
+        X_vectors = [np.array(Xu_vectors[i_Xu]) / 1.2398 * the_energies[i_Xu * n_hkl + i_hkl]
+                     for i_Xu in range(n_vox)
+                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
+        K_vectors = [X_vectors[i_Xu * n_hkl + i_hkl] + Gs_vectors[i_hkl]
+                     for i_Xu in range(n_vox)
+                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
+        return Xu_vectors, thetas, the_energies, X_vectors, K_vectors
+
     def fsim_grain(self, gid=1):
         self.grain = self.exp.get_sample().get_microstructure().get_grain(gid)
         sample = self.exp.get_sample()
@@ -807,28 +844,10 @@ class LaueForwardSimulation(ForwardSimulation):
                 self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
             hkl_planes = self.hkl_planes
         n_hkl = len(hkl_planes)
-        gt = self.grain.orientation_matrix().transpose()
-
-        # here we use list comprehension to avoid for loops
-        d_spacings = [hkl.interplanar_spacing() for hkl in hkl_planes]  # size n_hkl
-        G_vectors = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
-        Gs_vectors = [gt.dot(Gc) for Gc in G_vectors]  # size n_hkl, with 3 elements items
         positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
-        n_vox = len(positions)  # total number of discrete positions
-        Xu_vectors = [(pos - source.position) / np.linalg.norm(pos - source.position)
-                      for pos in positions]  # size n_vox
-        thetas = [np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
-                  for Xu in Xu_vectors
-                  for Gs in Gs_vectors]  # size n_vox * n_hkl
-        the_energies = [lambda_nm_to_keV(2 * d_spacings[i_hkl] * np.sin(thetas[i_Xu * n_hkl + i_hkl]))
-                        for i_Xu in range(n_vox)
-                        for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-        X_vectors = [np.array(Xu_vectors[i_Xu]) / 1.2398 * the_energies[i_Xu * n_hkl + i_hkl]
-                     for i_Xu in range(n_vox)
-                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-        K_vectors = [X_vectors[i_Xu * n_hkl + i_hkl] + Gs_vectors[i_hkl]
-                     for i_Xu in range(n_vox)
-                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
+        n_vox = len(positions)
+        Xu_vectors, thetas, the_energies, X_vectors, K_vectors = LaueForwardSimulation.fsim_laue(
+            self.grain.orientation, hkl_planes, positions, source.position)
         OR_vectors = [detector.project_along_direction(origin=positions[i_vox],
                                                        direction=K_vectors[i_vox * n_hkl + i_hkl])
                       for i_vox in range(n_vox)

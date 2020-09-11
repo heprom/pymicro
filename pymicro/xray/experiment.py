@@ -60,6 +60,38 @@ class XraySource:
         self.set_min_energy(min_energy)
         self.set_max_energy(max_energy)
 
+    def discretize(self, diameter, n=5):
+        """Discretize the focus zone of the source into a regular sphere.
+
+        :param float diameter: the diameter of the sphere to use.
+        :param int n: the number of point to use alongside the source diameter.
+        :return: a numpy array of size (n_inside, 3) with the xyz coordinates of the points inside teh sphere.
+        """
+        radius = 0.5 * diameter
+        step = diameter / n
+
+        # create x, y, z 1D coordinate vectors
+        x_source = np.arange(-radius, radius + step, step)
+        y_source = np.arange(-radius, radius + step, step)
+        z_source = np.arange(-radius, radius + step, step)
+
+        # combine the coordinates in 3D
+        xx, yy, zz = np.meshgrid(x_source, y_source, z_source, indexing='ij')
+
+        # filter the coordinate for points inside the sphere
+        is_in_sphere = (np.sqrt(xx ** 2 + yy ** 2 + zz ** 2) < radius).astype(np.uint8).ravel()
+        inside = np.where(is_in_sphere)[0]
+
+        # assemble the coordinates into a (n^3, 3) array and keep only points inside the sphere
+        all_source_positions = np.empty((len(x_source), len(y_source), len(z_source), 3), dtype=float)
+        all_source_positions[:, :, :, 0] = xx + self.position[0]
+        all_source_positions[:, :, :, 1] = yy + self.position[1]
+        all_source_positions[:, :, :, 2] = zz + self.position[2]
+        xyz_source = all_source_positions.reshape(-1, all_source_positions.shape[
+            -1])  # numpy array with the point coordinates
+        xyz_source = xyz_source[inside, :]
+        return xyz_source
+
 
 class SlitsGeometry:
     """Class to represent the geometry of a 4 blades slits."""

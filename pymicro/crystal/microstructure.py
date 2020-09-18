@@ -1778,6 +1778,31 @@ class Microstructure:
         # finally assign the dilated grain map to the microstructure
         self.grain_map = grain_map
 
+    def crop(self, x_start, x_end, y_start, y_end, z_start, z_end):
+        """Crop the microstructure to create a new one.
+
+        :param int x_start: start value for slicing the first axis.
+        :param int x_end: end value for slicing the first axis.
+        :param int y_start: start value for slicing the second axis.
+        :param int y_end: end value for slicing the second axis.
+        :param int z_start: start value for slicing the third axis.
+        :param int z_end: end value for slicing the third axis.
+        :return: a new `Microstructure` instance with the cropped grain map.
+        """
+        micro_crop = Microstructure()
+        micro_crop.name = self.name + '_crop'
+        print('cropping microstructure to %s' % micro_crop.name)
+        micro_crop.grain_map = self.grain_map[x_start:x_end, y_start:y_end, z_start:z_end]
+        if hasattr(self, 'mask'):
+            micro_crop.mask = self.mask[x_start:x_end, y_start:y_end, z_start:z_end]
+        grain_ids = np.unique(micro_crop.grain_map)
+        for gid in grain_ids:
+            if not gid > 0:
+                continue
+            micro_crop.grains.append(self.get_grain(gid))
+        print('%d grains in cropped microstructure' % len(micro_crop.grains))
+        return micro_crop
+
     def compute_grain_center(self, gid):
         """Compute the center of masses of a grain given its id.
 

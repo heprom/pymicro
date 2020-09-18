@@ -1702,34 +1702,29 @@ class Microstructure:
         grain_volume_final = (self.grain_map == grain_id).sum()
         print('grain %s was dilated by %d voxels' % (grain_id, grain_volume_final - grain_volume_init))
 
-    def dilate_grains(self, dilation_steps=1, dilation_ids=None):
-        """Dilate grains to fill the gap beween them.
+    @staticmethod
+    def dilate_labels(array, dilation_steps=1, mask=None, dilation_ids=None):
+        """Dilate labels isotropically to fill the gap between them.
 
         This code is based on the gtDilateGrains function from the DCT code. It has been extended to handle both 2D
         and 3D cases.
 
         :param int dilation_steps: the number of dilation steps to apply.
+        :param ndarray mask: a msk to constrain the dilation (None by default).
         :param list dilation_ids: a list to restrict the dilation to the given ids.
+        :return: the dilated array.
         """
-        if not hasattr(self, 'grain_map'):
-            raise ValueError('microstructure %s must have an associated grain_map attribute' % self.name)
-            return
-
-        grain_map = self.grain_map.copy()
-        # get rid of overlap regions flaged by -1
-        grain_map[grain_map == -1] = 0
-
         # carry out dilation in iterative steps
         for step in range(dilation_steps):
             if dilation_ids:
-                grains = np.isin(grain_map, dilation_ids)
+                grains = np.isin(array, dilation_ids)
             else:
-                grains = (grain_map > 0).astype(np.uint8)
+                grains = (array > 0).astype(np.uint8)
             from scipy import ndimage
             grains_dil = ndimage.morphology.binary_dilation(grains).astype(np.uint8)
-            if hasattr(self, 'mask'):
+            if mask:
                 # only dilate within the mask
-                grains_dil *= self.mask.astype(np.uint8)
+                grains_dil *= mask.astype(np.uint8)
             todo = (grains_dil - grains)
             # get the list of voxel for this dilation step
             X, Y, Z = np.where(todo)
@@ -1745,19 +1740,41 @@ class Microstructure:
             xstart[xstart < 0] = 0
             ystart[ystart < 0] = 0
             zstart[zstart < 0] = 0
-            xend[xend > grain_map.shape[0] - 1] = grain_map.shape[0] - 1
-            yend[yend > grain_map.shape[1] - 1] = grain_map.shape[1] - 1
-            zend[zend > grain_map.shape[2] - 1] = grain_map.shape[2] - 1
+            xend[xend > array.shape[0] - 1] = array.shape[0] - 1
+            yend[yend > array.shape[1] - 1] = array.shape[1] - 1
+            zend[zend > array.shape[2] - 1] = array.shape[2] - 1
 
             dilation = np.zeros_like(X).astype(np.int16)
             print('%d voxels to replace' % len(X))
             for i in range(len(X)):
-                neighbours = grain_map[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1, zstart[i]:zend[i] + 1]
+                neighbours = array[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1, zstart[i]:zend[i] + 1]
                 if np.any(neighbours):
                     # at least one neighboring voxel in non zero
                     dilation[i] = min(neighbours[neighbours > 0])
-            grain_map[X, Y, Z] = dilation
+            array[X, Y, Z] = dilation
             print('dilation step %d done' % (step + 1))
+            return array
+
+    def dilate_grains(self, dilation_steps=1, dilation_ids=None):
+        """Dilate grains to fill the gap between them.
+
+        This function calls `dilate_labels` with the grain map of the microstructure.
+
+        :param int dilation_steps: the number of dilation steps to apply.
+        :param list dilation_ids: a list to restrict the dilation to the given ids.
+        """
+        if not hasattr(self, 'grain_map'):
+            raise ValueError('microstructure %s must have an associated grain_map attribute' % self.name)
+            return
+
+        grain_map = self.grain_map.copy()
+        # get rid of overlap regions flaged by -1
+        grain_map[grain_map == -1] = 0
+
+        if hasattr(self, 'mask'):
+            grain_map = Microstructure.dilate_labels(grain_map, dilation_steps=dilation_steps, mask=self.mask, dilation_ids=dilation_ids)
+        else:
+            grain_map = Microstructure.dilate_labels(grain_map, dilation_steps=dilation_steps, dilation_ids=dilation_ids)
         # finally assign the dilated grain map to the microstructure
         self.grain_map = grain_map
 

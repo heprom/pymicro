@@ -1451,22 +1451,28 @@ class Microstructure:
         self.mask = mask
         self.voxel_size = voxel_size
 
-    def view_slice(self, slice=None):
+    def view_slice(self, slice=None, color='random', show_mask=True):
         """A simple utility method to show one microstructure slice.
 
         :param int slice: the slice number
+        :param str color: a string to chose the colormap from ('random', 'ipf')
         """
         if not hasattr(self, 'grain_map'):
             print('Microstructure instance mush have a grain_map field to use this method')
             return
-        from pymicro.view.vol_utils import alpha_cmap
         if not slice or slice > self.grain_map.shape[2] or slice < 0:
             slice = self.grain_map.shape[2] // 2
             print('using slice value %d' % slice)
-        grain_cmap = Microstructure.rand_cmap(first_is_black=True)
+        if color == 'random':
+            grain_cmap = Microstructure.rand_cmap(first_is_black=True)
+        elif color == 'ipf':
+            grain_cmap = self.ipf_cmap()
+        else:
+            grain_cmap = 'viridis'
         plt.imshow(self.grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
-        if hasattr(self, 'mask'):
-            plt.imshow(self.mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.5))
+        if hasattr(self, 'mask') and show_mask:
+            from pymicro.view.vol_utils import alpha_cmap
+            plt.imshow(self.mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
         plt.show()
 
     @staticmethod
@@ -1498,6 +1504,13 @@ class Microstructure:
     def ipf_cmap(self):
         """
         Return a colormap with ipf colors.
+
+        .. warning::
+
+          This function works only for a microstructure with the cubic symmetry due to current limitation in
+          the `Orientation` get_ipf_colour method.
+
+        :return: a color map that can be directly used in pyplot.
         """
 
         N = len(self.grains)

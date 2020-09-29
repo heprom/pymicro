@@ -1735,7 +1735,7 @@ class Microstructure:
                 grains = (array > 0).astype(np.uint8)
             from scipy import ndimage
             grains_dil = ndimage.morphology.binary_dilation(grains).astype(np.uint8)
-            if mask:
+            if mask is not None:
                 # only dilate within the mask
                 grains_dil *= mask.astype(np.uint8)
             todo = (grains_dil - grains)
@@ -1766,7 +1766,7 @@ class Microstructure:
                     dilation[i] = min(neighbours[neighbours > 0])
             array[X, Y, Z] = dilation
             print('dilation step %d done' % (step + 1))
-            return array
+        return array
 
     def dilate_grains(self, dilation_steps=1, dilation_ids=None):
         """Dilate grains to fill the gap between them.

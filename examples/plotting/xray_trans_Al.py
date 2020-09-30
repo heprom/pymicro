@@ -7,7 +7,7 @@ if __name__ == '__main__':
     import os
 
     image_name = os.path.splitext(__file__)[0] + '.png'
-    print 'writting %s' % image_name
+    print('writting %s' % image_name)
 
     from matplotlib import image
 

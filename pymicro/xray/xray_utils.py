@@ -4,27 +4,82 @@ from skimage.transform import radon
 from math import *
 from config import PYMICRO_XRAY_DATA_DIR
 
-densities = {'Li': 0.533,  # Z = 3
-             'Be': 1.8450,  # Z = 4
-             'C': 2.26,  # Z = 6, strongly depends on crystal structure
-             'Mg': 1.738,  # Z = 12
-             'Al': 2.6941,  # Z = 13
-             'Si': 2.33,  # Z = 14
-             'Ti': 4.530,  # Z = 22
-             'V': 6.100,  # Z = 23
-             'Cr': 7.180,  # Z = 24
-             'Mn': 7.430,  # Z = 25
-             'Fe': 7.874,  # Z = 26
-             'Co': 8.900,  # Z = 27
-             'Ni': 8.902,  # Z = 28
-             'Cu': 8.960,  # Z = 29
-             'Zn': 7.112,  # Z = 30
-             'Ga': 7.877,  # Z = 31
-             'Ge': 5.370,  # Z = 32
-             'Nb': 8.550,  # Z = 41
-             'Pb': 11.330,  # Z = 82
-             'WC': 15.63, # Z(W) = 74
-             }
+class Element:
+    """A class to represent a chemical element described by its name, symbol and density."""
+
+    def __init__(self, name, symbol, density):
+        self._name = name
+        self._symbol = symbol
+        self._density = density
+
+    @property
+    def name(self):
+        """Returns the name of the `Element`."""
+        return self._name
+
+    @property
+    def symbol(self):
+        """Returns the symbol of the `Element`."""
+        return self._symbol
+
+    @property
+    def density(self):
+        """Returns the density of the `Element`."""
+        return self._density
+
+    def __repr__(self):
+        return '%s, %s, density %.3f g.cm^-3' % (self.symbol, self.name, self.density)
+
+
+elements = {3: Element('Lithium', 'Li', 0.533),
+            4: Element('Berylium', 'Be', 1.8450),
+            6: Element('Carbon', 'C', 2.26),
+            11: Element('Sodium', 'Na', 0.968),
+            12: Element('Magnesium', 'Mg', 1.738),
+            13: Element('Aluminium', 'Al', 2.6941),
+            14: Element('Silicium', 'Si', 2.33),
+            22: Element('Titanium', 'Ti', 4.530),
+            23: Element('Vanadium', 'V', 6.100),
+            24: Element('Chromium', 'Cr', 7.180),
+            25: Element('Manganese', 'Mn', 7.430),
+            26: Element('Iron', 'Fe', 7.874),
+            27: Element('Cobalt', 'Co', 8.900),
+            28: Element('Nickel', 'Ni', 8.902),
+            29: Element('Copper', 'Cu', 8.960),
+            30: Element('Zinc', 'Zn', 7.112),
+            31: Element('Gallium', 'Ga', 7.877),
+            32: Element('Germanium', 'Ge', 5.370),
+            33: Element('Arsenic', 'As', 5.73),
+            34: Element('Selenium', 'Se', 4.79),
+            38: Element('Strontium', 'Sr', 2.54),
+            39: Element('Yttrium', 'Y', 4.472),
+            40: Element('Zirconium', 'Zr', 6.52),
+            41: Element('Niobium', 'Nb', 8.550),
+            42: Element('Molybdenum', 'Mo', 10.28),
+            43: Element('Technetium', 'Tc', 11.50),
+            47: Element('Silver', 'Ag', 10.49),
+            48: Element('Cadmium', 'Cd', 8.65),
+            49: Element('Indium', 'In', 7.31),
+            50: Element('Tin', 'Sn', 7.265),
+            74: Element('Tungsten', 'W', 19.3),
+            82: Element('Lead', 'Pb', 11.330),
+            83: Element('Bismuth', 'Bi', 9.747)
+            }
+
+
+def density_from_Z(Z):
+    if not Z in elements:
+        print('unknown atomic number: %d' % Z)
+        return None
+    return elements[Z].density
+
+
+def density_from_symbol(symbol):
+    for Z in elements:
+        if elements[Z].symbol == symbol:
+            return elements[Z].density
+    print('unknown symbol: %s' % symbol)
+    return None
 
 
 def f_atom(q, Z):
@@ -129,7 +184,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     from NIST `http://physics.nist.gov/cgi-bin/ffast/ffast.pl`
     The density is also tabulated and can be left blanked unless a specific value is to be used.
 
-    :param string mat: A string representing the material (e.g. 'Al')
+    :param string mat: a string representing the material (must be the atomic symbol if the density is not specified, e.g. 'Al')
     :param list ts: a list of thickness values of the material in mm ([1.0] by default)
     :param float rho: density of the material in g/cm^3 (None by default)
     :param list energy_lim: energy bounds in keV for the plot (1, 100 by default)
@@ -142,7 +197,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     print('Energy :', energy)
     # look up density
     if rho is None:
-        rho = densities[mat]
+        rho = density_from_symbol(mat)
     legstr = '%%s %s mm' % legfmt
     plt.figure()
     for t in ts:
@@ -155,7 +210,6 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     if energy_lim[1] > 200:
         energy_lim[1] = 200
     plt.xlim(energy_lim)
-    #plt.ylim(0, 10)
     plt.grid()
     plt.legend(loc='upper left')
     plt.xlabel('Photon Energy (keV)')

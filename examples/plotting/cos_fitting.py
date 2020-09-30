@@ -22,8 +22,6 @@ if __name__ == '__main__':
     # perform fitting
     F = fit(y, x, expression=C, nb_params=3)
     C = fit(y, x, expression='Cosine')
-    print F
-    print C
     plt.plot(x, y, 'bo', label='data points')
     plt.plot(x, C(x), 'k-', label='cosine fit')
     plt.plot(x, F(x), 'r--', label='custom fit')
@@ -32,7 +30,7 @@ if __name__ == '__main__':
     plt.legend(numpoints=1)
 
     image_name = os.path.splitext(__file__)[0] + '.png'
-    print 'writting %s' % image_name
+    print('writting %s' % image_name)
     plt.savefig(image_name, format='png')
 
     from matplotlib import image

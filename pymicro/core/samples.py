@@ -31,7 +31,7 @@ import numpy as np
 import tables as Tb
 import h5py as h5
 
-import geof
+import pymicro.core.geof as geof
 
 # usefull lists to parse keyword arguments
 compression_keys = ['complib', 'complevel', 'shuffle', 'bitshuffle', 'checksum',

@@ -1404,8 +1404,7 @@ class Microstructure:
             lattice = Lattice.cubic(1.0)
         self._lattice = lattice
         self.grains = []
-        self.grain_map = None
-        self.mask = None
+        self.data = None
         self.voxel_size = 1.0  # unit is voxel by default
         self.vtkmesh = None
 
@@ -1433,14 +1432,18 @@ class Microstructure:
         """
         return self._lattice
 
+    def get_grain_map(self):
+        grain_map = np.array(self.data.get_node(indexname='grain_ids'))
+        return grain_map
+
     def set_grain_map(self, grain_map, voxel_size):
         """Set the grain map for this microstructure.
 
         :param ndarray grain_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit.
         """
-        self.grain_map = grain_map
-        self.voxel_size = voxel_size
+        #TODO implement this
+        pass
 
     def set_mask(self, mask, voxel_size):
         """Set the mask for this microstructure.
@@ -1460,8 +1463,9 @@ class Microstructure:
         if not hasattr(self, 'grain_map'):
             print('Microstructure instance mush have a grain_map field to use this method')
             return
-        if not slice or slice > self.grain_map.shape[2] or slice < 0:
-            slice = self.grain_map.shape[2] // 2
+        grain_map = self.get_grain_map()
+        if not slice or slice > grain_map.shape[2] or slice < 0:
+            slice = grain_map.shape[2] // 2
             print('using slice value %d' % slice)
         if color == 'random':
             grain_cmap = Microstructure.rand_cmap(first_is_black=True)
@@ -1469,7 +1473,7 @@ class Microstructure:
             grain_cmap = self.ipf_cmap()
         else:
             grain_cmap = 'viridis'
-        plt.imshow(self.grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
+        plt.imshow(grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
         if hasattr(self, 'mask') and show_mask:
             from pymicro.view.vol_utils import alpha_cmap
             plt.imshow(self.mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
@@ -1694,9 +1698,10 @@ class Microstructure:
         """
         if not hasattr(self, 'grain_map'):
             return []
-        grain_data = self.grain_map == grain_id
+        grain_map = self.get_grain_map()
+        grain_data = grain_map == grain_id
         grain_data_dil = ndimage.binary_dilation(grain_data, iterations=distance).astype(np.uint8)
-        neighbor_ids = np.unique(self.grain_map[grain_data_dil - grain_data == 1])
+        neighbor_ids = np.unique(grain_map[grain_data_dil - grain_data == 1])
         return neighbor_ids.tolist()
 
     def dilate_grain(self, grain_id, dilation_steps=1, use_mask=False):
@@ -1706,13 +1711,15 @@ class Microstructure:
         :param int dilation_steps: the number of dilation steps to apply.
         :param bool use_mask: if True and that this microstructure has a mask, the dilation will be limite by it.
         """
-        grain_volume_init = (self.grain_map == grain_id).sum()
-        grain_data = self.grain_map == grain_id
+        grain_map = self.get_grain_map()
+        grain_volume_init = (grain_map == grain_id).sum()
+        grain_data = grain_map == grain_id
         grain_data = ndimage.binary_dilation(grain_data, iterations=dilation_steps).astype(np.uint8)
-        if use_mask and hasattr(self, 'mask'):
+        if use_mask and 'mask' in self.data.content_index:
+            #FIXME replace by get_mask method
             grain_data *= self.mask.astype(np.uint8)
-        self.grain_map[grain_data == 1] = grain_id
-        grain_volume_final = (self.grain_map == grain_id).sum()
+        grain_map[grain_data == 1] = grain_id
+        grain_volume_final = (grain_map == grain_id).sum()
         print('grain %s was dilated by %d voxels' % (grain_id, grain_volume_final - grain_volume_init))
 
     @staticmethod
@@ -1780,7 +1787,7 @@ class Microstructure:
             raise ValueError('microstructure %s must have an associated grain_map attribute' % self.name)
             return
 
-        grain_map = self.grain_map.copy()
+        grain_map = self.get_grain_map().copy()
         # get rid of overlap regions flaged by -1
         grain_map[grain_map == -1] = 0
 
@@ -1789,7 +1796,7 @@ class Microstructure:
         else:
             grain_map = Microstructure.dilate_labels(grain_map, dilation_steps=dilation_steps, dilation_ids=dilation_ids)
         # finally assign the dilated grain map to the microstructure
-        self.grain_map = grain_map
+        self.set_grain_map(grain_map)
 
     def crop(self, x_start, x_end, y_start, y_end, z_start, z_end):
         """Crop the microstructure to create a new one.
@@ -1805,10 +1812,12 @@ class Microstructure:
         micro_crop = Microstructure()
         micro_crop.name = self.name + '_crop'
         print('cropping microstructure to %s' % micro_crop.name)
-        micro_crop.grain_map = self.grain_map[x_start:x_end, y_start:y_end, z_start:z_end]
-        if hasattr(self, 'mask'):
+        grain_map = self.get_grain_map()
+        micro_crop.set_grain_map(grain_map[x_start:x_end, y_start:y_end, z_start:z_end])
+        if 'mask' in self.data.content_index:
+            #FIXME get get_mask and set_mask
             micro_crop.mask = self.mask[x_start:x_end, y_start:y_end, z_start:z_end]
-        grain_ids = np.unique(micro_crop.grain_map)
+        grain_ids = np.unique(micro_crop.get_grain_map())
         for gid in grain_ids:
             if not gid > 0:
                 continue
@@ -1823,14 +1832,15 @@ class Microstructure:
         :return: a tuple with the center of mass in mm units (or voxel if the voxel_size is not specified).
         """
         # isolate the grain within the complete grain map
-        slices = ndimage.find_objects(self.grain_map == gid)
+        grain_map = self.get_grain_map()
+        slices = ndimage.find_objects(grain_map == gid)
         if not len(slices) > 0:
             raise ValueError('warning grain %d not found in grain map' % gid)
         sl = slices[0]
         offset = np.array([sl[0].start, sl[1].start, sl[2].start])
-        grain_data_bin = (self.grain_map[sl] == gid).astype(np.uint8)
+        grain_data_bin = (grain_map[sl] == gid).astype(np.uint8)
         local_com = ndimage.measurements.center_of_mass(grain_data_bin)
-        com = self.voxel_size * (offset + local_com - 0.5 * np.array(self.grain_map.shape))
+        com = self.voxel_size * (offset + local_com - 0.5 * np.array(grain_map.shape))
         return com
 
     def recompute_grain_centers(self, verbose=False):
@@ -1906,12 +1916,13 @@ class Microstructure:
                                     data=np.array([g.center for g in self.grains], dtype=np.float32))
         # cell data
         cd = f.create_group('CellData')
-        if hasattr(self, 'grain_map') and self.grain_map is not None:
-            gm = cd.create_dataset('grain_ids', data=self.grain_map, compression='gzip', compression_opts=9)
-            gm.attrs['voxel_size'] = self.voxel_size
-        if hasattr(self, 'mask') and self.mask is not None:
-            ma = cd.create_dataset('mask', data=self.mask, compression='gzip', compression_opts=9)
-            ma.attrs['voxel_size'] = self.voxel_size
+        if 'grain_map' in self.data.content_index:
+            gm = cd.create_dataset('grain_ids', data=get_grain_map(), compression='gzip', compression_opts=9)
+            #FIXME double check spacing is retreived
+            gm.attrs['voxel_size'] = self.data.get_node('CellData')._v_attrs['spacing'][0]
+        if 'mask' in  self.data.content_index:
+            ma = cd.create_dataset('mask', data=self.get_mask(), compression='gzip', compression_opts=9)
+            gm.attrs['voxel_size'] = self.data.get_node('CellData')._v_attrs['spacing'][0]
         print('done writing')
         f.close()
 
@@ -1946,15 +1957,20 @@ class Microstructure:
                     g = Grain(grain_ids[i], Orientation.from_rodrigues(avg_rods[i, :]))
                     g.center = centers[i]
                     micro.grains.append(g)
-            # load cell data
-            if 'grain_ids' in f['CellData']:
-                micro.grain_map = f['CellData/grain_ids'][()]
-                if 'voxel_size' in f['CellData/grain_ids'].attrs:
-                    micro.voxel_size = f['CellData/grain_ids'].attrs['voxel_size']
-            if 'mask' in f['CellData']:
-                micro.mask = f['CellData/mask'][()]
-                if 'voxel_size' in f['CellData/mask'].attrs:
-                    micro.voxel_size = f['CellData/mask'].attrs['voxel_size']
+            # load cell data and populate a SampleData instance
+            from pymicro.core.samples import SampleData, ImageObject
+            micro.data = SampleData(micro.name + '_data')
+            # suppose all arrays have the same size and spacing
+            image_object = ImageObject()
+            for key in f['CellData']:
+                field = f['CellData/%s' % key][()]
+                #TODO create a set_dimension function for ImageObject
+                image_object.dimension = field.shape
+                if 'voxel_size' in f['CellData/%s' % key].attrs:
+                    voxel_size = f['CellData/%s' % key].attrs['voxel_size']
+                    image_object.spacing = [voxel_size, voxel_size, voxel_size]
+                image_object.add_field(field, key)
+            micro.data.add_image(image_object, 'CellData')
             return micro
 
     def to_dream3d(self):

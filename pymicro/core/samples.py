@@ -447,7 +447,7 @@ class SampleData:
 
         """
 
-        print('Lauching image reader on  {}...'.format(imagefile))
+        print('\nLauching image reader on  {}...'.format(imagefile))
         Reader = ImageReader(imagefile, **keywords)
         Image_object = Reader.image
         self.add_image(
@@ -490,7 +490,7 @@ class SampleData:
 
         if (indexname == ''):
             warn_msg = (' (add_mesh) indexname not provided, '
-                        ' the meshname {} is used instead to fill'
+                        ' the meshname {} is used in '
                         'content index'.format(meshname))
             print(warn_msg)
             indexname = meshname
@@ -504,6 +504,14 @@ class SampleData:
                                     path=location,
                                     groupname=meshname,
                                     indexname=indexname)
+
+        if mesh_group is None:
+#            self.get_node_info(node_path=location+imagename)
+            print(' If you want to modify this node, use instead methods :')
+            print('\t --- blabla1') # TODO : implement clean node modification method
+            print('\t --- blabla2')
+            print('\n(add_mesh) image creation aborted')
+            return
 
         # store mesh metadata as HDF5 attributes
         mesh_group._v_attrs.element_topology = mesh_object.element_topology[0]
@@ -618,7 +626,7 @@ class SampleData:
         """ add geometry data and fields stored on a mesh from a MeshObject
 
             Arguments:
-                    - image_object (samples.MeshObject)
+                    - image_object (samples.ImageObject)
                          ImageObject containing the data stored in the image
 
                     - imagename (str)
@@ -639,8 +647,8 @@ class SampleData:
         """
 
         if (indexname == ''):
-            warn_msg = (' (add_mesh_from_field) indexname not provided, '
-                        ' the meshname {} is used instead to fill'
+            warn_msg = ('\n (add_image) indexname not provided, '
+                        ' the image name {} is used instead in '
                         'content index'.format(imagename))
             print(warn_msg)
             indexname = imagename
@@ -648,17 +656,27 @@ class SampleData:
         # store image location in dataset index
         self.content_index[indexname] = image_path
 
+
         # create group in the h5 structure for the mesh
-        print('Creating hdf5 group {} in file {}'.format(
+        print('\nCreating hdf5 group {} in file {}'.format(
               image_path, self.h5_file))
         image_group = self.add_group(
                                     path=location,
                                     groupname=imagename,
                                     indexname=indexname)
+        if image_group is None:
+#            self.get_node_info(node_path=location+imagename)
+            print(' If you want to modify this node, use instead methods :')
+            print('\t --- blabla1') # TODO : implement clean node modification method
+            print('\t --- blabla2')
+            print('\n(add_image) image creation aborted')
+            return
 
         # store image metadata as HDF5 attributes
         image_group._v_attrs.element_topology = '3d_image'
         image_group._v_attrs.dimension = image_object.dimension
+        image_group._v_attrs.spacing = image_object.spacing
+        image_group._v_attrs.origin = image_object.origin
         image_group._v_attrs.image_description = description
         image_group._v_attrs.field_dim = {}
         image_group._v_attrs.group_type = '3Dimage'
@@ -971,18 +989,25 @@ class SampleData:
                   groupname,
                   indexname=''):
         """ Create a (hdf5) group at desired location in the data format"""
+
         if (indexname == ''):
-            warn_msg = (' (add_group) indexname not provided, '
-                        ' the groupname {} is used instead to fill'
-                        'content index'.format(groupname))
+            warn_msg = ('\n(add_group) indexname not provided, '
+                        ' the groupname {} is used in content '
+                        'index'.format(groupname))
             print(warn_msg)
             indexname = groupname
         self.content_index[indexname] = path+groupname
-        Group = self.h5_dataset.create_group(
-                                   where=path,
-                                   name=groupname,
-                                   title=indexname)
-        return Group
+        try:
+            Group = self.h5_dataset.create_group(
+                                       where=path,
+                                       name=groupname,
+                                       title=indexname)
+            return Group
+        except Tb.NodeError:
+            warn_msg = ('\n(add_group) group {} already exists, group creation '
+                        'aborted'.format(path+groupname))
+            print(warn_msg)
+            return None
 
 
     def get_indexname_from_path(self,

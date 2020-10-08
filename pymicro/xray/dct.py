@@ -37,15 +37,24 @@ class DctForwardSimulation(ForwardSimulation):
         self.set_hkl_planes(hkl_planes)
 
 
-    def setup(self, omega_step):
-        """Setup the forward simulation."""
+    def setup(self, omega_step, grain_ids=None):
+        """Setup the forward simulation.
+
+        :param float omega_step: the angular integration step (in degrees) use to compute the diffraction comditions.
+        :param list grain_ids: a list of grain ids to restrict the forward simulation (use all grains by default).
+        """
         assert self.exp.source.min_energy == self.exp.source.max_energy  # monochromatic case
         lambda_keV = self.exp.source.max_energy
         self.omegas = np.linspace(0.0, 360.0, num=int(360.0 / omega_step), endpoint=False)
         self.reflections = []
         for omega in self.omegas:
             self.reflections.append([])
-        for g in self.exp.sample.microstructure.grains:
+        if grain_ids:
+            # make a list of the grains selected for the forward simulation
+            grains = [self.exp.sample.microstructure.get_grain(gid) for gid in grain_ids]
+        else:
+            grains = self.exp.sample.microstructure.grains
+        for g in grains:
             for plane in self.hkl_planes:
                 (h, k, i, l) = HklPlane.three_to_four_indices(*plane.miller_indices())
                 try:
@@ -86,9 +95,10 @@ class DctForwardSimulation(ForwardSimulation):
                 g.included = gmat['proj/included'][0, :]
                 g.ondet = gmat['proj/ondet'][0, :]
                 g.stack_exp = gmat['proj/stack'][()].transpose(1, 2, 0)  # now in [ndx, u, v] form
-                # for this data set, we have to hack around the DCT + TT work in progress
-                ref_hklsp = gmat['allblobs/hklsp'][()][0][0]
-                g.hklsp = gmat[ref_hklsp][:, :]
+                # for the Ti7AL data set, we have to hack around the DCT + TT work in progress
+                #ref_hklsp = gmat['allblobs/hklsp'][()][0][0]
+                #g.hklsp = gmat[ref_hklsp][:, :]
+                g.hklsp = gmat['allblobs/hklsp'][:, :]
         self.grain = g
         if self.verbose:
             print('experimental proj stack shape: {}'.format(g.stack_exp.shape))
@@ -174,7 +184,22 @@ class DctForwardSimulation(ForwardSimulation):
         # build the 3d projection stack at once
         print('building grain projections stack')
         stack_sim = radiographs(data, omegas)
-        stack_sim = stack_sim.transpose(2, 0, 1)[:, :, ::-1]  # (u, v) axes correspond to (Y, -Z) for DCT detector
+        stack_sim = stack_sim.transpose(2, 0, 1)[:, ::-1, ::-1]
+        # here we need to account for the detector flips (detector is always supposed to be perpendicular to the beam)
+        # by default (u, v) correspond to (-Y, -Z)
+        hor_flip = np.dot(detector.u_dir, [0, -1, 0]) < 0
+        ver_flip = np.dot(detector.v_dir, [0, 0, -1]) < 0
+        if self.verbose:
+            print(detector.u_dir)
+            print(detector.v_dir)
+            print('detector horizontal flip: %s' % hor_flip)
+            print('detector vertical flip: %s' % ver_flip)
+        if hor_flip:
+            print('applying horizontal flip to the simulated image stack')
+            stack_sim = stack_sim[:, ::-1, :]
+        if ver_flip:
+            print('applying vertical flip to the simulated image stack')
+            stack_sim = stack_sim[:, :, ::-1]
         return self.grain_projection_image(g_uv, stack_sim)
 
 

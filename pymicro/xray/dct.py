@@ -137,8 +137,42 @@ class DctForwardSimulation(ForwardSimulation):
             self.load_grain(gid=gid)
         return self.grain_projection_image(self.grain.uv_exp, self.grain.stack_exp)
 
-    def grain_projection_simulation(self, gid=1, data=None):
-        """Function to compute all the grain projection in DCT geometry and create a composite image."""
+    def grain_projections(self, omegas, gid=1, data=None, hor_flip=False, ver_flip=False):
+        """Compute the projections of a grain at different rotation angles.
+
+        The method compute each projection and concatenate them into a single 3D array in the form [n, u, v]
+        with n the number of angles.
+
+        :param list omegas: the list of omega angles to use (in degrees).
+        :param int gid: the id of the grain to project (1 default).
+        :param ndarray data: the data array representing the grain.
+        :param bool hor_flip: a flag to apply a horizontal flip.
+        :param bool ver_flip: a flag to apply a vertical flip.
+        :return: a 3D array containing the n projections.
+        """
+        from scipy import ndimage
+        if data is None:
+            grain_ids = self.exp.get_sample().get_grain_ids()
+            print('binarizing grain %d' % gid)
+            data = np.where(grain_ids[ndimage.find_objects(grain_ids == gid)[0]] == gid, 1, 0)
+        print('shape of binary grain is {}'.format(data.shape))
+        stack_sim = radiographs(data, omegas)
+        stack_sim = stack_sim.transpose(2, 0, 1)[:, ::-1, ::-1]
+        # here we need to account for the detector flips (detector is always supposed to be perpendicular to the beam)
+        # by default (u, v) correspond to (-Y, -Z)
+        if hor_flip:
+            print('applying horizontal flip to the simulated image stack')
+            stack_sim = stack_sim[:, ::-1, :]
+        if ver_flip:
+            print('applying vertical flip to the simulated image stack')
+            stack_sim = stack_sim[:, :, ::-1]
+        return stack_sim
+
+    def grain_projection_simulation(self, gid=1):
+        """Function to compute all the grain projection in DCT geometry and create a composite image.
+
+        :param int gid: the id of the grain to project (1 default).
+        """
         print('forward simulation of grain %d' % gid)
         detector = self.exp.get_active_detector()
         lambda_keV = self.exp.source.max_energy
@@ -149,12 +183,6 @@ class DctForwardSimulation(ForwardSimulation):
         if not hasattr(self, 'grain'):
             # load the corresponding grain
             self.load_grain(gid=gid)
-        from scipy import ndimage
-        if data is None:
-            grain_ids = self.exp.get_sample().get_grain_ids()
-            print('binarizing grain %d' % gid)
-            data = np.where(grain_ids[ndimage.find_objects(grain_ids == gid)[0]] == gid, 1, 0)
-        print('shape of binary grain is {}'.format(data.shape))
 
         # compute all the omega values
         print('simulating diffraction spot positions on the detector')
@@ -181,12 +209,7 @@ class DctForwardSimulation(ForwardSimulation):
                 pg = detector.project_along_direction(K, g_pos_rot)
                 (up, vp) = detector.lab_to_pixel(pg)[0]
                 g_uv[:, 2 * i + j] = up, vp
-        # build the 3d projection stack at once
-        print('building grain projections stack')
-        stack_sim = radiographs(data, omegas)
-        stack_sim = stack_sim.transpose(2, 0, 1)[:, ::-1, ::-1]
-        # here we need to account for the detector flips (detector is always supposed to be perpendicular to the beam)
-        # by default (u, v) correspond to (-Y, -Z)
+        # check detector flips
         hor_flip = np.dot(detector.u_dir, [0, -1, 0]) < 0
         ver_flip = np.dot(detector.v_dir, [0, 0, -1]) < 0
         if self.verbose:
@@ -194,12 +217,8 @@ class DctForwardSimulation(ForwardSimulation):
             print(detector.v_dir)
             print('detector horizontal flip: %s' % hor_flip)
             print('detector vertical flip: %s' % ver_flip)
-        if hor_flip:
-            print('applying horizontal flip to the simulated image stack')
-            stack_sim = stack_sim[:, ::-1, :]
-        if ver_flip:
-            print('applying vertical flip to the simulated image stack')
-            stack_sim = stack_sim[:, :, ::-1]
+        # compute the projections
+        stack_sim = self.grain_projections(omegas, gid, hor_flip=hor_flip, ver_flip=ver_flip)
         return self.grain_projection_image(g_uv, stack_sim)
 
 

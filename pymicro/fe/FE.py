@@ -668,8 +668,12 @@ class FE_Mesh():
             elset_list = list(filter(lambda k: elset_prefix in k, self._elset_names))
         else:
             elset_list = self._elset_names[1:]
-        if len(elset_list) > 255:
-            print('warning, more than 255 elsets, using a uint16 field')
+        # figure out the depth of the field to use
+        names = [s for s in self._elset_names if elset_prefix in s]
+        names.sort()
+        max_id = int(names[-1].split(elset_prefix)[1])
+        if max_id > 255:
+            print('warning, max id larger than 255, using a uint16 field')
             elset_id = numpy.zeros(self.get_number_of_elements(), dtype=numpy.uint16)
         else:
             elset_id = numpy.zeros(self.get_number_of_elements(), dtype=numpy.uint8)

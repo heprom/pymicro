@@ -223,7 +223,13 @@ class DctForwardSimulation(ForwardSimulation):
 
 
     def dct_projection(self, omega, include_direct_beam=True, att=5):
-        """Function to compute a full DCT projection at a given omega angle."""
+        """Function to compute a full DCT projection at a given omega angle.
+
+        :param float omega: rotation angle in degrees.
+        :param bool include_direct_beam: flag to compute the transmission through the sample.
+        :param float att: an attenuation factor used to limit the gray levels in the direct beam.
+        :return: the dct projection as a 2D numpy array
+        """
         if len(self.reflections) == 0:
             print('empty list of reflections, you should run the setup function first')
             return None
@@ -268,7 +274,7 @@ class DctForwardSimulation(ForwardSimulation):
             # position of the grain at this rotation angle
             g_pos_rot = np.dot(R, g_center_mm)
             pg = detector.project_along_direction(K, g_pos_rot)
-            (up, vp) = detector.lab_to_pixel(pg)[0]
+            up, vp = detector.lab_to_pixel(pg)[0]
             if self.verbose:
                 print('\n* gid=%d, (%d,%d,%d) plane, angle=%.1f' % (gid, h, k, l, omega))
                 print('diffraction vector:', K)

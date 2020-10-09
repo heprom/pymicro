@@ -266,20 +266,7 @@ class Sample:
         return len(self.microstructure.grains) > 0
 
     def get_grain_ids(self):
-        if not hasattr(self, 'grain_ids'):
-            # try to load grain map
-            #try:
-            import h5py
-            import os
-            full_path = os.path.join(self.data_dir, self.grain_ids_path)
-            print('loading grain_ids field from %s' % full_path)
-            f = h5py.File(full_path)
-            print('successfully loaded grain_ids with shape {}'.format(f['vol'].shape))
-            self.grain_ids = f['vol'][()].transpose(2, 1, 0)  # now we have [x, y, z] representation just like matlab
-            f.close()
-            #except AttributeError:
-            #    print('failed to load grain_ids, please set the grain_ids path for this sample')
-        return self.grain_ids
+        return self.microstructure.grain_map
 
 class Experiment:
     """Class to represent an actual or a virtual X-ray experiment.

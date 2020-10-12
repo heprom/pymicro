@@ -1,10 +1,10 @@
 """
-The microstructure module provide elementary classes to describe a 
-crystallographic granular microstructure such as mostly present in 
+The microstructure module provide elementary classes to describe a
+crystallographic granular microstructure such as mostly present in
 metallic materials.
 
-It contains several classes which are used to describe a microstructure 
-composed of several grains, each one having its own crystallographic 
+It contains several classes which are used to describe a microstructure
+composed of several grains, each one having its own crystallographic
 orientation:
 
  * :py:class:`~pymicro.crystal.microstructure.Microstructure`
@@ -41,7 +41,7 @@ class Orientation:
 
       V_s = g^T.V_c
 
-    Most of the code to handle rotations has been written to comply with the conventions 
+    Most of the code to handle rotations has been written to comply with the conventions
     laid in :cite:`Rowenhorst2015`.
     """
 
@@ -150,7 +150,7 @@ class Orientation:
 
     def fzDihedral(rod, n):
         """check if the given Rodrigues vector is in the fundamental zone.
-        
+
         After book from Morawiecz.
         """
         # top and bottom face at +/-tan(pi/2n)
@@ -173,10 +173,10 @@ class Orientation:
 
     def inFZ(self, symmetry=Symmetry.cubic):
         """Check if the given Orientation lies within the fundamental zone.
-        
-        For a given crystal symmetry, several rotations can describe the same 
-        physcial crystllographic arangement. The Rodrigues fundamental zone 
-        restrict the orientation space accordingly. 
+
+        For a given crystal symmetry, several rotations can describe the same
+        physcial crystllographic arangement. The Rodrigues fundamental zone
+        restrict the orientation space accordingly.
         """
         r = self.rod
         if symmetry == Symmetry.cubic:
@@ -191,7 +191,7 @@ class Orientation:
         """
         Compute the equivalent crystal orientation in the Fundamental Zone of a given symmetry.
 
-        :param Symmetry symmetry: an instance of the `Symmetry` class 
+        :param Symmetry symmetry: an instance of the `Symmetry` class
         :param verbose: flag for verbose mode
         :return: a new Orientation instance which lies in the fundamental zone.
         """
@@ -230,7 +230,7 @@ class Orientation:
     @staticmethod
     def misorientation_axis_from_delta(delta):
         """Compute the misorientation axis from the misorientation matrix.
- 
+
         :param delta: The 3x3 misorientation matrix.
         :returns: the misorientation axis (normalised vector).
         """
@@ -255,7 +255,7 @@ class Orientation:
 
         Compute the angle assocated with this misorientation matrix :math:`\\Delta g`.
         It is defined as :math:`\\omega = \\arccos(\\text{trace}(\\Delta g)/2-1)`.
-        To avoid float rounding error, the argument is rounded to 1. if it is within 1 and 1 plus 32 bits floating 
+        To avoid float rounding error, the argument is rounded to 1. if it is within 1 and 1 plus 32 bits floating
         point precison.
 
         .. note::
@@ -282,10 +282,10 @@ class Orientation:
         is defined as the combination of the minimum misorientation angle
         and the misorientation axis lying in the fundamental zone, which
         can be used to bring the two lattices into coincidence.
-        
+
         .. note::
-        
-         Both orientations are supposed to have the same symmetry. This is not necessarily the case in multi-phase 
+
+         Both orientations are supposed to have the same symmetry. This is not necessarily the case in multi-phase
          materials.
 
         :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
@@ -367,7 +367,7 @@ class Orientation:
     @staticmethod
     def solve_trig_equation(A, B, C, verbose=False):
         """Solve the trigonometric equation in the form of:
-        
+
         .. math::
 
            A\cos\\theta + B\sin\\theta = C
@@ -612,10 +612,10 @@ class Orientation:
     @staticmethod
     def from_euler(euler, convention='Bunge'):
         """Rotation matrix from Euler angles.
-        
-        This is the classical method to obtain an orientation matrix by 3 successive rotations. The result depends on 
-        the convention used (how the successive rotation axes are chosen). In the Bunge convention, the first rotation 
-        is around Z, the second around the new X and the third one around the new Z. In the Roe convention, the second 
+
+        This is the classical method to obtain an orientation matrix by 3 successive rotations. The result depends on
+        the convention used (how the successive rotation axes are chosen). In the Bunge convention, the first rotation
+        is around Z, the second around the new X and the third one around the new Z. In the Roe convention, the second
         one is around Y.
         """
         if convention == 'Roe':
@@ -715,15 +715,15 @@ class Orientation:
     def OrientationMatrix2Euler(g):
         """
         Compute the Euler angles from the orientation matrix.
-        
+
         This conversion follows the paper of Rowenhorst et al. :cite:`Rowenhorst2015`.
-        In particular when :math:`g_{33} = 1` within the machine precision, 
-        there is no way to determine the values of :math:`\phi_1` and :math:`\phi_2` 
-        (only their sum is defined). The convention is to attribute 
-        the entire angle to :math:`\phi_1` and set :math:`\phi_2` to zero.         
+        In particular when :math:`g_{33} = 1` within the machine precision,
+        there is no way to determine the values of :math:`\phi_1` and :math:`\phi_2`
+        (only their sum is defined). The convention is to attribute
+        the entire angle to :math:`\phi_1` and set :math:`\phi_2` to zero.
 
         :param g: The 3x3 orientation matrix
-        :return: The 3 euler angles in degrees. 
+        :return: The 3 euler angles in degrees.
         """
         eps = np.finfo('float').eps
         (phi1, Phi, phi2) = (0.0, 0.0, 0.0)
@@ -752,9 +752,9 @@ class Orientation:
     def OrientationMatrix2Rodrigues(g):
         """
         Compute the rodrigues vector from the orientation matrix.
-        
+
         :param g: The 3x3 orientation matrix representing the rotation.
-        :returns: The Rodrigues vector as a 3 components array. 
+        :returns: The Rodrigues vector as a 3 components array.
         """
         t = g.trace() + 1
         if np.abs(t) < np.finfo(g.dtype).eps:
@@ -1212,9 +1212,9 @@ class Grain:
     def add_vtk_mesh(self, array, contour=True, verbose=False):
         """Add a mesh to this grain.
 
-        This method process a labeled array to extract the geometry of the grain. The grain shape is defined by 
-        the pixels with a value of the grain id. A vtkUniformGrid object is created and thresholded or contoured 
-        depending on the value of the flag `contour`. 
+        This method process a labeled array to extract the geometry of the grain. The grain shape is defined by
+        the pixels with a value of the grain id. A vtkUniformGrid object is created and thresholded or contoured
+        depending on the value of the flag `contour`.
         The resulting mesh is returned, centered on the center of mass of the grain.
 
         :param ndarray array: a numpy array from which to extract the grain shape.
@@ -1433,8 +1433,14 @@ class Microstructure:
         return self._lattice
 
     def get_grain_map(self):
-        grain_map = np.array(self.data.get_node(indexname='grain_ids'))
+#        grain_map = np.array(self.data.get_node(indexname='grain_ids'))
+        grain_map = self.data.get_data_array(name='grain_ids',as_numpy=True)
         return grain_map
+
+    def get_mask(self):
+#        grain_map = np.array(self.data.get_node(indexname='grain_ids'))
+        mask = self.data.get_data_array(name='mask',as_numpy=True)
+        return mask
 
     def set_grain_map(self, grain_map, voxel_size):
         """Set the grain map for this microstructure.
@@ -2027,7 +2033,7 @@ class Microstructure:
     def from_dream3d(file_path, main_key='DataContainers', data_container='DataContainer', grain_data='FeatureData',
                 grain_orientations='AvgEulerAngles', orientation_type='euler', grain_centroid='Centroids'):
         """Read a microstructure from a hdf5 file.
-        
+
         :param str file_path: the path to the hdf5 file to read.
         :param str main_key: the string describing the root key.
         :param str data_container: the string describing the data container group in the hdf5 file.
@@ -2069,7 +2075,7 @@ class Microstructure:
         the '4_grains/phase_01' folder. Then, the reconstructed volume file (labeled image) is stored
         in the '5_reconstruction' folder as an hdf5 file, possibly stored alongside a mask file coming from the
         absorption reconstruction.
-        
+
         :param str data_dir: the path to the folder containing the reconstruction data.
         :param str grain_file: the name of the file containing grains info.
         :param str vol_file: the name of the volume file.

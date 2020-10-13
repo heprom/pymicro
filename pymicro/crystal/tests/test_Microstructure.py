@@ -28,15 +28,14 @@ class MicrostructureTests(unittest.TestCase):
         # read a microstructure from a DCT index.mat file
         m = Microstructure.from_dct(data_dir=PYMICRO_EXAMPLES_DATA_DIR, grain_file='t5_dct_cen_index.mat', use_dct_path=False)
         self.assertEqual(len(m.grains), 146)
-        self.assertEqual(m.voxel_size, 0.0014)
 
     def test_from_h5(self):
         # read a test microstructure
         m = Microstructure.from_h5(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 't5_dct_slice.h5'))
         self.assertEqual(len(m.grains), 21)
-        self.assertEqual(m.voxel_size, 0.0014)
-        self.assertEqual(hasattr(m, 'grain_map'), True)
-        self.assertEqual(hasattr(m, 'mask'), True)
+        self.assertEqual(m.get_voxel_size(), 0.0014)
+        self.assertEqual(type(m.get_grain_map()), np.ndarray)
+        self.assertEqual(type(m.get_mask()), np.ndarray)
 
     def test_find_neighbors(self):
         m = Microstructure.from_h5(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 't5_dct_slice.h5'))

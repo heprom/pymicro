@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt, colors, cm
 from xml.dom.minidom import Document, parse
 from pymicro.crystal.lattice import Lattice, Symmetry
 from pymicro.crystal.quaternion import Quaternion
+from pymicro.core.samples import SampleData, ImageObject
 from math import atan2, pi
 
 
@@ -1394,8 +1395,8 @@ class Microstructure:
     Class used to manipulate a full microstructure.
 
     It is typically defined as a list of grains objects, has an associated crystal `Lattice` instance.
-    A grain map and a mask can be added to the microstructure instance. For simplicity a simple field `voxel_size`
-    describe the spatial resolution of teses maps.
+    Image data can be added to the microstructure instance using a `SampleData` object. This will have the effect
+    to create an HDF5 file to gather the spatial microstructure data.
     """
 
     def __init__(self, name='empty', lattice=None):
@@ -1405,7 +1406,6 @@ class Microstructure:
         self._lattice = lattice
         self.grains = []
         self.data = None
-        self.voxel_size = 1.0  # unit is voxel by default
         self.vtkmesh = None
 
     def get_number_of_phases(self):
@@ -1433,13 +1433,17 @@ class Microstructure:
         return self._lattice
 
     def get_grain_map(self):
-#        grain_map = np.array(self.data.get_node(indexname='grain_ids'))
-        grain_map = self.data.get_data_array(name='grain_ids',as_numpy=True)
+        if not self.data:
+            return None
+        #grain_map = np.array(self.data.get_node(indexname='grain_ids'))
+        grain_map = self.data.get_data_array(name='grain_ids', as_numpy=True)
         return grain_map
 
     def get_mask(self):
-#        grain_map = np.array(self.data.get_node(indexname='grain_ids'))
-        mask = self.data.get_data_array(name='mask',as_numpy=True)
+        if not self.data:
+            return None
+        #grain_map = np.array(self.data.get_node(indexname='grain_ids'))
+        mask = self.data.get_data_array(name='mask', as_numpy=True)
         return mask
 
     def set_grain_map(self, grain_map, voxel_size):
@@ -1448,8 +1452,22 @@ class Microstructure:
         :param ndarray grain_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit.
         """
-        #TODO implement this
-        pass
+        # create the image_object using the grain_map array
+        image_object = ImageObject()
+        image_object.dimension = grain_map.shape
+        image_object.spacing = [voxel_size, voxel_size, voxel_size]
+        image_object.add_field(grain_map, 'grain_ids')
+        self.data.add_image(image_object, imagename='grain_ids', location='/CellData', replace=True)
+
+    def get_voxel_size(self):
+        """Get the voxel size associated with the image data of the microstructure.
+
+        If this instance of `Microstructure has no image data, None is returned.
+        """
+        if not self.data:
+            return None
+        else:
+            return self.data.h5_dataset.get_node('/CellData')._v_attrs['spacing'][0]
 
     def set_mask(self, mask, voxel_size):
         """Set the mask for this microstructure.
@@ -1457,8 +1475,12 @@ class Microstructure:
         :param ndarray mask: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit.
         """
-        self.mask = mask
-        self.voxel_size = voxel_size
+        # create the image_object using the grain_map array
+        image_object = ImageObject()
+        image_object.dimension = mask.shape
+        image_object.spacing = [voxel_size, voxel_size, voxel_size]
+        image_object.add_field(mask, 'mask')
+        self.data.add_image(image_object, imagename='mask', location='/CellData', replace=True)
 
     def view_slice(self, slice=None, color='random', show_mask=True):
         """A simple utility method to show one microstructure slice.
@@ -1702,9 +1724,9 @@ class Microstructure:
         :param int distance: the distance to use for the dilation (default is 1 voxel).
         :return: a list (possibly empty) of the neighboring grain ids.
         """
-        if not hasattr(self, 'grain_map'):
-            return []
         grain_map = self.get_grain_map()
+        if grain_map is None:
+            return []
         grain_data = grain_map == grain_id
         grain_data_dil = ndimage.binary_dilation(grain_data, iterations=distance).astype(np.uint8)
         neighbor_ids = np.unique(grain_map[grain_data_dil - grain_data == 1])
@@ -1846,7 +1868,7 @@ class Microstructure:
         offset = np.array([sl[0].start, sl[1].start, sl[2].start])
         grain_data_bin = (grain_map[sl] == gid).astype(np.uint8)
         local_com = ndimage.measurements.center_of_mass(grain_data_bin)
-        com = self.voxel_size * (offset + local_com - 0.5 * np.array(grain_map.shape))
+        com = self.get_voxel_size() * (offset + local_com - 0.5 * np.array(grain_map.shape))
         return com
 
     def recompute_grain_centers(self, verbose=False):
@@ -1922,13 +1944,12 @@ class Microstructure:
                                     data=np.array([g.center for g in self.grains], dtype=np.float32))
         # cell data
         cd = f.create_group('CellData')
-        if 'grain_map' in self.data.content_index:
+        if self.data and 'grain_ids' in self.data.content_index:
             gm = cd.create_dataset('grain_ids', data=get_grain_map(), compression='gzip', compression_opts=9)
-            #FIXME double check spacing is retreived
             gm.attrs['voxel_size'] = self.data.get_node('CellData')._v_attrs['spacing'][0]
-        if 'mask' in  self.data.content_index:
+        if self.data and 'mask' in  self.data.content_index:
             ma = cd.create_dataset('mask', data=self.get_mask(), compression='gzip', compression_opts=9)
-            gm.attrs['voxel_size'] = self.data.get_node('CellData')._v_attrs['spacing'][0]
+            ma.attrs['voxel_size'] = self.data.get_node('CellData')._v_attrs['spacing'][0]
         print('done writing')
         f.close()
 
@@ -1964,13 +1985,11 @@ class Microstructure:
                     g.center = centers[i]
                     micro.grains.append(g)
             # load cell data and populate a SampleData instance
-            from pymicro.core.samples import SampleData, ImageObject
-            micro.data = SampleData(micro.name + '_data')
+            micro.data = SampleData(micro.name + '_data', verbose=True, overwrite_hdf5=True)  # existing data file is deleted
             # suppose all arrays have the same size and spacing
             image_object = ImageObject()
             for key in f['CellData']:
                 field = f['CellData/%s' % key][()]
-                #TODO create a set_dimension function for ImageObject
                 image_object.dimension = field.shape
                 if 'voxel_size' in f['CellData/%s' % key].attrs:
                     voxel_size = f['CellData/%s' % key].attrs['voxel_size']
@@ -2103,7 +2122,7 @@ class Microstructure:
             return None
         from scipy.io import loadmat
         index = loadmat(index_path)
-        micro.voxel_size = index['cryst'][0][0][25][0][0]
+        voxel_size = index['cryst'][0][0][25][0][0]
         # grab the crystal lattice
         lattice_params = index['cryst'][0][0][3][0]
         sym = Symmetry.from_string(index['cryst'][0][0][7][0])
@@ -2127,9 +2146,9 @@ class Microstructure:
         if os.path.exists(grain_map_path):
             with h5py.File(grain_map_path, 'r') as f:
                 # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
-                micro.grain_map = f['vol'][()].transpose(2, 1, 0)
+                micro.set_grain_map(f['vol'][()].transpose(2, 1, 0), voxel_size)
                 if verbose:
-                    print('loaded grain ids volume with shape: {}'.format(micro.grain_map.shape))
+                    print('loaded grain ids volume with shape: {}'.format(micro.get_grain_map().shape))
         # load the mask if available
         if use_dct_path:
             mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
@@ -2138,7 +2157,7 @@ class Microstructure:
         if os.path.exists(mask_path):
             try:
                 with h5py.File(mask_path, 'r') as f:
-                    micro.mask = f['vol'][()].transpose(2, 1, 0).astype(np.uint8)
+                    micro.set_mask(f['vol'][()].transpose(2, 1, 0).astype(np.uint8), voxel_size)
             except:
                 # fallback on matlab format
                 micro.mask = loadmat(mask_path)['vol']
@@ -2215,9 +2234,9 @@ class Microstructure:
         if micros[0].get_lattice() != micros[1].get_lattice():
             raise ValueError('both microstructure must have the same crystal lattice')
         lattice = micros[0].get_lattice()
-        if micros[0].voxel_size != micros[1].voxel_size:
+        if micros[0].get_voxel_size() != micros[1].get_voxel_size():
             raise ValueError('both microstructure must have the same voxel size')
-        voxel_size = micros[0].voxel_size
+        voxel_size = micros[0].get_voxel_size()
 
         # create two microstructure of the overlapping regions: end slices in first scan and first slices in second scan
         grain_ids_ol1 = micros[0].grain_map[:, :, micros[0].grain_map.shape[2] - overlap:]

@@ -1716,7 +1716,7 @@ class Microstructure:
         print('grain %s was dilated by %d voxels' % (grain_id, grain_volume_final - grain_volume_init))
 
     @staticmethod
-    def dilate_labels(array, dilation_steps=1, mask=None, dilation_ids=None):
+    def dilate_labels(array, dilation_steps=1, mask=None, dilation_ids=None, struct=None):
         """Dilate labels isotropically to fill the gap between them.
 
         This code is based on the gtDilateGrains function from the DCT code. It has been extended to handle both 2D
@@ -1725,46 +1725,60 @@ class Microstructure:
         :param int dilation_steps: the number of dilation steps to apply.
         :param ndarray mask: a msk to constrain the dilation (None by default).
         :param list dilation_ids: a list to restrict the dilation to the given ids.
+        :param ndarray struct: the structuring element to use (strong connectivity by default).
         :return: the dilated array.
         """
+        from scipy import ndimage
+        if struct is None:
+            struct = ndimage.morphology.generate_binary_structure(array.ndim, 1)
+        assert struct.ndim == array.ndim
         # carry out dilation in iterative steps
         for step in range(dilation_steps):
             if dilation_ids:
                 grains = np.isin(array, dilation_ids)
             else:
                 grains = (array > 0).astype(np.uint8)
-            from scipy import ndimage
-            grains_dil = ndimage.morphology.binary_dilation(grains).astype(np.uint8)
+            grains_dil = ndimage.morphology.binary_dilation(grains, structure=struct).astype(np.uint8)
             if mask is not None:
                 # only dilate within the mask
                 grains_dil *= mask.astype(np.uint8)
             todo = (grains_dil - grains)
             # get the list of voxel for this dilation step
-            X, Y, Z = np.where(todo)
+            if array.ndim == 2:
+                X, Y = np.where(todo)
+            else:
+                X, Y, Z = np.where(todo)
 
             xstart = X - 1
             xend = X + 1
             ystart = Y - 1
             yend = Y + 1
-            zstart = Z - 1
-            zend = Z + 1
 
             # check bounds
             xstart[xstart < 0] = 0
             ystart[ystart < 0] = 0
-            zstart[zstart < 0] = 0
             xend[xend > array.shape[0] - 1] = array.shape[0] - 1
             yend[yend > array.shape[1] - 1] = array.shape[1] - 1
-            zend[zend > array.shape[2] - 1] = array.shape[2] - 1
+            if array.ndim == 3:
+                zstart = Z - 1
+                zend = Z + 1
+                zstart[zstart < 0] = 0
+                zend[zend > array.shape[2] - 1] = array.shape[2] - 1
 
             dilation = np.zeros_like(X).astype(np.int16)
             print('%d voxels to replace' % len(X))
             for i in range(len(X)):
-                neighbours = array[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1, zstart[i]:zend[i] + 1]
+                if array.ndim == 2:
+                    neighbours = array[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1]
+                else:
+                    neighbours = array[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1, zstart[i]:zend[i] + 1]
                 if np.any(neighbours):
                     # at least one neighboring voxel in non zero
                     dilation[i] = min(neighbours[neighbours > 0])
-            array[X, Y, Z] = dilation
+            if array.ndim == 2:
+                array[X, Y] = dilation
+            else:
+                array[X, Y, Z] = dilation
             print('dilation step %d done' % (step + 1))
         return array
 

@@ -36,7 +36,7 @@ import pymicro.core.geof as geof
 
 # Module global variables for xdmf compatibility
 FIELD_TYPE = {1: 'Scalar', 2: 'Vector', 3: 'Vector', 6: 'Tensor6', 9: 'Tensor'}
-CENTERS_XDMF = {'NDimage': 'Cell', 'mesh': 'Node'}
+CENTERS_XDMF = {'3DImage': 'Cell', 'mesh': 'Node'}
 
 # usefull lists to parse keyword arguments
 compression_keys = ['complib', 'complevel', 'shuffle', 'bitshuffle', 'checksum',
@@ -711,7 +711,7 @@ class SampleData:
         image_group._v_attrs.origin = image_object.origin
         image_group._v_attrs.image_description = description
         image_group._v_attrs.field_dim = {}
-        image_group._v_attrs.group_type = 'NDimage'
+        image_group._v_attrs.group_type = '3DImage'
 
         self._verbose_print('Updating xdmf tree...', line_break=False)
         image_xdmf = etree.Element(_tag='Grid',
@@ -1150,20 +1150,14 @@ class SampleData:
         print('name is {}'.format(name))
         Node = self.h5_dataset.create_carray(where=location_path, name=name,
                                       filters=Filters, obj=array)
-        str(Node)
 
-        # TODO : find a solution for field type, for XDMF convention, robust for
-        #        various array shapes
-        #     create _get_field_type utility method
-        #    use knowledge of grid location caracteristics to determine field
-        #    type
-#        if self._is_grid(location):
-##            print('array shape 1 is {}'.format(array.shape[1]))
-##            ftype = FIELD_TYPE[array.shape[1]]
-#            dic = {'field_type':'scalar'}
-#            self.add_attributes(dic=dic, nodename=name)
-#            self._add_field_to_xdmf(name)
-#        return
+        if self._is_grid(location):
+            ftype = self._get_xdmf_field_type(field=array,
+                                              grid_location=location_path)
+            dic = {'field_type':ftype}
+            self.add_attributes(dic=dic, nodename=name)
+            self._add_field_to_xdmf(name,array)
+        return
 
     def add_attributes(self, dic, nodename):
         """
@@ -1531,7 +1525,7 @@ class SampleData:
     def _is_grid(self, name):
         """ find out if name or path references a image or mesh HDF5 Group """
         gtype = self._get_group_type(name)
-        List = ['mesh','NDimage']
+        List = ['mesh','3DImage']
         if (gtype in List):
             return True
         else:
@@ -1540,7 +1534,7 @@ class SampleData:
     def _check_field_compatibility(self, name, field):
         """ check if field dimension is compatible with the storing location"""
         group_type = self._get_group_type(name)
-        if group_type == 'NDimage':
+        if group_type == '3DImage':
             compatibility = self._compatibility_with_image(name, field)
         elif group_type == 'mesh':
             compatibility = self._compatibility_with_mesh(name,field)
@@ -1566,7 +1560,7 @@ class SampleData:
     def _compatibility_with_image(self, name, field):
         """ check if field has a number of values compatible with the image"""
         image = self.get_node(name)
-        compatibility = (image._v_attrs.dimension == field.shape)
+        compatibility = (image._v_attrs.dimension == field.shape[0:3])
         if not(compatibility):
             msg = ('Field number of values ({}) is not conformant with image '
                    '`{}` dimensions ({})'.format(field.shape,name,
@@ -1579,9 +1573,10 @@ class SampleData:
 
         Node = self.get_node(name)
         Grid_type = self._get_parent_type(name)
+        Grid_name = self._get_parent_name(name)
         attribute_center = CENTERS_XDMF[Grid_type]
         xdmf_path = self.get_attribute(attrname='xdmf_path',
-                                       node_name=name)
+                                       node_name=Grid_name)
         field_type = self.get_attribute(attrname='field_type',
                                          node_name=name)
         Xdmf_grid_node = self.xdmf_tree.find(xdmf_path)
@@ -1610,7 +1605,8 @@ class SampleData:
                                        Dimensions=Dim,
                                        NumberType=NumberType,
                                        Precision=Precision)
-        Attribute_data.text = self.h5_file + ':' + self._name_or_node_to_path(name)
+        Attribute_data.text = (self.h5_file + ':'
+                               + self._name_or_node_to_path(name) )
 
         # add data item to attribute
         Attribute_xdmf.append(Attribute_data)
@@ -1624,13 +1620,35 @@ class SampleData:
     def _get_xdmf_field_type(self, field, grid_location):
         """ Determine field's XDMF nature w.r.t. grid dimension"""
 
+        field_type = None
         # get grid dimension
-
+        if not(self._is_grid(grid_location)):
+            msg = ('(_get_xdmf_field_type) name or path `{}` is not a grid.'
+                   'Field type detection impossible'.format(grid_location))
+            self._verbose_print(msg)
+            return None
+        Type = self._get_group_type(grid_location)
         # analyze field shape
-        # allowed shapes: (npoints,ndim) or (nx1,nx2,...nxm,ndim)
-
+        if Type == 'mesh':
+            if len(field.shape) != 2:
+                msg = ('(_get_xdmf_field_type) wrong field shape. For a mesh'
+                       'field, shape should be (Nnodes,Ndim) or (NIntPts,Ndim)'
+                       '. None type returned')
+                warnings.warn(msg)
+                return field_type
+            field_dim = field.shape[1]
+        elif Type == '3DImage':
+            if (len(field.shape) < 3) or (len(field.shape) > 4):
+                msg = ('(_get_xdmf_field_type) wrong field shape. For a 3DImage'
+                       'field, shape should be (Nx1,Nx2,Nx3) or'
+                       ' (Nx1,Nx2,Nx3,Ndim). None type returned')
+                warnings.warn(msg)
+                return field_type
+            if (len(field.shape) == 3): field_dim= 1
+            if (len(field.shape) == 4): field_dim = field.shape[3]
         # determine field dimension and get name in dictionary
-        pass
+        field_type = FIELD_TYPE[field_dim]
+        return field_type
 
     def _get_node_class(self,
                         name):

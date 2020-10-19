@@ -535,21 +535,19 @@ class SampleData:
                                     groupname=meshname,
                                     indexname=indexname)
         self.content_index[indexname] = mesh_path
-
         # store mesh metadata as HDF5 attributes
-        mesh_group._v_attrs.element_topology = mesh_object.element_topology[0]
-        mesh_group._v_attrs.mesh_description = description
-        mesh_group._v_attrs.field_dim = {}
-        mesh_group._v_attrs.group_type = 'mesh'
+        Attribute_dic = {'element_topology':mesh_object.element_topology[0],
+                         'mesh_description':description,
+                         'group_type':'mesh'}
 
         self._verbose_print('Creating Nodes data set in group {} in file {}'
                             ''.format(mesh_path, self.h5_file))
-        self.h5_dataset.create_carray(
-            where=mesh_path,
-            name='Nodes',
-            filters=self.Filters,
-            obj=mesh_object.nodes,
-            title=indexname + '_Nodes')
+        Nodes = self.h5_dataset.create_carray(where=mesh_path,
+                                      name='Nodes',
+                                      filters=self.Filters,
+                                      obj=mesh_object.nodes,
+                                      title=indexname + '_Nodes')
+        Nodes_path = Nodes._v_pathname
 
         # safety check
         if (len(mesh_object.element_topology) > 1):
@@ -560,18 +558,17 @@ class SampleData:
 
         self._verbose_print('Creating Elements data set in group {} in file {}'
                             ''.format(location + '/' + meshname, self.h5_file))
-        self.h5_dataset.create_carray(
-            where=mesh_path,
-            name='Elements',
-            filters=self.Filters,
-            obj=mesh_object.element_connectivity[0],
-            title=indexname + '_Elements')
+        Elements =self.h5_dataset.create_carray(where=mesh_path,
+                                      name='Elements',
+                                      filters=self.Filters,
+                                      obj=mesh_object.element_connectivity[0],
+                                      title=indexname + '_Elements')
+        Elements_path = Elements._v_pathname
 
         self._verbose_print('...Updating xdmf tree...', line_break=False)
-        mesh_xdmf = etree.Element(
-            _tag='Grid',
-            Name=meshname,
-            GridType='Uniform')
+        mesh_xdmf = etree.Element(_tag='Grid',
+                                  Name=meshname,
+                                  GridType='Uniform')
 
         NElements = str(mesh_object.element_connectivity[0].shape[0])
         Dim = str(mesh_object.element_connectivity[0].shape).strip(
@@ -579,34 +576,23 @@ class SampleData:
         Dim = Dim.replace(',', ' ')
 
         topology_xdmf = etree.Element(_tag='Topology',
-                                      TopologyType=mesh_object.
-                                      element_topology[0][0],
-                                      NumberOfElements=NElements)
-
-        topology_data = etree.Element(_tag='DataItem',
-                                      Format='HDF',
-                                      Dimensions=Dim,
-                                      NumberType='Int',
+                                TopologyType=mesh_object.element_topology[0][0],
+                                NumberOfElements=NElements)
+        topology_data = etree.Element(_tag='DataItem', Format='HDF',
+                                      Dimensions=Dim, NumberType='Int',
                                       Precision='64')
-
         topology_data.text = self.h5_file + ':' + mesh_path + '/Elements'
         # Add node DataItem as children of node Topology
         topology_xdmf.append(topology_data)
 
         # create Geometry element
-        geometry_xdmf = etree.Element(_tag='Geometry',
-                                      Type='XYZ')
-
+        geometry_xdmf = etree.Element(_tag='Geometry', Type='XYZ')
         Dim = str(mesh_object.nodes.shape).strip('(').strip(')').replace(
-            ',', ' ')
-        geometry_data = etree.Element(_tag='DataItem',
-                                      Format='HDF',
-                                      Dimensions=Dim,
-                                      NumberType='Float',
+                  ',', ' ')
+        geometry_data = etree.Element(_tag='DataItem', Format='HDF',
+                                      Dimensions=Dim, NumberType='Float',
                                       Precision='64')
-
         geometry_data.text = self.h5_file + ':' + mesh_path + '/Nodes'
-
         # Add node DataItem as children of node Geometry
         geometry_xdmf.append(geometry_data)
 
@@ -620,24 +606,26 @@ class SampleData:
         # Get xdmf elements paths as attributes
         #   mesh group
         el_path = self.xdmf_tree.getelementpath(mesh_xdmf)
-        mesh_group._v_attrs.xdmf_path = el_path
+        Attribute_dic['xdmf_path'] = el_path
         #   topology element
         el_path = self.xdmf_tree.getelementpath(topology_xdmf)
-        mesh_group._v_attrs.xdmf_topology_path = el_path
-        mesh_group.Elements._v_attrs.xdmf_path = el_path
+        Attribute_dic['xdmf_topology_path'] = el_path
+        Topology_attribute_dic = {'xdmf_path':el_path}
         #   geometry  element
         el_path = self.xdmf_tree.getelementpath(geometry_xdmf)
-        mesh_group._v_attrs.xdmf_geometry_path = el_path
-        mesh_group.Nodes._v_attrs.xdmf_path = el_path
+        Attribute_dic['xdmf_geometry_path'] = el_path
+        Geometry_attribute_dic = {'xdmf_path':el_path}
+
+        self.add_attributes(Attribute_dic,indexname)
+        self.add_attributes(Topology_attribute_dic,Elements_path)
+        self.add_attributes(Geometry_attribute_dic,Nodes_path)
 
         # Add mesh fields if some are stored
-        for Mesh_fields in mesh_object.fields:
-            self.add_field_to_mesh(mesh_location=location,
-                                   meshname=meshname,
-                                   field=list(Mesh_fields.values())[0],
-                                   fieldname=list(Mesh_fields.keys())[0],
-                                   field_indexname='')
-
+        for Mesh_field in mesh_object.fields:
+            self.add_data_array(location=mesh_path,
+                                name=list(Mesh_field.keys())[0],
+                                array=list(Mesh_field.values())[0],
+                                indexname=list(Mesh_field.keys())[0])
         return
 
     def add_image(self,
@@ -700,18 +688,8 @@ class SampleData:
         # create group in the h5 structure for the mesh
         self._verbose_print('Creating hdf5 group {} in file {}'.format(
             image_path, self.h5_file))
-        image_group = self.add_group(
-            path=location,
-            groupname=imagename,
-            indexname=indexname)
-
-        # store image metadata as HDF5 attributes
-        image_group._v_attrs.dimension = image_object.dimension
-        image_group._v_attrs.spacing = image_object.spacing
-        image_group._v_attrs.origin = image_object.origin
-        image_group._v_attrs.image_description = description
-        image_group._v_attrs.field_dim = {}
-        image_group._v_attrs.group_type = '3DImage'
+        image_group = self.add_group(path=location, groupname=imagename,
+                                     indexname=indexname)
 
         self._verbose_print('Updating xdmf tree...', line_break=False)
         image_xdmf = etree.Element(_tag='Grid',
@@ -761,264 +739,30 @@ class SampleData:
         # Add Grid to node Domain
         self.xdmf_tree.getroot()[0].append(image_xdmf)
 
+        # store image metadata as HDF5 attributes
+        Attribute_dic = {'dimension':image_object.dimension,
+                         'spacing':image_object.spacing,
+                         'origin':image_object.origin,
+                         'description':description,
+                         'group_type':'3DImage'}
         # Get xdmf elements paths as HDF5 attributes
         #     image group
         el_path = self.xdmf_tree.getelementpath(image_xdmf)
-        image_group._v_attrs.xdmf_path = el_path
+        Attribute_dic['xdmf_path'] = el_path
         #     topology group
         el_path = self.xdmf_tree.getelementpath(topology_xdmf)
-        image_group._v_attrs.xdmf_topology_path = el_path
+        Attribute_dic['xdmf_topology_path'] = el_path
         #     geometry group
         el_path = self.xdmf_tree.getelementpath(geometry_xdmf)
-        image_group._v_attrs.xdmf_geometry_path = el_path
+        Attribute_dic['xdmf_geometry_path'] = el_path
+        self.add_attributes(Attribute_dic,indexname)
 
         # Add mesh fields if some are stored
-        for Image_fields in image_object.fields:
-            self.add_field_to_image(image_location=location,
-                                    imagename=imagename,
-                                    field=list(Image_fields.values())[0],
-                                    fieldname=list(Image_fields.keys())[0],
-                                    field_indexname='')
-        return
-
-    def add_field_to_mesh(self,
-                          mesh_location,
-                          meshname,
-                          field,
-                          fieldname,
-                          field_indexname=''):
-        """ Add field nodal values associated to a mesh in the data structure
-
-            New fields must be added to already existing mesh
-
-            Arguments:
-                - mesh_location (str)
-                    location of the hdf5 group containing the mesh on which the
-                    field is defined
-
-                - meshname (str)
-                    name of the hdf5 group containing the mesh
-
-                - field  (np.array shape : Nnodes x Ncomponents)
-                    np.array containing the nodal values of the field. First
-                    dimension length must match first dimension of nodes array
-                    in the mesh
-
-                - fieldname (str)
-                    name of the field
-        """
-
-        if (field_indexname == ''):
-            warn_msg = (' (add_field_to_mesh) indexname not provided, '
-                        ' the fieldname {} is used instead to fill'
-                        'content index'.format(fieldname))
-            self._verbose_print(warn_msg)
-            field_indexname = fieldname
-
-        mesh_path = os.path.join(mesh_location, meshname)
-        field_path = os.path.join(mesh_path, fieldname)
-        # store mesh location in dataset index
-        self.content_index[field_indexname] = field_path
-
-        Field_type = {1: 'Scalar',
-                      2: 'Vector',
-                      3: 'Vector',
-                      6: 'Tensor6',
-                      9: 'Tensor'
-                      }
-
-        # if field has only 1 dimension, reshape it to a 2dim array
-        if (field.ndim < 2):
-            field = field.reshape([field.shape[0], 1])
-
-        # get mesh node in hdf5 data structure
-        mesh_group = self.h5_dataset.get_node(mesh_path)
-
-        # get corresponding grid node in xdmf tree
-        for grid in self.xdmf_tree.getroot()[0]:
-            if (grid.attrib['Name'] == meshname):
-                mesh_xdmf_grid = grid
-
-        # verify that number of nodes and number of nodal values match
-        if (mesh_group.Nodes.shape[0] != field.shape[0]):
-            raise ValueError(''' The nodal value array given for the field
-                              contains {} nodal values, which do not match the
-                              number of nodes in the mesh object ({} nodes)
-                             '''.format(field.shape[0],
-                                        mesh_group.Nodes.shape[0]))
-
-        # Add field data to the hdf5 data structure
-        self._verbose_print('Creating field "{}" data set in group {} in'
-                            ' file {}'.format(fieldname,
-                                              mesh_location + meshname, self.h5_file))
-        field_node = self.h5_dataset.create_carray(
-            where=mesh_path,
-            name=fieldname,
-            filters=self.Filters,
-            obj=field)
-
-        # determine AttributeType
-        for Ftype in Field_type:
-            if (Ftype == field.shape[1]):
-                Attribute_type = Field_type[Ftype]
-                break
-            else:
-                Attribute_type = 'Matrix'
-
-        # Store field attributes : nothing for now
-        mesh_group._v_attrs.field_dim.update({fieldname: Attribute_type})
-
-        # Update xdmf tree
-        # 1- create Attribute element
-        self._verbose_print('Updating xdmf tree...', line_break=False)
-        Attribute_xdmf = etree.Element(_tag='Attribute',
-                                       Name=fieldname,
-                                       AttributeType=Attribute_type,
-                                       Center='Node')
-
-        Dim = str(field.shape).strip('(').strip(')')
-        Dim = Dim.replace(',', ' ')
-        Attribute_data = etree.Element(_tag='DataItem',
-                                       Format='HDF',
-                                       Dimensions=Dim,
-                                       NumberType='Float',
-                                       Precision='64')
-        Attribute_data.text = self.h5_file + ':' + field_path
-
-        # add data item to attribute
-        Attribute_xdmf.append(Attribute_data)
-
-        # add attribute to Grid
-        mesh_xdmf_grid.append(Attribute_xdmf)
-
-        # add element path to h5 structure
-        el_path = self.xdmf_tree.getelementpath(Attribute_xdmf)
-        field_node._v_attrs.xdmf_path = el_path
-        return
-
-    def add_field_to_image(self,
-                           image_location,
-                           imagename,
-                           field,
-                           fieldname,
-                           field_indexname=''):
-        """ Add field nodal values associated to a 3D image in the data structure
-
-            New fields must be added to already existing image
-
-            Arguments:
-                - image_location (str)
-                    location of the hdf5 group containing the image on which the
-                    field is defined
-
-                - imagename (str)
-                    name of the hdf5 group containing the image
-
-                - field  (np.array shape : Nnodes x Ncomponents)
-                    np.array containing the values of the field at voxels centers.
-                    Dimension must match image dimension
-
-                - fieldname (str)
-                    name of the field
-        """
-
-        if (field_indexname == ''):
-            warn_msg = ('(add_field_to_image) indexname not provided, '
-                        ' the fieldname {} is used instead to fill'
-                        'content index'.format(fieldname))
-            self._verbose_print(warn_msg)
-            field_indexname = fieldname
-
-        image_path = os.path.join(image_location, imagename)
-        field_path = os.path.join(image_path, fieldname)
-        # store mesh location in dataset index
-        self.content_index[field_indexname] = field_path
-
-        Field_type = {1: 'Scalar',
-                      2: 'Vector',
-                      3: 'Vector',
-                      6: 'Tensor6',
-                      9: 'Tensor'
-                      }
-
-        # get image node in hdf5 data structure
-        image_group = self.h5_dataset.get_node(image_path)
-
-        # get corresponding grid node in xdmf tree
-        for grid in self.xdmf_tree.getroot()[0]:
-            if (grid.attrib['Name'] == imagename):
-                image_xdmf_grid = grid
-
-        # verify that number of nodes and number of nodal values match
-        if (image_group._v_attrs.dimension != field.shape):
-            raise ValueError(''' The array given for the field
-                              contains {} cell values, which do not match the
-                              dimensions of the image object ({} voxels)
-                             '''.format(field.shape[0],
-                                        image_group._v_attrs.dimension))
-
-        # Add field data to the hdf5 data structure
-        self._verbose_print('Creating field "{}" data set in group {} in'
-                            ' file {}'.format(
-            fieldname, image_location + imagename, self.h5_file))
-        self._verbose_print('Creating field with following compression'
-                            ' Filters : ')
-        self._verbose_print(str(self.Filters))
-        field_node = self.h5_dataset.create_carray(
-            where=image_path,
-            name=fieldname,
-            filters=self.Filters,
-            obj=field)
-        self._verbose_print('CREATED field compression Filters : ')
-        self._verbose_print(str(field_node.filters))
-
-        for Ftype in Field_type:
-            if (Ftype == field.shape[1]):
-                Attribute_type = Field_type[Ftype]
-                break
-            else:
-                Attribute_type = 'Matrix'
-
-        # Store field attributes : nothing for now
-        image_group._v_attrs.field_dim.update({fieldname: Attribute_type})
-
-        # Update xdmf tree
-        # 1- create Attribute element
-        self._verbose_print('Updating xdmf tree...', line_break=False)
-        Attribute_xdmf = etree.Element(_tag='Attribute',
-                                       Name=fieldname,
-                                       AttributeType=Attribute_type,
-                                       Center='Cell')
-
-        Dim = str(field.shape).strip('(').strip(')')
-        Dim = Dim.replace(',', ' ')
-
-        if (np.issubdtype(field.dtype, np.floating)):
-            NumberType = 'Float'
-            if (str(field.dtype) == 'float'):
-                Precision = '32'
-            else:
-                Precision = '64'
-        elif (np.issubdtype(field.dtype, np.integer)):
-            NumberType = 'Int'
-            Precision = str(field.dtype).strip('int')
-
-        Attribute_data = etree.Element(_tag='DataItem',
-                                       Format='HDF',
-                                       Dimensions=Dim,
-                                       NumberType=NumberType,
-                                       Precision=Precision)
-        Attribute_data.text = self.h5_file + ':' + field_path
-
-        # add data item to attribute
-        Attribute_xdmf.append(Attribute_data)
-
-        # add attribute to Grid
-        image_xdmf_grid.append(Attribute_xdmf)
-
-        # add element path to h5 structure
-        el_path = self.xdmf_tree.getelementpath(Attribute_xdmf)
-        field_node._v_attrs.xdmf_path = el_path
+        for Image_field in image_object.fields:
+            self.add_data_array(location=image_path,
+                                name=list(Image_field.keys())[0],
+                                array=list(Image_field.values())[0],
+                                indexname=list(Image_field.keys())[0])
         return
 
     def add_group(self,
@@ -1038,19 +782,17 @@ class SampleData:
         self.content_index[indexname] = path + groupname
 
         try:
-            Group = self.h5_dataset.create_group(
-                where=path,
-                name=groupname,
-                title=indexname)
+            Group = self.h5_dataset.create_group(where=path, name=groupname,
+                                                 title=indexname)
+            self.add_attributes(dic={'group_type':'Data'},
+                                nodename=Group)
             return Group
         except Tb.NodeError:
             node_path = os.path.join(path, groupname)
             if (self.h5_dataset.__contains__(node_path)):
                 if replace:
-                    Group = self.h5_dataset.create_group(
-                        where=path,
-                        name=groupname,
-                        title=indexname)
+                    Group = self.h5_dataset.create_group(where=path,
+                                                name=groupname, title=indexname)
                     return Group
                 else:
                     warn_msg = ('\n(add_group) group {} already exists,'
@@ -1066,11 +808,6 @@ class SampleData:
             else:
                 raise
 
-    # =========================================================================
-    # TODO : implement this
-    #       -- Test
-    #       -- Replace add_field_to_mesh add_image_to_mesh by add_data_array
-    #==========================================================================
     def add_data_array(self,
                        location,
                        name,
@@ -1140,7 +877,7 @@ class SampleData:
             self._verbose_print('\t * No Compression')
 
         # get location type
-        if location_exists:
+        if location_exists and self._is_grid(location):
             self._check_field_compatibility(location,array)
         self._verbose_print('Adding array `{}` into `{}`'
                             ''.format(name,location))
@@ -1428,9 +1165,7 @@ class SampleData:
                 Node.remove()
             self._verbose_print('Node sucessfully removed, '
                                 'new data structure is:\n')
-            self._verbose_print(str(self.h5_dataset))
-            self._verbose_print('New data structure is:\n')
-            self._verbose_print(self.print_index())
+            self._verbose_print(self.__repr__())
 
         return
 
@@ -1538,6 +1273,9 @@ class SampleData:
             compatibility = self._compatibility_with_image(name, field)
         elif group_type == 'mesh':
             compatibility = self._compatibility_with_mesh(name,field)
+        else:
+            msg = ('location {} is not a grid.'.format(name))
+            raise ValueError(msg)
 
         if not(compatibility):
             msg = ('Array dimensions not compatible with location {}'

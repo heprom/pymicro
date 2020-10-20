@@ -235,6 +235,39 @@ class SampleData:
             self.write_xdmf()
         return
 
+    def init_content_index(self):
+        """
+            Initialize SampleData dictionary attribute that stores the name and
+            the location of dataset/group/attribute stored in the h5 file.
+            The dic. is synchronized with the hdf5 Group '/Index' from Root.
+            Its items are stored there as HDF5 attributes when the SampleData
+            object is destroyed.
+
+            This dic. is used by other methods to easily access/Add/remove/
+            modify nodes et contents in the h5 file/Pytables tree structure
+        """
+
+        minimal_dic = self.return_minimal_content()
+        self.minimal_content = {key: '' for key in minimal_dic}
+        self.content_index = {}
+        self.aliases = {}
+
+        if self.file_exist:
+            self.content_index = self.get_dic_from_attributes(
+                                                    node_path='/Index')
+            self.aliases = self.get_dic_from_attributes(
+                                                    node_path='/Index/Aliases')
+        else:
+            self.h5_dataset.create_group('/', name='Index')
+            self.add_attributes(
+                 dic=self.minimal_content,
+                 nodename='/Index')
+            self.content_index = self.get_dic_from_attributes(
+                node_path='/Index')
+            self.h5_dataset.create_group('/Index', name='Aliases')
+            self.aliases = {}
+        return
+
     def print_xdmf(self):
         """ Print a readable version of xdmf_tree content"""
 
@@ -262,40 +295,6 @@ class SampleData:
         with open(self.xdmf_file, 'w') as f:
             f.writelines(lines)
 
-        return
-
-    # =========================================================================
-    # TODO : implement add to content_index with check of existing name and
-    #        aliases mechanism
-    #
-    # TODO : implement alias mechanism (get path with name & )
-    # =========================================================================
-    def init_content_index(self):
-        """
-            Initialize SampleData dictionary attribute that stores the name and
-            the location of dataset/group/attribute stored in the h5 file.
-            The dic. is synchronized with the hdf5 Group '/Index' from Root.
-            Its items are stored there as HDF5 attributes when the SampleData
-            object is destroyed.
-
-            This dic. is used by other methods to easily access/Add/remove/
-            modify nodes et contents in the h5 file/Pytables tree structure
-        """
-
-        minimal_dic = self.return_minimal_content()
-        self.minimal_content = {key: '' for key in minimal_dic}
-        self.content_index = {}
-
-        if self.file_exist:
-            self.content_index = self.get_dic_from_attributes(
-                node_path='/Index')
-        else:
-            self.h5_dataset.create_group('/', name='Index')
-            self.add_attributes(
-                 dic=self.minimal_content,
-                 nodename='/Index')
-            self.content_index = self.get_dic_from_attributes(
-                node_path='/Index')
         return
 
     def print_dataset_content(self, as_string=False):
@@ -326,6 +325,11 @@ class SampleData:
         for key, value in self.content_index.items():
             s += str('\t Name : {:20}  H5_Path : {} \t\n'.format(
                         key, value))
+            if key in self.aliases:
+                s += str('\t {} aliases -->'.format(key))
+                for aliasname in self.aliases[key]:
+                    s += str(' `'+aliasname+'`')
+                s += '\n'
         if not(as_string):
             print(s)
             s = ''
@@ -340,10 +344,12 @@ class SampleData:
                             line_break=False)
         self.add_attributes(dic=self.content_index,
                                      nodename='/Index')
+        self.add_attributes(dic=self.aliases,
+                                     nodename='/Index/Aliases')
         self.write_xdmf()
         self._verbose_print('.... flushing data in file {}'.format(
-            self.h5_file),
-            line_break=False)
+                                self.h5_file),
+                                line_break=False)
         self.h5_dataset.flush()
         self._verbose_print('File {} synchronized with in memory data tree'
                             ''.format(self.h5_file),
@@ -534,7 +540,6 @@ class SampleData:
         mesh_group = self.add_group(path=location,
                                     groupname=meshname,
                                     indexname=indexname)
-        self.content_index[indexname] = mesh_path
         # store mesh metadata as HDF5 attributes
         Attribute_dic = {'element_topology':mesh_object.element_topology[0],
                          'mesh_description':description,
@@ -779,7 +784,7 @@ class SampleData:
 
             self._verbose_print(warn_msg)
             indexname = groupname
-        self.content_index[indexname] = path + groupname
+        self.add_to_index(indexname, path+groupname)
 
         try:
             Group = self.h5_dataset.create_group(where=path, name=groupname,
@@ -863,7 +868,7 @@ class SampleData:
                         ''.format(name))
             self._verbose_print(warn_msg)
             indexname = name
-        self.content_index[indexname] = os.path.join(location_path,name)
+        self.add_to_index(indexname,os.path.join(location_path,name))
 
         # get compression options
         Filters = self._get_local_compression_opt(**keywords)
@@ -917,10 +922,44 @@ class SampleData:
             Node._v_attrs[key] = value
         return
 
-    def get_indexname_from_path(self,
-                                node_path):
-        """Return the key of the given node_path in the content index."""
+    def add_alias(self, aliasname, path):
+        """Add alias name to the input path"""
+        Is_present = (self._is_in_index(aliasname)
+                      and self._is_alias(aliasname))
+        if Is_present:
+            msg =('Name `{}` already in content_index : duplicates not allowed'
+                  ' in Index'.format(aliasname))
+            self._verbose_print(msg)
+        else:
+            indexname = self.get_indexname_from_path(path)
+            if indexname in self.aliases:
+                self.aliases[indexname].append(aliasname)
+            else:
+                self.aliases[indexname] = [aliasname]
+        return
 
+    def add_to_index(self, indexname, path):
+        """ Add path to index if indexname is not already in content_index"""
+        Is_present = (self._is_in_index(indexname)
+                      and self._is_alias(indexname))
+        if Is_present:
+            raise ValueError('Name `{}` already in '
+                             'content_index : duplicates not allowed in Index'
+                             ''.format(indexname))
+        else:
+            for item in self.content_index:
+                if path == self.content_index[item]:
+                    msg = (' (add_to_index) indexname provided for a path ({})'
+                           'that already in index --> stored as alias name.'
+                           ''.format(path))
+                    self._verbose_print(msg)
+                    self.add_alias(indexname, path)
+                    return
+            self.content_index[indexname] = path
+        return
+
+    def get_indexname_from_path(self, node_path):
+        """Return the key of the given node_path in the content index."""
         key = ''
         for k in self.content_index.keys():
             if (self.content_index[k] == node_path):
@@ -1184,7 +1223,7 @@ class SampleData:
             for which the subclass is designed
 
         """
-        minimal_content_index_dic = []
+        minimal_content_index_dic = {}
         return minimal_content_index_dic
 
     # =============================================================================
@@ -1197,11 +1236,12 @@ class SampleData:
         try:
             key = self.get_indexname_from_path(node_path)
             removed_path = self.content_index.pop(key)
+            self.aliases.pop(key)
             self._verbose_print('item {} : {} removed from context index'
                                 ' dictionary'.format(key, removed_path))
         except ValueError:
-            print('node {} not found in content index values for removal'
-                  ''.format(node_path))
+            self._verbose_print('node {} not found in content index values for'
+                                'removal'.format(node_path))
         return
 
     def _name_or_node_to_path(self, name_or_node):
@@ -1219,6 +1259,10 @@ class SampleData:
         if name_or_node in self.content_index:
             # name is a key in content index
             path = self._get_path_with_indexname(name_or_node)
+        if self._is_alias(name_or_node):
+            # name is a an alias for a node path in content_index
+            temp_name = self._is_alias_for(name_or_node)
+            path = self._get_path_with_indexname(temp_name)
         # if not found with indexname or is not a path
         # find nodes with this name. If several nodes have this name
         # return warn message and return None
@@ -1265,6 +1309,27 @@ class SampleData:
             return True
         else:
             return False
+
+    def _is_in_index(self,name):
+        return (name in self.content_index)
+
+    def _is_alias(self,name):
+        """ Chekc if name is an HDF5 node alias"""
+        Is_alias = False
+        for item in self.aliases:
+            if (name in self.aliases[item]):
+                Is_alias = True
+                break
+        return Is_alias
+
+    def _is_alias_for(self,name):
+        """ Returns the indexname for which input name is an alias"""
+        Indexname = None
+        for item in self.aliases:
+            if (name in self.aliases[item]):
+                Indexname = item
+                break
+        return Indexname
 
     def _check_field_compatibility(self, name, field):
         """ check if field dimension is compatible with the storing location"""
@@ -1442,7 +1507,7 @@ class SampleData:
         s += str(' -- Childrens : ')
         for child in Group._v_children:
             s += str('{}, '.format(child))
-        s += str('\n----------------\n')
+        s += str('\n----------------')
         if not(as_string):
             print(s)
             s = ''
@@ -1463,7 +1528,7 @@ class SampleData:
             value = Node._v_attrs[attr]
             s += str('\t {} : {}\n'.format(attr, value))
         s += str(' -- content : {}\n'.format(str(Node)))
-        s += str('----------------\n')
+        s += str('----------------')
         if not(as_string):
             print(s)
             s = ''

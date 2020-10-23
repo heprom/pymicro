@@ -2168,9 +2168,10 @@ def show_boundaries(grid, array_id=0, array_name=None, write=False):
     grid.GetCellData().SetActiveScalars(array_name)
     # we use a vtkAppendPolyData to gather all the boundaries
     append = vtk.vtkAppendPolyData()
-    gids_range = array.GetRange()
-    print('field range used to find the boudnaries: [%d - %d]' % (gids_range[0], gids_range[1]))
-    for gid in range(int(gids_range[0]), 1 + int(gids_range[1])):
+    numpy_array = numpy_support.vtk_to_numpy(array)
+    gids_list = np.unique(numpy_array)
+    print('field range used to find the boudnaries: [%d - %d]' % (gids_list[0], gids_list[-1]))
+    for gid in gids_list:
         print('trying gid=%d' % gid)
         thresh = vtk.vtkThreshold()
         thresh.SetInputData(grid)

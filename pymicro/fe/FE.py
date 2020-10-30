@@ -638,6 +638,27 @@ class FE_Mesh():
         f.write('***return\n')
         f.close()
 
+    def translate_mesh(self, T):
+        """Translate a mesh by modifying the nodes coordinates."""
+        assert len(T) == self._dim
+        print('translating mesh')
+        for node in self._nodes:
+            node._x += T[0]
+            node._y += T[1]
+            if self._dim == 3:
+                node._z += T[2]
+
+    def rotate_mesh(self, R):
+        """Rotate a mesh by transforming the nodes coordinates using a rotation matrix."""
+        assert R.shape[0] == R.shape[1]
+        assert R.shape[0] == self._dim
+        print('rotating mesh')
+        for node in self._nodes:
+            new_position = numpy.dot(R, [node._x, node._y, node._z])
+            node._x = new_position[0]
+            node._y = new_position[1]
+            node._z = new_position[2]
+
     def compute_id_to_rank(self, nodes=True):
         if nodes:
             the_list = self._nodes

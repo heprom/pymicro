@@ -247,7 +247,7 @@ class SampleData:
             modify nodes et contents in the h5 file/Pytables tree structure
         """
 
-        minimal_dic = self.return_minimal_content()
+        minimal_dic = self._minimal_content()
         self.minimal_content = {key: '' for key in minimal_dic}
         self.content_index = {}
         self.aliases = {}
@@ -299,12 +299,35 @@ class SampleData:
 
     def print_dataset_content(self, as_string=False):
         """ Print information on all nodes in hdf5 file"""
-        s = '\n****** DATA SET CONTENT ******\n   {} \n'.format(self.h5_file)
+        s = '\n****** DATA SET CONTENT ******\n   {}'.format(self.h5_file)
         if not(as_string):
             print(s)
-        for node in self.h5_dataset:
+        s += self.get_node_info('/', as_string)
+        for node in self.h5_dataset.root:
             if not(node._v_name == 'Index'):
-                s += self.get_node_info(node._v_name, as_string)
+                s +=self.get_node_info(node._v_name, as_string)
+                s += self.print_group_content(node._v_name,
+                                              recursive = True,
+                                              as_string = as_string)
+                s += '************************************************'
+                if not(as_string):
+                    print('************************************************')
+        return s
+
+    def print_group_content(self, groupname,
+                            recursive=False,
+                            as_string=False):
+        """  Print information on all nodes in hdf5 group """
+        s = '\n****** GROUP {} CONTENT ******'.format(groupname)
+        if not(as_string):
+            print(s)
+        group = self.get_node(groupname)
+        for node in group._f_iter_nodes():
+            s += self.get_node_info(node._v_name, as_string)
+            if (self._is_group(node._v_name) and recursive):
+                self.print_group_content(node._v_pathname,
+                                         recursive=True,
+                                         as_string=as_string)
         return s
 
     def print_data_arrays(self, as_string=False):
@@ -888,8 +911,6 @@ class SampleData:
                             ''.format(name,location))
 
         # Create dataset node to store array
-        print('location_path is {}'.format(location_path))
-        print('name is {}'.format(name))
         Node = self.h5_dataset.create_carray(where=location_path, name=name,
                                       filters=Filters, obj=array)
 
@@ -919,7 +940,7 @@ class SampleData:
         """
         Node = self.get_node(nodename)
         for key, value in dic.items():
-            Node._v_attrs[key] = value
+                Node._v_attrs[key] = value
         return
 
     def add_alias(self, aliasname, path):
@@ -1074,7 +1095,22 @@ class SampleData:
         else:
             attribute = self.h5_dataset.get_node_attr(where=data_path,
                                                       attrname=attrname)
+            if isinstance(attribute,bytes):
+                attribute = attribute.decode()
         return attribute
+
+    def get_file_disk_size(self):
+        units = ['bytes','Kb','Mb','Gb','Tb','Pb']
+        fsize = os.path.getsize(self.h5_file)
+        k=0
+        unit = units[k]
+        while fsize/1024 > 1:
+            k = k+1
+            fsize = fsize/1024
+            unit = units[k]
+        print('File size is {:4.3f} {} for file \n {}'.format(fsize,unit,
+                                                       self.h5_file))
+        return fsize, unit
 
     def set_global_compression_opt(self, **keywords):
         """
@@ -1208,7 +1244,11 @@ class SampleData:
 
         return
 
-    def return_minimal_content(self):
+    # =========================================================================
+    #  SampleData private utilities
+    # =========================================================================
+
+    def _minimal_content(self):
         """
             Specify the minimal contents of the hdf5 (Node names, organization)
             in the form of a dictionary {content:Location}
@@ -1226,9 +1266,6 @@ class SampleData:
         minimal_content_index_dic = {}
         return minimal_content_index_dic
 
-    # =============================================================================
-    #  SampleData private utilities
-    # =============================================================================
     def _remove_from_index(self,
                            node_path):
         """Remove a hdf5 node from content index dictionary"""
@@ -1287,7 +1324,7 @@ class SampleData:
     def _is_array(self, name):
         """ find out if name or path references an array dataset"""
         Class = self._get_node_class(name)
-        List = ['CARRAY', 'EARRAY', 'VLARRAY', 'ARRAY', ]
+        List = ['CARRAY', 'EARRAY', 'VLARRAY', 'ARRAY', 'TABLE']
         if (Class in List):
             return True
         else:
@@ -1469,6 +1506,8 @@ class SampleData:
 
     def _get_group_type(self, groupname):
         """  """
+        if groupname == '/':
+            return 'GROUP'
         if self._is_group(groupname):
             grouptype = self.get_attribute(attrname='group_type',
                                            node_name=groupname)
@@ -1582,7 +1621,7 @@ class SampleData:
 
     def _set_defaut_compression(self):
         """ Returns a Filter object with defaut compression parameters """
-        Filters = Tb.Filters(complib='zlib', complevel=1, shuffle=True)
+        Filters = Tb.Filters(complib='zlib', complevel=0, shuffle=True)
         return Filters
 
     def _verbose_print(self, message, line_break=True):

@@ -59,7 +59,7 @@ def edf_info(file_name, header_size=None, verbose=False):
     """Read and return informations contained in the header of a .edf file.
 
     Edf files always start with a header (of variable length) containing
-    informations about the file such as acquisition conditions, image
+    information about the file such as acquisition conditions, image
     dimensions... This function reads a certain amount of bytes of a given
     file as ascii data and unpack it.
     If not specified, the header size is determined automatically by
@@ -69,7 +69,7 @@ def edf_info(file_name, header_size=None, verbose=False):
     :param str file_name: the name of the edf file to read.
     :param int header_size: number of bytes to read as a multiple of 512 (None by default).
     :param bool verbose: flag to activate verbose mode.
-    :return: a dictionnary containing the file informations.
+    :return: a dictionary containing the file information.
     """
     try:
         f = open(file_name, 'r', encoding='latin-1')

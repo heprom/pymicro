@@ -1872,6 +1872,83 @@ class Microstructure:
                 print('grain %d center: %.3f, %.3f, %.3f' % (g.id, com[0], com[1], com[2]))
             g.center = com
 
+    def to_amitex_fftp(self, binary=True):
+        """Write orientation data to ascii files to prepare for FFT computation.
+
+        AMITEX_FFTP can be used to compute the elastoplastic response of polycrystalline microstructures. The
+        calculation needs orientation data for each grain written in the form of the coordinates of the first two basis
+        vectors expressed in the crystal local frame which is given by the first two columns of the orientation matrix.
+        The values are written in 6 files N1X.txt, N1Y.txt, N1Z.txt, N2X.txt, N2Y.txt, N2Z.txt, each containing n values
+        with n the number of grains. The data is written either in BINARY or in ASCII form.
+
+        :param bool binary: flag to write the files in binary or ascii format.
+        """
+        ext = 'bin' if binary else 'txt'
+        n1x = open('N1X.%s' % ext, 'w')
+        n1y = open('N1Y.%s' % ext, 'w')
+        n1z = open('N1Z.%s' % ext, 'w')
+        n2x = open('N2X.%s' % ext, 'w')
+        n2y = open('N2Y.%s' % ext, 'w')
+        n2z = open('N2Z.%s' % ext, 'w')
+        files = [n1x, n1y, n1z, n2x, n2y, n2z]
+        if binary:
+            import struct
+            for f in files:
+                f.write('%d \ndouble \n' % self.get_number_of_grains())
+                f.close()
+            n1x = open('N1X.%s' % ext, 'ab')
+            n1y = open('N1Y.%s' % ext, 'ab')
+            n1z = open('N1Z.%s' % ext, 'ab')
+            n2x = open('N2X.%s' % ext, 'ab')
+            n2y = open('N2Y.%s' % ext, 'ab')
+            n2z = open('N2Z.%s' % ext, 'ab')
+            for g in self.grains:
+                gt = g.orientation_matrix().T
+                n1 = gt[0]
+                n2 = gt[1]
+                n1x.write(struct.pack('>d', n1[0]))
+                n1y.write(struct.pack('>d', n1[1]))
+                n1z.write(struct.pack('>d', n1[2]))
+                n2x.write(struct.pack('>d', n2[0]))
+                n2y.write(struct.pack('>d', n2[1]))
+                n2z.write(struct.pack('>d', n2[2]))
+        else:
+            for g in self.grains:
+                gt = g.orientation_matrix().T
+                n1 = gt[0]
+                n2 = gt[1]
+                n1x.write('%f\n' % n1[0])
+                n1y.write('%f\n' % n1[1])
+                n1z.write('%f\n' % n1[2])
+                n2x.write('%f\n' % n2[0])
+                n2y.write('%f\n' % n2[1])
+                n2z.write('%f\n' % n2[2])
+        n1x.close()
+        n1y.close()
+        n1z.close()
+        n2x.close()
+        n2y.close()
+        n2z.close()
+        print('orientation data written for AMITEX_FFTP')
+
+        # if possible, write the vtk file to run the computation
+        if hasattr(self, 'grain_map') and self.grain_map is not None:
+            # convert the grain map to vtk file
+            from vtk.util import numpy_support
+            vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(self.grain_map, order='F'), deep=1)
+            vtk_data_array.SetName('GrainIds')
+            grid = vtk.vtkImageData()
+            size = self.grain_map.shape
+            grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
+            grid.GetCellData().SetScalars(vtk_data_array)
+            grid.SetSpacing(self.voxel_size, self.voxel_size, self.voxel_size)
+            writer = vtk.vtkStructuredPointsWriter()
+            writer.SetFileName('%s_pymicro.vtk' % self.name)
+            if binary:
+                writer.SetFileTypeToBinary()
+            writer.SetInputData(grid)
+            writer.Write()
+            print('grain map written in legacy vtk form for AMITEX_FFTP')
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """
@@ -2072,7 +2149,7 @@ class Microstructure:
         print('creating microstructure from Neper tesselation %s' % neper_file)
         name, ext = os.path.splitext(neper_file)
         print(name, ext)
-        assert ext == '.tesr'  # suing raster tesselation
+        assert ext == '.tesr'  # assuming raster tesselation
         micro = Microstructure(name=name)
         with open(neper_file_path, 'r', encoding='latin-1') as f:
             line = f.readline()  # ***tesr

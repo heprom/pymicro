@@ -1456,11 +1456,12 @@ class Microstructure:
 
         :param int slice: the slice number
         :param str color: a string to chose the colormap from ('random', 'ipf')
+        :param bool show_mask: a flag to show the mask by transparency.
         """
         if not hasattr(self, 'grain_map'):
             print('Microstructure instance mush have a grain_map field to use this method')
             return
-        if not slice or slice > self.grain_map.shape[2] or slice < 0:
+        if slice is None or slice > self.grain_map.shape[2] - 1 or slice < 0:
             slice = self.grain_map.shape[2] // 2
             print('using slice value %d' % slice)
         if color == 'random':
@@ -1469,7 +1470,11 @@ class Microstructure:
             grain_cmap = self.ipf_cmap()
         else:
             grain_cmap = 'viridis'
-        plt.imshow(self.grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
+        fig, ax = plt.subplots()
+        ax.imshow(self.grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
+        ax.xaxis.set_label_position('top')
+        plt.xlabel('X')
+        plt.ylabel('Y')
         if hasattr(self, 'mask') and show_mask:
             from pymicro.view.vol_utils import alpha_cmap
             plt.imshow(self.mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
@@ -2184,7 +2189,6 @@ class Microstructure:
             oridescriptor = f.readline().strip()  # must be euler-bunge:passive
             if oridescriptor != 'euler-bunge:passive':
                 print('Wrong orientation descriptor: %s, must be euler-bunge:passive' % oridescriptor)
-                return
             for i in range(n):
                 euler_angles = np.array(f.readline().split()).astype(float).tolist()
                 print('adding grain %d' % grain_ids[i])
@@ -2199,7 +2203,8 @@ class Microstructure:
             data = np.fromfile(f, dtype=np.uint16)[:-4]  # leave out the last 4 values
             print(data.shape)
             assert np.prod(dims) == data.shape[0]
-            micro.set_grain_map(data.reshape(dims), voxel_size[0])
+            micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0), voxel_size[0])  # swap X/Z axes
+            micro.recompute_grain_centers()
         print('done')
         return micro
 

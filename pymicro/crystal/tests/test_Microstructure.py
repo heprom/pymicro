@@ -11,38 +11,60 @@ class MicrostructureTests(unittest.TestCase):
     def setUp(self):
         print('testing the Microstructure class')
         self.test_eulers = [(45., 45, 0.), (10., 20, 30.), (191.9, 69.9, 138.9)]
-        self.micro = Microstructure()
-        self.micro.name = 'test'
+
+    def test_base(self):
+        micro = Microstructure(name='test', autodelete=True)
+        gr = micro.grains.row
         for i in range(len(self.test_eulers)):
             euler = self.test_eulers[i]
-            self.micro.grains.append(Grain(i + 1, Orientation.from_euler(euler)))
+            gr['idnumber'] = i
+            gr['orientation'] = Orientation.from_euler(euler).rod
+            gr.append()
+        micro.grains.flush()
+        self.assertEqual(micro.grains.nrows,3)
+        self.assertTrue(micro.name=='test')
+        self.assertTrue(os.path.exists(micro.h5_file))
+        self.assertTrue(os.path.exists(micro.xdmf_file))
+        h5_file = micro.h5_file
+        xdmf_file = micro.xdmf_file
+        del micro
+        self.assertTrue(not os.path.exists(h5_file))
+        self.assertTrue(not os.path.exists(xdmf_file))
 
-    def test_to_h5(self):
-        self.micro.to_h5()
-        # read the file we have just written
-        m = Microstructure.from_h5('%s.h5' % self.micro.name)
-        self.assertEqual(len(m.grains), len(self.test_eulers))
-        os.remove('%s.h5' % self.micro.name)
+#    def test_to_h5(self):
+#        self.micro.to_h5()
+#        # read the file we have just written
+#        m = Microstructure.from_h5('%s.h5' % self.micro.name)
+#        self.assertEqual(len(m.grains), len(self.test_eulers))
+#        os.remove('%s.h5' % self.micro.name)
 
     def test_from_dct(self):
         # read a microstructure from a DCT index.mat file
-        m = Microstructure.from_dct(data_dir=PYMICRO_EXAMPLES_DATA_DIR, grain_file='t5_dct_cen_index.mat', use_dct_path=False)
-        self.assertEqual(len(m.grains), 146)
+        m = Microstructure.from_dct(data_dir=PYMICRO_EXAMPLES_DATA_DIR,
+                                    grain_file='t5_dct_cen_index.mat',
+                                    use_dct_path=False)
+        m.autodelete = True
+        self.assertEqual(m.grains.nrows, 146)
 
     def test_from_h5(self):
         # read a test microstructure
         m = Microstructure.from_h5(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 't5_dct_slice.h5'))
-        self.assertEqual(len(m.grains), 21)
+        m.autodelete = True
+        self.assertEqual(m.grains.nrows, 21)
         self.assertEqual(m.get_voxel_size(), 0.0014)
-        self.assertEqual(type(m.get_grain_map()), np.ndarray)
-        self.assertEqual(type(m.get_mask()), np.ndarray)
+        self.assertEqual(type(m.get_grain_map(as_numpy=True)), np.ndarray)
+        self.assertEqual(type(m.get_mask(as_numpy=True)), np.ndarray)
+        self.assertTrue(True)
+        del m
 
     def test_find_neighbors(self):
         m = Microstructure.from_h5(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 't5_dct_slice.h5'))
+        m.autodelete = True
         neighbors = m.find_neighbors(grain_id=5, distance=3)
         self.assertEqual(len(neighbors), 9)
         for gid in [0, 1, 3, 14, 17, 18, 25, 51, 115]:
             self.assertTrue(gid in neighbors)
+        del m
 
 
 class OrientationTests(unittest.TestCase):

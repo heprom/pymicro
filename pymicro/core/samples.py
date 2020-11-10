@@ -28,6 +28,7 @@ import os
 from lxml import etree
 from lxml.builder import ElementMaker
 
+import shutil
 import numpy as np
 import tables as Tb
 import h5py as h5
@@ -36,7 +37,7 @@ import pymicro.core.geof as geof
 
 # Module global variables for xdmf compatibility
 FIELD_TYPE = {1: 'Scalar', 2: 'Vector', 3: 'Vector', 6: 'Tensor6', 9: 'Tensor'}
-CENTERS_XDMF = {'3DImage': 'Cell', 'mesh': 'Node'}
+CENTERS_XDMF = {'3DImage': 'Cell', 'Mesh': 'Node'}
 
 # usefull lists to parse keyword arguments
 compression_keys = ['complib', 'complevel', 'shuffle', 'bitshuffle', 'checksum',
@@ -88,6 +89,7 @@ class SampleData:
                  sample_description="""  """,
                  verbose=False,
                  overwrite_hdf5=False,
+                 autodelete=False,
                  **keywords):
         """ DataSample initialization
 
@@ -128,10 +130,12 @@ class SampleData:
 
         # initiate verbosity flag
         self._verbose = verbose
+        self.autodelete = autodelete
 
         # if file exists and overwrite flag is True, delete it
         if os.path.exists(self.h5_file) and overwrite_hdf5:
-            self._verbose_print('-- File "{}" exists  and will be overwritten'.format(self.h5_file))
+            self._verbose_print('-- File "{}" exists  and will be '
+                                'overwritten'.format(self.h5_file))
             os.remove(self.h5_file)
 
         # h5 table file object creation
@@ -146,7 +150,7 @@ class SampleData:
             Compression_keywords = {k: v for k, v in keywords.items() if k in \
                                     compression_keys}
             self.set_global_compression_opt(**Compression_keywords)
-
+        self.sync()
         return
 
     def __del__(self):
@@ -163,8 +167,13 @@ class SampleData:
         """
         self._verbose_print('Deleting DataSample object ')
         self.sync()
+        self.repack_h5file()
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
+        if self.autodelete:
+            self._verbose_print('Autodelete: Removing hdf5 and xdmf files')
+            os.remove(self.h5_file)
+            os.remove(self.xdmf_file)
         return
 
     def __repr__(self):
@@ -172,6 +181,14 @@ class SampleData:
         s = self.print_index(as_string=True)
         s += self.print_dataset_content(as_string=True)
         return s
+
+    def __contains__(self, name):
+        """ Check if inputed name/indexname/path is a HDF5 node in dataset"""
+        path = self._name_or_node_to_path(name)
+        if path is None:
+            return False
+        else:
+            return self.h5_dataset.__contains__(path)
 
     def init_file_object(self,
                          sample_name='',
@@ -185,10 +202,10 @@ class SampleData:
             self._verbose_print('-- Opening file "{}" '.format(self.h5_file),
                                 line_break=False)
             self.file_exist = True
-            self.init_content_index()
             self.Filters = self.h5_dataset.filters
-            self._verbose_print(' ****** File content *****')
-            self._verbose_print(repr(self))
+            self._init_data_model()
+            self._verbose_print('**** FILE CONTENT ****')
+            self._verbose_print(SampleData.__repr__(self))
         except IOError:
             self._verbose_print('-- File "{}" not found : file'
                                 ' created'.format(self.h5_file))
@@ -197,7 +214,7 @@ class SampleData:
             # add sample name and description
             self.h5_dataset.root._v_attrs.sample_name = sample_name
             self.h5_dataset.root._v_attrs.description = sample_description
-            self.init_content_index()
+            self._init_data_model()
         return
 
     def init_xml_tree(self):
@@ -235,39 +252,6 @@ class SampleData:
             self.write_xdmf()
         return
 
-    def init_content_index(self):
-        """
-            Initialize SampleData dictionary attribute that stores the name and
-            the location of dataset/group/attribute stored in the h5 file.
-            The dic. is synchronized with the hdf5 Group '/Index' from Root.
-            Its items are stored there as HDF5 attributes when the SampleData
-            object is destroyed.
-
-            This dic. is used by other methods to easily access/Add/remove/
-            modify nodes et contents in the h5 file/Pytables tree structure
-        """
-
-        minimal_dic = self._minimal_content()
-        self.minimal_content = {key: '' for key in minimal_dic}
-        self.content_index = {}
-        self.aliases = {}
-
-        if self.file_exist:
-            self.content_index = self.get_dic_from_attributes(
-                                                    node_path='/Index')
-            self.aliases = self.get_dic_from_attributes(
-                                                    node_path='/Index/Aliases')
-        else:
-            self.h5_dataset.create_group('/', name='Index')
-            self.add_attributes(
-                 dic=self.minimal_content,
-                 nodename='/Index')
-            self.content_index = self.get_dic_from_attributes(
-                node_path='/Index')
-            self.h5_dataset.create_group('/Index', name='Aliases')
-            self.aliases = {}
-        return
-
     def print_xdmf(self):
         """ Print a readable version of xdmf_tree content"""
 
@@ -299,33 +283,41 @@ class SampleData:
 
     def print_dataset_content(self, as_string=False):
         """ Print information on all nodes in hdf5 file"""
-        s = '\n****** DATA SET CONTENT ******\n   {}'.format(self.h5_file)
+        s = '\n****** DATA SET CONTENT ******\n File: \n  {}'.format(
+                self.h5_file)
         if not(as_string):
             print(s)
         s += self.get_node_info('/', as_string)
+        s += '\n************************************************'
+        if not(as_string):
+            print('\n************************************************')
         for node in self.h5_dataset.root:
             if not(node._v_name == 'Index'):
-                s +=self.get_node_info(node._v_name, as_string)
+                s += self.get_node_info(node._v_name, as_string)
                 s += self.print_group_content(node._v_name,
                                               recursive = True,
                                               as_string = as_string)
-                s += '************************************************'
+                s += '\n************************************************'
                 if not(as_string):
-                    print('************************************************')
+                    print('\n************************************************')
         return s
 
     def print_group_content(self, groupname,
                             recursive=False,
                             as_string=False):
         """  Print information on all nodes in hdf5 group """
-        s = '\n****** GROUP {} CONTENT ******'.format(groupname)
-        if not(as_string):
-            print(s)
+        s = '\n\n****** Group {} CONTENT ******'.format(groupname)
         group = self.get_node(groupname)
+        if group._v_nchildren == 0:
+            return ''
+        else:
+            if not(as_string):
+                print(s)
+
         for node in group._f_iter_nodes():
             s += self.get_node_info(node._v_name, as_string)
             if (self._is_group(node._v_name) and recursive):
-                self.print_group_content(node._v_pathname,
+                s += self.print_group_content(node._v_pathname,
                                          recursive=True,
                                          as_string=as_string)
         return s
@@ -346,10 +338,20 @@ class SampleData:
         s += str('Dataset Content Index :\n')
         s += str('------------------------:\n')
         for key, value in self.content_index.items():
-            s += str('\t Name : {:20}  H5_Path : {} \t\n'.format(
-                        key, value))
+            col = None
+            if isinstance(value,list):
+                path = value[0]
+                col = value[1]
+            else:
+                path = value
+            if col is None:
+                s += str('\t Name : {:20}  H5_Path : {} \t\n'.format(
+                         key, path))
+            else:
+                s += str('\t Name : {:20}  H5_Path : {}|col:{} \t\n'.format(
+                         key, path,col))
             if key in self.aliases:
-                s += str('\t {} aliases -->'.format(key))
+                s += str('\t        {} aliases -->'.format(key))
                 for aliasname in self.aliases[key]:
                     s += str(' `'+aliasname+'`')
                 s += '\n'
@@ -505,12 +507,8 @@ class SampleData:
         return
 
     def add_mesh(self,
-                 mesh_object,
-                 meshname,
-                 indexname='',
-                 location='/',
-                 description=' ',
-                 replace=False):
+                 mesh_object=None, meshname='', indexname='', location='/',
+                 description=' ', replace=False, **keywords):
         """ add geometry data and fields stored on a mesh from a MeshObject
 
             Arguments:
@@ -541,32 +539,46 @@ class SampleData:
                         'content index'.format(meshname))
             self._verbose_print(warn_msg)
             indexname = meshname
+        location = self._name_or_node_to_path(location)
         mesh_path = os.path.join(location, meshname)
-
         # Check mesh group existence and replacement
         if self.h5_dataset.__contains__(mesh_path):
             msg = ('(add_mesh) Mesh group {} already exists.'
                    ''.format(mesh_path))
-            if replace:
+            empty = self.get_attribute('empty',mesh_path)
+            if empty:
+                mesh_group = self.get_node(mesh_path)
+                empty = (mesh_object is None)
+            elif (not(empty) and replace):
                 msg += ('--- It will be replaced by the new MeshObject content')
                 self.remove_node(node_path=mesh_path, recursive=True)
                 self._verbose_print(msg)
+                self._verbose_print('Creating hdf5 group {} in file {}'.format(
+                                     mesh_path, self.h5_file))
+                mesh_group = self.add_group(path=location, groupname=meshname,
+                                            indexname=indexname)
             else:
                 msg += ('\n--- If you want to replace it by new MeshObject'
                         ' content, please add `replace=True` to keyword'
                         ' arguments of `add_mesh`')
                 self._verbose_print(msg)
                 return
-
-        self._verbose_print('Creating hdf5 group {} in file {}'.format(
-            mesh_path, self.h5_file))
-        mesh_group = self.add_group(path=location,
-                                    groupname=meshname,
-                                    indexname=indexname)
+        else:
+            self._verbose_print('Creating hdf5 group {} in file {}'.format(
+                mesh_path, self.h5_file))
+            mesh_group = self.add_group(path=location, groupname=meshname,
+                                        indexname=indexname)
+            empty = (mesh_object is None)
+        if empty:
+            Attribute_dic = {'empty':True,
+                             'group_type':'Mesh'}
+            self.add_attributes(Attribute_dic,indexname)
+            return
         # store mesh metadata as HDF5 attributes
         Attribute_dic = {'element_topology':mesh_object.element_topology[0],
                          'mesh_description':description,
-                         'group_type':'mesh'}
+                         'group_type':'Mesh',
+                         'empty':False}
 
         self._verbose_print('Creating Nodes data set in group {} in file {}'
                             ''.format(mesh_path, self.h5_file))
@@ -649,20 +661,16 @@ class SampleData:
         self.add_attributes(Geometry_attribute_dic,Nodes_path)
 
         # Add mesh fields if some are stored
-        for Mesh_field in mesh_object.fields:
+        for field_name, field in mesh_object.fields.items():
             self.add_data_array(location=mesh_path,
-                                name=list(Mesh_field.keys())[0],
-                                array=list(Mesh_field.values())[0],
-                                indexname=list(Mesh_field.keys())[0])
+                                name=field_name,
+                                array=field,
+                                **keywords)
         return
 
     def add_image(self,
-                  image_object,
-                  imagename,
-                  indexname='',
-                  location='/',
-                  description=' ',
-                  replace=False):
+                  image_object=None, imagename='', indexname='', location='/',
+                  description=' ', replace=False, **keywords):
         """ add geometry data and fields stored on a mesh from a MeshObject
 
             Arguments:
@@ -692,32 +700,44 @@ class SampleData:
                         'content index'.format(imagename))
             self._verbose_print(warn_msg)
             indexname = imagename
+        location = self._name_or_node_to_path(location)
         image_path = os.path.join(location, imagename)
-
-        # Check mesh group existence and replacement
+        # Check image group existence and replacement
         if self.h5_dataset.__contains__(image_path):
             msg = ('\n(add_image) Image group {} already exists.'
                    ''.format(image_path))
-            if replace:
+            empty = self.get_attribute('empty',image_path)
+            if empty:
+                image_group = self.get_node(image_path)
+                empty = (image_object is None)
+            elif (not(empty) and replace):
                 msg += ('--- It will be replaced by the new ImageObject'
                         ' content')
                 # self.remove_node(node_path=image_path, recursive=True)
                 self.remove_node(name=imagename, recursive=True)
                 self._verbose_print(msg)
+                self._verbose_print('Creating hdf5 group {} in file {}'.format(
+                                     image_path, self.h5_file))
+                image_group = self.add_group(path=location,
+                                             groupname=imagename,
+                                             indexname=indexname)
             else:
                 msg += ('\n--- If you want to replace it by new ImageObject '
                         'content, please add `replace=True` to keyword '
-                        'arguments of `add_image`.'
-                        'WARNING This will erase the current Group and'
-                        'its content')
+                        'arguments of `add_image`.')
                 print(msg)
                 return
-
-        # create group in the h5 structure for the mesh
-        self._verbose_print('Creating hdf5 group {} in file {}'.format(
-            image_path, self.h5_file))
-        image_group = self.add_group(path=location, groupname=imagename,
-                                     indexname=indexname)
+        else:
+            self._verbose_print('Creating hdf5 group {} in file {}'.format(
+                image_path, self.h5_file))
+            image_group = self.add_group(path=location, groupname=imagename,
+                                         indexname=indexname)
+            empty = (image_object is None)
+        if empty:
+            Attribute_dic = {'empty':True,
+                             'group_type':'3DImage'}
+            self.add_attributes(Attribute_dic,indexname)
+            return
 
         self._verbose_print('Updating xdmf tree...', line_break=False)
         image_xdmf = etree.Element(_tag='Grid',
@@ -772,7 +792,8 @@ class SampleData:
                          'spacing':image_object.spacing,
                          'origin':image_object.origin,
                          'description':description,
-                         'group_type':'3DImage'}
+                         'group_type':'3DImage',
+                         'empty':False}
         # Get xdmf elements paths as HDF5 attributes
         #     image group
         el_path = self.xdmf_tree.getelementpath(image_xdmf)
@@ -785,19 +806,17 @@ class SampleData:
         Attribute_dic['xdmf_geometry_path'] = el_path
         self.add_attributes(Attribute_dic,indexname)
 
-        # Add mesh fields if some are stored
-        for Image_field in image_object.fields:
+        # Add fields if some are stored in the image object
+        for field_name,field in image_object.fields.items():
             self.add_data_array(location=image_path,
-                                name=list(Image_field.keys())[0],
-                                array=list(Image_field.values())[0],
-                                indexname=list(Image_field.keys())[0])
+                                name=field_name,
+                                array=field,
+                                **keywords)
         return
 
     def add_group(self,
-                  path,
-                  groupname,
-                  indexname='',
-                  replace=False):
+                  path, groupname, indexname='',
+                  replace=False, createparents=False):
         """ Create a (hdf5) group at desired location in the data format"""
 
         if (indexname == ''):
@@ -807,11 +826,13 @@ class SampleData:
 
             self._verbose_print(warn_msg)
             indexname = groupname
-        self.add_to_index(indexname, path+groupname)
+        group_path = os.path.join(path,groupname)
+        self.add_to_index(indexname, group_path)
 
         try:
             Group = self.h5_dataset.create_group(where=path, name=groupname,
-                                                 title=indexname)
+                                                 title=indexname,
+                                                  createparents=createparents)
             self.add_attributes(dic={'group_type':'Data'},
                                 nodename=Group)
             return Group
@@ -819,8 +840,10 @@ class SampleData:
             node_path = os.path.join(path, groupname)
             if (self.h5_dataset.__contains__(node_path)):
                 if replace:
+                    self.remove_node(node_path,recursive=True)
                     Group = self.h5_dataset.create_group(where=path,
-                                                name=groupname, title=indexname)
+                                                name=groupname, title=indexname,
+                                                  createparents=createparents)
                     return Group
                 else:
                     warn_msg = ('\n(add_group) group {} already exists,'
@@ -831,18 +854,17 @@ class SampleData:
                                  'arguments of `add_group`.'
                                  'WARNING This will erase the current Group and'
                                  'its content'.format(groupname))
-                    print(warn_msg)
+                    self._verbose_print(warn_msg)
                 return None
             else:
                 raise
 
-    def add_data_array(self,
-                       location,
-                       name,
-                       array,
+    def add_data_array(self, location, name, array,
                        indexname=None,
+                       chunkshape=None,
                        createparents=False,
                        replace=False,
+                       filters=None,
                        **keywords):
         """Add the data array at the given location in hte HDF5 data tree.
 
@@ -863,14 +885,19 @@ class SampleData:
         else:
             location_exists = True
             # check location nature
-            if not(self._get_node_class(location) == 'GROUP') :
+            if not(self._get_node_class(location) == 'GROUP'):
                     msg = ('(add_data_array): location {} is not a Group nor '
                            'empty. Please choose an empty location or a HDF5 '
-                           'Group to store data array'.format(location))
+                           'Group to store data array'
+                           ' flag'.format(location))
                     self._verbose_print(msg)
                     return
             # check if array location exists and remove node if asked
-            array_path = location_path + name
+            array_path = os.path.join(location_path, name)
+            self._verbose_print('coucou location_path {} '.format(
+                                location_path))
+            self._verbose_print('coucou name : {}'.format(name))
+            self._verbose_print('coucou array_path : {}'.format(array_path))
             if self.h5_dataset.__contains__(array_path):
                 if replace:
                     msg = ('(add_data_array): existing node {} will be '
@@ -894,7 +921,13 @@ class SampleData:
         self.add_to_index(indexname,os.path.join(location_path,name))
 
         # get compression options
-        Filters = self._get_local_compression_opt(**keywords)
+        # keywords compression options prioritized over passed filters instances
+        if (filters is None) or bool(keywords):
+            Filters = self._get_local_compression_opt(**keywords)
+            self._verbose_print('-- Compression Options for dataset {}'
+                                ''.format(name))
+        else:
+            Filters = filters
         self._verbose_print('-- Compression Options for dataset {}'
                             ''.format(name))
         if (self.Filters.complevel > 0):
@@ -912,7 +945,8 @@ class SampleData:
 
         # Create dataset node to store array
         Node = self.h5_dataset.create_carray(where=location_path, name=name,
-                                      filters=Filters, obj=array)
+                                             filters=Filters, obj=array,
+                                             chunkshape=chunkshape)
 
         if self._is_grid(location):
             ftype = self._get_xdmf_field_type(field=array,
@@ -920,7 +954,81 @@ class SampleData:
             dic = {'field_type':ftype}
             self.add_attributes(dic=dic, nodename=name)
             self._add_field_to_xdmf(name,array)
-        return
+        return Node
+
+    def add_table(self, location, name, description,
+                  indexname=None, chunkshape=None, replace=False,
+                  createparents=False, data=None,
+                  filters=None, **keywords):
+        """ Add a structured array dataset (tables.Table) in HDF5 tree"""
+
+        # get location path
+        location_path = self._name_or_node_to_path(location)
+        if (location_path is None) and not(createparents):
+            msg = ('(add_table): location {} does not exist, table'
+                   ' cannot be added. Use optional argument'
+                   ' "createparents=True" to force location Group creation'
+                   ''.format(location))
+            self._verbose_print(msg)
+            return
+        else:
+            # check location nature
+            if not(self._get_node_class(location) == 'GROUP') :
+                    msg = ('(add_table): location {} is not a Group nor '
+                           'empty. Please choose an empty location or a HDF5 '
+                           'Group to store table'.format(location))
+                    self._verbose_print(msg)
+                    return
+            # check if array location exists and remove node if asked
+            table_path = location_path + name
+            if self.h5_dataset.__contains__(table_path):
+                if replace:
+                    msg = ('(add_table): existing node {} will be '
+                           'overwritten and all of its childrens removed'
+                           ''.format(table_path))
+                    self._verbose_print(msg)
+                    self.remove_node(table_path, recursive=True)
+                else:
+                    msg = ('(add_table): node {} already exists. To '
+                           'overwrite, use optional argument "replace=True"'
+                           ''.format(table_path))
+                    self._verbose_print(msg)
+
+        # get compression options
+        # keywords compression options prioritized over passed filters instances
+        if (filters is None) or bool(keywords):
+            Filters = self._get_local_compression_opt(**keywords)
+            self._verbose_print('-- Compression Options for dataset {}'
+                                ''.format(name))
+        else:
+            Filters = filters
+        self._verbose_print('-- Compression Options for dataset {}'
+                            ''.format(name))
+        if (self.Filters.complevel > 0):
+            msg_list = str(self.Filters).strip('Filters(').strip(')').split()
+            for msg in msg_list:
+                self._verbose_print('\t * {}'.format(msg), line_break=False)
+        else:
+            self._verbose_print('\t * No Compression')
+
+        table = self.h5_dataset.create_table(where=location_path,name=name,
+                                     description=description,
+                                     filters=Filters,chunkshape=chunkshape,
+                                     createparents=createparents)
+
+        if data is not None:
+            table.append(data)
+            table.flush()
+
+        # add to index
+        if indexname is None:
+            warn_msg = (' (add_table) indexname not provided, '
+                        ' the table name `{}` is used as index name '
+                        ''.format(name))
+            self._verbose_print(warn_msg)
+            indexname = name
+        self.add_to_index(indexname,table._v_pathname)
+        return table
 
     def add_attributes(self, dic, nodename):
         """
@@ -943,23 +1051,29 @@ class SampleData:
                 Node._v_attrs[key] = value
         return
 
-    def add_alias(self, aliasname, path):
+    def add_alias(self, aliasname, path=None, indexname = None):
         """Add alias name to the input path"""
+        if (path is None) and (indexname is None):
+            msg = ('(add_alias) None path nor indexname inputed. Alias'
+                   'addition aborted')
+            self._verbose_print(msg)
+            return
         Is_present = (self._is_in_index(aliasname)
                       and self._is_alias(aliasname))
         if Is_present:
-            msg =('Name `{}` already in content_index : duplicates not allowed'
-                  ' in Index'.format(aliasname))
+            msg =('Alias`{}` already exists : duplicates not allowed'
+                  ''.format(aliasname))
             self._verbose_print(msg)
         else:
-            indexname = self.get_indexname_from_path(path)
+            if (indexname is None):
+                indexname = self.get_indexname_from_path(path)
             if indexname in self.aliases:
                 self.aliases[indexname].append(aliasname)
             else:
                 self.aliases[indexname] = [aliasname]
         return
 
-    def add_to_index(self, indexname, path):
+    def add_to_index(self, indexname, path, colname = None):
         """ Add path to index if indexname is not already in content_index"""
         Is_present = (self._is_in_index(indexname)
                       and self._is_alias(indexname))
@@ -969,14 +1083,23 @@ class SampleData:
                              ''.format(indexname))
         else:
             for item in self.content_index:
-                if path == self.content_index[item]:
+                if isinstance(self.content_index[item],list):
+                    index_path = self.content_index[item][0]
+                    index_colname = self.content_index[item][1]
+                else:
+                    index_path = self.content_index[item]
+                    index_colname = None
+                if (path == index_path) and (colname is index_colname):
                     msg = (' (add_to_index) indexname provided for a path ({})'
                            'that already in index --> stored as alias name.'
                            ''.format(path))
                     self._verbose_print(msg)
-                    self.add_alias(indexname, path)
+                    self.add_alias(aliasname=indexname, indexname=item)
                     return
-            self.content_index[indexname] = path
+            if colname is None:
+                self.content_index[indexname] = path
+            else:
+                self.content_index[indexname] = [path, colname]
         return
 
     def get_indexname_from_path(self, node_path):
@@ -993,58 +1116,49 @@ class SampleData:
                 node_path)
             raise ValueError(msg)
 
-    def get_data_array(self,
-                       name,
-                       as_numpy=False):
-        """ Searchs and returns data array with given name in hdf5 data tree
-
-                Parameters
-                ----------
-                    name (str):
-                        string interpreted as the data path in the hdf5 tree
-                        structure or data name in self.content_index directory
-
-                    as_numpy (bool):
-                        if True, returns the data as a numpy array.
-                        if False (default) returns Data as a Pytables node
-
-        """
+    def get_tablecol(self, tablename, colname):
+        """ Returns a column of a Pytables.Table as a numpy array"""
 
         data = None
-        data_path = self._name_or_node_to_path(name)
+        data_path = self._name_or_node_to_path(tablename)
         if data_path is None:
-            msg = ('(get_data_array) `name` not matched with a path or an'
+            msg = ('(get_tablecol) `tablename` not matched with a path or an'
                    ' indexname. No data returned')
             self._verbose_print(msg)
         else:
-            if self._is_array(name=data_path):
-                msg = '(get_data_array) Getting data from : {}:{}'.format(self.h5_file, data_path)
+            if self._is_table(name=data_path):
+                msg = '(get_tablecol) Getting column {} from : {}:{}'.format(
+                        colname,self.h5_file, data_path)
                 self._verbose_print(msg)
-                data = self.get_node(name=data_path, as_numpy=as_numpy)
+                table = self.get_node(name=data_path)
+                data = table.col(colname)
             else:
-                msg = ('(get_data_array) Data is not an array node.'
-                       ' Use `get_node` method instead.')
+                msg = ('(get_tablecol) Data is not an table node.')
                 self._verbose_print(msg)
         return data
 
-    def get_node(self,
-                 name,
-                 as_numpy=False):
+    def get_node(self, name, as_numpy=False):
         """ get a Node object from the HDF5 data tree from indexname or path.
-
-            If the node is not found, returns None.
-            Else, returns the Node object as corresponding Pytable class, or as
-            a Numpy array if requested, and if the Node stores array data.
         """
-
         node = None
+        colname = None
         node_path = self._name_or_node_to_path(name)
         if node_path is None:
-            msg = '(get_node) ERROR : Node name does not fit any hdf5 path nor index name.'
+            msg = ('(get_node) ERROR : Node name does not fit any hdf5 path'
+                   ' nor index name.')
             self._verbose_print(msg)
         else:
-            node = self.h5_dataset.get_node(node_path)
-            if as_numpy and self._is_array(name):
+            if self._is_table(node_path):
+                node = self.h5_dataset.get_node(node_path)
+                if name in self.content_index:
+                    if isinstance(self.content_index[name],list):
+                        colname = self.content_index[name][1]
+                elif name in node.colnames:
+                   colname = name
+                if (colname is not None): node = node.col(colname)
+            else:
+                node = self.h5_dataset.get_node(node_path)
+            if as_numpy and self._is_array(name) and (colname is None):
                 node = node.read()
         return node
 
@@ -1061,8 +1175,7 @@ class SampleData:
 
     def get_dic_from_attributes(self, node_path):
         """
-            private method used to store a Python dictionary as a set of
-            HDF5 Attributes compatible with Pytables AttributeSet class
+            private method used to get HDF5 Attributes of a node as a dic
 
             Arguments
             ---------
@@ -1074,7 +1187,6 @@ class SampleData:
             --------
                 * Attributes are not meant for heavy data storage. Keep the
                   content of dic to strings and small numerical arrays
-                *
         """
         Node = self.h5_dataset.get_node(node_path)
         dic = {}
@@ -1111,6 +1223,85 @@ class SampleData:
         print('File size is {:4.3f} {} for file \n {}'.format(fsize,unit,
                                                        self.h5_file))
         return fsize, unit
+
+    def set_description(self, node, description):
+        """ """
+        self.add_attributes({'description':description},node)
+        return
+
+    def set_voxel_size(self, image_data_group, voxel_size):
+        """ Set voxel size for an HDF5 image data group"""
+        self.add_attributes({'spacing':voxel_size},image_data_group)
+        xdmf_geometry_path = self.get_attribute('xdmf_geometry_path',
+                                                image_data_group)
+        xdmf_geometry = self.xdmf_tree.find(xdmf_geometry_path)
+        spacing_node = xdmf_geometry.getchildren()[1]
+        spacing_text = str(voxel_size).strip('[').strip(']').replace(',', ' ')
+        spacing_node.text = spacing_text
+        self.sync()
+        return
+
+    def set_origin(self, image_data_group, origin):
+        """ Set voxel size for an HDF5 image data group"""
+        self.add_attributes({'origin':origin},image_data_group)
+        xdmf_geometry_path = self.get_attribute('xdmf_geometry_path',
+                                                image_data_group)
+        xdmf_geometry = self.xdmf_tree.find(xdmf_geometry_path)
+        origin_node = xdmf_geometry.getchildren()[0]
+        origin_text = str(origin).strip('[').strip(']').replace(',', ' ')
+        origin_node.text = origin_text
+        self.sync()
+        return
+
+    def set_chunkshape_and_compression(self, node, chunkshape=None,
+                                       filters=None, **keywords):
+        """ Changes the chunkshape for a HDF5 array node
+
+            Removes the array and recreate it with a different chunkshape
+
+            Note:
+                Disk space of HDF5 will not be reduced until `repack_h5`
+                method is used, or `ptrepack` executable utility is used on
+                h5_file.
+                This is default behavior of hdf5 files
+        """
+        if not self._is_array(node):
+            msg = ('(set_chunkshape) Cannot set chunkshape or compression'
+                   ' settings for a non array node')
+            raise ValueError(msg)
+        node_tmp = self.get_node(node)
+        node_name = node_tmp._v_name
+        node_indexname = self.get_indexname_from_path(node_tmp._v_pathname)
+        node_path = os.path.dirname(node_tmp._v_pathname)
+        node_chunkshape = node_tmp.chunkshape
+        if chunkshape is not None:
+            node_chunkshape = chunkshape
+        if filters is None:
+            node_filters = node_tmp.filters
+        else:
+            node_filters = filters
+        if self.aliases.__contains__(node_indexname):
+            node_aliases = self.aliases[node_indexname]
+        else:
+            node_aliases = []
+        array = node_tmp.read()
+        if self._is_table(node):
+            description = node.description
+            new_array = self.add_table(location=node_path, name=node_name,
+                                     description=description,
+                                     indexname=node_indexname,
+                                     chunkshape=node_chunkshape, replace=True,
+                                     data=array, filters=node_filters,
+                                     **keywords)
+        else:
+            new_array = self.add_data_array(location=node_path, name=node_name,
+                                            indexname=node_indexname,
+                                            array=array, filters=node_filters,
+                                            chunkshape=node_chunkshape,
+                                            replace=True, **keywords)
+        for alias in node_aliases:
+            self.add_alias(aliasname=alias, indexname=node_indexname)
+        return
 
     def set_global_compression_opt(self, **keywords):
         """
@@ -1171,6 +1362,12 @@ class SampleData:
                                    data structure
                 - recursive : boolean control allowing to force recursive
                               suppression if the node is a Group
+
+            Note:
+                Disk space of HDF5 will not be reduced until `repack_h5`
+                method is used, or `ptrepack` executable utility is used on
+                h5_file.
+                This is default behavior of hdf5 files
         """
 
         node_path = self._name_or_node_to_path(name)
@@ -1238,22 +1435,35 @@ class SampleData:
             else:
                 self._remove_from_index(node_path=Node._v_pathname)
                 Node.remove()
+            self.sync()
             self._verbose_print('Node sucessfully removed, '
                                 'new data structure is:\n')
             self._verbose_print(self.__repr__())
 
         return
 
+    def repack_h5file(self):
+        """ Overwrite hdf5 file with a copy of itself to recover disk space
+
+            Manipulation to recover space leaved empty when removing data from
+            the HDF5 tree.
+        """
+        head, tail = os.path.split(self.h5_file)
+        tmp_file = os.path.join(head,'tmp_'+tail)
+        self.h5_dataset.copy_file(tmp_file)
+        shutil.move(tmp_file,self.h5_file)
+        return
+
     # =========================================================================
     #  SampleData private utilities
     # =========================================================================
 
-    def _minimal_content(self):
+    def _minimal_data_model(self):
         """
             Specify the minimal contents of the hdf5 (Node names, organization)
             in the form of a dictionary {content:Location}
 
-            This method is central to define derived classes from SampleData
+            This method is central to defien derived classes from SampleData
             that are associated with a minimal content and organization
             for the hdf5 file storing the data.
 
@@ -1264,7 +1474,55 @@ class SampleData:
 
         """
         minimal_content_index_dic = {}
-        return minimal_content_index_dic
+        minimal_content_type_dic = {}
+        return minimal_content_index_dic, minimal_content_type_dic
+
+    def _init_data_model(self):
+        """ Initialization of the minimal data model specified for the class"""
+        content_paths, content_type = self._minimal_data_model()
+        self._init_content_index(content_paths)
+        if not(self.file_exist):
+            for key,value in content_paths.items():
+                head, tail = os.path.split(value)
+                if self.h5_dataset.__contains__(content_paths[key]):
+                    pass
+                if content_type[key] == 'Group':
+                    self.add_group(path=head, groupname=tail, indexname=key,
+                                   replace=False,createparents=True)
+                elif content_type[key] == '3DImage':
+                    self.add_image(imagename=tail, indexname=key, location=head)
+                elif content_type[key] == 'Mesh':
+                    self.add_mesh(meshname=tail, indexname=key, location=head)
+        return
+
+    def _init_content_index(self, path_dic):
+        """
+            Initialize SampleData dictionary attribute that stores the name and
+            the location of dataset/group/attribute stored in the h5 file.
+            The dic. is synchronized with the hdf5 Group '/Index' from Root.
+            Its items are stored there as HDF5 attributes when the SampleData
+            object is destroyed.
+
+            This dic. is used by other methods to easily access/Add/remove/
+            modify nodes et contents in the h5 file/Pytables tree structure
+        """
+
+        self.minimal_content = {key: '' for key in path_dic}
+        self.content_index = {}
+        self.aliases = {}
+
+        if self.file_exist:
+            self.content_index = self.get_dic_from_attributes(
+                                                    node_path='/Index')
+            self.aliases = self.get_dic_from_attributes(
+                                                    node_path='/Index/Aliases')
+        else:
+            self.h5_dataset.create_group('/', name='Index')
+            self.add_attributes(dic=self.minimal_content, nodename='/Index')
+            self.content_index = self.get_dic_from_attributes(
+                    node_path='/Index')
+            self.h5_dataset.create_group('/Index', name='Aliases')
+        return
 
     def _remove_from_index(self,
                            node_path):
@@ -1301,8 +1559,8 @@ class SampleData:
             temp_name = self._is_alias_for(name_or_node)
             path = self._get_path_with_indexname(temp_name)
         # if not found with indexname or is not a path
-        # find nodes with this name. If several nodes have this name
-        # return warn message and return None
+        # find nodes or table column with this name.
+        # If several nodes have this name return warn message and return None
         if path is None:
             count = 0
             path_list = []
@@ -1310,6 +1568,10 @@ class SampleData:
                 if (name_or_node == node._v_name):
                     count = count +1
                     path_list.append(node._v_pathname)
+                if node._v_attrs.CLASS == 'TABLE':
+                    if name_or_node in node.colnames:
+                        count = count + 1
+                        path_list.append(node._v_pathname)
             if count == 1:
                 path = path_list[0]
             elif count > 1:
@@ -1323,9 +1585,17 @@ class SampleData:
 
     def _is_array(self, name):
         """ find out if name or path references an array dataset"""
-        Class = self._get_node_class(name)
+        name2 = self._name_or_node_to_path(name)
+        Class = self._get_node_class(name2)
         List = ['CARRAY', 'EARRAY', 'VLARRAY', 'ARRAY', 'TABLE']
         if (Class in List):
+            return True
+        else:
+            return False
+
+    def _is_table(self, name):
+        """ find out if name or path references an array dataset"""
+        if (self._get_node_class(name) == 'TABLE'):
             return True
         else:
             return False
@@ -1341,7 +1611,7 @@ class SampleData:
     def _is_grid(self, name):
         """ find out if name or path references a image or mesh HDF5 Group """
         gtype = self._get_group_type(name)
-        List = ['mesh','3DImage']
+        List = ['Mesh','3DImage']
         if (gtype in List):
             return True
         else:
@@ -1373,15 +1643,15 @@ class SampleData:
         group_type = self._get_group_type(name)
         if group_type == '3DImage':
             compatibility = self._compatibility_with_image(name, field)
-        elif group_type == 'mesh':
+        elif group_type == 'Mesh':
             compatibility = self._compatibility_with_mesh(name,field)
         else:
             msg = ('location {} is not a grid.'.format(name))
             raise ValueError(msg)
 
         if not(compatibility):
-            msg = ('Array dimensions not compatible with location {}'
-                   ''.format(name))
+            msg = ('Array dimensions not compatible with {} `{}`'
+                   ''.format(group_type,name))
             raise ValueError(msg)
         return
 
@@ -1469,7 +1739,7 @@ class SampleData:
             return None
         Type = self._get_group_type(grid_location)
         # analyze field shape
-        if Type == 'mesh':
+        if Type == 'Mesh':
             if len(field.shape) != 2:
                 msg = ('(_get_xdmf_field_type) wrong field shape. For a mesh'
                        'field, shape should be (Nnodes,Ndim) or (NIntPts,Ndim)'
@@ -1478,6 +1748,7 @@ class SampleData:
                 return field_type
             field_dim = field.shape[1]
         elif Type == '3DImage':
+            print('field shape is '.format(field.shape))
             if (len(field.shape) < 3) or (len(field.shape) > 4):
                 msg = ('(_get_xdmf_field_type) wrong field shape. For a 3DImage'
                        'field, shape should be (Nx1,Nx2,Nx3) or'
@@ -1498,7 +1769,10 @@ class SampleData:
 
     def _get_path_with_indexname(self, indexname):
         if indexname in self.content_index.keys():
-            return self.content_index[indexname]
+            if isinstance(self.content_index[indexname],list):
+                return self.content_index[indexname][0]
+            else:
+                return self.content_index[indexname]
         else:
             raise ValueError('Index contains no item named {}'.format(
                 indexname))
@@ -1693,7 +1967,7 @@ class MeshObject():
         self.node_sets = {}
 
         # mesh fields defaut empty instantiation
-        self.fields = []
+        self.fields = {}
 
         return
 
@@ -1815,8 +2089,7 @@ class MeshObject():
         # singleton last dimension
         if (Field.ndim < 2):
             Field = Field.reshape([Field.shape[0], 1])
-
-        self.fields.append({Field_name: Field})
+        self.fields[Field_name]= Field
         #        print('\t field {} of dimension {} added to the mesh'.format(Field_name,
         #              Field.shape))
         return
@@ -1873,7 +2146,7 @@ class ImageObject():
         self.spacing = spacing
 
         # mesh fields defaut empty instantiation
-        self.fields = []
+        self.fields = {}
         return
 
     def add_field(self,
@@ -1895,14 +2168,15 @@ class ImageObject():
         """
 
         # verify that number of field nodes and self.nodes are coherent
+        if (len(Field.shape) == 2) and (len(self.dimension) == 2):
+            new_shape = (Field.shape[0], Field.shape[1], 1)
+            Field = Field.reshape(new_shape)
+            self.dimension = new_shape
         if (Field.shape != self.dimension):
             raise ValueError(''' The array given for the field shape is {}
                                which does not match ImageObject dimension : {}
                              '''.format(Field.shape, self.dimension))
-
-        self.fields.append({Field_name: Field})
-        #        print('\t field {} of dimension {} added to the 3D image'.format(Field_name,
-        #              Field.shape))
+        self.fields[Field_name] = Field
         return
 
 
@@ -2120,10 +2394,8 @@ class MeshReader():
             field = matfile_data[fieldloc][()]
             #            print(' \t reading field in h5 node {} ....'.format(fieldloc))
             self.mesh.add_field(field, fieldname)
-
         # close .mat file
         matfile_data.close()
-
         return
 
     def read_geof_mesh(self):

@@ -1339,12 +1339,15 @@ class Microstructure(SampleData):
         - 'Lattice' instance
     """
     def __init__(self,
-                 name, description='empty',
+                 name='micro', description='empty', filename=None,
                  file_path=None, verbose = False, overwrite_hdf5=False,
                  lattice=None, autodelete=False, **keywords):
 
         # initialize microstructure/file name, hdf5 and xdmf datasets
-        filename = name + '_data'
+        if filename is None:
+            filename = name + '_data'
+        else:
+            filename = os.path.splitext(filename)[0]
         if (file_path is not None):
             filename = os.path.join(file_path,filename)
         SampleData.__init__(self,filename,name,description,verbose,
@@ -1508,12 +1511,13 @@ class Microstructure(SampleData):
 
         :param int slice: the slice number
         :param str color: a string to chose the colormap from ('random', 'ipf')
+        :param bool show_mask: a flag to show the mask by transparency.
         """
         if not self.__contains__('grain_ids'):
             print('Microstructure instance mush have a grain_map field to use this method')
             return
         grain_map = self.get_grain_map()
-        if not slice or slice > grain_map.shape[2] or slice < 0:
+        if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
             slice = grain_map.shape[2] // 2
             print('using slice value %d' % slice)
         if color == 'random':
@@ -1522,7 +1526,11 @@ class Microstructure(SampleData):
             grain_cmap = self.ipf_cmap()
         else:
             grain_cmap = 'viridis'
-        plt.imshow(grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
+        fig, ax = plt.subplots()
+        ax.imshow(grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
+        ax.xaxis.set_label_position('top')
+        plt.xlabel('X')
+        plt.ylabel('Y')
         if self.__contains__('mask') and show_mask:
             from pymicro.view.vol_utils import alpha_cmap
             mask = self.get_mask()
@@ -1820,9 +1828,10 @@ class Microstructure(SampleData):
         grain_volume_final = (grain_map == grain_id).sum()
         print('grain %s was dilated by %d voxels' % (grain_id,
                                         grain_volume_final - grain_volume_init))
+        self.sync()
 
     @staticmethod
-    def dilate_labels(array, dilation_steps=1, mask=None, dilation_ids=None):
+    def dilate_labels(array, dilation_steps=1, mask=None, dilation_ids=None, struct=None):
         """Dilate labels isotropically to fill the gap between them.
 
         This code is based on the gtDilateGrains function from the DCT code.
@@ -1830,50 +1839,62 @@ class Microstructure(SampleData):
 
         :param int dilation_steps: the number of dilation steps to apply.
         :param ndarray mask: a msk to constrain the dilation (None by default).
-        :param list dilation_ids: a list to restrict the dilation to the given
-               ids.
+        :param list dilation_ids: a list to restrict the dilation to the given ids.
+        :param ndarray struct: the structuring element to use (strong connectivity by default).
         :return: the dilated array.
         """
+        from scipy import ndimage
+        if struct is None:
+            struct = ndimage.morphology.generate_binary_structure(array.ndim, 1)
+        assert struct.ndim == array.ndim
         # carry out dilation in iterative steps
         for step in range(dilation_steps):
             if dilation_ids:
                 grains = np.isin(array, dilation_ids)
             else:
                 grains = (array > 0).astype(np.uint8)
-            from scipy import ndimage
-            grains_dil = ndimage.morphology.binary_dilation(grains).astype(
-                                                                       np.uint8)
+            grains_dil = ndimage.morphology.binary_dilation(grains,
+                                            structure=struct).astype(np.uint8)
             if mask is not None:
                 # only dilate within the mask
                 grains_dil *= mask.astype(np.uint8)
             todo = (grains_dil - grains)
             # get the list of voxel for this dilation step
-            X, Y, Z = np.where(todo)
+            if array.ndim == 2:
+                X, Y = np.where(todo)
+            else:
+                X, Y, Z = np.where(todo)
 
             xstart = X - 1
             xend = X + 1
             ystart = Y - 1
             yend = Y + 1
-            zstart = Z - 1
-            zend = Z + 1
 
             # check bounds
             xstart[xstart < 0] = 0
             ystart[ystart < 0] = 0
-            zstart[zstart < 0] = 0
             xend[xend > array.shape[0] - 1] = array.shape[0] - 1
             yend[yend > array.shape[1] - 1] = array.shape[1] - 1
-            zend[zend > array.shape[2] - 1] = array.shape[2] - 1
+            if array.ndim == 3:
+                zstart = Z - 1
+                zend = Z + 1
+                zstart[zstart < 0] = 0
+                zend[zend > array.shape[2] - 1] = array.shape[2] - 1
 
             dilation = np.zeros_like(X).astype(np.int16)
             print('%d voxels to replace' % len(X))
             for i in range(len(X)):
-                neighbours = (array[xstart[i]:xend[i] + 1, ystart[i]:yend[i]
-                              + 1, zstart[i]:zend[i] + 1])
+                if array.ndim == 2:
+                    neighbours = array[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1]
+                else:
+                    neighbours = array[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1, zstart[i]:zend[i] + 1]
                 if np.any(neighbours):
                     # at least one neighboring voxel in non zero
                     dilation[i] = min(neighbours[neighbours > 0])
-            array[X, Y, Z] = dilation
+            if array.ndim == 2:
+                array[X, Y] = dilation
+            else:
+                array[X, Y, Z] = dilation
             print('dilation step %d done' % (step + 1))
         return array
 
@@ -2063,6 +2084,89 @@ class Microstructure(SampleData):
         self.grains.flush()
         return
 
+    def to_amitex_fftp(self, binary=True):
+        """Write orientation data to ascii files to prepare for FFT computation.
+
+        AMITEX_FFTP can be used to compute the elastoplastic response of polycrystalline microstructures. The
+        calculation needs orientation data for each grain written in the form of the coordinates of the first two basis
+        vectors expressed in the crystal local frame which is given by the first two columns of the orientation matrix.
+        The values are written in 6 files N1X.txt, N1Y.txt, N1Z.txt, N2X.txt, N2Y.txt, N2Z.txt, each containing n values
+        with n the number of grains. The data is written either in BINARY or in ASCII form.
+
+        :param bool binary: flag to write the files in binary or ascii format.
+        """
+        ext = 'bin' if binary else 'txt'
+        n1x = open('N1X.%s' % ext, 'w')
+        n1y = open('N1Y.%s' % ext, 'w')
+        n1z = open('N1Z.%s' % ext, 'w')
+        n2x = open('N2X.%s' % ext, 'w')
+        n2y = open('N2Y.%s' % ext, 'w')
+        n2z = open('N2Z.%s' % ext, 'w')
+        files = [n1x, n1y, n1z, n2x, n2y, n2z]
+        if binary:
+            import struct
+            for f in files:
+                f.write('%d \ndouble \n' % self.get_number_of_grains())
+                f.close()
+            n1x = open('N1X.%s' % ext, 'ab')
+            n1y = open('N1Y.%s' % ext, 'ab')
+            n1z = open('N1Z.%s' % ext, 'ab')
+            n2x = open('N2X.%s' % ext, 'ab')
+            n2y = open('N2Y.%s' % ext, 'ab')
+            n2z = open('N2Z.%s' % ext, 'ab')
+            for g in self.grains:
+                o = Orientation.from_rodrigues(g['orientation'])
+                gt = o.orientation_matrix().T
+                n1 = gt[0]
+                n2 = gt[1]
+                n1x.write(struct.pack('>d', n1[0]))
+                n1y.write(struct.pack('>d', n1[1]))
+                n1z.write(struct.pack('>d', n1[2]))
+                n2x.write(struct.pack('>d', n2[0]))
+                n2y.write(struct.pack('>d', n2[1]))
+                n2z.write(struct.pack('>d', n2[2]))
+        else:
+            for g in self.grains:
+                o = Orientation.from_rodrigues(g['orientation'])
+                gt = o.orientation_matrix().T
+                n1 = gt[0]
+                n2 = gt[1]
+                n1x.write('%f\n' % n1[0])
+                n1y.write('%f\n' % n1[1])
+                n1z.write('%f\n' % n1[2])
+                n2x.write('%f\n' % n2[0])
+                n2y.write('%f\n' % n2[1])
+                n2z.write('%f\n' % n2[2])
+        n1x.close()
+        n1y.close()
+        n1z.close()
+        n2x.close()
+        n2y.close()
+        n2z.close()
+        print('orientation data written for AMITEX_FFTP')
+
+        # if possible, write the vtk file to run the computation
+        if self.__contains__('grain_map'):
+            # convert the grain map to vtk file
+            from vtk.util import numpy_support
+            grain_map = self.get_grain_map(as_numpy=True)
+            voxel_size = self.get_voxel_size()
+            vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(grain_map,
+                                                        order='F'), deep=1)
+            vtk_data_array.SetName('GrainIds')
+            grid = vtk.vtkImageData()
+            size = grain_map.shape
+            grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
+            grid.GetCellData().SetScalars(vtk_data_array)
+            grid.SetSpacing(voxel_size, voxel_size, voxel_size)
+            writer = vtk.vtkStructuredPointsWriter()
+            writer.SetFileName('%s_pymicro.vtk' % self.name)
+            if binary:
+                writer.SetFileTypeToBinary()
+            writer.SetInputData(grid)
+            writer.Write()
+            print('grain map written in legacy vtk form for AMITEX_FFTP')
+
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """
         Outputs the material block corresponding to this microstructure for
@@ -2187,6 +2291,80 @@ class Microstructure(SampleData):
                     grain['center'] = centroids[i - offset]
                 grain.append()
             micro.grains.flush()
+        return micro
+
+    @staticmethod
+    def from_neper(neper_file_path):
+        """Create a microstructure from a neper tesselation.
+
+        Neper is an open source program to generate polycristalline microstructure using voronoi tesselations.
+        It is available at https://neper.info
+
+        :param str neper_file_path: the path to the tesselation file generated by Neper.
+        :return: a pymicro `Microstructure` instance.
+        """
+        neper_file = neper_file_path.split(os.sep)[-1]
+        neper_dir = os.path.dirname(neper_file_path)
+        print('creating microstructure from Neper tesselation %s' % neper_file)
+        name, ext = os.path.splitext(neper_file)
+        print(name, ext)
+        assert ext == '.tesr'  # assuming raster tesselation
+        micro = Microstructure(name=name, file_path=neper_dir)
+        with open(neper_file_path, 'r', encoding='latin-1') as f:
+            line = f.readline()  # ***tesr
+            # look for **general
+            while True:
+                line = f.readline().strip()  # get rid of unnecessary spaces
+                if line.startswith('**general'):
+                    break
+            dim = f.readline().strip()
+            print(dim)
+            dims = np.array(f.readline().split()).astype(int).tolist()
+            print(dims)
+            voxel_size = np.array(f.readline().split()).astype(float).tolist()
+            print(voxel_size)
+            # look for **cell
+            while True:
+                line = f.readline().strip()
+                if line.startswith('**cell'):
+                    break
+            n = int(f.readline().strip())
+            print('microstructure contains %d grains' % n)
+            f.readline()  # *id
+            grain_ids = []
+            # look for *ori
+            while True:
+                line = f.readline().strip()
+                if line.startswith('*ori'):
+                    break
+                else:
+                    grain_ids.extend(np.array(line.split()).astype(int).tolist())
+            print('grain ids are:', grain_ids)
+            oridescriptor = f.readline().strip()  # must be euler-bunge:passive
+            if oridescriptor != 'euler-bunge:passive':
+                print('Wrong orientation descriptor: %s, must be euler-bunge:passive' % oridescriptor)
+            grain = micro.grains.row
+            for i in range(n):
+                euler_angles = np.array(f.readline().split()).astype(float).tolist()
+                print('adding grain %d' % grain_ids[i])
+                grain['idnumber'] = grain_ids[i]
+                grain['orientation'] = Orientation.from_euler(euler_angles).rod
+                grain.append()
+            micro.grains.flush()
+            # look for **data
+            while True:
+                line = f.readline().strip()
+                if line.startswith('**data'):
+                    break
+            print(f.tell())
+            print('reading data from byte %d' % f.tell())
+            data = np.fromfile(f, dtype=np.uint16)[:-4]  # leave out the last 4 values
+            print(data.shape)
+            assert np.prod(dims) == data.shape[0]
+            micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0), voxel_size[0])  # swap X/Z axes
+            micro.recompute_grain_centers()
+            micro.recompute_grain_volumes()
+        print('done')
         return micro
 
     @staticmethod

@@ -37,15 +37,24 @@ class DctForwardSimulation(ForwardSimulation):
         self.set_hkl_planes(hkl_planes)
 
 
-    def setup(self, omega_step):
-        """Setup the forward simulation."""
+    def setup(self, omega_step, grain_ids=None):
+        """Setup the forward simulation.
+
+        :param float omega_step: the angular integration step (in degrees) use to compute the diffraction comditions.
+        :param list grain_ids: a list of grain ids to restrict the forward simulation (use all grains by default).
+        """
         assert self.exp.source.min_energy == self.exp.source.max_energy  # monochromatic case
         lambda_keV = self.exp.source.max_energy
         self.omegas = np.linspace(0.0, 360.0, num=int(360.0 / omega_step), endpoint=False)
         self.reflections = []
         for omega in self.omegas:
             self.reflections.append([])
-        for g in self.exp.sample.microstructure.grains:
+        if grain_ids:
+            # make a list of the grains selected for the forward simulation
+            grains = [self.exp.sample.microstructure.get_grain(gid) for gid in grain_ids]
+        else:
+            grains = self.exp.sample.microstructure.grains
+        for g in grains:
             for plane in self.hkl_planes:
                 (h, k, i, l) = HklPlane.three_to_four_indices(*plane.miller_indices())
                 try:
@@ -86,9 +95,10 @@ class DctForwardSimulation(ForwardSimulation):
                 g.included = gmat['proj/included'][0, :]
                 g.ondet = gmat['proj/ondet'][0, :]
                 g.stack_exp = gmat['proj/stack'][()].transpose(1, 2, 0)  # now in [ndx, u, v] form
-                # for this data set, we have to hack around the DCT + TT work in progress
-                ref_hklsp = gmat['allblobs/hklsp'][()][0][0]
-                g.hklsp = gmat[ref_hklsp][:, :]
+                # for the Ti7AL data set, we have to hack around the DCT + TT work in progress
+                #ref_hklsp = gmat['allblobs/hklsp'][()][0][0]
+                #g.hklsp = gmat[ref_hklsp][:, :]
+                g.hklsp = gmat['allblobs/hklsp'][:, :]
         self.grain = g
         if self.verbose:
             print('experimental proj stack shape: {}'.format(g.stack_exp.shape))
@@ -127,8 +137,42 @@ class DctForwardSimulation(ForwardSimulation):
             self.load_grain(gid=gid)
         return self.grain_projection_image(self.grain.uv_exp, self.grain.stack_exp)
 
-    def grain_projection_simulation(self, gid=1, data=None):
-        """Function to compute all the grain projection in DCT geometry and create a composite image."""
+    def grain_projections(self, omegas, gid=1, data=None, hor_flip=False, ver_flip=False):
+        """Compute the projections of a grain at different rotation angles.
+
+        The method compute each projection and concatenate them into a single 3D array in the form [n, u, v]
+        with n the number of angles.
+
+        :param list omegas: the list of omega angles to use (in degrees).
+        :param int gid: the id of the grain to project (1 default).
+        :param ndarray data: the data array representing the grain.
+        :param bool hor_flip: a flag to apply a horizontal flip.
+        :param bool ver_flip: a flag to apply a vertical flip.
+        :return: a 3D array containing the n projections.
+        """
+        from scipy import ndimage
+        if data is None:
+            grain_ids = self.exp.get_sample().get_grain_ids()
+            print('binarizing grain %d' % gid)
+            data = np.where(grain_ids[ndimage.find_objects(grain_ids == gid)[0]] == gid, 1, 0)
+        print('shape of binary grain is {}'.format(data.shape))
+        stack_sim = radiographs(data, omegas)
+        stack_sim = stack_sim.transpose(2, 0, 1)[:, ::-1, ::-1]
+        # here we need to account for the detector flips (detector is always supposed to be perpendicular to the beam)
+        # by default (u, v) correspond to (-Y, -Z)
+        if hor_flip:
+            print('applying horizontal flip to the simulated image stack')
+            stack_sim = stack_sim[:, ::-1, :]
+        if ver_flip:
+            print('applying vertical flip to the simulated image stack')
+            stack_sim = stack_sim[:, :, ::-1]
+        return stack_sim
+
+    def grain_projection_simulation(self, gid=1):
+        """Function to compute all the grain projection in DCT geometry and create a composite image.
+
+        :param int gid: the id of the grain to project (1 default).
+        """
         print('forward simulation of grain %d' % gid)
         detector = self.exp.get_active_detector()
         lambda_keV = self.exp.source.max_energy
@@ -139,12 +183,6 @@ class DctForwardSimulation(ForwardSimulation):
         if not hasattr(self, 'grain'):
             # load the corresponding grain
             self.load_grain(gid=gid)
-        from scipy import ndimage
-        if data is None:
-            grain_ids = self.exp.get_sample().get_grain_ids()
-            print('binarizing grain %d' % gid)
-            data = np.where(grain_ids[ndimage.find_objects(grain_ids == gid)[0]] == gid, 1, 0)
-        print('shape of binary grain is {}'.format(data.shape))
 
         # compute all the omega values
         print('simulating diffraction spot positions on the detector')
@@ -171,15 +209,27 @@ class DctForwardSimulation(ForwardSimulation):
                 pg = detector.project_along_direction(K, g_pos_rot)
                 (up, vp) = detector.lab_to_pixel(pg)[0]
                 g_uv[:, 2 * i + j] = up, vp
-        # build the 3d projection stack at once
-        print('building grain projections stack')
-        stack_sim = radiographs(data, omegas)
-        stack_sim = stack_sim.transpose(2, 0, 1)[:, :, ::-1]  # (u, v) axes correspond to (Y, -Z) for DCT detector
+        # check detector flips
+        hor_flip = np.dot(detector.u_dir, [0, -1, 0]) < 0
+        ver_flip = np.dot(detector.v_dir, [0, 0, -1]) < 0
+        if self.verbose:
+            print(detector.u_dir)
+            print(detector.v_dir)
+            print('detector horizontal flip: %s' % hor_flip)
+            print('detector vertical flip: %s' % ver_flip)
+        # compute the projections
+        stack_sim = self.grain_projections(omegas, gid, hor_flip=hor_flip, ver_flip=ver_flip)
         return self.grain_projection_image(g_uv, stack_sim)
 
 
     def dct_projection(self, omega, include_direct_beam=True, att=5):
-        """Function to compute a full DCT projection at a given omega angle."""
+        """Function to compute a full DCT projection at a given omega angle.
+
+        :param float omega: rotation angle in degrees.
+        :param bool include_direct_beam: flag to compute the transmission through the sample.
+        :param float att: an attenuation factor used to limit the gray levels in the direct beam.
+        :return: the dct projection as a 2D numpy array
+        """
         if len(self.reflections) == 0:
             print('empty list of reflections, you should run the setup function first')
             return None
@@ -224,7 +274,7 @@ class DctForwardSimulation(ForwardSimulation):
             # position of the grain at this rotation angle
             g_pos_rot = np.dot(R, g_center_mm)
             pg = detector.project_along_direction(K, g_pos_rot)
-            (up, vp) = detector.lab_to_pixel(pg)[0]
+            up, vp = detector.lab_to_pixel(pg)[0]
             if self.verbose:
                 print('\n* gid=%d, (%d,%d,%d) plane, angle=%.1f' % (gid, h, k, l, omega))
                 print('diffraction vector:', K)

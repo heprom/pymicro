@@ -638,6 +638,27 @@ class FE_Mesh():
         f.write('***return\n')
         f.close()
 
+    def translate_mesh(self, T):
+        """Translate a mesh by modifying the nodes coordinates."""
+        assert len(T) == self._dim
+        print('translating mesh')
+        for node in self._nodes:
+            node._x += T[0]
+            node._y += T[1]
+            if self._dim == 3:
+                node._z += T[2]
+
+    def rotate_mesh(self, R):
+        """Rotate a mesh by transforming the nodes coordinates using a rotation matrix."""
+        assert R.shape[0] == R.shape[1]
+        assert R.shape[0] == self._dim
+        print('rotating mesh')
+        for node in self._nodes:
+            new_position = numpy.dot(R, [node._x, node._y, node._z])
+            node._x = new_position[0]
+            node._y = new_position[1]
+            node._z = new_position[2]
+
     def compute_id_to_rank(self, nodes=True):
         if nodes:
             the_list = self._nodes
@@ -668,8 +689,12 @@ class FE_Mesh():
             elset_list = list(filter(lambda k: elset_prefix in k, self._elset_names))
         else:
             elset_list = self._elset_names[1:]
-        if len(elset_list) > 255:
-            print('warning, more than 255 elsets, using a uint16 field')
+        # figure out the depth of the field to use
+        names = [s for s in self._elset_names if elset_prefix in s]
+        names.sort()
+        max_id = int(names[-1].split(elset_prefix)[1])
+        if max_id > 255:
+            print('warning, max id larger than 255, using a uint16 field')
             elset_id = numpy.zeros(self.get_number_of_elements(), dtype=numpy.uint16)
         else:
             elset_id = numpy.zeros(self.get_number_of_elements(), dtype=numpy.uint8)

@@ -22,7 +22,7 @@ from pymicro.crystal.lattice import Lattice, Symmetry
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData, ImageObject
 from tables import IsDescription
-from tables import Int64Col,Float64Col
+from tables import Int64Col, Int32Col, Float64Col, Float32Col
 from math import atan2, pi
 
 
@@ -1317,13 +1317,15 @@ class GrainData(IsDescription):
        Microstructure Class, in HDF5 node /GrainData/GrainDataTable
     """
     # grain identity number
-    idnumber    = Int64Col()      # Signed 64-bit integer
+    idnumber    = Int32Col()      # Signed 64-bit integer
     # grain volume
-    volume      = Float64Col()    # float  (double-precision)
+    volume      = Float32Col()    # float
     # grain center of mass coordinates
-    center      = Float64Col(shape=(3,))    # float  (double-precision)
+    center      = Float32Col(shape=(3,))    # float  (double-precision)
     # Rodriguez vector defining grain orientation
-    orientation = Float64Col(shape=(3,))    # float  (double-precision)
+    orientation = Float32Col(shape=(3,))    # float  (double-precision)
+    # Grain Bounding box
+    bounding_box = Int32Col(shape=(3,2))   # Signed 64-bit integer
 
 class Microstructure(SampleData):
     """
@@ -1343,43 +1345,26 @@ class Microstructure(SampleData):
                  file_path=None, verbose = False, overwrite_hdf5=False,
                  lattice=None, autodelete=False, **keywords):
 
-        # initialize microstructure/file name, hdf5 and xdmf datasets
-        if filename is None:
-            filename = name + '_data'
-        else:
-            filename = os.path.splitext(filename)[0]
-        if (file_path is not None):
-            filename = os.path.join(file_path,filename)
-        SampleData.__init__(self,filename,name,description,verbose,
+        Filename = self._init_filename(filename, name, file_path)
+        SampleData.__init__(self,Filename,name,description,verbose,
                             overwrite_hdf5, autodelete)
         self.name = name
-        # initialize microstructure lattice
-        if lattice is None:
-            lattice = Lattice.cubic(1.0)
-        if not(self.file_exist):
-            # Create GrainTable
-            self.grains = self.add_table(location='Grain_data',
-                                         name='GrainDataTable',
-                                         description=GrainData,
-                                         indexname='grain_data')
-            self._lattice = lattice
-            sym = {'symmetry':self._lattice.get_symmetry().to_string()}
-            params = np.array(self.get_lattice().get_lattice_parameters(),
-                              dtype=np.float32)
-            self.add_attributes(sym,'Crystal_data')
-            self.add_data_array('Crystal_data', name='LatticeParameters',
-                                array= params, indexname='lattice_params')
-        else:
-            self.grains = self.get_node('GrainDataTable')
-            sym = Symmetry.from_string(self.get_attribute('symmetry',
-                                                          'Crystal_data'))
-            params = self.get_node('LatticeParameters', as_numpy=True)
-            lattice = Lattice.from_symmetry(sym, params)
-            self._lattice = lattice
-        # TODO : store mesh in specific group in h5_dataset
+        self.grains = self.get_node('GrainDataTable')
+        self._init_lattice(lattice)
         self.vtkmesh = None
         self.sync()
         return
+
+    def __repr__(self):
+        """Provide a string representation of the class."""
+        s = '%s\n' % self.__class__.__name__
+        s += '* name: %s\n' % self.name
+        s += '\n'
+#        for g in self.grains:
+#            s += '* %s' % g.__repr__
+        s += SampleData.__repr__(self)
+        return s
+
 
     def _minimal_data_model(self):
         """
@@ -1388,14 +1373,53 @@ class Microstructure(SampleData):
             Extends SampleData Class _minimal_data_model class
         """
         minimal_content_index_dic = {'Image_data':'/CellData',
+                                     'grain_map':'/CellData/grain_map',
+                                     'mask':'/CellData/mask',
                                      'Mesh_data':'/MeshData',
                                      'Grain_data':'/GrainData',
-                                     'Crystal_data':'/CrystalStructure'}
+                                     'GrainDataTable':('/GrainData/'
+                                                       'GrainDataTable'),
+                                     'Crystal_data':'/CrystalStructure',
+                                     'lattice_params':('/CrystalStructure'
+                                                       '/LatticeParameters'),}
         minimal_content_type_dic = {'Image_data':'3DImage',
+                                    'grain_map':'Array',
+                                    'mask':'Array',
                                     'Mesh_data':'Mesh',
                                     'Grain_data':'Group',
-                                    'Crystal_data':'Group'}
+                                    'GrainDataTable':GrainData,
+                                    'Crystal_data':'Group',
+                                    'lattice_params':'Array',}
         return minimal_content_index_dic, minimal_content_type_dic
+
+    def _init_filename(self, filename, name, file_path):
+        if filename is None:
+            Filename = name + '_data'
+        else:
+            Filename = os.path.splitext(filename)[0]
+        if (file_path is not None):
+            Filename = os.path.join(file_path,Filename)
+        return Filename
+
+    def _init_lattice(self, lattice):
+        if lattice is None:
+            lattice = Lattice.cubic(1.0)
+        if not(self.file_exist):
+            self._lattice = lattice
+            sym = {'symmetry':self._lattice.get_symmetry().to_string()}
+            params = np.array(self.get_lattice().get_lattice_parameters(),
+                              dtype=np.float32)
+            self.add_attributes(sym,'Crystal_data')
+            self.add_data_array('Crystal_data', name='LatticeParameters',
+                                array= params, indexname='lattice_params',
+                                replace=True)
+        else:
+            sym = Symmetry.from_string(self.get_attribute('symmetry',
+                                                          'Crystal_data'))
+            params = self.get_node('LatticeParameters', as_numpy=True)
+            lattice = Lattice.from_symmetry(sym, params)
+            self._lattice = lattice
+        return
 
     def get_number_of_phases(self):
         """Return the number of phases in this microstructure.
@@ -1407,13 +1431,6 @@ class Microstructure(SampleData):
         """Return the number of grains in this microstructure."""
         return self.grains.nrows
 
-    def set_lattice(self, lattice):
-        """Set the crystallographic lattice associated with this microstructure.
-
-        :param Lattice lattice: an instance of the `Lattice class`.
-        """
-        self._lattice = lattice
-
     def get_lattice(self):
         """Get the crystallographic lattice associated with this microstructure.
 
@@ -1422,12 +1439,148 @@ class Microstructure(SampleData):
         return self._lattice
 
     def get_grain_map(self, as_numpy=False ):
-        grain_map = self.get_node(name='grain_ids', as_numpy=as_numpy)
+        grain_map = self.get_node(name='grain_map', as_numpy=as_numpy)
+        if self._is_empty('grain_map'): grain_map = None
         return grain_map
 
     def get_mask(self, as_numpy=False ):
         mask = self.get_node(name='mask',  as_numpy=as_numpy)
+        if self._is_empty('mask'): mask = None
         return mask
+
+    def get_grain_ids(self, id_list=None):
+        if id_list is None:
+            return self.get_tablecol('GrainDataTable','idnumber')
+        else:
+            ids = []
+            for g in self.grains:
+                ids.append(g['idnumber'])
+            return ids
+
+    def get_grain_volumes(self, id_list=None):
+        if id_list is None:
+            return self.get_tablecol('GrainDataTable','volume')
+        else:
+            vol = []
+            for g in self.grains:
+                vol.append(g['volume'])
+            return vol
+
+    def get_grain_centers(self, id_list=None):
+        if id_list is None:
+            return self.get_tablecol('GrainDataTable','center')
+        else:
+            com = []
+            for g in self.grains:
+                com.append(g['center'])
+            return com
+
+    def get_grain_rodrigues(self, id_list=None):
+        if id_list is None:
+            return self.get_tablecol('GrainDataTable','orientation')
+        else:
+            o = []
+            for g in self.grains:
+                o.append(g['orientation'])
+            return com
+
+    def get_grain_orientations(self, id_list=None):
+        orientations = []
+        for gr in self.grains:
+            if id_list is not None:
+                if gr['idnumber'] not in id_list:
+                    continue
+            o = Orientation.from_rodrigues(gr['orientation'])
+            orientations.append(o)
+        return orientations
+
+    def get_grain_bounding_boxes(self, id_list=None):
+        if id_list is None:
+            return self.get_tablecol('GrainDataTable','bounding_box')
+        else:
+            Bbox = []
+            for g in self.grains:
+                Bbox.append(g['bounding_box'])
+            return com
+
+    def get_voxel_size(self):
+        """Get the voxel size for image data of the microstructure.
+
+        If this instance of `Microstructure has no image data, None is returned.
+        """
+        try:
+            return self.get_attribute(attrname='spacing',
+                                      node_name='/CellData')[0]
+        except:
+            return None
+
+    def get_grain(self, gid):
+        """Get a particular grain given its id.
+
+        This method browses the microstructure and return the grain
+        corresponding to the given id. If the grain is not found, the
+        method raises a `ValueError`.
+
+        :param int gid: the grain id.
+        :return: The method return a `Grain` with the corresponding id.
+        """
+        try:
+            gr = self.grains.read_where('(idnumber == gid)')[0]
+            grain = Grain(gr['idnumber'],
+                          Orientation.from_rodrigues(gr['orientation']))
+            grain.center = gr['center']
+            grain.volume = gr['volume']
+            return grain
+        except:
+            raise ValueError('grain %d not found in the microstructure' % gid)
+
+    def get_all_grains(self):
+        """ Returns the Grain objects list of all grains in microstructure"""
+        grains_list = []
+        for gr in self.grains:
+            gid = gr['idnumber']
+            grains_list.append(self.get_grain(gid))
+        return grains_list
+
+    def get_grain_positions(self):
+        """Return all te grain positions as a numpy array of shape (n, 3) where n is the number of grains."""
+        positions = np.empty((self.get_number_of_grains(), 3))
+        for i in range(self.get_number_of_grains()):
+            positions[i] = self.grains[i]['center']
+        return positions
+
+    def get_grain_volume_fractions(self):
+        """Compute all grains volume fractions."""
+        total_volume = 0.
+        for grain in self.grains:
+            total_volume += grain['volume']
+        return [grain['volume']/total_volume for grain in self.grains]
+
+    def get_grain_volume_fraction(self, gid, use_total_volume_value=None):
+        """Compute the grain volume fraction.
+
+        :param int gid: the grain id.
+        :param float use_total_volume_value: the total volume value to use.
+        :return float: the grain volume fraction as a number in the range [0, 1].
+        """
+        # compute the total volume
+        if use_total_volume_value:
+            total_volume = use_total_volume_value
+        else:
+            # sum all the grain volume to compute the total volume
+            total_volume = 0.
+            for grain in self.grains:
+                total_volume += grain['volume']
+        volume_fraction = [grain['volume']/total_volume for grain
+                           in self.grains.where('(idnumber == gid)')]
+        return  volume_fraction[0]
+
+    def set_lattice(self, lattice):
+        """Set the crystallographic lattice associated with this microstructure.
+
+        :param Lattice lattice: an instance of the `Lattice class`.
+        """
+        self._lattice = lattice
 
     def set_grain_map(self, grain_map, voxel_size=None, **keywords):
         """Set the grain map for this microstructure.
@@ -1441,17 +1594,18 @@ class Microstructure(SampleData):
             if not(empty):
                 create_image = False
         if create_image:
+            print('CREATE IMAAAGE YIIHAAAAAA')
             if (voxel_size is None):
                 msg = '(set_mask) Please specify voxel size for CellData image'
                 raise ValueError(msg)
             image_object = ImageObject()
             image_object.dimension = grain_map.shape
             image_object.spacing = [voxel_size, voxel_size, voxel_size]
-            image_object.add_field(grain_map, 'grain_ids')
+            image_object.add_field(grain_map, 'grain_map')
             self.add_image(image_object, imagename='CellData',
                            location='/', replace=True, **keywords)
-            gmap_path = self._name_or_node_to_path('grain_ids')
-            self.add_to_index(indexname='grain_map', path=gmap_path)
+            gmap_path = self._name_or_node_to_path('grain_map')
+            self.add_to_index(indexname='grain_ids', path=gmap_path)
         else:
             im_vox_size = self.get_attribute('spacing','CellData')
             vox_size = [voxel_size, voxel_size, voxel_size]
@@ -1463,17 +1617,6 @@ class Microstructure(SampleData):
                                 array=grain_map, indexname='grain_map',
                                 replace=True, **keywords)
         return
-
-    def get_voxel_size(self):
-        """Get the voxel size for image data of the microstructure.
-
-        If this instance of `Microstructure has no image data, None is returned.
-        """
-        try:
-            return self.get_attribute(attrname='spacing',
-                                      node_name='/CellData')[0]
-        except:
-            return None
 
     def set_mask(self, mask, voxel_size=None, **keywords):
         """Set the mask for this microstructure.
@@ -1506,6 +1649,38 @@ class Microstructure(SampleData):
                                 array=mask, **keywords)
         return
 
+    def set_random_orientations(self):
+        """ Set random orientations for all grains in GrainDataTable """
+        for grain in self.grains:
+            o = Orientation.random()
+            grain['orientation'] = o.rod
+            grain.update()
+        self.grains.flush()
+        return
+
+
+    @staticmethod
+    def random_texture(n=100):
+        """Generate a random texture microstructure.
+
+        **parameters:**
+
+        *n* The number of grain orientations in the microstructure.
+        """
+        m = Microstructure(name='random_texture')
+        grain = m.grains.row
+        for i in range(n):
+            grain['idnumber'] = i +1
+            o = Orientation.random()
+            grain['orientation'] = o.rod
+            grain.append()
+        m.grains.flush()
+        return m
+
+    def SetVtkMesh(self, mesh):
+        # TODO : create a dedicated node in h5_dataset
+        self.vtkmesh = mesh
+
     def view_slice(self, slice=None, color='random', show_mask=True):
         """A simple utility method to show one microstructure slice.
 
@@ -1536,24 +1711,6 @@ class Microstructure(SampleData):
             mask = self.get_mask()
             plt.imshow(mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
         plt.show()
-
-    @staticmethod
-    def random_texture(n=100):
-        """Generate a random texture microstructure.
-
-        **parameters:**
-
-        *n* The number of grain orientations in the microstructure.
-        """
-        m = Microstructure(name='random_texture')
-        grain = m.grains.row
-        for i in range(n):
-            grain['idnumber'] = i +1
-            o = Orientation.random()
-            grain['orientation'] = o.rod
-            grain.append()
-        m.grains.flush()
-        return m
 
     @staticmethod
     def rand_cmap(N=4096, first_is_black=False):
@@ -1619,45 +1776,6 @@ class Microstructure(SampleData):
         micro.grains.flush()
         return micro
 
-    def get_grain(self, gid):
-        """Get a particular grain given its id.
-
-        This method browses the microstructure and return the grain
-        corresponding to the given id. If the grain is not found, the
-        method raises a `ValueError`.
-
-        :param int gid: the grain id.
-        :return: The method return a `Grain` with the corresponding id.
-        """
-        try:
-            gr = self.grains.read_where('(idnumber == gid)')[0]
-            grain = Grain(gr['idnumber'],
-                          Orientation.from_rodrigues(gr['orientation']))
-            grain.center = gr['center']
-            grain.volume = gr['volume']
-            return grain
-        except:
-            raise ValueError('grain %d not found in the microstructure' % gid)
-
-    def get_all_grains(self):
-        """ Returns the Grain objects list of all grains in microstructure"""
-        grains_list = []
-        for gr in self.grains:
-            gid = gr['idnumber']
-            grains_list.append(self.get_grain(gid))
-        return grains_list
-
-
-    def __repr__(self):
-        """Provide a string representation of the class."""
-        s = '%s\n' % self.__class__.__name__
-        s += '* name: %s\n' % self.name
-        s += '\n'
-#        for g in self.grains:
-#            s += '* %s' % g.__repr__
-        s += SampleData.__repr__(self)
-        return s
-
     def print_grains_info(self, grain_list=None, as_string=False):
         """ Print informations on the grains in the microstructure"""
         s = ''
@@ -1675,43 +1793,6 @@ class Microstructure(SampleData):
             if not(as_string):
                 print(s)
         return s
-
-    def get_grain_positions(self):
-        """Return all te grain positions as a numpy array of shape (n, 3) where n is the number of grains."""
-        positions = np.empty((self.get_number_of_grains(), 3))
-        for i in range(self.get_number_of_grains()):
-            positions[i] = self.grains[i]['center']
-        return positions
-
-    def get_grain_volume_fractions(self):
-        """Compute all grains volume fractions."""
-        total_volume = 0.
-        for grain in self.grains:
-            total_volume += grain['volume']
-        return [grain['volume']/total_volume for grain in self.grains]
-
-    def get_grain_volume_fraction(self, gid, use_total_volume_value=None):
-        """Compute the grain volume fraction.
-
-        :param int gid: the grain id.
-        :param float use_total_volume_value: the total volume value to use.
-        :return float: the grain volume fraction as a number in the range [0, 1].
-        """
-        # compute the total volume
-        if use_total_volume_value:
-            total_volume = use_total_volume_value
-        else:
-            # sum all the grain volume to compute the total volume
-            total_volume = 0.
-            for grain in self.grains:
-                total_volume += grain['volume']
-        volume_fraction = [grain['volume']/total_volume for grain
-                           in self.grains.where('(idnumber == gid)')]
-        return  volume_fraction[0]
-
-    def SetVtkMesh(self, mesh):
-        # TODO : create a dedicated node in h5_dataset
-        self.vtkmesh = mesh
 
     @staticmethod
     def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
@@ -1962,6 +2043,7 @@ class Microstructure(SampleData):
             grain = self.grains.read_where('idnumber == gid')
             micro_crop.grains.append(grain)
         print('%d grains in cropped microstructure' % micro_crop.grains.nrows)
+        micro_crop.grains.flush()
         return micro_crop
 
     def compute_grain_volume(self, gid):
@@ -1974,6 +2056,36 @@ class Microstructure(SampleData):
         grain_map = self.get_grain_map()
         voxel_size = self.get_attribute('spacing','CellData')
         return np.sum(grain_map[:] ==  np.array(gid)) * voxel_size[0]
+
+    def compute_grain_center(self, gid):
+        """Compute the center of masses of a grain given its id.
+
+        :param int gid: the grain id to consider.
+        :return: a tuple with the center of mass in mm units
+                 (or voxel if the voxel_size is not specified).
+        """
+        # isolate the grain within the complete grain map
+        grain_map = self.get_grain_map()
+        voxel_size = self.get_attribute('spacing','CellData')
+        slices = ndimage.find_objects(grain_map == np.array(gid))
+        if not len(slices) > 0:
+            raise ValueError('warning grain %d not found in grain map' % gid)
+        sl = slices[0]
+        offset = np.array([sl[0].start, sl[1].start, sl[2].start])
+        grain_data_bin = (grain_map[sl] == gid).astype(np.uint8)
+        local_com = ndimage.measurements.center_of_mass(grain_data_bin)
+        com = voxel_size*(offset + local_com - 0.5 * np.array(grain_map.shape))
+        return com
+
+    def compute_grain_bounding_box(self, gid, as_slice=False):
+        """ Compute the grain bounding box indices in the grain map """
+        slices = ndimage.find_objects(self.get_grain_map() == np.array(gid))[0]
+        if as_slice: return slices
+        x_indices = (slices[0].start, slices[0].stop)
+        y_indices = (slices[1].start, slices[1].stop)
+        z_indices = (slices[2].start, slices[2].stop)
+        return (x_indices,y_indices,z_indices)
+
 
     def recompute_grain_volumes(self, verbose=False):
         """Compute the volume of all grains in the microstructure.
@@ -2006,27 +2118,7 @@ class Microstructure(SampleData):
             g['volume'] = vol
             g.update()
         self.grains.flush()
-        return
-
-    def compute_grain_center(self, gid):
-        """Compute the center of masses of a grain given its id.
-
-        :param int gid: the grain id to consider.
-        :return: a tuple with the center of mass in mm units
-                 (or voxel if the voxel_size is not specified).
-        """
-        # isolate the grain within the complete grain map
-        grain_map = self.get_grain_map()
-        voxel_size = self.get_attribute('spacing','CellData')
-        slices = ndimage.find_objects(grain_map == np.array(gid))
-        if not len(slices) > 0:
-            raise ValueError('warning grain %d not found in grain map' % gid)
-        sl = slices[0]
-        offset = np.array([sl[0].start, sl[1].start, sl[2].start])
-        grain_data_bin = (grain_map[sl] == gid).astype(np.uint8)
-        local_com = ndimage.measurements.center_of_mass(grain_data_bin)
-        com = voxel_size*(offset + local_com - 0.5 * np.array(grain_map.shape))
-        return com
+        return self.get_grain_volumes()
 
     def recompute_grain_centers(self, verbose=False):
         """Compute and assign the center of all grains in the microstructure.
@@ -2057,10 +2149,42 @@ class Microstructure(SampleData):
             g['center'] = com
             g.update()
         self.grains.flush()
-        return
+        return self.get_grain_centers()
+
+    def recompute_grain_bounding_boxes(self, verbose=False):
+        """Compute and assign the center of all grains in the microstructure.
+
+        Each grain center is computed using its center of mass. The value is
+        assigned to the grain.center attribute. If the voxel size is specified,
+        the grain centers will be in mm unit, if not in voxel unit.
+
+        .. note::
+
+          A grain map need to be associated with this microstructure instance for the method to run.
+
+        :param bool verbose: flag for verbose mode.
+        """
+        if not(self.__contains__('grain_map')):
+            print('warning: need a grain map to recompute the bounding boxes'
+                  ' of the grains')
+            return
+        for g in self.grains:
+            try:
+                Bbox = self.compute_grain_bounding_box(g['idnumber'])
+            except ValueError:
+                print('skipping grain %d' % g['idnumber'])
+                continue
+            if verbose:
+                print('grain %d bounding box: [%d:%d, %d:%d, %d:%d]'
+                       % (g['idnumber'], Bbox[0][0], Bbox[0][1],Bbox[1][0],
+                          Bbox[1][1], Bbox[2][0], Bbox[2][1]))
+            g['bounding_box'] = Bbox
+            g.update()
+        self.grains.flush()
+        return self.get_grain_bounding_boxes()
 
     def compute_grains_geometry(self):
-        """ Compute grain centers and volume from grain_map """
+        """ Compute grain centers, volume and bounding box from grain_map """
         gmap = self.get_node('grain_map')
         grains_id = np.unique(gmap)
         del gmap
@@ -2071,16 +2195,8 @@ class Microstructure(SampleData):
             gr['idnumber'] = i
             gr['center'] = self.compute_grain_center(i)
             gr['volume'] = self.compute_grain_volume(i)
+            gr['bounding_box'] = self.compute_grain_bounding_box(i)
             gr.append()
-        self.grains.flush()
-        return
-
-    def set_random_orientations(self):
-        """ Set random orientations for all grains in GrainDataTable """
-        for grain in self.grains:
-            o = Orientation.random()
-            grain['orientation'] = o.rod
-            grain.update()
         self.grains.flush()
         return
 

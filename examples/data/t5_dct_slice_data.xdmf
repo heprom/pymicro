@@ -8,8 +8,8 @@
         <DataItem Format="XML" Dimensions="3">0. 0. 0.</DataItem>
         <DataItem Format="XML" Dimensions="3">0.0014  0.0014  0.0014</DataItem>
       </Geometry>
-      <Attribute Name="grain_ids" AttributeType="Scalar" Center="Cell">
-        <DataItem Format="HDF" Dimensions="654  654  1" NumberType="Int" Precision="16">/home/amarano/Codes/pymicro/examples/data/t5_dct_slice_data.h5:/CellData/grain_ids</DataItem>
+      <Attribute Name="grain_map" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="654  654  1" NumberType="Int" Precision="16">/home/amarano/Codes/pymicro/examples/data/t5_dct_slice_data.h5:/CellData/grain_map</DataItem>
       </Attribute>
       <Attribute Name="mask" AttributeType="Scalar" Center="Cell">
         <DataItem Format="HDF" Dimensions="654  654  1" NumberType="Int" Precision="uint8">/home/amarano/Codes/pymicro/examples/data/t5_dct_slice_data.h5:/CellData/mask</DataItem>

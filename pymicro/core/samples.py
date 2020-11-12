@@ -31,6 +31,7 @@ from lxml.builder import ElementMaker
 import shutil
 import numpy as np
 import tables as Tb
+from tables import dtype_from_descr
 import h5py as h5
 
 import pymicro.core.geof as geof
@@ -124,32 +125,15 @@ class SampleData:
         else:
             filename_tmp = filename
 
-        # initialize filenames
         self.h5_file = filename_tmp + '.h5'
         self.xdmf_file = filename_tmp + '.xdmf'
-
-        # initiate verbosity flag
         self._verbose = verbose
         self.autodelete = autodelete
-
-        # if file exists and overwrite flag is True, delete it
         if os.path.exists(self.h5_file) and overwrite_hdf5:
             self._verbose_print('-- File "{}" exists  and will be '
                                 'overwritten'.format(self.h5_file))
             os.remove(self.h5_file)
-
-        # h5 table file object creation
-        self.file_exist = False
-        self.init_file_object(sample_name, sample_description)
-
-        # initialize XML tree for xdmf format handling
-        self.init_xml_tree()
-
-        # set compression options for HDF5 (passed in keywords args)
-        if not self.file_exist:
-            Compression_keywords = {k: v for k, v in keywords.items() if k in \
-                                    compression_keys}
-            self.set_global_compression_opt(**Compression_keywords)
+        self.init_file_object(sample_name, sample_description, **keywords)
         self.sync()
         return
 
@@ -171,9 +155,13 @@ class SampleData:
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
         if self.autodelete:
-            self._verbose_print('Autodelete: Removing hdf5 and xdmf files')
+            print('{} Autodelete: \n Removing hdf5 file {} and xdmf file {}'
+                  ''.format(self.__class__.__name__, self.h5_file,
+                            self.xdmf_file))
             os.remove(self.h5_file)
             os.remove(self.xdmf_file)
+            if (os.path.exists(self.h5_file) or os.path.exists(self.xdmf_file)):
+                raise RuntimeError('HDF5 and XDMF not removed')
         return
 
     def __repr__(self):
@@ -188,11 +176,13 @@ class SampleData:
         if path is None:
             return False
         else:
-            return self.h5_dataset.__contains__(path)
+            return (self.h5_dataset.__contains__(path)
+                    and not self._is_empty(path))
 
     def init_file_object(self,
                          sample_name='',
-                         sample_description=''):
+                         sample_description='',
+                         **keywords):
         """ Initiate PyTable file object from .h5 file or create it if
             needed
         """
@@ -202,54 +192,27 @@ class SampleData:
             self._verbose_print('-- Opening file "{}" '.format(self.h5_file),
                                 line_break=False)
             self.file_exist = True
+            self._init_xml_tree()
             self.Filters = self.h5_dataset.filters
             self._init_data_model()
             self._verbose_print('**** FILE CONTENT ****')
             self._verbose_print(SampleData.__repr__(self))
         except IOError:
+            self.file_exist = False
             self._verbose_print('-- File "{}" not found : file'
-                                ' created'.format(self.h5_file))
+                                ' created'.format(self.h5_file),
+                                line_break=True)
             self.h5_dataset = Tb.File(self.h5_file, mode='a')
-
+            self._init_xml_tree()
             # add sample name and description
             self.h5_dataset.root._v_attrs.sample_name = sample_name
             self.h5_dataset.root._v_attrs.description = sample_description
+            # get compression options
+            Compression_keywords = {k: v for k, v in keywords.items() if k in
+                                    compression_keys}
+            self.set_global_compression_opt(**Compression_keywords)
+            # Generic Data Model initialization
             self._init_data_model()
-        return
-
-    def init_xml_tree(self):
-        """ Read xml tree structured data in .xdmf file or initiate one if
-            needed
-
-           The new xdmf trees are created with the minimal nodes for
-           XDMF format:
-               - root Xdmf node
-               - Xinclude namespace in root node
-               - Domaine node as children of Xdmf root node
-        """
-
-        try:
-            self.xdmf_tree = etree.parse(self.xdmf_file)
-        except OSError:
-            # Non existent xdmf file.
-            # A new .xdmf is created with the base node Xdmf and one Domain
-            self._verbose_print('-- File "{}" not found : file'
-                                ' created'.format(self.xdmf_file),
-                                line_break=False)
-
-            # create root element of xdmf tree structure
-            E = ElementMaker(namespace="http://www.w3.org/2003/XInclude",
-                             nsmap={'xi': "http://www.w3.org/2003/XInclude"})
-            root = E.root()
-            root.tag = 'Xdmf'
-            root.set("Version", "2.2")
-            self.xdmf_tree = etree.ElementTree(root)
-
-            # create element Domain as a children of root
-            self.xdmf_tree.getroot().append(etree.Element("Domain"))
-
-            # write file
-            self.write_xdmf()
         return
 
     def print_xdmf(self):
@@ -564,8 +527,6 @@ class SampleData:
                 self._verbose_print(msg)
                 return
         else:
-            self._verbose_print('Creating hdf5 group {} in file {}'.format(
-                mesh_path, self.h5_file))
             mesh_group = self.add_group(path=location, groupname=meshname,
                                         indexname=indexname)
             empty = (mesh_object is None)
@@ -728,8 +689,6 @@ class SampleData:
                 print(msg)
                 return
         else:
-            self._verbose_print('Creating hdf5 group {} in file {}'.format(
-                image_path, self.h5_file))
             image_group = self.add_group(path=location, groupname=imagename,
                                          indexname=indexname)
             empty = (image_object is None)
@@ -811,6 +770,7 @@ class SampleData:
             self.add_data_array(location=image_path,
                                 name=field_name,
                                 array=field,
+                                replace=True,
                                 **keywords)
         return
 
@@ -826,6 +786,8 @@ class SampleData:
 
             self._verbose_print(warn_msg)
             indexname = groupname
+        self._verbose_print('Creating hdf5 group `{}` {} in file {}'.format(
+            groupname, path, self.h5_file))
         group_path = os.path.join(path,groupname)
         self.add_to_index(indexname, group_path)
 
@@ -860,16 +822,14 @@ class SampleData:
                 raise
 
     def add_data_array(self, location, name, array,
-                       indexname=None,
-                       chunkshape=None,
-                       createparents=False,
-                       replace=False,
-                       filters=None,
+                       indexname=None, chunkshape=None, createparents=False,
+                       replace=False, filters=None, empty=False,
                        **keywords):
         """Add the data array at the given location in hte HDF5 data tree.
 
         """
-
+        self._verbose_print('Adding array `{}` into Group `{}`'
+                            ''.format(name,location))
         # get location path
         location_path = self._name_or_node_to_path(location)
         if location_path is None:
@@ -894,10 +854,6 @@ class SampleData:
                     return
             # check if array location exists and remove node if asked
             array_path = os.path.join(location_path, name)
-            self._verbose_print('coucou location_path {} '.format(
-                                location_path))
-            self._verbose_print('coucou name : {}'.format(name))
-            self._verbose_print('coucou array_path : {}'.format(array_path))
             if self.h5_dataset.__contains__(array_path):
                 if replace:
                     msg = ('(add_data_array): existing node {} will be '
@@ -911,21 +867,10 @@ class SampleData:
                            ''.format(array_path))
                     self._verbose_print(msg)
 
-        # add to index
-        if indexname is None:
-            warn_msg = (' (add_data_array) indexname not provided, '
-                        ' the array name `{}` is used as index name '
-                        ''.format(name))
-            self._verbose_print(warn_msg)
-            indexname = name
-        self.add_to_index(indexname,os.path.join(location_path,name))
-
         # get compression options
         # keywords compression options prioritized over passed filters instances
         if (filters is None) or bool(keywords):
             Filters = self._get_local_compression_opt(**keywords)
-            self._verbose_print('-- Compression Options for dataset {}'
-                                ''.format(name))
         else:
             Filters = filters
         self._verbose_print('-- Compression Options for dataset {}'
@@ -938,17 +883,31 @@ class SampleData:
             self._verbose_print('\t * No Compression')
 
         # get location type
-        if location_exists and self._is_grid(location):
+        if (location_exists and self._is_grid(location) and not empty
+           and not self._is_empty(location)):
             self._check_field_compatibility(location,array)
-        self._verbose_print('Adding array `{}` into `{}`'
-                            ''.format(name,location))
+        # add to index
+        if indexname is None:
+            warn_msg = (' (add_data_array) indexname not provided, '
+                        ' the array name `{}` is used as index name '
+                        ''.format(name))
+            self._verbose_print(warn_msg)
+            indexname = name
+        self.add_to_index(indexname,os.path.join(location_path,name))
 
         # Create dataset node to store array
-        Node = self.h5_dataset.create_carray(where=location_path, name=name,
+        if empty:
+            Node = self.h5_dataset.create_carray(where=location_path, name=name,
+                                                 obj=np.array([0]))
+            self.add_attributes(dic={'empty':True}, nodename=name)
+        else:
+            Node = self.h5_dataset.create_carray(where=location_path, name=name,
                                              filters=Filters, obj=array,
                                              chunkshape=chunkshape)
+            self.add_attributes(dic={'empty':False}, nodename=name)
 
-        if self._is_grid(location):
+        if (self._is_grid(location) and not empty
+                                    and not self._is_empty(location)):
             ftype = self._get_xdmf_field_type(field=array,
                                               grid_location=location_path)
             dic = {'field_type':ftype}
@@ -962,6 +921,8 @@ class SampleData:
                   filters=None, **keywords):
         """ Add a structured array dataset (tables.Table) in HDF5 tree"""
 
+        self._verbose_print('Adding table `{}` into Group `{}`'
+                            ''.format(name,location))
         # get location path
         location_path = self._name_or_node_to_path(location)
         if (location_path is None) and not(createparents):
@@ -1205,8 +1166,13 @@ class SampleData:
             self._verbose_print(' (get_attribute) neither indexname nor'
                                 ' node_path passed, node return aborted')
         else:
-            attribute = self.h5_dataset.get_node_attr(where=data_path,
-                                                      attrname=attrname)
+            try:
+                attribute = self.h5_dataset.get_node_attr(where=data_path,
+                                                          attrname=attrname)
+            except AttributeError:
+                self._verbose_print(' (get_attribute) node {} has no attribute'
+                                    ' `empty`'.format(node_name))
+                return None
             if isinstance(attribute,bytes):
                 attribute = attribute.decode()
         return attribute
@@ -1322,7 +1288,7 @@ class SampleData:
         # ------ check if default compression is required
         if 'default_compression' in keywords:
             default = True
-            self.Filters = self._set_defaut_compression()
+            self.Filters = self._set_default_compression()
         else:
             self.Filters = self._get_compression_opt(**keywords)
 
@@ -1413,12 +1379,13 @@ class SampleData:
         if (remove_flag or not (isGroup)):
 
             # remove node in xdmf tree
-            xdmf_path = Node._v_attrs.xdmf_path
-            group_xdmf = self.xdmf_tree.find(xdmf_path)
-            self._verbose_print('Removing  node {} in xdmf'
-                                ' tree....'.format(xdmf_path))
-            parent = group_xdmf.getparent()
-            parent.remove(group_xdmf)
+            xdmf_path = self.get_attribute('xdmf_path',Node)
+            if xdmf_path is not None:
+                group_xdmf = self.xdmf_tree.find(xdmf_path)
+                self._verbose_print('Removing  node {} in xdmf'
+                                    ' tree....'.format(xdmf_path))
+                parent = group_xdmf.getparent()
+                parent.remove(group_xdmf)
 
             self._verbose_print('Removing  node {} in h5 structure'
                                 ' ....'.format(node_path))
@@ -1436,10 +1403,7 @@ class SampleData:
                 self._remove_from_index(node_path=Node._v_pathname)
                 Node.remove()
             self.sync()
-            self._verbose_print('Node sucessfully removed, '
-                                'new data structure is:\n')
-            self._verbose_print(self.__repr__())
-
+            self._verbose_print('Node {} sucessfully removed'.format(name))
         return
 
     def repack_h5file(self):
@@ -1473,26 +1437,78 @@ class SampleData:
             for which the subclass is designed
 
         """
-        minimal_content_index_dic = {}
-        minimal_content_type_dic = {}
-        return minimal_content_index_dic, minimal_content_type_dic
+        index_dic = {}
+        type_dic = {}
+        return index_dic, type_dic
 
     def _init_data_model(self):
         """ Initialization of the minimal data model specified for the class"""
         content_paths, content_type = self._minimal_data_model()
         self._init_content_index(content_paths)
-        if not(self.file_exist):
-            for key,value in content_paths.items():
-                head, tail = os.path.split(value)
-                if self.h5_dataset.__contains__(content_paths[key]):
-                    pass
-                if content_type[key] == 'Group':
-                    self.add_group(path=head, groupname=tail, indexname=key,
-                                   replace=False,createparents=True)
-                elif content_type[key] == '3DImage':
-                    self.add_image(imagename=tail, indexname=key, location=head)
-                elif content_type[key] == 'Mesh':
-                    self.add_mesh(meshname=tail, indexname=key, location=head)
+        self._verbose_print('Minimal data model initialization....')
+        for key,value in content_paths.items():
+            head, tail = os.path.split(value)
+            if self.h5_dataset.__contains__(content_paths[key]):
+                if self._is_table(content_paths[key]):
+                   self._update_table_columns(tablename=content_paths[key],
+                                              Description=content_type[key])
+                if self._is_empty(content_paths[key]):
+                    self._verbose_print('Warning: node {} specified in the'
+                                        'minimal data model for this class'
+                                        'is empty'.format(content_paths[key]))
+                continue
+            elif content_type[key] == 'Group':
+                self.add_group(path=head, groupname=tail, indexname=key,
+                               replace=False,createparents=True)
+            elif content_type[key] == '3DImage':
+                self.add_image(imagename=tail, indexname=key, location=head)
+            elif content_type[key] == 'Mesh':
+                self.add_mesh(meshname=tail, indexname=key, location=head)
+            elif content_type[key] == 'Array':
+                empty_array = np.array([0])
+                self.add_data_array(location=head, name=tail,
+                                    array=empty_array, empty=True,
+                                    indexname=key)
+            elif (isinstance(content_type[key],Tb.IsDescription)
+                  or issubclass(content_type[key],Tb.IsDescription) ):
+                self.add_table(location=head,name=tail,indexname=key,
+                               description=content_type[key])
+        self._verbose_print('Minimal data model initialization done\n')
+        return
+
+    def _init_xml_tree(self):
+        """ Read xml tree structured data in .xdmf file or initiate one if
+            needed
+
+           The new xdmf trees are created with the minimal nodes for
+           XDMF format:
+               - root Xdmf node
+               - Xinclude namespace in root node
+               - Domaine node as children of Xdmf root node
+        """
+
+        try:
+            self.xdmf_tree = etree.parse(self.xdmf_file)
+        except OSError:
+            # Non existent xdmf file.
+            # A new .xdmf is created with the base node Xdmf and one Domain
+            self._verbose_print('-- File "{}" not found : file'
+                                ' created'.format(self.xdmf_file),
+                                line_break=False)
+
+            # create root element of xdmf tree structure
+            E = ElementMaker(namespace="http://www.w3.org/2003/XInclude",
+                             nsmap={'xi': "http://www.w3.org/2003/XInclude"})
+            root = E.root()
+            root.tag = 'Xdmf'
+            root.set("Version", "2.2")
+            self.xdmf_tree = etree.ElementTree(root)
+
+            # create element Domain as a children of root
+            self.xdmf_tree.getroot().append(etree.Element("Domain"))
+
+            # write file
+            self.write_xdmf()
         return
 
     def _init_content_index(self, path_dic):
@@ -1524,14 +1540,75 @@ class SampleData:
             self.h5_dataset.create_group('/Index', name='Aliases')
         return
 
+    def _compatible_descriptions(self, desc_items1, desc_items2 ):
+        """ """
+        if not(desc_items1.keys() <= desc_items2.keys()):
+            return False
+        else:
+            for key in desc_items1:
+                kind_comp = (desc_items1[key].kind == desc_items2[key].kind )
+                shape_comp = (desc_items1[key].shape == desc_items2[key].shape)
+                if not(kind_comp and shape_comp):
+                    return False
+            return True
+
+
+
+    def _update_table_columns(self, tablename, Description):
+        """ Update table if associated table description Class has evolved"""
+        table = self.get_node(tablename)
+        current_desc = table.description._v_colobjects
+        desc_dtype = dtype_from_descr(Description)
+        # Check if current table description is contained or equal to
+        # Class defined table description
+        compatibility = self._compatible_descriptions(current_desc,
+                                                      Description.columns)
+        if not(compatibility):
+            msg = ('Table `{}` has a Description (column specification) '
+                   'that does not match the Class `{}` Description `{}` for '
+                   'this table\n'.format(tablename, self.__class__.__name__,
+                                   Description.__name__))
+            msg += ('Current table description: \n {} \nClass table description'
+                    ': \n {}'.format(current_desc.items,
+                                     Description.columns))
+            raise ValueError(msg)
+        elif compatibility and (current_desc.keys()
+                                 < Description.columns.keys()):
+            msg = ('Updating `{}` with current class Table description'.format(
+                    tablename))
+            self._verbose_print(msg)
+            Nrows = table.nrows
+            tab_name = table._v_name
+            tab_indexname = self.get_indexname_from_path(table._v_pathname)
+            tab_path = os.path.dirname(table._v_pathname)
+            tab_chunkshape = table.chunkshape
+            tab_filters = table.filters
+            data = np.array(np.zeros((Nrows,)), dtype=desc_dtype)
+            for key in current_desc:
+                data[key] = self.get_tablecol(tablename=tablename,
+                                                        colname=key)
+            if self.aliases.__contains__(tab_indexname):
+                tab_aliases = self.aliases[tab_indexname]
+            else:
+                tab_aliases = []
+            self.remove_node(tab_name)
+            new_tab = self.add_table(location=tab_path, name=tab_name,
+                                     description=Description,
+                                     indexname=tab_indexname,
+                                     chunkshape=tab_chunkshape, replace=True,
+                                     data=data, filters=tab_filters)
+            for alias in tab_aliases:
+                self.add_alias(aliasname=alias, indexname=tab_indexname)
+        return
+
     def _remove_from_index(self,
                            node_path):
         """Remove a hdf5 node from content index dictionary"""
-
         try:
             key = self.get_indexname_from_path(node_path)
             removed_path = self.content_index.pop(key)
-            self.aliases.pop(key)
+            if key in self.aliases:
+                self.aliases.pop(key)
             self._verbose_print('item {} : {} removed from context index'
                                 ' dictionary'.format(key, removed_path))
         except ValueError:
@@ -1582,6 +1659,15 @@ class SampleData:
                 warnings.warn(msg)
                 path = None
         return path
+
+    def _is_empty(self, name):
+        """ find out if name or path references an empty node"""
+        name2 = self._name_or_node_to_path(name)
+        if self._is_table(name):
+            tab = self.get_node(name2)
+            return tab.nrows > 0
+        else:
+            return self.get_attribute('empty',name2)
 
     def _is_array(self, name):
         """ find out if name or path references an array dataset"""
@@ -1641,10 +1727,17 @@ class SampleData:
     def _check_field_compatibility(self, name, field):
         """ check if field dimension is compatible with the storing location"""
         group_type = self._get_group_type(name)
+        msg = ''
         if group_type == '3DImage':
             compatibility = self._compatibility_with_image(name, field)
+            if self._is_empty(name):
+                msg += ('{} is an empty image. Use add_image to initialize'
+                        ''.format(name))
         elif group_type == 'Mesh':
             compatibility = self._compatibility_with_mesh(name,field)
+            if self._is_empty(name):
+                msg += ('{} is an empty mesh. Use add_mesh to initialize'
+                        ''.format(name))
         else:
             msg = ('location {} is not a grid.'.format(name))
             raise ValueError(msg)
@@ -1748,7 +1841,6 @@ class SampleData:
                 return field_type
             field_dim = field.shape[1]
         elif Type == '3DImage':
-            print('field shape is '.format(field.shape))
             if (len(field.shape) < 3) or (len(field.shape) > 4):
                 msg = ('(_get_xdmf_field_type) wrong field shape. For a 3DImage'
                        'field, shape should be (Nx1,Nx2,Nx3) or'
@@ -1841,6 +1933,9 @@ class SampleData:
             value = Node._v_attrs[attr]
             s += str('\t {} : {}\n'.format(attr, value))
         s += str(' -- content : {}\n'.format(str(Node)))
+        if self._is_table(nodename):
+            s += ' -- table description : \n'
+            s += repr(Node.description)+'\n'
         s += str('----------------')
         if not(as_string):
             print(s)
@@ -1853,7 +1948,7 @@ class SampleData:
             See PyTables documentation of Filters class for keywords and use
             details
         """
-        Filters = self._set_defaut_compression()
+        Filters = self._set_default_compression()
         # ------ read specified values of compression options
         for word in keywords:
             if (word == 'complib'):
@@ -1876,7 +1971,13 @@ class SampleData:
             See PyTables documentation of Filters class for keywords and use
             details
         """
-        Filters = self.Filters
+        if 'default' in keywords:
+            if keywords['default']:
+                Filters = self._set_default_compression()
+            else:
+                Filters = self.Filters
+        else:
+            Filters = self.Filters
         # ------ read specified values of compression options
         for word in keywords:
             if (word == 'complib'):
@@ -1893,7 +1994,7 @@ class SampleData:
                 Filters.least_significant_digit = keywords[word]
         return Filters
 
-    def _set_defaut_compression(self):
+    def _set_default_compression(self):
         """ Returns a Filter object with defaut compression parameters """
         Filters = Tb.Filters(complib='zlib', complevel=0, shuffle=True)
         return Filters

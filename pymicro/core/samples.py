@@ -81,9 +81,9 @@ class SampleData:
 
     """
 
-    # =============================================================================
+    # =========================================================================
     # SampleData magic methods
-    # =============================================================================
+    # =========================================================================
     def __init__(self,
                  filename,
                  sample_name='name_to_fill',
@@ -133,6 +133,7 @@ class SampleData:
             self._verbose_print('-- File "{}" exists  and will be '
                                 'overwritten'.format(self.h5_file))
             os.remove(self.h5_file)
+            os.remove(self.xdmf_file)
         self.init_file_object(sample_name, sample_description, **keywords)
         self.sync()
         return
@@ -1190,6 +1191,9 @@ class SampleData:
                                                        self.h5_file))
         return fsize, unit
 
+    def set_sample_name(self, sample_name):
+        self.add_attributes({'sample_name':sample_name},'/')
+
     def set_description(self, node, description):
         """ """
         self.add_attributes({'description':description},node)
@@ -1417,6 +1421,36 @@ class SampleData:
         self.h5_dataset.copy_file(tmp_file)
         shutil.move(tmp_file,self.h5_file)
         return
+
+    @staticmethod
+    def copy_sample(src_sample_file, dst_sample_file, overwrite=False,
+                    get_object=False, new_sample_name=None, autodelete=False):
+        """ Initiate a new SampleData object and files from existing one"""
+        sample = SampleData(filename=src_sample_file)
+        if new_sample_name is None:
+            new_sample_name = sample.get_attribute('sample_name','/')
+        # copy HDF5 file
+        dst_sample_file_h5 = os.path.splitext(dst_sample_file)[0] + '.h5'
+        dst_sample_file_xdmf = os.path.splitext(dst_sample_file)[0] + '.xdmf'
+        sample.h5_dataset.copy_file(dst_sample_file_h5, overwrite=overwrite)
+        # copy XDMF file
+        dst_xdmf_lines = []
+        with open(sample.xdmf_file,'r') as f:
+            src_xdmf_lines = f.readlines()
+        for line in src_xdmf_lines:
+            dst_xdmf_lines.append(line.replace(sample.h5_file,
+                                               dst_sample_file_h5))
+        with open(dst_sample_file_xdmf,'w') as f:
+            f.writelines(dst_xdmf_lines)
+        del sample
+        new_sample = SampleData(filename=dst_sample_file_h5,
+                                autodelete=autodelete)
+        new_sample.set_sample_name(new_sample_name)
+        if get_object:
+            return new_sample
+        else:
+            del new_sample
+            return
 
     # =========================================================================
     #  SampleData private utilities

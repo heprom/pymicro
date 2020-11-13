@@ -20,9 +20,10 @@ from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry
 from pymicro.crystal.quaternion import Quaternion
-from pymicro.core.samples import SampleData, ImageObject
+from pymicro.core.samples import SampleData
+from pymicro.core.images import ImageObject
 from tables import IsDescription
-from tables import Int64Col, Int32Col, Float64Col, Float32Col
+from tables import Int32Col, Float32Col
 from math import atan2, pi
 
 
@@ -1448,14 +1449,19 @@ class Microstructure(SampleData):
         if self._is_empty('mask'): mask = None
         return mask
 
-    def get_grain_ids(self, id_list=None):
-        if id_list is None:
-            return self.get_tablecol('GrainDataTable','idnumber')
-        else:
-            ids = []
-            for g in self.grains:
-                ids.append(g['idnumber'])
-            return ids
+    def get_ids_from_grain_map(self):
+        """ Return the list of grain ids found in the grain map
+
+            convention : 0 is not a grain (background of the grain map 3D Image)
+        """
+        gmap = self.get_node('grain_map')
+        grains_id = np.unique(gmap)
+        grains_id = grains_id[grains_id != 0]
+        return grains_id
+
+
+    def get_grain_ids(self):
+        return self.get_tablecol('GrainDataTable','idnumber')
 
     def get_grain_volumes(self, id_list=None):
         if id_list is None:
@@ -1574,6 +1580,34 @@ class Microstructure(SampleData):
         volume_fraction = [grain['volume']/total_volume for grain
                            in self.grains.where('(idnumber == gid)')]
         return  volume_fraction[0]
+
+    def set_orientations(self, orientations):
+        """ Store grain orientations array in GrainDataTable
+
+            orientation : (Ngrains, 3) array of rodrigues orientation vectors
+        """
+        self.set_tablecol('GrainDataTable','orientation',column=orientations)
+        return
+
+    def set_centers(self, centers):
+        """ Store grain centers array in GrainDataTable
+
+            centers : (Ngrains, 3) array of grain centers of mass
+        """
+        self.set_tablecol('GrainDataTable','center',column=centers)
+        return
+
+    def set_bounding_boxes(self, bounding_boxes):
+        """ Store grain bounding boxes array in GrainDataTable
+        """
+        self.set_tablecol('GrainDataTable','bounding_box',column=bounding_boxes)
+        return
+
+    def set_volumes(self, volumes):
+        """ Store grain volumes array in GrainDataTable
+        """
+        self.set_tablecol('GrainDataTable','volume',column=volumes)
+        return
 
     def set_lattice(self, lattice):
         """Set the crystallographic lattice associated with this microstructure.
@@ -2183,20 +2217,24 @@ class Microstructure(SampleData):
         self.grains.flush()
         return self.get_grain_bounding_boxes()
 
-    def compute_grains_geometry(self):
+    def compute_grains_geometry(self, overwrite_table=False):
         """ Compute grain centers, volume and bounding box from grain_map """
-        gmap = self.get_node('grain_map')
-        grains_id = np.unique(gmap)
-        del gmap
-        if self.grains.nrows > 0:
+        grains_id = self.get_ids_from_grain_map()
+        if (self.grains.nrows > 0) and overwrite_table:
             self.grains.remove_rows(start=0)
-        gr = self.grains.row
         for i in grains_id:
-            gr['idnumber'] = i
+            gidx = self.grains.get_where_list('(idnumber == i)')
+            if len(gidx) > 0:
+                gr = self.grains[gidx]
+            else:
+                gr = np.zeros((1,), dtype=self.grains.dtype)
             gr['center'] = self.compute_grain_center(i)
             gr['volume'] = self.compute_grain_volume(i)
             gr['bounding_box'] = self.compute_grain_bounding_box(i)
-            gr.append()
+            if len(gidx) > 0:
+                self.grains[gidx] = gr
+            else:
+                self.grains.append(gr)
         self.grains.flush()
         return
 
@@ -2408,6 +2446,17 @@ class Microstructure(SampleData):
                 grain.append()
             micro.grains.flush()
         return micro
+
+    @staticmethod
+    def copy_sample(src_micro_file, dst_micro_file, overwrite=False,
+                    get_object=False, dst_name=None, autodelete=False):
+        """ Initiate a new SampleData object and files from existing one"""
+        SampleData.copy_sample(src_micro_file, dst_micro_file, overwrite,
+                               new_sample_name= dst_name)
+        if get_object:
+            return Microstructure(filename=dst_micro_file,autodelete=autodelete)
+        else:
+            return
 
     @staticmethod
     def from_neper(neper_file_path):

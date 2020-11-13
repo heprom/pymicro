@@ -1223,6 +1223,21 @@ class SampleData:
         self.sync()
         return
 
+    def set_tablecol(self, tablename, colname, column):
+        """ Store the inputed array into a structured table column"""
+        if not self._is_table(tablename):
+            raise ValueError('{} is not a structured table node'.format(
+                              tablename))
+        tab = self.get_node(tablename)
+        col_shape = self.get_tablecol(tablename, colname).shape
+        if (column.shape != col_shape):
+            raise ValueError('inputed column shape {} does not match the shape'
+                             '{} of column {} in table {}'.format(column.shape,
+                              col_shape, colname, tablename))
+        tab.modify_column(column=column,colname=colname)
+        tab.flush()
+        return
+
     def set_chunkshape_and_compression(self, node, chunkshape=None,
                                        filters=None, **keywords):
         """ Changes the chunkshape for a HDF5 array node

@@ -31,7 +31,8 @@ class ImageObject():
                 voxel size in each dimension
 
                  DEFAUT DIMENSIONS : voxels size [1,1,1] and origin at
-                 [0.5, 0.5, 0.5] --> the first node of the first voxel is
+                 [0.5, 0.5, 0.5] (first voxel center)
+                 --> the first node of the first voxel is
                  the point with coordinates [0 0 0]
 
             - fields (list)

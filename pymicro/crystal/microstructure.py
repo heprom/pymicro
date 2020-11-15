@@ -1366,7 +1366,6 @@ class Microstructure(SampleData):
         s += SampleData.__repr__(self)
         return s
 
-
     def _minimal_data_model(self):
         """
             Specify the minimal contents of the hdf5 (Group names, paths,, and

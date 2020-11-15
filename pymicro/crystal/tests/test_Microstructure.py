@@ -51,7 +51,7 @@ class MicrostructureTests(unittest.TestCase):
         del m
 
     def test_from_copy(self):
-        # test computing of grain geoemtrical quantities and copy of an
+        # test computing of grain geometrical quantities and copy of an
         # existing Microstructure dataset
         # create new microstructure copy of an already existing file
         filename = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,
@@ -70,6 +70,8 @@ class MicrostructureTests(unittest.TestCase):
         m_ref = Microstructure(filename=filename)
         for i in range(m_ref.grains.nrows):
             self.assertEqual(m.grains[i], m_ref.grains[i])
+        volume = np.sum(m.get_mask(as_numpy=True))
+        self.assertEqual(volume,194025)
         del m
         self.assertTrue(not os.path.exists(h5_file))
         self.assertTrue(not os.path.exists(xdmf_file))
@@ -85,7 +87,8 @@ class MicrostructureTests(unittest.TestCase):
         for i in range(100):
             euler_pymicro = m.get_grain(i + 1).orientation.euler
             for j in range(3):
-                self.assertAlmostEqual(euler_pymicro[j], euler_neper[i][j] % 360)
+                self.assertAlmostEqual(euler_pymicro[j],
+                                       euler_neper[i][j] % 360, 4)
         self.assertEqual(m.__contains__('grain_map'), True)
         self.assertAlmostEqual(m.get_voxel_size(), 0.018, 2)
         dims = (54, 65, 75)

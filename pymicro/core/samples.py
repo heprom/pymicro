@@ -31,7 +31,7 @@ from lxml.builder import ElementMaker
 import shutil
 import numpy as np
 import tables as Tb
-from tables import dtype_from_descr
+from tables import dtype_from_descr, NodeError
 
 from pymicro.core.images import ImageReader
 from pymicro.core.meshes import MeshReader
@@ -177,8 +177,7 @@ class SampleData:
         if path is None:
             return False
         else:
-            return (self.h5_dataset.__contains__(path)
-                    and not self._is_empty(path))
+            return (self.h5_dataset.__contains__(path))
 
     def init_file_object(self,
                          sample_name='',
@@ -247,8 +246,10 @@ class SampleData:
 
     def print_dataset_content(self, as_string=False):
         """ Print information on all nodes in hdf5 file"""
-        s = '\n****** DATA SET CONTENT ******\n File: \n  {}'.format(
-                self.h5_file)
+        size,unit = self.get_file_disk_size(print_flag=False)
+        s = ('\n****** DATA SET CONTENT ******\n -- File: {}\n '
+            '-- Size: {:9.3f} {}\n -- Data Model Class: {}\n'
+            ''.format(self.h5_file, size, unit,self.__class__.__name__))
         if not(as_string):
             print(s)
         s += self.get_node_info('/', as_string)
@@ -942,8 +943,9 @@ class SampleData:
                     self._verbose_print(msg)
                     return
             # check if array location exists and remove node if asked
-            table_path = location_path + name
+            table_path = os.path.join(location_path,name)
             if self.h5_dataset.__contains__(table_path):
+                print('coucouc les amish {}'.format(table_path))
                 if replace:
                     msg = ('(add_table): existing node {} will be '
                            'overwritten and all of its childrens removed'
@@ -960,8 +962,6 @@ class SampleData:
         # keywords compression options prioritized over passed filters instances
         if (filters is None) or bool(keywords):
             Filters = self._get_local_compression_opt(**keywords)
-            self._verbose_print('-- Compression Options for dataset {}'
-                                ''.format(name))
         else:
             Filters = filters
         self._verbose_print('-- Compression Options for dataset {}'
@@ -1076,7 +1076,7 @@ class SampleData:
         else:
             msg = 'No node with path {} referenced in content index'.format(
                 node_path)
-            raise ValueError(msg)
+            raise NodeError(msg)
 
     def get_tablecol(self, tablename, colname):
         """ Returns a column of a Pytables.Table as a numpy array"""
@@ -1121,11 +1121,28 @@ class SampleData:
             else:
                 node = self.h5_dataset.get_node(node_path)
             if as_numpy and self._is_array(name) and (colname is None):
-                node = node.read()
+                # note : np.atleast_1d is used here to avoid returning a 0d
+                # array when squeezing a scalar node
+                node = np.atleast_1d(np.squeeze(node.read()))
         return node
 
+    def get_mesh_nodes(self, meshname, as_numpy=False):
+        """ Return the mesh node coordinates array HDF5 node or Numpy array"""
+        Mesh = self.get_node(meshname)
+        return self.get_node(os.path.join(Mesh._v_pathname,'Nodes'),as_numpy)
+
+    def get_mesh_elements(self, meshname, as_numpy=False):
+        """ Return the mesh elements connectivity HDF5 node or Numpy array"""
+        Mesh = self.get_node(meshname)
+        return self.get_node(os.path.join(Mesh._v_pathname,'Elements'),as_numpy)
+
+    def get_field(self, gridname, fieldname, as_numpy=False):
+        """ Return a mesh/image field values HDF5 node or Numpy array"""
+        Grid = self.get_node(gridname)
+        return self.get_node(os.path.join(Grid._v_pathname,fieldname), as_numpy)
+
     def get_node_info(self, name, as_string=False):
-        """ get information on a node in HDF5 tree from indexname or path."""
+        """ print information on a node in HDF5 tree from indexname or path."""
 
         s = ''
         node_path = self._name_or_node_to_path(name)
@@ -1134,6 +1151,24 @@ class SampleData:
         else:
             s += self._get_group_info(name,as_string)
         return s
+
+    def get_node_compression_info(self, name, as_string=False):
+        """ print the compression options for a specific array node"""
+        s = ''
+        if not self.__contains__(name):
+            raise NodeError('node `{}` not in {} instance'.format(name,
+                            self.__class__.__name__))
+        node_path = self._name_or_node_to_path(name)
+        if self._is_array(node_path):
+            N = self.get_node(name)
+            s += 'Compression options for node `{}`:\n\t'.format(name)
+            s += repr(N.filters).strip('Filters(').strip(')')
+        else:
+            s += '{} is not a data array node'.format(name)
+        if not as_string:
+            print(s)
+        return s+'\n'
+
 
     def get_dic_from_attributes(self, node_path):
         """
@@ -1178,18 +1213,42 @@ class SampleData:
                 attribute = attribute.decode()
         return attribute
 
-    def get_file_disk_size(self):
+    def get_file_disk_size(self, print_flag=True, convert = True):
         units = ['bytes','Kb','Mb','Gb','Tb','Pb']
         fsize = os.path.getsize(self.h5_file)
         k=0
         unit = units[k]
-        while fsize/1024 > 1:
-            k = k+1
-            fsize = fsize/1024
-            unit = units[k]
-        print('File size is {:4.3f} {} for file \n {}'.format(fsize,unit,
+        if convert:
+            while fsize/1024 > 1:
+                k = k+1
+                fsize = fsize/1024
+                unit = units[k]
+        if print_flag:
+            print('File size is {:9.3f} {} for file \n {}'.format(fsize,unit,
                                                        self.h5_file))
         return fsize, unit
+
+    def get_node_disk_size(self, nodename, print_flag=True, convert = True):
+        units = ['bytes','Kb','Mb','Gb','Tb','Pb']
+        if not self.__contains__(nodename):
+            raise NodeError('node `{}` not in {} instance'.format(nodename,
+                             self.__class__.__name__))
+        if not self._is_array(nodename):
+            print('Node {} is not a data array node'.format(nodename))
+            return None
+        node = self.get_node(nodename)
+        nsize = node.size_on_disk
+        k=0
+        unit = units[k]
+        if convert:
+            while nsize/1024 > 1:
+                k = k+1
+                nsize = nsize/1024
+                unit = units[k]
+        if print_flag:
+            print('Node {} size on disk is {:9.3f} {}'.format(nodename,
+                  nsize,unit))
+        return nsize, unit
 
     def set_sample_name(self, sample_name):
         self.add_attributes({'sample_name':sample_name},'/')
@@ -1226,7 +1285,7 @@ class SampleData:
     def set_tablecol(self, tablename, colname, column):
         """ Store the inputed array into a structured table column"""
         if not self._is_table(tablename):
-            raise ValueError('{} is not a structured table node'.format(
+            raise NodeError('{} is not a structured table node'.format(
                               tablename))
         tab = self.get_node(tablename)
         col_shape = self.get_tablecol(tablename, colname).shape
@@ -1236,6 +1295,19 @@ class SampleData:
                               col_shape, colname, tablename))
         tab.modify_column(column=column,colname=colname)
         tab.flush()
+        return
+
+    def set_nodes_compression_chunkshape(self, node_list=None, chunkshape=None,
+                                         filters=None, **keywords):
+        """ Sets compression options for a list of nodes in the dataset"""
+        if node_list is None:
+            node_list = []
+            for node in self.h5_dataset.root:
+                if self._is_array(node):
+                    node_list.append(node)
+        for nodename in node_list:
+            self.set_chunkshape_and_compression(nodename, chunkshape, filters,
+                                                **keywords)
         return
 
     def set_chunkshape_and_compression(self, node, chunkshape=None,
@@ -1253,7 +1325,7 @@ class SampleData:
         if not self._is_array(node):
             msg = ('(set_chunkshape) Cannot set chunkshape or compression'
                    ' settings for a non array node')
-            raise ValueError(msg)
+            raise NodeError(msg)
         node_tmp = self.get_node(node)
         node_name = node_tmp._v_name
         node_indexname = self.get_indexname_from_path(node_tmp._v_pathname)
@@ -1271,7 +1343,7 @@ class SampleData:
             node_aliases = []
         array = node_tmp.read()
         if self._is_table(node):
-            description = node.description
+            description = node_tmp.description
             new_array = self.add_table(location=node_path, name=node_name,
                                      description=description,
                                      indexname=node_indexname,
@@ -1620,7 +1692,7 @@ class SampleData:
             msg += ('Current table description: \n {} \nClass table description'
                     ': \n {}'.format(current_desc.items,
                                      Description.columns))
-            raise ValueError(msg)
+            raise NodeError(msg)
         elif compatibility and (current_desc.keys()
                                  < Description.columns.keys()):
             msg = ('Updating `{}` with current class Table description'.format(
@@ -1711,12 +1783,11 @@ class SampleData:
 
     def _is_empty(self, name):
         """ find out if name or path references an empty node"""
-        name2 = self._name_or_node_to_path(name)
         if self._is_table(name):
-            tab = self.get_node(name2)
-            return tab.nrows > 0
+            tab = self.get_node(name)
+            return tab.nrows <= 0
         else:
-            return self.get_attribute('empty',name2)
+            return self.get_attribute('empty',name)
 
     def _is_array(self, name):
         """ find out if name or path references an array dataset"""
@@ -1789,7 +1860,7 @@ class SampleData:
                         ''.format(name))
         else:
             msg = ('location {} is not a grid.'.format(name))
-            raise ValueError(msg)
+            raise NodeError(msg)
 
         if not(compatibility):
             msg = ('Array dimensions not compatible with {} `{}`'
@@ -1915,7 +1986,7 @@ class SampleData:
             else:
                 return self.content_index[indexname]
         else:
-            raise ValueError('Index contains no item named {}'.format(
+            raise NodeError('Index contains no item named {}'.format(
                 indexname))
             return
 
@@ -1985,6 +2056,10 @@ class SampleData:
         if self._is_table(nodename):
             s += ' -- table description : \n'
             s += repr(Node.description)+'\n'
+        s += str(' -- ')
+        s += self.get_node_compression_info(nodename, as_string=True)
+        size,unit = self.get_node_disk_size(nodename, print_flag=False)
+        s += str(' -- Node size : {:9.3f} {}\n'.format(size,unit))
         s += str('----------------')
         if not(as_string):
             print(s)

@@ -23,7 +23,6 @@
 """
 # TODO : Update documentation !!!
 
-import warnings
 import os
 from lxml import etree
 from lxml.builder import ElementMaker
@@ -554,10 +553,11 @@ class SampleData:
 
         # safety check
         if (len(mesh_object.element_topology) > 1):
-            warnings.warn('''  number of element type found : {} \n
+            msg = ('''  number of element type found : {} \n
                           add_mesh_from_file current implementation works only
                           with meshes with only one element type
                           '''.format(len(mesh_object.element_topology)))
+            raise ValueError(msg)
 
         self._verbose_print('Creating Elements data set in group {} in file {}'
                             ''.format(location + '/' + meshname, self.h5_file))
@@ -1777,7 +1777,7 @@ class SampleData:
                        'name {} have been found :\n {} \n Use indexname to '
                        'distinguish nodes.'.format(count,name_or_node,
                                                    path_list))
-                warnings.warn(msg)
+                self._verbose_print(msg)
                 path = None
         return path
 
@@ -1957,7 +1957,7 @@ class SampleData:
                 msg = ('(_get_xdmf_field_type) wrong field shape. For a mesh'
                        'field, shape should be (Nnodes,Ndim) or (NIntPts,Ndim)'
                        '. None type returned')
-                warnings.warn(msg)
+                self._verbose_print(msg)
                 return field_type
             field_dim = field.shape[1]
         elif Type == '3DImage':
@@ -1965,7 +1965,7 @@ class SampleData:
                 msg = ('(_get_xdmf_field_type) wrong field shape. For a 3DImage'
                        'field, shape should be (Nx1,Nx2,Nx3) or'
                        ' (Nx1,Nx2,Nx3,Ndim). None type returned')
-                warnings.warn(msg)
+                self._verbose_print(msg)
                 return field_type
             if (len(field.shape) == 3): field_dim= 1
             if (len(field.shape) == 4): field_dim = field.shape[3]

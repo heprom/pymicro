@@ -5,7 +5,6 @@ Image data handling package: utility package for SampleData class
 
 @author: amarano
 """
-import warnings
 import numpy as np
 import h5py as h5
 
@@ -204,11 +203,11 @@ class ImageReader():
 
     def read_image(self):
         """ Call the appropriate read method for the considered 3D image format """
-
         if (self.file_type == 'matlab'):
             self.read_image_matlab()
         elif (self.file_type == 'vtk'):
-            warnings.warn(" vtk reading not implemented yet for ImageReader, no data has been read ")
+            msg = (" vtk reading not implemented yet for ImageReader, no data has been read ")
+            raise ValueError(msg)
         return
 
     def read_image_matlab(self):

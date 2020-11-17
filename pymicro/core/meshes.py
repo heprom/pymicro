@@ -5,7 +5,6 @@ Mesh data handling package: utility package for SampleData class
 
 @author: amarano
 """
-import warnings
 import numpy as np
 import h5py as h5
 import pymicro.core.geof as geof
@@ -367,7 +366,8 @@ class MeshReader():
         elif (self.file_type == 'geof'):
             self.read_geof_mesh()
         elif (self.file_type == 'vtk'):
-            warnings.warn(" vtk reading not implemented yet for MeshReader, no data has been read ")
+            msg = (" vtk reading not implemented yet for MeshReader, no data has been read ")
+            raise ValueError(msg)
         return
 
     def read_mesh_matlab(self):

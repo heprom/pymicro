@@ -1633,7 +1633,8 @@ class Microstructure(SampleData):
                 raise ValueError(msg)
             image_object = ImageObject()
             image_object.dimension = grain_map.shape
-            image_object.spacing = [voxel_size, voxel_size, voxel_size]
+            image_object.spacing = np.array([voxel_size, voxel_size,
+                                             voxel_size])
             image_object.add_field(grain_map, 'grain_map')
             self.add_image(image_object, imagename='CellData',
                            location='/', replace=True, **keywords)
@@ -1668,7 +1669,8 @@ class Microstructure(SampleData):
                 raise ValueError(msg)
             image_object = ImageObject()
             image_object.dimension = mask.shape
-            image_object.spacing = [voxel_size, voxel_size, voxel_size]
+            image_object.spacing = np.array([voxel_size, voxel_size,
+                                             voxel_size])
             image_object.add_field(mask, 'mask')
             self.add_image(image_object, imagename='CellData',
                            location='/', replace=True, **keywords)

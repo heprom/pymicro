@@ -1,6 +1,7 @@
 import json
 from json import JSONEncoder
 import numpy as np
+import os
 from pymicro.xray.detectors import Detector2d, RegArrayDetector2d
 from pymicro.crystal.lattice import Lattice, Symmetry
 from pymicro.crystal.microstructure import Microstructure, Grain, Orientation
@@ -109,9 +110,9 @@ class SlitsGeometry:
 
 class ObjectGeometry:
     """Class to represent any object geometry.
-    
-    The geometry may have multiple form, including just a point, a regular 3D array or it may be described by a CAD 
-    file using the STL format. The array represents the material microstructure using the grain ids and should be set 
+
+    The geometry may have multiple form, including just a point, a regular 3D array or it may be described by a CAD
+    file using the STL format. The array represents the material microstructure using the grain ids and should be set
     in accordance with an associated  Microstructure instance. In this case, zero represent a non crystalline region.
     """
 
@@ -198,11 +199,11 @@ class ObjectGeometry:
 
 class Sample:
     """Class to describe a material sample.
-    
-    A sample is made by a given material (that may have multiple phases), has a name and a position in the experimental 
-    local frame. A sample also has a geometry (just a point by default), that may be used to discretize the volume 
+
+    A sample is made by a given material (that may have multiple phases), has a name and a position in the experimental
+    local frame. A sample also has a geometry (just a point by default), that may be used to discretize the volume
     in space or display it in 3D.
-    
+
     .. note::
 
       For the moment, the material is simply a crystal lattice.
@@ -219,7 +220,7 @@ class Sample:
 
     def set_name(self, name):
         """Set the sample name.
-        
+
         :param str name: The sample name.
         """
         self.name = name
@@ -256,22 +257,24 @@ class Sample:
 
     def set_microstructure(self, microstructure):
         if microstructure is None:
-            microstructure = Microstructure()
+            microstructure = Microstructure(name='tmp_micro',
+                                            file_path=os.getcwd(),
+                                            autodelete=True)
         self.microstructure = microstructure
 
     def has_grains(self):
         """Method to see if a sample has at least one grain in the microstructure.
-        
+
         :return: True if the sample has at east one grain, False otherwise."""
-        return len(self.microstructure.grains) > 0
+        return self.microstructure.grains.nrows > 0
 
     def get_grain_ids(self):
         return self.microstructure.grain_map
 
 class Experiment:
     """Class to represent an actual or a virtual X-ray experiment.
-    
-    A cartesian coordinate system (X, Y, Z) is associated with the experiment. By default X is the direction of X-rays 
+
+    A cartesian coordinate system (X, Y, Z) is associated with the experiment. By default X is the direction of X-rays
     and the sample is placed at the origin (0, 0, 0).
     """
 
@@ -305,7 +308,7 @@ class Experiment:
 
     def add_detector(self, detector, set_as_active=True):
         """Add a detector to this experiment.
-        
+
         If this is the first detector, the active detector id is set accordingly.
 
         :param Detector2d detector: an instance of the Detector2d class.
@@ -323,10 +326,10 @@ class Experiment:
     def get_active_detector(self):
         """Return the active detector for this experiment."""
         return self.detectors[self.active_detector_id]
-    
+
     def forward_simulation(self, fs, set_result_to_detector=True):
         """Perform a forward simulation of the X-ray experiment onto the active detector.
-        
+
         This typically sets the detector.data field with the computed image.
 
         :param bool set_result_to_detector: if True, the result is assigned to the current detector.
@@ -377,7 +380,9 @@ class Experiment:
             material = Lattice.from_parameters(a, b, c, alpha, beta, gamma, centering=centering, symmetry=symmetry)
             sample.set_material(material)
         if 'Microstructure' in dict_exp['Sample']:
-            micro = Microstructure(dict_exp['Sample']['Microstructure']['Name'])
+            micro = Microstructure(name= dict_exp[
+                                          'Sample']['Microstructure']['Name'],
+                                   file_path=os.path.dirname(file_path))
             # crystal lattice
             if 'Lattice' in dict_exp['Sample']['Microstructure']:
                 a, b, c = dict_exp['Sample']['Microstructure']['Lattice']['Lengths']
@@ -386,14 +391,18 @@ class Experiment:
                 symmetry = Symmetry.from_string(dict_exp['Sample']['Microstructure']['Lattice']['Symmetry'])
                 lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, centering=centering, symmetry=symmetry)
                 micro.set_lattice(lattice)
+            grain = micro.grains.row
             for i in range(len(dict_exp['Sample']['Microstructure']['Grains'])):
                 dict_grain = dict_exp['Sample']['Microstructure']['Grains'][i]
-                grain = Grain(int(dict_grain['Id']), Orientation.from_euler(dict_grain['Orientation']['Euler Angles (degrees)']))
-                grain.position = np.array(dict_grain['Position'])
-                grain.volume = dict_grain['Volume']
-                if 'hkl_planes' in dict_grain:
-                    grain.hkl_planes = dict_grain['hkl_planes']
-                micro.grains.append(grain)
+                grain['idnumber'] = int(dict_grain['Id'])
+                euler = dict_grain['Orientation']['Euler Angles (degrees)']
+                grain['orientation'] = Orientation.from_euler(euler).rod
+                grain['center'] = np.array(dict_grain['Position'])
+                grain['volume'] = dict_grain['Volume']
+#                if 'hkl_planes' in dict_grain:
+#                    grain.hkl_planes = dict_grain['hkl_planes']
+                grain.append()
+            micro.grains.flush()
             sample.set_microstructure(micro)
         # lazy behaviour, we load only the grain_ids path, the actual array is loaded in memory if needed
         sample.grain_ids_path = dict_exp['Sample']['Grain Ids Path']
@@ -481,7 +490,8 @@ class ExperimentEncoder(json.JSONEncoder):
             dict_micro = {}
             dict_micro['Name'] = o.name
             dict_micro['Lattice'] = o.get_lattice()
-            dict_micro['Grains'] = o.grains
+            grains_list = o.get_all_grains()
+            dict_micro['Grains'] = grains_list
             return dict_micro
         if isinstance(o, Grain):
             dict_grain = {}

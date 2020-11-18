@@ -1898,10 +1898,14 @@ class SampleData:
     def _compatibility_with_image(self, name, field):
         """ check if field has a number of values compatible with the image"""
         image = self.get_node(name)
-        compatibility = (image._v_attrs.dimension == field.shape[0:3])
-        if not(compatibility):
+        compatibility = True
+        for i in range(len(image._v_attrs.dimension)):
+            if image._v_attrs.dimension[i] != field.shape[i]:
+                compatibility = False
+                break
+        if not compatibility:
             msg = ('Field number of values ({}) is not conformant with image '
-                   '`{}` dimensions ({})'.format(field.shape,name,
+                   '`{}` dimensions ({})'.format(field.shape, name,
                                                  image._v_attrs.dimension))
             self._verbose_print(msg)
         return compatibility

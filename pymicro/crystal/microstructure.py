@@ -1616,31 +1616,30 @@ class Microstructure(SampleData):
         :param float voxel_size: the size of the voxels in mm unit.
         """
         create_image = True
+        print('VOXELSIZE', voxel_size)
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', node_name='CellData')
-            if not (empty):
+            if not empty:
                 create_image = False
         if create_image:
             print('CREATE IMAAAGE YIIHAAAAAA')
-            if (voxel_size is None):
-                msg = '(set_mask) Please specify voxel size for CellData image'
+            if voxel_size is None:
+                msg = '(set_grain_map) Please specify voxel size for CellData image'
                 raise ValueError(msg)
             image_object = ImageObject()
             image_object.dimension = grain_map.shape
             image_object.spacing = np.array([voxel_size, voxel_size,
                                              voxel_size])
             image_object.add_field(grain_map, 'grain_map')
-            self.add_image(image_object, imagename='CellData',
-                           location='/', replace=True, **keywords)
+            self.add_image(image_object, imagename='CellData', location='/', replace=True, **keywords)
             #TODO we keep the alias 'grain_map' for now and will implement an actual alias mechanism later
             #gmap_path = self._name_or_node_to_path('grain_map')
             #self.add_to_index(indexname='grain_ids', path=gmap_path)
         else:
             im_vox_size = self.get_attribute('spacing', 'CellData')
-            vox_size = [voxel_size, voxel_size, voxel_size]
-            if (voxel_size is not None) and (im_vox_size != vox_size):
-                msg = ('Voxel size mismatch between input and CellData node'
-                       '`spacing` attribute')
+            mismatch = im_vox_size[0] != voxel_size or im_vox_size[1] != voxel_size or im_vox_size[0] != voxel_size
+            if (voxel_size is not None) and mismatch:
+                msg = ('Voxel size mismatch between input and CellData node `spacing` attribute')
                 raise ValueError(msg)
             self.add_data_array(location='CellData', name='grain_map',
                                 array=grain_map, replace=True, **keywords)
@@ -1667,8 +1666,7 @@ class Microstructure(SampleData):
             image_object.spacing = np.array([voxel_size, voxel_size,
                                              voxel_size])
             image_object.add_field(mask, 'mask')
-            self.add_image(image_object, imagename='CellData',
-                           location='/', replace=True, **keywords)
+            self.add_image(image_object, imagename='CellData', location='/', replace=True, **keywords)
         else:
             im_vox_size = self.get_attribute('spacing', 'CellData')[0]
             if (voxel_size is not None) and (im_vox_size != voxel_size):
@@ -2519,7 +2517,7 @@ class Microstructure(SampleData):
             data = np.fromfile(f, dtype=np.uint16)[:-4]  # leave out the last 4 values
             print(data.shape)
             assert np.prod(dims) == data.shape[0]
-            micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0), voxel_size[0])  # swap X/Z axes
+            micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0), voxel_size=voxel_size[0])  # swap X/Z axes
             micro.recompute_grain_centers()
             micro.recompute_grain_volumes()
         print('done')

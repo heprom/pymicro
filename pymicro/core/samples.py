@@ -748,9 +748,9 @@ class SampleData:
         self.xdmf_tree.getroot()[0].append(image_xdmf)
 
         # store image metadata as HDF5 attributes
-        Attribute_dic = {'dimension':image_object.dimension,
-                         'spacing':image_object.spacing,
-                         'origin':image_object.origin,
+        Attribute_dic = {'dimension':np.array(image_object.dimension),
+                         'spacing':np.array(image_object.spacing),
+                         'origin':np.array(image_object.origin),
                          'description':description,
                          'group_type':'3DImage',
                          'empty':False}
@@ -1276,7 +1276,7 @@ class SampleData:
 
     def set_voxel_size(self, image_data_group, voxel_size):
         """ Set voxel size for an HDF5 image data group"""
-        self.add_attributes({'spacing':voxel_size},image_data_group)
+        self.add_attributes({'spacing':np.array(voxel_size)},image_data_group)
         xdmf_geometry_path = self.get_attribute('xdmf_geometry_path',
                                                 image_data_group)
         xdmf_geometry = self.xdmf_tree.find(xdmf_geometry_path)

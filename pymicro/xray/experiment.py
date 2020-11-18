@@ -488,7 +488,7 @@ class ExperimentEncoder(json.JSONEncoder):
             return dict_source
         if isinstance(o, Microstructure):
             dict_micro = {}
-            dict_micro['Name'] = o.name
+            dict_micro['Name'] = o.get_sample_name()
             dict_micro['Lattice'] = o.get_lattice()
             grains_list = o.get_all_grains()
             dict_micro['Grains'] = grains_list

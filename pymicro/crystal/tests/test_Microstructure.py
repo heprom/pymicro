@@ -22,7 +22,7 @@ class MicrostructureTests(unittest.TestCase):
             gr.append()
         micro.grains.flush()
         self.assertEqual(micro.grains.nrows,3)
-        self.assertTrue(micro.name=='test')
+        self.assertTrue(micro.get_sample_name() == 'test')
         self.assertTrue(os.path.exists(micro.h5_file))
         self.assertTrue(os.path.exists(micro.xdmf_file))
         h5_file = micro.h5_file

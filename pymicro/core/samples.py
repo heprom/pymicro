@@ -29,8 +29,7 @@ from lxml.builder import ElementMaker
 
 import shutil
 import numpy as np
-import tables as Tb
-from tables import dtype_from_descr, NodeError
+import tables
 
 from pymicro.core.images import ImageReader
 from pymicro.core.meshes import MeshReader
@@ -187,7 +186,7 @@ class SampleData:
         """
 
         try:
-            self.h5_dataset = Tb.File(self.h5_file, mode='r+')
+            self.h5_dataset = tables.File(self.h5_file, mode='r+')
             self._verbose_print('-- Opening file "{}" '.format(self.h5_file),
                                 line_break=False)
             self.file_exist = True
@@ -201,7 +200,7 @@ class SampleData:
             self._verbose_print('-- File "{}" not found : file'
                                 ' created'.format(self.h5_file),
                                 line_break=True)
-            self.h5_dataset = Tb.File(self.h5_file, mode='a')
+            self.h5_dataset = tables.File(self.h5_file, mode='a')
             self._init_xml_tree()
             # add sample name and description
             self.h5_dataset.root._v_attrs.sample_name = sample_name
@@ -800,7 +799,7 @@ class SampleData:
             self.add_attributes(dic={'group_type':'Data'},
                                 nodename=Group)
             return Group
-        except Tb.NodeError:
+        except tables.NodeError:
             node_path = os.path.join(path, groupname)
             if (self.h5_dataset.__contains__(node_path)):
                 if replace:
@@ -1076,7 +1075,7 @@ class SampleData:
         else:
             msg = 'No node with path {} referenced in content index'.format(
                 node_path)
-            raise NodeError(msg)
+            raise tables.NodeError(msg)
 
     def get_tablecol(self, tablename, colname):
         """ Returns a column of a Pytables.Table as a numpy array"""
@@ -1156,8 +1155,7 @@ class SampleData:
         """ print the compression options for a specific array node"""
         s = ''
         if not self.__contains__(name):
-            raise NodeError('node `{}` not in {} instance'.format(name,
-                            self.__class__.__name__))
+            raise tables.NodeError('node `{}` not in {} instance'.format(name, self.__class__.__name__))
         node_path = self._name_or_node_to_path(name)
         if self._is_array(node_path):
             N = self.get_node(name)
@@ -1231,8 +1229,7 @@ class SampleData:
     def get_node_disk_size(self, nodename, print_flag=True, convert = True):
         units = ['bytes','Kb','Mb','Gb','Tb','Pb']
         if not self.__contains__(nodename):
-            raise NodeError('node `{}` not in {} instance'.format(nodename,
-                             self.__class__.__name__))
+            raise tables.NodeError('node `{}` not in {} instance'.format(nodename, self.__class__.__name__))
         if not self._is_array(nodename):
             print('Node {} is not a data array node'.format(nodename))
             return None
@@ -1304,8 +1301,7 @@ class SampleData:
     def set_tablecol(self, tablename, colname, column):
         """ Store the inputed array into a structured table column"""
         if not self._is_table(tablename):
-            raise NodeError('{} is not a structured table node'.format(
-                              tablename))
+            raise tables.NodeError('{} is not a structured table node'.format(tablename))
         tab = self.get_node(tablename)
         col_shape = self.get_tablecol(tablename, colname).shape
         if (column.shape != col_shape):
@@ -1344,7 +1340,7 @@ class SampleData:
         if not self._is_array(node):
             msg = ('(set_chunkshape) Cannot set chunkshape or compression'
                    ' settings for a non array node')
-            raise NodeError(msg)
+            raise tables.NodeError(msg)
         node_tmp = self.get_node(node)
         node_name = node_tmp._v_name
         node_indexname = self.get_indexname_from_path(node_tmp._v_pathname)
@@ -1609,8 +1605,8 @@ class SampleData:
                 self.add_data_array(location=head, name=tail,
                                     array=empty_array, empty=True,
                                     indexname=key)
-            elif (isinstance(content_type[key],Tb.IsDescription)
-                  or issubclass(content_type[key],Tb.IsDescription) ):
+            elif (isinstance(content_type[key],tables.IsDescription)
+                  or issubclass(content_type[key],tables.IsDescription) ):
                 self.add_table(location=head,name=tail,indexname=key,
                                description=content_type[key])
         self._verbose_print('Minimal data model initialization done\n')
@@ -1698,7 +1694,7 @@ class SampleData:
         """ Update table if associated table description Class has evolved"""
         table = self.get_node(tablename)
         current_desc = table.description._v_colobjects
-        desc_dtype = dtype_from_descr(Description)
+        desc_dtype = tables.dtype_from_descr(Description)
         # Check if current table description is contained or equal to
         # Class defined table description
         compatibility = self._compatible_descriptions(current_desc,
@@ -1711,7 +1707,7 @@ class SampleData:
             msg += ('Current table description: \n {} \nClass table description'
                     ': \n {}'.format(current_desc.items,
                                      Description.columns))
-            raise NodeError(msg)
+            raise tables.NodeError(msg)
         elif compatibility and (current_desc.keys()
                                  < Description.columns.keys()):
             msg = ('Updating `{}` with current class Table description'.format(
@@ -1761,7 +1757,7 @@ class SampleData:
         """
         path = None
         # name_or_node is a Node
-        if isinstance(name_or_node,Tb.Node):
+        if isinstance(name_or_node,tables.Node):
             return name_or_node._v_pathname
         # name_or_node is a string or else
         name_tmp = os.path.join('/', name_or_node)
@@ -1879,7 +1875,7 @@ class SampleData:
                         ''.format(name))
         else:
             msg = ('location {} is not a grid.'.format(name))
-            raise NodeError(msg)
+            raise tables.NodeError(msg)
 
         if not(compatibility):
             msg = ('Array dimensions not compatible with {} `{}`'
@@ -2005,8 +2001,7 @@ class SampleData:
             else:
                 return self.content_index[indexname]
         else:
-            raise NodeError('Index contains no item named {}'.format(
-                indexname))
+            raise tables.NodeError('Index contains no item named {}'.format(indexname))
             return
 
     def _get_group_type(self, groupname):
@@ -2139,7 +2134,7 @@ class SampleData:
 
     def _set_default_compression(self):
         """ Returns a Filter object with defaut compression parameters """
-        Filters = Tb.Filters(complib='zlib', complevel=0, shuffle=True)
+        Filters = tables.Filters(complib='zlib', complevel=0, shuffle=True)
         return Filters
 
     def _verbose_print(self, message, line_break=True):

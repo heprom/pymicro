@@ -1352,7 +1352,7 @@ class Microstructure(SampleData):
         Filename = self._init_filename(filename, name, file_path)
         SampleData.__init__(self, Filename, name, description, verbose,
                             overwrite_hdf5, autodelete)
-        self.name = name
+        self.set_sample_name(name)
         self.grains = self.get_node('GrainDataTable')
         self._init_lattice(lattice)
         self.vtkmesh = None
@@ -1362,7 +1362,7 @@ class Microstructure(SampleData):
     def __repr__(self):
         """Provide a string representation of the class."""
         s = '%s\n' % self.__class__.__name__
-        s += '* name: %s\n' % self.name
+        s += '* name: %s\n' % self.get_sample_name()
         s += '\n'
         #        for g in self.grains:
         #            s += '* %s' % g.__repr__
@@ -1513,11 +1513,10 @@ class Microstructure(SampleData):
     def get_voxel_size(self):
         """Get the voxel size for image data of the microstructure.
 
-        If this instance of `Microstructure has no image data, None is returned.
+        If this instance of `Microstructure` has no image data, None is returned.
         """
         try:
-            return self.get_attribute(attrname='spacing',
-                                      node_name='/CellData')[0]
+            return self.get_attribute(attrname='spacing', node_name='/CellData')[0]
         except:
             return None
 
@@ -1541,26 +1540,18 @@ class Microstructure(SampleData):
         return grain
 
     def get_all_grains(self):
-        """ Returns the Grain objects list of all grains in microstructure"""
-        grains_list = []
-        for gr in self.grains:
-            gid = gr['idnumber']
-            grains_list.append(self.get_grain(gid))
+        """Returns a list of `Grain` instances for all grains in this `Microstructure`."""
+        grains_list = [self.get_grain(gid) for gid in self.get_tablecol('GrainDataTable', 'idnumber')]
         return grains_list
 
     def get_grain_positions(self):
-        """Return all te grain positions as a numpy array of shape (n, 3) where n is the number of grains."""
-        positions = np.empty((self.get_number_of_grains(), 3))
-        for i in range(self.get_number_of_grains()):
-            positions[i] = self.grains[i]['center']
-        return positions
+        """Return all the grain positions as a numpy array of shape (n, 3) where n is the number of grains."""
+        return self.grains[:]['center']
 
     def get_grain_volume_fractions(self):
         """Compute all grains volume fractions."""
-        total_volume = 0.
-        for grain in self.grains:
-            total_volume += grain['volume']
-        return [grain['volume'] / total_volume for grain in self.grains]
+        total_volume = np.sum(self.grains[:]['volume'])
+        return self.grains[:]['volume'] / total_volume
 
     def get_grain_volume_fraction(self, gid, use_total_volume_value=None):
         """Compute the grain volume fraction.
@@ -2025,7 +2016,7 @@ class Microstructure(SampleData):
         # TODO : Test
         if not self.__contains__('grain_map'):
             raise ValueError('microstructure %s must have an associated '
-                             'grain_map ' % self.name)
+                             'grain_map ' % self.get_sample_name())
             return
         grain_map = self.get_grain_map(as_numpy=True).copy()
         # get rid of overlap regions flaged by -1
@@ -2055,9 +2046,9 @@ class Microstructure(SampleData):
         :return: a new `Microstructure` instance with the cropped grain map.
         """
         # TODO: Test
-        name = self.name + '_crop'
+        crop_name = self.get_sample_name() + '_crop'
         path = os.path.dirname(self.h5_file)
-        micro_crop = Microstructure(name=name, file_path=path)
+        micro_crop = Microstructure(name=crop_name, file_path=path)
         micro_crop.set_lattice(self.lattice)
         print('cropping microstructure to %s' % micro_crop.h5_file)
         grain_map = self.get_grain_map()
@@ -2312,7 +2303,7 @@ class Microstructure(SampleData):
             grid.GetCellData().SetScalars(vtk_data_array)
             grid.SetSpacing(voxel_size, voxel_size, voxel_size)
             writer = vtk.vtkStructuredPointsWriter()
-            writer.SetFileName('%s_pymicro.vtk' % self.name)
+            writer.SetFileName('%s_pymicro.vtk' % self.get_sample_name())
             if binary:
                 writer.SetFileTypeToBinary()
             writer.SetInputData(grid)
@@ -2345,7 +2336,7 @@ class Microstructure(SampleData):
         """Write the microstructure as a hdf5 file compatible with DREAM3D."""
         # TODO: test
         import time
-        f = h5py.File('%s.h5' % self.name, 'w')
+        f = h5py.File('%s.h5' % self.get_sample_name(), 'w')
         f.attrs['FileVersion'] = np.string_('7.0')
         f.attrs['DREAM3D Version'] = np.string_('6.1.77.d28a796')
         f.attrs['HDF5_Version'] = h5py.version.hdf5_version

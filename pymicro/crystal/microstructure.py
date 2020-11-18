@@ -1443,12 +1443,14 @@ class Microstructure(SampleData):
 
     def get_grain_map(self, as_numpy=False):
         grain_map = self.get_node(name='grain_map', as_numpy=as_numpy)
-        if self._is_empty('grain_map'): grain_map = None
+        if self._is_empty('grain_map'):
+            grain_map = None
         return grain_map
 
     def get_mask(self, as_numpy=False):
         mask = self.get_node(name='mask', as_numpy=as_numpy)
-        if self._is_empty('mask'): mask = None
+        if self._is_empty('mask'):
+            mask = None
         return mask
 
     def get_ids_from_grain_map(self):
@@ -1629,8 +1631,9 @@ class Microstructure(SampleData):
             image_object.add_field(grain_map, 'grain_map')
             self.add_image(image_object, imagename='CellData',
                            location='/', replace=True, **keywords)
-            gmap_path = self._name_or_node_to_path('grain_map')
-            self.add_to_index(indexname='grain_ids', path=gmap_path)
+            #TODO we keep the alias 'grain_map' for now and will implement an actual alias mechanism later
+            #gmap_path = self._name_or_node_to_path('grain_map')
+            #self.add_to_index(indexname='grain_ids', path=gmap_path)
         else:
             im_vox_size = self.get_attribute('spacing', 'CellData')
             vox_size = [voxel_size, voxel_size, voxel_size]
@@ -1638,9 +1641,8 @@ class Microstructure(SampleData):
                 msg = ('Voxel size mismatch between input and CellData node'
                        '`spacing` attribute')
                 raise ValueError(msg)
-            self.add_data_array(location='CellData', name='grain_ids',
-                                array=grain_map, indexname='grain_map',
-                                replace=True, **keywords)
+            self.add_data_array(location='CellData', name='grain_map',
+                                array=grain_map, replace=True, **keywords)
         return
 
     def set_mask(self, mask, voxel_size=None, **keywords):
@@ -2011,8 +2013,7 @@ class Microstructure(SampleData):
         microstructure.
 
         :param int dilation_steps: the number of dilation steps to apply.
-        :param list dilation_ids: a list to restrict the dilation to the given
-               ids.
+        :param list dilation_ids: a list to restrict the dilation to the given ids.
         """
         # TODO : Test
         if not self.__contains__('grain_map'):

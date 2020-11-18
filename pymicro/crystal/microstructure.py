@@ -1655,6 +1655,7 @@ class Microstructure(SampleData):
             if not (empty):
                 create_image = False
         if create_image:
+            print('MASK: CREATE IMAGE')
             if (voxel_size is None):
                 msg = '(set_mask) Please specify voxel size for CellData image'
                 raise ValueError(msg)
@@ -1671,7 +1672,7 @@ class Microstructure(SampleData):
                        '`spacing` attribute')
                 raise ValueError(msg)
             self.add_data_array(location='CellData', name='mask',
-                                array=mask, **keywords)
+                                array=mask, replace=True, **keywords)
         return
 
     def set_random_orientations(self):
@@ -2613,6 +2614,49 @@ class Microstructure(SampleData):
                 print('loaded mask volume with shape: {}'
                       ''.format(micro.mask.shape))
         return micro
+
+    @staticmethod
+    def from_legacy_h5(file_path):
+        """read a microstructure object from a HDF5 file created by pymicro until version 0.4.5.
+
+        :param str file_path: the path to the file to read.
+        :return: the new `Microstructure` instance created from the file.
+        """
+        with h5py.File(file_path, 'r') as f:
+            micro = Microstructure(name=f.attrs['microstructure_name'])
+            if 'symmetry' in f['EnsembleData/CrystalStructure'].attrs:
+                sym = f['EnsembleData/CrystalStructure'].attrs['symmetry']
+                parameters = f['EnsembleData/CrystalStructure/LatticeParameters'][()]
+                micro.set_lattice(Lattice.from_symmetry(Symmetry.from_string(sym), parameters))
+            if 'data_dir' in f.attrs:
+                micro.data_dir = f.attrs['data_dir']
+            # load feature data
+            if 'R_vectors' in f['FeatureData']:
+                print('some grains')
+                avg_rods = f['FeatureData/R_vectors'][()]
+                print(avg_rods.shape)
+                if 'grain_ids' in f['FeatureData']:
+                    grain_ids = f['FeatureData/grain_ids'][()]
+                else:
+                    grain_ids = range(1, 1 + avg_rods.shape[0])
+                if 'centers' in f['FeatureData']:
+                    centers = f['FeatureData/centers'][()]
+                else:
+                    centers = np.zeros_like(avg_rods)
+                # add all grains to the microstructure
+                grain = micro.grains.row
+                for i in range(avg_rods.shape[0]):
+                    grain['idnumber'] = grain_ids[i]
+                    grain['orientation'] = avg_rods[i, :]
+                    grain['center'] = centers[i]
+                    grain.append()
+                micro.grains.flush()
+            # load cell data
+            if 'grain_ids' in f['CellData']:
+                micro.set_grain_map(f['CellData/grain_ids'][()], f['CellData/grain_ids'].attrs['voxel_size'])
+            if 'mask' in f['CellData']:
+                micro.set_mask(f['CellData/mask'][()], f['CellData/mask'].attrs['voxel_size'])
+            return micro
 
     @staticmethod
     def merge_microstructures(micros, overlap, plot=False):

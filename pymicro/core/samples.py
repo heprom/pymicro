@@ -1250,12 +1250,31 @@ class SampleData:
                   nsize,unit))
         return nsize, unit
 
+    def get_sample_name(self):
+        """Return the sample name."""
+        return self.get_attribute(attrname='sample_name', node_name='/')
+
     def set_sample_name(self, sample_name):
+        """Set the sample name.
+
+        :param str sample_name: a string for the sample name.
+        """
         self.add_attributes({'sample_name':sample_name},'/')
 
-    def set_description(self, node, description):
-        """ """
-        self.add_attributes({'description':description},node)
+    def get_description(self, node_name='/'):
+        """Get the string describing this node, by defaut the sample description is returned.
+
+        :param str node_name: the path or name of the node of interest.
+        """
+        return self.get_attribute(attrname='description', node_name='/')
+
+    def set_description(self, description, node='/'):
+        """Set the description of a node. By defaut this method sets the description of the complete sample.
+
+        :param str description: a string for the description of the node or sample.
+        :param str node: the path or name of the node of interest ('/' by default).
+        """
+        self.add_attributes({'description':description}, node)
         return
 
     def set_voxel_size(self, image_data_group, voxel_size):

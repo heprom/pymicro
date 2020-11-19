@@ -32,8 +32,8 @@ class Orientation:
 
     This follows the passive rotation definition which means that it brings
     the sample coordinate system into coincidence with the crystal coordinate
-    system. Then one may express a vector :math:`V_c` in the crystal coordinate system
-    from the vector in the sample coordinate system :math:`V_s` by:
+    system. Then one may express a vector :math:`V_c` in the crystal coordinate
+    system from the vector in the sample coordinate system :math:`V_s` by:
 
     .. math::
 
@@ -45,8 +45,8 @@ class Orientation:
 
       V_s = g^T.V_c
 
-    Most of the code to handle rotations has been written to comply with the conventions
-    laid in :cite:`Rowenhorst2015`.
+    Most of the code to handle rotations has been written to comply with the
+    conventions laid in :cite:`Rowenhorst2015`.
     """
 
     def __init__(self, matrix):
@@ -191,10 +191,11 @@ class Orientation:
 
     def move_to_FZ(self, symmetry=Symmetry.cubic, verbose=False):
         """
-        Compute the equivalent crystal orientation in the Fundamental Zone of a given symmetry.
+        Compute the equivalent crystal orientation in the Fundamental Zone of
+        a given symmetry.
 
-        :param Symmetry symmetry: an instance of the `Symmetry` class
-        :param verbose: flag for verbose mode
+        :param Symmetry symmetry: an instance of the `Symmetry` class.
+        :param verbose: flag for verbose mode.
         :return: a new Orientation instance which lies in the fundamental zone.
         """
         om = symmetry.move_rotation_to_FZ(self.orientation_matrix(), verbose=verbose)
@@ -203,8 +204,8 @@ class Orientation:
     @staticmethod
     def misorientation_MacKenzie(psi):
         """Return the fraction of the misorientations corresponding to the
-        given :math:`\\psi` angle in the reference solution derived By MacKenzie in
-        his 1958 paper :cite:`MacKenzie_1958`.
+        given :math:`\\psi` angle in the reference solution derived By MacKenzie
+        in his 1958 paper :cite:`MacKenzie_1958`.
 
         :param psi: the misorientation angle in radians.
         :returns: the value in the cummulative distribution corresponding to psi.
@@ -221,11 +222,10 @@ class Orientation:
             X = (sqrt(2) - 1) / (1 - (sqrt(2) - 1) ** 2 / tan(0.5 * psi) ** 2) ** 0.5
             Y = (sqrt(2) - 1) ** 2 / ((3 - 1 / tan(0.5 * psi) ** 2) ** 0.5)
             p = (2. / 15) * ((3 * (sqrt(2) - 1) + 4 / sqrt(3)) * sin(psi) - 6 * (1 - cos(psi))) \
-                - 8. / (5 * pi) * (
-                        2 * (sqrt(2) - 1) * acos(X / tan(0.5 * psi)) + 1. / sqrt(3) * acos(Y / tan(0.5 * psi))) * sin(
-                psi) \
-                + 8. / (5 * pi) * (2 * acos((sqrt(2) + 1) * X / sqrt(2)) + acos((sqrt(2) + 1) * Y / sqrt(2))) * (
-                        1 - cos(psi))
+                - 8. / (5 * pi) * (2 * (sqrt(2) - 1) * acos(X / tan(0.5 * psi))
+                                   + 1. / sqrt(3) * acos(Y / tan(0.5 * psi))) \
+                * sin(psi) + 8. / (5 * pi) * (2 *acos((sqrt(2) + 1) * X / sqrt(2))
+                                              + acos((sqrt(2) + 1) * Y / sqrt(2))) * (1 - cos(psi))
         else:
             p = 0.
         return p
@@ -237,9 +237,11 @@ class Orientation:
         :param delta: The 3x3 misorientation matrix.
         :returns: the misorientation axis (normalised vector).
         """
-        n = np.array([delta[1, 2] - delta[2, 1], delta[2, 0] - delta[0, 2], delta[0, 1] - delta[1, 0]])
-        n /= np.sqrt(
-            (delta[1, 2] - delta[2, 1]) ** 2 + (delta[2, 0] - delta[0, 2]) ** 2 + (delta[0, 1] - delta[1, 0]) ** 2)
+        n = np.array([delta[1, 2] - delta[2, 1], delta[2, 0] -
+                      delta[0, 2], delta[0, 1] - delta[1, 0]])
+        n /= np.sqrt((delta[1, 2] - delta[2, 1]) ** 2 +
+                     (delta[2, 0] - delta[0, 2]) ** 2 +
+                     (delta[0, 1] - delta[1, 0]) ** 2)
         return n
 
     def misorientation_axis(self, orientation):
@@ -256,10 +258,10 @@ class Orientation:
     def misorientation_angle_from_delta(delta):
         """Compute the misorientation angle from the misorientation matrix.
 
-        Compute the angle assocated with this misorientation matrix :math:`\\Delta g`.
+        Compute the angle associated with this misorientation matrix :math:`\\Delta g`.
         It is defined as :math:`\\omega = \\arccos(\\text{trace}(\\Delta g)/2-1)`.
-        To avoid float rounding error, the argument is rounded to 1. if it is within 1 and 1 plus 32 bits floating
-        point precison.
+        To avoid float rounding error, the argument is rounded to 1.0 if it is
+        within 1 and 1 plus 32 bits floating point precison.
 
         .. note::
 
@@ -288,12 +290,15 @@ class Orientation:
 
         .. note::
 
-         Both orientations are supposed to have the same symmetry. This is not necessarily the case in multi-phase
-         materials.
+         Both orientations are supposed to have the same symmetry. This is not
+         necessarily the case in multi-phase materials.
 
-        :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class desribing the other crystal orientation from which to compute the angle.
-        :param crystal_structure: an instance of the `Symmetry` class describing the crystal symmetry, triclinic (no symmetry) by default.
-        :returns tuple: the misorientation angle in radians, the axis as a numpy vector (crystal coordinates), the axis as a numpy vector (sample coordinates).
+        :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class describing
+        the other crystal orientation from which to compute the angle.
+        :param crystal_structure: an instance of the `Symmetry` class describing
+        the crystal symmetry, triclinic (no symmetry) by default.
+        :returns tuple: the misorientation angle in radians, the axis as a numpy
+        vector (crystal coordinates), the axis as a numpy vector (sample coordinates).
         """
         the_angle = np.pi
         symmetries = crystal_structure.symmetry_operators()
@@ -357,7 +362,9 @@ class Orientation:
         Gc = hkl.scattering_vector()
         Gs = gt.dot(Gc)  # in the cartesian sample CS
         omegar = omega * np.pi / 180
-        R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
+        R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                      [np.sin(omegar), np.cos(omegar), 0],
+                      [0, 0, 1]])
         Gl = R.dot(Gs)
         alpha = np.arccos(np.dot(-X, Gl) / np.linalg.norm(Gl)) * 180 / np.pi
         if verbose:
@@ -458,7 +465,9 @@ class Orientation:
             print('\n** COMPUTING AT OMEGA=%03.1f deg' % omega)
             # prepare rotation matrix
             omegar = omega * np.pi / 180
-            R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                          [np.sin(omegar), np.cos(omegar), 0],
+                          [0, 0, 1]])
             # R = R.dot(Rlt).dot(Rut) # with tilts
             Gl = R.dot(Gs)
             print('scattering vector in laboratory CS', Gl)
@@ -533,11 +542,12 @@ class Orientation:
 
     @staticmethod
     def compute_instrument_transformation_matrix(rx_offset, ry_offset, rz_offset):
-        """ Compute the instrument transformation matrix for given rotation offset.
+        """Compute the instrument transformation matrix for given rotation offset.
 
-        This function compute a 3x3 rotation matrix (passive convention) that transform the sample coordinate system
-        by rotating around the 3 cartesian axes in this order: rotation around X is applied first, then around Y and
-        finally around Z.
+        This function compute a 3x3 rotation matrix (passive convention) that
+        transforms the sample coordinate system by rotating around the 3
+        cartesian axes in this order: rotation around X is applied first,
+        then around Y and finally around Z.
 
         A sample vector :math:`V_s` is consequently transformed into :math:`V'_s` as:
 
@@ -548,14 +558,21 @@ class Orientation:
         :param double rx_offset: value to apply for the rotation around X.
         :param double ry_offset: value to apply for the rotation around Y.
         :param double rz_offset: value to apply for the rotation around Z.
-        :return: a 3x3 rotation matrix describing the transformation applied by the diffractometer.
+        :return: a 3x3 rotation matrix describing the transformation applied
+        by the diffractometer.
         """
         angle_zr = np.radians(rz_offset)
         angle_yr = np.radians(ry_offset)
         angle_xr = np.radians(rx_offset)
-        Rz = np.array([[np.cos(angle_zr), -np.sin(angle_zr), 0], [np.sin(angle_zr), np.cos(angle_zr), 0], [0, 0, 1]])
-        Ry = np.array([[np.cos(angle_yr), 0, np.sin(angle_yr)], [0, 1, 0], [-np.sin(angle_yr), 0, np.cos(angle_yr)]])
-        Rx = np.array([[1, 0, 0], [0, np.cos(angle_xr), -np.sin(angle_xr)], [0, np.sin(angle_xr), np.cos(angle_xr)]])
+        Rz = np.array([[np.cos(angle_zr), -np.sin(angle_zr), 0],
+                       [np.sin(angle_zr), np.cos(angle_zr), 0],
+                       [0, 0, 1]])
+        Ry = np.array([[np.cos(angle_yr), 0, np.sin(angle_yr)],
+                       [0, 1, 0],
+                       [-np.sin(angle_yr), 0, np.cos(angle_yr)]])
+        Rx = np.array([[1, 0, 0],
+                       [0, np.cos(angle_xr), -np.sin(angle_xr)],
+                       [0, np.sin(angle_xr), np.cos(angle_xr)]])
         T = Rz.dot(np.dot(Ry, Rx))
         return T
 
@@ -563,7 +580,8 @@ class Orientation:
         """Compute the tilts for topotomography alignment.
 
         :param hkl: the hkl plane, an instance of :py:class:`~pymicro.crystal.lattice.HklPlane`
-        :param ndarray T: transformation matrix representing the diffractometer direction at omega=0.
+        :param ndarray T: transformation matrix representing the diffractometer
+        direction at omega=0.
         :param bool verbose: activate verbose mode (False by default).
         :returns tuple: (ut, lt) the two values of tilts to apply (in radians).
         """
@@ -586,10 +604,12 @@ class Orientation:
     def from_euler(euler, convention='Bunge'):
         """Rotation matrix from Euler angles.
 
-        This is the classical method to obtain an orientation matrix by 3 successive rotations. The result depends on
-        the convention used (how the successive rotation axes are chosen). In the Bunge convention, the first rotation
-        is around Z, the second around the new X and the third one around the new Z. In the Roe convention, the second
-        one is around Y.
+        This is the classical method to obtain an orientation matrix by 3
+        successive rotations. The result depends on the convention used
+        (how the successive rotation axes are chosen). In the Bunge convention,
+        the first rotation is around Z, the second around the new X and the
+        third one around the new Z. In the Roe convention, the second one
+        is around Y.
         """
         if convention == 'Roe':
             (phi1, phi, phi2) = (euler[0] + 90, euler[1], euler[2] - 90)
@@ -613,25 +633,34 @@ class Orientation:
 
     @staticmethod
     def Zrot2OrientationMatrix(x1=None, x2=None, x3=None):
-        """Compute the orientation matrix  from the rotated coordinates given in the
-           .inp file for Zebulon's computations
-           Need at least two vectors to compute cross product
+        """Compute the orientation matrix from the rotated coordinates given
+        in the .inp file for Zebulon's computations.
 
-           Still need some tests to validate this function
+        The function needs two of the three base vectors, the third one is
+        computed using a cross product.
+
+        .. note::
+
+            Still need some tests to validate this function.
+
+        :param x1: the first basis vector.
+        :param x2: the second basis vector.
+        :param x3: the third basis vector.
+        :return: the corresponding 3x3 orientation matrix.
         """
 
-        if (x1 is None and x2 is None):
+        if x1 is None and x2 is None:
             raise NameError('Need at least two vectors to compute the matrix')
-        elif (x1 == None and x3 == None):
+        elif x1 is None and x3 is None:
             raise NameError('Need at least two vectors to compute the matrix')
-        elif (x3 == None and x2 == None):
+        elif x3 is None and x2 is None:
             raise NameError('Need at least two vectors to compute the matrix')
 
-        if x1 == None:
+        if x1 is None:
             x1 = np.cross(x2, x3)
-        elif x2 == None:
+        elif x2 is None:
             x2 = np.cross(x3, x1)
-        elif x3 == None:
+        elif x3 is None:
             x3 = np.cross(x1, x2)
 
         x1 = x1 / np.linalg.norm(x1)
@@ -731,7 +760,8 @@ class Orientation:
         """
         t = g.trace() + 1
         if np.abs(t) < np.finfo(g.dtype).eps:
-            print('warning, returning [0., 0., 0.], consider using axis, angle representation instead')
+            print('warning, returning [0., 0., 0.], consider using axis, angle '
+                  'representation instead')
             return np.zeros(3)
         else:
             r1 = (g[1, 2] - g[2, 1]) / t
@@ -767,12 +797,15 @@ class Orientation:
         r = np.linalg.norm(rod)
         I = np.diagflat(np.ones(3))
         if r < np.finfo(r.dtype).eps:
+            # the rodrigues vector is zero, return the identity matrix
             return I
-        else:
-            theta = 2 * np.arctan(r)
-            n = rod / r
-            omega = np.array([[0.0, n[2], -n[1]], [-n[2], 0.0, n[0]], [n[1], -n[0], 0.0]])
-            return I + np.sin(theta) * omega + (1 - np.cos(theta)) * omega.dot(omega)
+        theta = 2 * np.arctan(r)
+        n = rod / r
+        omega = np.array([[0.0, n[2], -n[1]],
+                          [-n[2], 0.0, n[0]],
+                          [n[1], -n[0], 0.0]])
+        g = I + np.sin(theta) * omega + (1 - np.cos(theta)) * omega.dot(omega)
+        return g
 
     @staticmethod
     def Rodrigues2Axis(rod):
@@ -799,20 +832,23 @@ class Orientation:
         omega = np.radians(angle)
         c = np.cos(omega)
         s = np.sin(omega)
-        g = np.array([[c + (1 - c) * axis[0] ** 2, (1 - c) * axis[0] * axis[1] + s * axis[2],
+        g = np.array([[c + (1 - c) * axis[0] ** 2,
+                       (1 - c) * axis[0] * axis[1] + s * axis[2],
                        (1 - c) * axis[0] * axis[2] - s * axis[1]],
-                      [(1 - c) * axis[0] * axis[1] - s * axis[2], c + (1 - c) * axis[1] ** 2,
+                      [(1 - c) * axis[0] * axis[1] - s * axis[2],
+                       c + (1 - c) * axis[1] ** 2,
                        (1 - c) * axis[1] * axis[2] + s * axis[0]],
-                      [(1 - c) * axis[0] * axis[2] + s * axis[1], (1 - c) * axis[1] * axis[2] - s * axis[0],
+                      [(1 - c) * axis[0] * axis[2] + s * axis[1],
+                       (1 - c) * axis[1] * axis[2] - s * axis[0],
                        c + (1 - c) * axis[2] ** 2]])
         return g
 
     @staticmethod
     def Euler2Axis(euler):
-        """
-        Compute the (axis, angle) representation associated to this (passive) rotation expressed by the Euler angles.
+        """Compute the (axis, angle) representation associated to this (passive)
+        rotation expressed by the Euler angles.
 
-        :param euler: 3 euler angles (in degrees)
+        :param euler: 3 euler angles (in degrees).
         :returns: a tuple containing the axis (a vector) and the angle (in radians).
         """
         (phi1, Phi, phi2) = np.radians(euler)
@@ -831,11 +867,11 @@ class Orientation:
 
     @staticmethod
     def Euler2Quaternion(euler, P=1):
-        """
-        Compute the quaternion from the 3 euler angles (in degrees).
-        @param tuple euler: the 3 euler angles in degrees.
-        @param int P: +1 to compute an active quaternion (default), -1 for a passive quaternion.
-        @return: a `Quaternion` instance representing the rotation.
+        """Compute the quaternion from the 3 euler angles (in degrees).
+
+        :param tuple euler: the 3 euler angles in degrees.
+        :param int P: +1 to compute an active quaternion (default), -1 for a passive quaternion.
+        :return: a `Quaternion` instance representing the rotation.
         """
         (phi1, Phi, phi2) = np.radians(euler)
         q0 = np.cos(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
@@ -847,8 +883,10 @@ class Orientation:
 
     @staticmethod
     def Euler2Rodrigues(euler):
-        """
-        Compute the rodrigues vector from the 3 euler angles (in degrees)
+        """Compute the rodrigues vector from the 3 euler angles (in degrees).
+
+        :param euler: the 3 Euler angles (in degrees).
+        :return: the roodrigues vector as a 3 components numpy array.
         """
         (phi1, Phi, phi2) = np.radians(euler)
         a = 0.5 * (phi1 - phi2)
@@ -860,21 +898,26 @@ class Orientation:
 
     @staticmethod
     def Euler2OrientationMatrix(euler):
-        """
-        Compute the orientation matrix :math:`\mathbf{g}` associated with the 3 Euler angles
-        :math:`(\phi_1, \Phi, \phi_2)`. The matrix is calculated via (see the `euler_angles` recipe in the cookbook
-        for a detailed example):
+        """Compute the orientation matrix :math:`\mathbf{g}` associated with
+        the 3 Euler angles :math:`(\phi_1, \Phi, \phi_2)`.
+
+        The matrix is calculated via (see the `euler_angles` recipe in the
+        cookbook for a detailed example):
 
         .. math::
 
            \mathbf{g}=\\begin{pmatrix}
-           \cos\phi_1\cos\phi_2 - \sin\phi_1\sin\phi_2\cos\Phi & \sin\phi_1\cos\phi_2 + \cos\phi_1\sin\phi_2\cos\Phi & \sin\phi_2\sin\Phi \\\\
-           -\cos\phi_1\sin\phi_2 - \sin\phi_1\cos\phi_2\cos\Phi & -\sin\phi_1\sin\phi_2 + \cos\phi_1\cos\phi_2\cos\Phi & \cos\phi_2\sin\Phi \\\\
+           \cos\phi_1\cos\phi_2 - \sin\phi_1\sin\phi_2\cos\Phi &
+           \sin\phi_1\cos\phi_2 + \cos\phi_1\sin\phi_2\cos\Phi &
+           \sin\phi_2\sin\Phi \\\\
+           -\cos\phi_1\sin\phi_2 - \sin\phi_1\cos\phi_2\cos\Phi &
+           -\sin\phi_1\sin\phi_2 + \cos\phi_1\cos\phi_2\cos\Phi &
+           \cos\phi_2\sin\Phi \\\\
            \sin\phi_1\sin\Phi & -\cos\phi_1\sin\Phi & \cos\Phi \\\\
            \end{pmatrix}
 
         :param euler: The triplet of the Euler angles (in degrees).
-        :returns g: The 3x3 orientation matrix.
+        :return g: The 3x3 orientation matrix.
         """
         (rphi1, rPhi, rphi2) = np.radians(euler)
         c1 = np.cos(rphi1)
@@ -918,9 +961,11 @@ class Orientation:
                 Phi = pi
             phi_2 = 0.
         else:
-            phi_1 = atan2((q1 * q3 - P * q0 * q2) / chi, (-P * q0 * q1 - q2 * q3) / chi)
+            phi_1 = atan2((q1 * q3 - P * q0 * q2) / chi,
+                          (-P * q0 * q1 - q2 * q3) / chi)
             Phi = atan2(2 * chi, q03 - q12)
-            phi_2 = atan2((P * q0 * q2 + q1 * q3) / chi, (q2 * q3 - P * q0 * q1) / chi)
+            phi_2 = atan2((P * q0 * q2 + q1 * q3) / chi,
+                          (q2 * q3 - P * q0 * q1) / chi)
         return np.degrees([phi_1, Phi, phi_2])
 
     @staticmethod
@@ -939,7 +984,8 @@ class Orientation:
         Read a set of euler angles from an ascii file.
 
         :param str txt_path: path to the text file containing the euler angles.
-        :returns dict: a dictionary with the line number and the corresponding orientation.
+        :returns dict: a dictionary with the line number and the corresponding
+        orientation.
         """
         return Orientation.read_orientations(txt_path)
 
@@ -948,15 +994,18 @@ class Orientation:
         """
         Read a set of grain orientations from a text file.
 
-        The text file must be organised in 3 columns (the other are ignored), corresponding to either the three euler
-        angles or the three rodrigues veotor components, depending on the data_type). Internally the ascii file is read
-        by the genfromtxt function of numpy, additional keyworks (such as the delimiter) can be passed to via the
-        kwargs dictionnary.
+        The text file must be organised in 3 columns (the other are ignored),
+        corresponding to either the three euler angles or the three rodrigues
+        vector components, depending on the data_type). Internally the ascii
+        file is read by the genfromtxt function of numpy, to which additional
+        keyworks (such as the delimiter) can be passed to via the kwargs
+        dictionnary.
 
         :param str txt_path: path to the text file containing the orientations.
         :param str data_type: 'euler' (default) or 'rodrigues'.
         :param dict kwargs: additional parameters passed to genfromtxt.
-        :returns dict: a dictionary with the line number and the corresponding orientation.
+        :returns dict: a dictionary with the line number and the corresponding
+        orientation.
         """
         data = np.genfromtxt(txt_path, **kwargs)
         size = len(data)
@@ -981,14 +1030,20 @@ class Orientation:
 
         ::
 
-         **elset elset1 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 0.438886 -1.028805 0.197933 x3 1.038339 0.893172 1.003888
-         **elset elset2 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 0.178825 -0.716937 1.043300 x3 0.954345 0.879145 1.153101
-         **elset elset3 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 -0.540479 -0.827319 1.534062 x3 1.261700 1.284318 1.004174
-         **elset elset4 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 -0.941278 0.700996 0.034552 x3 1.000816 1.006824 0.885212
-         **elset elset5 *file au.mat *integration theta_method_a 1.0 1.e-9 150 *rotation x1 -2.383786 0.479058 -0.488336 x3 0.899545 0.806075 0.984268
+         **elset elset1 *file au.mat *integration theta_method_a 1.0 1.e-9 150
+          *rotation x1 0.438886 -1.028805 0.197933 x3 1.038339 0.893172 1.003888
+         **elset elset2 *file au.mat *integration theta_method_a 1.0 1.e-9 150
+          *rotation x1 0.178825 -0.716937 1.043300 x3 0.954345 0.879145 1.153101
+         **elset elset3 *file au.mat *integration theta_method_a 1.0 1.e-9 150
+          *rotation x1 -0.540479 -0.827319 1.534062 x3 1.261700 1.284318 1.004174
+         **elset elset4 *file au.mat *integration theta_method_a 1.0 1.e-9 150
+          *rotation x1 -0.941278 0.700996 0.034552 x3 1.000816 1.006824 0.885212
+         **elset elset5 *file au.mat *integration theta_method_a 1.0 1.e-9 150
+          *rotation x1 -2.383786 0.479058 -0.488336 x3 0.899545 0.806075 0.984268
 
         :param str inp_path: the path to the ascii file to read.
-        :returns dict: a dictionary of the orientations associated with the elset names.
+        :returns dict: a dictionary of the orientations associated with the
+        elset names.
         """
         inp = open(inp_path)
         lines = inp.readlines()
@@ -1000,7 +1055,7 @@ class Orientation:
             # read until next *** block
             if line.lstrip().startswith('***'):
                 break
-            if (not line.lstrip().startswith('%') and line.find('**elset') >= 0):
+            if not line.lstrip().startswith('%') and line.find('**elset') >= 0:
                 euler_lines.append(line)
         euler = []
         for l in euler_lines:
@@ -1016,7 +1071,8 @@ class Orientation:
                 x3[0] = float(tokens[irot + 6])
                 x3[1] = float(tokens[irot + 7])
                 x3[2] = float(tokens[irot + 8])
-                euler.append([elset, Orientation.Zrot2OrientationMatrix(x1=x1, x3=x3)])
+                euler.append([elset,
+                              Orientation.Zrot2OrientationMatrix(x1=x1, x3=x3)])
             else:  # euler angles
                 phi1 = tokens[irot + 1]
                 Phi = tokens[irot + 2]
@@ -1026,8 +1082,9 @@ class Orientation:
         return dict(euler)
 
     def slip_system_orientation_tensor(self, s):
-        """Compute the orientation strain tensor m^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
-        and the given slip system.
+        """Compute the orientation strain tensor m^s for this
+        :py:class:`~pymicro.crystal.microstructure.Orientation` and the given
+        slip system.
 
         :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
 
@@ -1043,8 +1100,9 @@ class Orientation:
         return np.outer(l_rot, n_rot)
 
     def slip_system_orientation_strain_tensor(self, s):
-        """Compute the orientation strain tensor m^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
-        and the given slip system.
+        """Compute the orientation strain tensor m^s for this
+        :py:class:`~pymicro.crystal.microstructure.Orientation` and the given
+        slip system.
 
         :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
 
@@ -1061,8 +1119,9 @@ class Orientation:
         return m
 
     def slip_system_orientation_rotation_tensor(self, s):
-        """Compute the orientation rotation tensor q^s for this :py:class:`~pymicro.crystal.microstructure.Orientation`
-        and the given slip system.
+        """Compute the orientation rotation tensor q^s for this
+        :py:class:`~pymicro.crystal.microstructure.Orientation and the given
+        slip system.
 
         :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
 
@@ -1083,7 +1142,8 @@ class Orientation:
         given slip system.
 
         :param slip_system: a slip system instance.
-        :param load_direction: a unit vector describing the loading direction (default: vertical axis [0, 0, 1]).
+        :param load_direction: a unit vector describing the loading direction
+        (default: vertical axis [0, 0, 1]).
         :returns float: a number between 0 ad 0.5.
         """
         plane = slip_system.get_slip_plane()
@@ -1091,15 +1151,19 @@ class Orientation:
         n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
         slip = slip_system.get_slip_direction().direction()
         slip_rot = np.dot(gt, slip)
-        SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
+        SF = np.abs(np.dot(n_rot, load_direction) *
+                    np.dot(slip_rot, load_direction))
         return SF
 
-    def compute_all_schmid_factors(self, slip_systems, load_direction=[0., 0., 1], verbose=False):
+    def compute_all_schmid_factors(self, slip_systems,
+                                   load_direction=[0., 0., 1], verbose=False):
         """Compute all Schmid factors for this crystal orientation and the
         given list of slip systems.
 
-        :param slip_systems: a list of the slip system from which to compute the Schmid factor values.
-        :param load_direction: a unit vector describing the loading direction (default: vertical axis [0, 0, 1]).
+        :param slip_systems: a list of the slip system from which to compute
+        the Schmid factor values.
+        :param load_direction: a unit vector describing the loading direction
+        (default: vertical axis [0, 0, 1]).
         :param bool verbose: activate verbose mode.
         :returns list: a list of the schmid factors.
         """

@@ -170,12 +170,17 @@ class SampleData:
         return s
 
     def __contains__(self, name):
-        """ Check if inputed name/indexname/path is a HDF5 node in dataset"""
+        """Check if input string is a HDF5 node in the dataset.
+
+        :param str name: a string for the name / indexname / path
+        :return bool: True if the dataset has a node associated with this name,
+        False if not.
+        """
         path = self._name_or_node_to_path(name)
         if path is None:
             return False
         else:
-            return (self.h5_dataset.__contains__(path))
+            return self.h5_dataset.__contains__(path)
 
     def init_file_object(self,
                          sample_name='',

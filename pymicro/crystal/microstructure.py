@@ -1141,48 +1141,47 @@ class Orientation:
         """Compute the Schmid factor for this crystal orientation and the
         given slip system.
 
-        :param slip_system: a slip system instance.
+        :param slip_system: a `SlipSystem` instance.
         :param load_direction: a unit vector describing the loading direction
         (default: vertical axis [0, 0, 1]).
-        :returns float: a number between 0 ad 0.5.
+        :return float: a number between 0 ad 0.5.
         """
         plane = slip_system.get_slip_plane()
         gt = self.orientation_matrix().transpose()
         n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
         slip = slip_system.get_slip_direction().direction()
         slip_rot = np.dot(gt, slip)
-        SF = np.abs(np.dot(n_rot, load_direction) *
-                    np.dot(slip_rot, load_direction))
-        return SF
+        schmid_factor = np.abs(np.dot(n_rot, load_direction) *
+                               np.dot(slip_rot, load_direction))
+        return schmid_factor
 
     def compute_all_schmid_factors(self, slip_systems,
                                    load_direction=[0., 0., 1], verbose=False):
         """Compute all Schmid factors for this crystal orientation and the
         given list of slip systems.
 
-        :param slip_systems: a list of the slip system from which to compute
+        :param slip_systems: a list of the slip systems from which to compute
         the Schmid factor values.
         :param load_direction: a unit vector describing the loading direction
         (default: vertical axis [0, 0, 1]).
         :param bool verbose: activate verbose mode.
-        :returns list: a list of the schmid factors.
+        :return list: a list of the schmid factors.
         """
-        SF_list = []
+        schmid_factor_list = []
         for ss in slip_systems:
             sf = self.schmid_factor(ss, load_direction)
             if verbose:
                 print('Slip system: %s, Schmid factor is %.3f' % (ss, sf))
-            SF_list.append(sf)
-        return SF_list
+            schmid_factor_list.append(sf)
+        return schmid_factor_list
 
 
 class Grain:
     """
     Class defining a crystallographic grain.
 
-    A grain has its own crystallographic orientation.
-    An optional id for the grain may be specified.
-    The center attribute is the center of mass of the grain in world coordinates.
+    A grain has a constant crystallographic `Orientation` and a grain id. The
+    center attribute is the center of mass of the grain in world coordinates.
     The volume of the grain is expressed in pixel/voxel unit.
     """
 
@@ -1190,7 +1189,7 @@ class Grain:
         self.id = grain_id
         self.orientation = grain_orientation
         self.center = np.array([0., 0., 0.])
-        self.volume = 0  # warning not implemented
+        self.volume = 0
         self.vtkmesh = None
         self.hkl_planes = []
 
@@ -1217,42 +1216,31 @@ class Grain:
             return self.volume / total_volume
 
     def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
-        """Compute the Schmid factor of this grain for the given slip system.
+        """Compute the Schmid factor of this grain for the given slip system
+        and loading direction.
 
-        **Parameters**:
-
-        *slip_system*: a slip system instance.
-
-        *load_direction*: a unit vector describing the loading direction.
-
-        **Returns**
-
-        The Schmid factor of this grain for the given slip system.
+        :param slip_system: a `SlipSystem` instance.
+        :param load_direction: a unit vector describing the loading direction
+        (default: vertical axis [0, 0, 1]).
+        :return float: a number between 0 ad 0.5.
         """
-        plane = slip_system.get_slip_plane()
-        gt = self.orientation_matrix().transpose()
-        n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
-        slip = slip_system.get_slip_direction().direction()
-        slip_rot = np.dot(gt, slip)
-        SF = np.abs(np.dot(n_rot, load_direction) * np.dot(slip_rot, load_direction))
         return self.orientation.schmid_factor(slip_system, load_direction)
 
     def SetVtkMesh(self, mesh):
         """Set the VTK mesh of this grain.
 
-        **Parameters:**
-
-        *mesh* The grain mesh in VTK format (typically vtkunstructuredgrid)
+        :param mesh: the grain mesh in VTK format.
         """
         self.vtkmesh = mesh
 
     def add_vtk_mesh(self, array, contour=True, verbose=False):
         """Add a mesh to this grain.
 
-        This method process a labeled array to extract the geometry of the grain. The grain shape is defined by
-        the pixels with a value of the grain id. A vtkUniformGrid object is created and thresholded or contoured
-        depending on the value of the flag `contour`.
-        The resulting mesh is returned, centered on the center of mass of the grain.
+        This method process a labeled array to extract the geometry of the
+        grain. The grain shape is defined by the pixels with a value of the
+        grain id. A vtkUniformGrid object is created and thresholded or
+        contoured depending on the value of the flag `contour`. The resulting
+        mesh is returned, centered on the center of mass of the grain.
 
         :param ndarray array: a numpy array from which to extract the grain shape.
         :param bool contour: a flag to use contour mode for the shape.
@@ -1274,7 +1262,8 @@ class Grain:
         else:
             grid.SetScalarType(vtk.VTK_UNSIGNED_CHAR)
         if contour:
-            grid.SetExtent(0, grain_size[0] - 1, 0, grain_size[1] - 1, 0, grain_size[2] - 1)
+            grid.SetExtent(0, grain_size[0] - 1, 0,
+                           grain_size[1] - 1, 0, grain_size[2] - 1)
             grid.GetPointData().SetScalars(vtk_data_array)
             # contouring selected grain
             contour = vtk.vtkContourFilter()
@@ -1330,7 +1319,10 @@ class Grain:
         self.vtkmesh = reader.GetOutput()
 
     def orientation_matrix(self):
-        """Returns the grain orientation matrix."""
+        """A method to access the grain orientation matrix.
+
+        :return: the grain 3x3 orientation matrix.
+        """
         return self.orientation.orientation_matrix()
 
     def dct_omega_angles(self, hkl, lambda_keV, verbose=False):
@@ -1345,7 +1337,7 @@ class Grain:
         :param hkl: The given cristallographic :py:class:`~pymicro.crystal.lattice.HklPlane`
         :param float lambda_keV: The X-rays energy expressed in keV
         :param bool verbose: Verbose mode (False by default)
-        :returns tuple: (w1, w2) the two values of the omega angle.
+        :return tuple: (w1, w2) the two values of the omega angle.
         """
         return self.orientation.dct_omega_angles(hkl, lambda_keV, verbose)
 
@@ -1355,7 +1347,7 @@ class Grain:
 
         :param int label: the grain id.
         :param str data_dir: the data root from where to fetch data files.
-        :return: A new grain instance.
+        :return: a new grain instance.
         """
         grain_path = os.path.join(data_dir, '4_grains', 'phase_01', 'grain_%04d.mat' % label)
         grain_info = h5py.File(grain_path)
@@ -1368,12 +1360,10 @@ class Grain:
                 # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
                 vol = f['vol'].value.transpose(2, 1, 0)
                 from scipy import ndimage
-                # TODO: use ndimage.find_objects to store bounding box in
-                # GrainDataTable
                 grain_data = vol[ndimage.find_objects(vol == label)[0]]
                 g.volume = ndimage.measurements.sum(vol == label)
                 # create the vtk representation of the grain
-            g.add_vtk_mesh(grain_data, contour=False)
+                g.add_vtk_mesh(grain_data, contour=False)
         return g
 
 
@@ -1396,16 +1386,21 @@ class GrainData(IsDescription):
 
 class Microstructure(SampleData):
     """
-    Class used to manipulate a full microstructure.
+    Class used to manipulate a full microstructure derived from the
+    `SampleData` class.
 
-    Derived from 'SampleData' class.
     As SampleData, this class is a data container for a mechanical sample and
     its microstructure, synchronized with a HDF5 file and a XML file
     Microstructure implements a hdf5 data model specific to polycrystalline
     sample data.
 
-    Additional attributes:
-        - 'Lattice' instance
+    The dataset maintains a `GrainData` instance which inherits from
+    tables.IsDescription and acts as a structured array containing the grain
+    attributes such as id, orientations (in form of rodrigues vectors), volume
+    and bounding box.
+
+    A crystal `Lattice` is also associated to the microstructure and used in
+    all crystallography calculations.
     """
 
     def __init__(self,
@@ -1427,17 +1422,22 @@ class Microstructure(SampleData):
         """Provide a string representation of the class."""
         s = '%s\n' % self.__class__.__name__
         s += '* name: %s\n' % self.get_sample_name()
+        s += '* lattice: %s\n' % self.get_lattice()
         s += '\n'
-        #        for g in self.grains:
-        #            s += '* %s' % g.__repr__
+        if self._verbose:
+            for g in self.grains:
+                s += '* %s' % g.__repr__
         s += SampleData.__repr__(self)
         return s
 
     def _minimal_data_model(self):
-        """
-            Specify the minimal contents of the hdf5 (Group names, paths,, and
-            group types) in the form of a dictionary {content:Location}
-            Extends SampleData Class _minimal_data_model class
+        """Data model for a polycrystalline microstructure.
+
+        Specify the minimal contents of the hdf5 (Group names, paths and group
+        types) in the form of a dictionary {content: location}. This extends
+        `~pymicro.core.SampleData._minimal_data_model` method.
+
+        :return: a tuple containing the two dictionnaries.
         """
         minimal_content_index_dic = {'Image_data': '/CellData',
                                      'grain_map': '/CellData/grain_map',
@@ -1460,11 +1460,18 @@ class Microstructure(SampleData):
         return minimal_content_index_dic, minimal_content_type_dic
 
     def _init_filename(self, filename, name, file_path):
+        """
+
+        :param filename:
+        :param name:
+        :param file_path:
+        :return:
+        """
         if filename is None:
             Filename = name + '_data'
         else:
             Filename = os.path.splitext(filename)[0]
-        if (file_path is not None):
+        if file_path is not None:
             Filename = os.path.join(file_path, Filename)
         return Filename
 
@@ -1491,11 +1498,18 @@ class Microstructure(SampleData):
     def get_number_of_phases(self):
         """Return the number of phases in this microstructure.
 
-        For the moment only one phase is supported, so this function simply returns 1."""
+        For the moment only one phase is supported, so this function simply
+        returns 1.
+
+        :return int: the number of phases in the microstructure.
+        """
         return 1
 
     def get_number_of_grains(self):
-        """Return the number of grains in this microstructure."""
+        """Return the number of grains in this microstructure.
+
+        :return: the number of grains in the microstructure.
+        """
         return self.grains.nrows
 
     def get_lattice(self):
@@ -1518,16 +1532,23 @@ class Microstructure(SampleData):
         return mask
 
     def get_ids_from_grain_map(self):
-        """ Return the list of grain ids found in the grain map
+        """Return the list of grain ids found in the grain map.
 
-            convention : 0 is not a grain (background of the grain map 3D Image)
+        By convention, only positive values are taken into account, 0 is
+        reserved for the background and -1 for overlap regions.
+
+        :return: a 1D numpy array containing the grain ids.
         """
-        gmap = self.get_node('grain_map')
-        grains_id = np.unique(gmap)
-        grains_id = grains_id[grains_id != 0]
+        grain_map = self.get_node('grain_map')
+        grains_id = np.unique(grain_map)
+        grains_id = grains_id[grains_id > 0]
         return grains_id
 
     def get_grain_ids(self):
+        """Return the grain ids found in the GrainDataTable.
+
+        :return: a 1D numpy array containing the grain ids.
+        """
         return self.get_tablecol('GrainDataTable', 'idnumber')
 
     def get_grain_volumes(self, id_list=None):
@@ -1695,15 +1716,18 @@ class Microstructure(SampleData):
             image_object.spacing = np.array([voxel_size, voxel_size,
                                              voxel_size])
             image_object.add_field(grain_map, 'grain_map')
-            self.add_image(image_object, imagename='CellData', location='/', replace=True, **keywords)
+            self.add_image(image_object, imagename='CellData', location='/',
+                           replace=True, **keywords)
             #TODO we keep the alias 'grain_map' for now and will implement an actual alias mechanism later
             #gmap_path = self._name_or_node_to_path('grain_map')
             #self.add_to_index(indexname='grain_ids', path=gmap_path)
         else:
             im_vox_size = self.get_attribute('spacing', 'CellData')
-            mismatch = im_vox_size[0] != voxel_size or im_vox_size[1] != voxel_size or im_vox_size[0] != voxel_size
+            mismatch = im_vox_size[0] != voxel_size or \
+                       im_vox_size[1] != voxel_size or \
+                       im_vox_size[0] != voxel_size
             if (voxel_size is not None) and mismatch:
-                msg = ('Voxel size mismatch between input and CellData node `spacing` attribute')
+                msg = 'Voxel size mismatch between input and CellData node `spacing` attribute'
                 raise ValueError(msg)
             self.add_data_array(location='CellData', name='grain_map',
                                 array=grain_map, replace=True, **keywords)
@@ -1730,7 +1754,8 @@ class Microstructure(SampleData):
             image_object.spacing = np.array([voxel_size, voxel_size,
                                              voxel_size])
             image_object.add_field(mask, 'mask')
-            self.add_image(image_object, imagename='CellData', location='/', replace=True, **keywords)
+            self.add_image(image_object, imagename='CellData', location='/',
+                           replace=True, **keywords)
         else:
             im_vox_size = self.get_attribute('spacing', 'CellData')[0]
             if (voxel_size is not None) and (im_vox_size != voxel_size):
@@ -1779,8 +1804,9 @@ class Microstructure(SampleData):
         :param str color: a string to chose the colormap from ('random', 'ipf')
         :param bool show_mask: a flag to show the mask by transparency.
         """
-        if not self.__contains__('grain_ids'):
-            print('Microstructure instance mush have a grain_map field to use this method')
+        if self._is_empty('grain_map'):
+            print('Microstructure instance mush have a grain_map field to use '
+                  'this method')
             return
         grain_map = self.get_grain_map()
         if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
@@ -1797,21 +1823,27 @@ class Microstructure(SampleData):
         ax.xaxis.set_label_position('top')
         plt.xlabel('X')
         plt.ylabel('Y')
-        if self.__contains__('mask') and show_mask:
+        if not self._is_empty('mask') and show_mask:
             from pymicro.view.vol_utils import alpha_cmap
             mask = self.get_mask()
             plt.imshow(mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
         plt.show()
 
     @staticmethod
-    def rand_cmap(N=4096, first_is_black=False):
-        """Creates a random color map.
+    def rand_cmap(n=4096, first_is_black=False, seed=13):
+        """Creates a random color map to color the grains.
 
-           The first color can be enforced to black and usually figure out the background.
-           The random seed is fixed to consistently produce the same colormap.
+        The first color can be enforced to black and usually figure out the
+        background. The random seed is fixed to consistently produce the same
+        colormap.
+
+        :param int n: the number of colors in the list.
+        :param bool first_is_black: set black as the first color of the list.
+        :param int seed: the random seed.
+        :return: a matplotlib colormap.
         """
-        np.random.seed(13)
-        rand_colors = np.random.rand(N, 3)
+        np.random.seed(seed)
+        rand_colors = np.random.rand(n, 3)
         if first_is_black:
             rand_colors[0] = [0., 0., 0.]  # enforce black background (value 0)
         return colors.ListedColormap(rand_colors)
@@ -1822,8 +1854,8 @@ class Microstructure(SampleData):
 
         .. warning::
 
-          This function works only for a microstructure with the cubic symmetry due to current limitation in
-          the `Orientation` get_ipf_colour method.
+          This function works only for a microstructure with the cubic symmetry
+          due to current limitation in the `Orientation` get_ipf_colour method.
 
         :return: a color map that can be directly used in pyplot.
         """
@@ -1880,7 +1912,7 @@ class Microstructure(SampleData):
                 s += ' * %s\n' % (o)
                 s += ' * center %s\n' % np.array_str(row['center'])
                 s += ' * volume %f\n' % (row['volume'])
-            #                s += ' * has vtk mesh ? %s\n' % (self.vtkmesh != None)
+                # s += ' * has vtk mesh ? %s\n' % (self.vtkmesh != None)
             if not (as_string):
                 print(s)
         return s
@@ -1898,13 +1930,13 @@ class Microstructure(SampleData):
 
           This function works only for microstructures with the same symmetry.
 
-        :param micro2: the second instance of `Microstructure` from which to match grains.
+        :param micro2: the second instance of `Microstructure` from which to match the grains.
         :param float mis_tol: the tolerance is misorientation to use to detect matches (in degrees).
         :param list use_grain_ids: a list of ids to restrict the grains in which to search for matches.
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
-        :returns tuple: A tuple of three lists holding respectively the matches, the candidates for each match and
-        the grains that were unmatched.
+        :return tuple: a tuple of three lists holding respectively the matches,
+        the candidates for each match and the grains that were unmatched.
         """
         # TODO : Test
         if not (self.get_lattice().get_symmetry()
@@ -2009,6 +2041,7 @@ class Microstructure(SampleData):
         This code is based on the gtDilateGrains function from the DCT code.
         It has been extended to handle both 2D and 3D cases.
 
+        :param ndarray array: the numpy array to dilate.
         :param int dilation_steps: the number of dilation steps to apply.
         :param ndarray mask: a msk to constrain the dilation (None by default).
         :param list dilation_ids: a list to restrict the dilation to the given ids.

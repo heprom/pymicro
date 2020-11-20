@@ -1304,8 +1304,6 @@ class Grain:
                 # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
                 vol = f['vol'].value.transpose(2, 1, 0)
                 from scipy import ndimage
-                # TODO: use ndimage.find_objects to store bounding box in
-                # GrainDataTable
                 grain_data = vol[ndimage.find_objects(vol == label)[0]]
                 g.volume = ndimage.measurements.sum(vol == label)
                 # create the vtk representation of the grain
@@ -1491,7 +1489,7 @@ class Microstructure(SampleData):
             o = []
             for g in self.grains:
                 o.append(g['orientation'])
-            return com
+            return o
 
     def get_grain_orientations(self, id_list=None):
         orientations = []
@@ -1510,7 +1508,7 @@ class Microstructure(SampleData):
             Bbox = []
             for g in self.grains:
                 Bbox.append(g['bounding_box'])
-            return com
+            return Bbox
 
     def get_voxel_size(self):
         """Get the voxel size for image data of the microstructure.
@@ -1622,7 +1620,6 @@ class Microstructure(SampleData):
             if not empty:
                 create_image = False
         if create_image:
-            print('CREATE IMAAAGE YIIHAAAAAA')
             if voxel_size is None:
                 msg = '(set_grain_map) Please specify voxel size for CellData image'
                 raise ValueError(msg)
@@ -1657,7 +1654,6 @@ class Microstructure(SampleData):
             if not (empty):
                 create_image = False
         if create_image:
-            print('MASK: CREATE IMAGE')
             if (voxel_size is None):
                 msg = '(set_mask) Please specify voxel size for CellData image'
                 raise ValueError(msg)

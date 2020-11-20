@@ -69,7 +69,8 @@ SINGLE_IMAGE = """
 def extract_docstring(filename):
     """ Extract a module-level docstring, if any
     """
-    lines = file(filename).readlines()
+    with filename as f:
+        lines = f.readlines()
     start_row = 0
     if lines[0].startswith('#!'):
         lines.pop(0)
@@ -115,7 +116,7 @@ def generate_example_rst(example_dir, out_dir):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     # we create an index.rst with all examples
-    fhindex = file(os.path.join(out_dir, 'index.rst'), 'w')
+    fhindex = open(os.path.join(out_dir, 'index.rst'), 'w')
     fhindex.write("""\
 
 .. raw:: html
@@ -216,15 +217,15 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
 
     image_dir = os.path.join(target_dir, 'images')
     thumb_dir = os.path.join(image_dir, 'thumb')
-    print 'image_dir: ', image_dir
-    print 'thumb_dir: ', thumb_dir
+    print('image_dir: ', image_dir)
+    print('thumb_dir: ', thumb_dir)
     if not os.path.exists(image_dir):
         os.makedirs(image_dir)
     if not os.path.exists(thumb_dir):
         os.makedirs(thumb_dir)
     image_path = os.path.join(image_dir, image_fname)
     image_thumb_path = os.path.join(src_dir, 'thumb_' + image_fname)
-    print 'image_thumb_path: ', image_thumb_path
+    print('image_thumb_path: ', image_thumb_path)
     # copy image to the images folder
     shutil.copy(os.path.join(src_dir, image_fname), image_path)
 

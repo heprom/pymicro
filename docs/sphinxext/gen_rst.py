@@ -69,7 +69,7 @@ SINGLE_IMAGE = """
 def extract_docstring(filename):
     """ Extract a module-level docstring, if any
     """
-    with filename as f:
+    with open(filename) as f:
         lines = f.readlines()
     start_row = 0
     if lines[0].startswith('#!'):
@@ -78,7 +78,9 @@ def extract_docstring(filename):
 
     docstring = ''
     first_par = ''
-    tokens = tokenize.generate_tokens(lines.__iter__().next)
+    tokens = tokenize.generate_tokens(lines.__iter__)
+    for tok in tokens:
+        print(tok)
     for tok_type, tok_content, _, (erow, _), _ in tokens:
         tok_type = token.tok_name[tok_type]
         if tok_type in ('NEWLINE', 'COMMENT', 'NL', 'INDENT', 'DEDENT'):
@@ -100,16 +102,17 @@ def generate_all_example_rst(app):
         examples.
     """
     input_dir = os.path.abspath(app.builder.srcdir)
+    input_dir = os.path.join(input_dir, 'auto_examples')
     print('*** input_dir = ', input_dir)
     # Walk all our source tree to find examples and generate them
-    for dir_path, dir_names, file_names in os.walk(input_dir):
-        if 'build' in dir_path.split(os.sep) or 'auto_examples' in dir_path.split(os.sep):
-            continue
-        if 'examples' in dir_names:
-            print ('*** found examples')
-            generate_example_rst(
-                os.path.join(dir_path, 'examples'),
-                os.path.join(dir_path, 'auto_examples'))
+    for file_name in os.listdir(input_dir):
+        if not os.path.isdir(file_name):
+          continue
+        dir_path = os.path.join(input_dir, file_name)
+        print ('*** found examples in %s' % file_name)
+        generate_example_rst(
+            os.path.join(dir_path, 'examples'),
+            os.path.join(dir_path, 'auto_examples'))
 
 
 def generate_example_rst(example_dir, out_dir):
@@ -245,7 +248,8 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
         shutil.copy(image_thumb_path, thumb_file)
 
     docstring, short_desc, end_row = extract_docstring(example_file)
-
+    #docstring, short_desc, end_row = '', '', 0
+    
     if plot_anim:
         image_fname = image_fname[:-4] + '.gif'
         gif_path = os.path.join(image_dir, image_fname)

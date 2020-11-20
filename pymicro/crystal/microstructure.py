@@ -1405,12 +1405,15 @@ class Microstructure(SampleData):
 
     def __init__(self,
                  name='micro', description='empty', filename=None,
-                 file_path=None, verbose=False, overwrite_hdf5=False,
-                 lattice=None, autodelete=False, **keywords):
+                 verbose=False, overwrite_hdf5=False, lattice=None,
+                 autodelete=False, **keywords):
 
-        Filename = self._init_filename(filename, name, file_path)
-        SampleData.__init__(self, Filename, name, description, verbose,
-                            overwrite_hdf5, autodelete)
+        if filename is None:
+            # only add '_' if not present at the end of name
+            filename = name + (not name.endswith('_')) * '_' + 'data'
+
+        SampleData.__init__(self, filename, name, description, verbose,
+                            overwrite_hdf5, autodelete, **keywords)
         self.set_sample_name(name)
         self.grains = self.get_node('GrainDataTable')
         self._init_lattice(lattice)
@@ -1458,22 +1461,6 @@ class Microstructure(SampleData):
                                     'Crystal_data': 'Group',
                                     'lattice_params': 'Array', }
         return minimal_content_index_dic, minimal_content_type_dic
-
-    def _init_filename(self, filename, name, file_path):
-        """
-
-        :param filename:
-        :param name:
-        :param file_path:
-        :return:
-        """
-        if filename is None:
-            Filename = name + '_data'
-        else:
-            Filename = os.path.splitext(filename)[0]
-        if file_path is not None:
-            Filename = os.path.join(file_path, Filename)
-        return Filename
 
     def _init_lattice(self, lattice):
         if lattice is None:

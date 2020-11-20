@@ -22,8 +22,7 @@ from pymicro.crystal.lattice import Lattice, Symmetry
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 from pymicro.core.images import ImageObject
-from tables import IsDescription
-from tables import Int32Col, Float32Col
+import tables
 from math import atan2, pi
 
 
@@ -1367,21 +1366,21 @@ class Grain:
         return g
 
 
-class GrainData(IsDescription):
+class GrainData(tables.IsDescription):
     """
        Description class specifying structured storage of grain data in
        Microstructure Class, in HDF5 node /GrainData/GrainDataTable
     """
     # grain identity number
-    idnumber = Int32Col()  # Signed 64-bit integer
+    idnumber = tables.Int32Col()  # Signed 64-bit integer
     # grain volume
-    volume = Float32Col()  # float
+    volume = tables.Float32Col()  # float
     # grain center of mass coordinates
-    center = Float32Col(shape=(3,))  # float  (double-precision)
+    center = tables.Float32Col(shape=(3,))  # float  (double-precision)
     # Rodriguez vector defining grain orientation
-    orientation = Float32Col(shape=(3,))  # float  (double-precision)
+    orientation = tables.Float32Col(shape=(3,))  # float  (double-precision)
     # Grain Bounding box
-    bounding_box = Int32Col(shape=(3, 2))  # Signed 64-bit integer
+    bounding_box = tables.Int32Col(shape=(3, 2))  # Signed 64-bit integer
 
 
 class Microstructure(SampleData):
@@ -1405,12 +1404,15 @@ class Microstructure(SampleData):
 
     def __init__(self,
                  name='micro', description='empty', filename=None,
-                 file_path=None, verbose=False, overwrite_hdf5=False,
-                 lattice=None, autodelete=False, **keywords):
+                 verbose=False, overwrite_hdf5=False, lattice=None,
+                 autodelete=False, **keywords):
 
-        Filename = self._init_filename(filename, name, file_path)
-        SampleData.__init__(self, Filename, name, description, verbose,
-                            overwrite_hdf5, autodelete)
+        if filename is None:
+            # only add '_' if not present at the end of name
+            filename = name + (not name.endswith('_')) * '_' + 'data'
+
+        SampleData.__init__(self, filename, name, description, verbose,
+                            overwrite_hdf5, autodelete, **keywords)
         self.set_sample_name(name)
         self.grains = self.get_node('GrainDataTable')
         self._init_lattice(lattice)
@@ -1458,22 +1460,6 @@ class Microstructure(SampleData):
                                     'Crystal_data': 'Group',
                                     'lattice_params': 'Array', }
         return minimal_content_index_dic, minimal_content_type_dic
-
-    def _init_filename(self, filename, name, file_path):
-        """
-
-        :param filename:
-        :param name:
-        :param file_path:
-        :return:
-        """
-        if filename is None:
-            Filename = name + '_data'
-        else:
-            Filename = os.path.splitext(filename)[0]
-        if file_path is not None:
-            Filename = os.path.join(file_path, Filename)
-        return Filename
 
     def _init_lattice(self, lattice):
         if lattice is None:
@@ -1603,7 +1589,8 @@ class Microstructure(SampleData):
         If this instance of `Microstructure` has no image data, None is returned.
         """
         try:
-            return self.get_attribute(attrname='spacing', node_name='/CellData')[0]
+            return self.get_attribute(attrname='spacing',
+                                      node_name='/CellData')[0]
         except:
             return None
 
@@ -1621,27 +1608,39 @@ class Microstructure(SampleData):
             gr = self.grains.read_where('(idnumber == gid)')[0]
         except:
             raise ValueError('grain %d not found in the microstructure' % gid)
-        grain = Grain(gr['idnumber'], Orientation.from_rodrigues(gr['orientation']))
+        grain = Grain(gr['idnumber'],
+                      Orientation.from_rodrigues(gr['orientation']))
         grain.center = gr['center']
         grain.volume = gr['volume']
         return grain
 
     def get_all_grains(self):
-        """Returns a list of `Grain` instances for all grains in this `Microstructure`."""
-        grains_list = [self.get_grain(gid) for gid in self.get_tablecol('GrainDataTable', 'idnumber')]
+        """Build a list of `Grain` instances for all grains in this `Microstructure`.
+
+        :return: a list of the grains.
+        """
+        grains_list = [self.get_grain(gid)
+                       for gid in self.get_tablecol('GrainDataTable', 'idnumber')]
         return grains_list
 
     def get_grain_positions(self):
-        """Return all the grain positions as a numpy array of shape (n, 3) where n is the number of grains."""
+        """Return all the grain positions as a numpy array of shape (n, 3)
+        where n is the number of grains.
+
+        :return: a numpy array of shape (n, 3) of the grain positions.
+        """
         return self.grains[:]['center']
 
     def get_grain_volume_fractions(self):
-        """Compute all grains volume fractions."""
+        """Compute all grains volume fractions.
+
+        :return: a 1D numpy array with all grain volume fractions.
+        """
         total_volume = np.sum(self.grains[:]['volume'])
         return self.grains[:]['volume'] / total_volume
 
     def get_grain_volume_fraction(self, gid, use_total_volume_value=None):
-        """Compute the grain volume fraction.
+        """Compute the volume fraction of this grain.
 
         :param int gid: the grain id.
         :param float use_total_volume_value: the total volume value to use.
@@ -1717,16 +1716,14 @@ class Microstructure(SampleData):
             image_object.add_field(grain_map, 'grain_map')
             self.add_image(image_object, imagename='CellData', location='/',
                            replace=True, **keywords)
-            #TODO we keep the alias 'grain_map' for now and will implement an actual alias mechanism later
-            #gmap_path = self._name_or_node_to_path('grain_map')
-            #self.add_to_index(indexname='grain_ids', path=gmap_path)
         else:
             im_vox_size = self.get_attribute('spacing', 'CellData')
             mismatch = im_vox_size[0] != voxel_size or \
                        im_vox_size[1] != voxel_size or \
                        im_vox_size[0] != voxel_size
             if (voxel_size is not None) and mismatch:
-                msg = 'Voxel size mismatch between input and CellData node `spacing` attribute'
+                msg = 'Voxel size mismatch between input and CellData node ' \
+                      '`spacing` attribute'
                 raise ValueError(msg)
             self.add_data_array(location='CellData', name='grain_map',
                                 array=grain_map, replace=True, **keywords)
@@ -1917,7 +1914,8 @@ class Microstructure(SampleData):
 
     @staticmethod
     def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
-        return micro1.match_grains(micro2, use_grain_ids=use_grain_ids, verbose=verbose)
+        return micro1.match_grains(micro2, use_grain_ids=use_grain_ids,
+                                   verbose=verbose)
 
     def match_grains(self, micro2, mis_tol=1, use_grain_ids=None, verbose=False):
         """Match grains from a second microstructure to this microstructure.
@@ -1928,9 +1926,12 @@ class Microstructure(SampleData):
 
           This function works only for microstructures with the same symmetry.
 
-        :param micro2: the second instance of `Microstructure` from which to match the grains.
-        :param float mis_tol: the tolerance is misorientation to use to detect matches (in degrees).
-        :param list use_grain_ids: a list of ids to restrict the grains in which to search for matches.
+        :param micro2: the second instance of `Microstructure` from which
+        to match the grains.
+        :param float mis_tol: the tolerance is misorientation to use
+        to detect matches (in degrees).
+        :param list use_grain_ids: a list of ids to restrict the grains
+        in which to search for matches.
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
         :return tuple: a tuple of three lists holding respectively the matches,
@@ -1996,8 +1997,10 @@ class Microstructure(SampleData):
         neighborhood of the grain. The ids can then be determined using numpy
         unique function.
 
-        :param int grain_id: the grain id from which the neighbors need to be determined.
-        :param int distance: the distance to use for the dilation (default is 1 voxel).
+        :param int grain_id: the grain id from which the neighbors need
+        to be determined.
+        :param int distance: the distance to use for the dilation (default
+        is 1 voxel).
         :return: a list (possibly empty) of the neighboring grain ids.
         """
         grain_map = self.get_grain_map(as_numpy=True)
@@ -2033,7 +2036,8 @@ class Microstructure(SampleData):
         self.sync()
 
     @staticmethod
-    def dilate_labels(array, dilation_steps=1, mask=None, dilation_ids=None, struct=None):
+    def dilate_labels(array, dilation_steps=1, mask=None, dilation_ids=None,
+                      struct=None):
         """Dilate labels isotropically to fill the gap between them.
 
         This code is based on the gtDilateGrains function from the DCT code.
@@ -2043,7 +2047,8 @@ class Microstructure(SampleData):
         :param int dilation_steps: the number of dilation steps to apply.
         :param ndarray mask: a msk to constrain the dilation (None by default).
         :param list dilation_ids: a list to restrict the dilation to the given ids.
-        :param ndarray struct: the structuring element to use (strong connectivity by default).
+        :param ndarray struct: the structuring element to use (strong
+        connectivity by default).
         :return: the dilated array.
         """
         from scipy import ndimage
@@ -2088,9 +2093,12 @@ class Microstructure(SampleData):
             print('%d voxels to replace' % len(X))
             for i in range(len(X)):
                 if array.ndim == 2:
-                    neighbours = array[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1]
+                    neighbours = array[xstart[i]:xend[i] + 1,
+                                       ystart[i]:yend[i] + 1]
                 else:
-                    neighbours = array[xstart[i]:xend[i] + 1, ystart[i]:yend[i] + 1, zstart[i]:zend[i] + 1]
+                    neighbours = array[xstart[i]:xend[i] + 1,
+                                       ystart[i]:yend[i] + 1,
+                                       zstart[i]:zend[i] + 1]
                 if np.any(neighbours):
                     # at least one neighboring voxel in non zero
                     dilation[i] = min(neighbours[neighbours > 0])
@@ -2199,13 +2207,19 @@ class Microstructure(SampleData):
         return com
 
     def compute_grain_bounding_box(self, gid, as_slice=False):
-        """ Compute the grain bounding box indices in the grain map """
+        """Compute the grain bounding box indices in the grain map.
+
+        :param int gid: the id of the grain.
+        :param bool as_slice: a flag to return the grain bounding box as a slice.
+        :return: the bounding box coordinates.
+        """
         slices = ndimage.find_objects(self.get_grain_map() == np.array(gid))[0]
-        if as_slice: return slices
+        if as_slice:
+            return slices
         x_indices = (slices[0].start, slices[0].stop)
         y_indices = (slices[1].start, slices[1].stop)
         z_indices = (slices[2].start, slices[2].stop)
-        return (x_indices, y_indices, z_indices)
+        return x_indices, y_indices, z_indices
 
     def recompute_grain_volumes(self, verbose=False):
         """Compute the volume of all grains in the microstructure.
@@ -2217,11 +2231,13 @@ class Microstructure(SampleData):
 
         .. note::
 
-          A grain map need to be associated with this microstructure instance for the method to run.
+          A grain map need to be associated with this microstructure instance
+          for the method to run.
 
         :param bool verbose: flag for verbose mode.
+        :return: a 1D array with all grain volumes.
         """
-        if not (self.__contains__('grain_map')):
+        if not (self._is_empty('grain_map')):
             print('warning: need a grain map to recompute the volumes '
                   ' of the grains')
             return
@@ -2249,11 +2265,13 @@ class Microstructure(SampleData):
 
         .. note::
 
-          A grain map need to be associated with this microstructure instance for the method to run.
+          A grain map need to be associated with this microstructure instance
+          for the method to run.
 
         :param bool verbose: flag for verbose mode.
+        :return: a 1D array with all grain centers.
         """
-        if not (self.__contains__('grain_map')):
+        if not (self._is_empty('grain_map')):
             print('warning: need a grain map to recompute the center of mass'
                   ' of the grains')
             return
@@ -2280,7 +2298,8 @@ class Microstructure(SampleData):
 
         .. note::
 
-          A grain map need to be associated with this microstructure instance for the method to run.
+          A grain map need to be associated with this microstructure instance
+          for the method to run.
 
         :param bool verbose: flag for verbose mode.
         """
@@ -2327,11 +2346,14 @@ class Microstructure(SampleData):
     def to_amitex_fftp(self, binary=True):
         """Write orientation data to ascii files to prepare for FFT computation.
 
-        AMITEX_FFTP can be used to compute the elastoplastic response of polycrystalline microstructures. The
-        calculation needs orientation data for each grain written in the form of the coordinates of the first two basis
-        vectors expressed in the crystal local frame which is given by the first two columns of the orientation matrix.
-        The values are written in 6 files N1X.txt, N1Y.txt, N1Z.txt, N2X.txt, N2Y.txt, N2Z.txt, each containing n values
-        with n the number of grains. The data is written either in BINARY or in ASCII form.
+        AMITEX_FFTP can be used to compute the elastoplastic response of
+        polycrystalline microstructures. The calculation needs orientation data
+        for each grain written in the form of the coordinates of the first two
+        basis vectors expressed in the crystal local frame which is given by
+        the first two columns of the orientation matrix. The values are written
+        in 6 files N1X.txt, N1Y.txt, N1Z.txt, N2X.txt, N2Y.txt, N2Z.txt, each
+        containing n values with n the number of grains. The data is written
+        either in BINARY or in ASCII form.
 
         :param bool binary: flag to write the files in binary or ascii format.
         """
@@ -2392,7 +2414,8 @@ class Microstructure(SampleData):
             grain_map = self.get_grain_map(as_numpy=True)
             voxel_size = self.get_voxel_size()
             vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(grain_map,
-                                                                 order='F'), deep=1)
+                                                                 order='F'),
+                                                        deep=1)
             vtk_data_array.SetName('GrainIds')
             grid = vtk.vtkImageData()
             size = grain_map.shape
@@ -2413,9 +2436,9 @@ class Microstructure(SampleData):
         a finite element calculation with z-set.
 
         :param str mat_file: The name of the file where the material behaviour
-                             is located
+        is located
         :param str grain_prefix: The grain prefix used to name the elsets
-                                 corresponding to the different grains
+        corresponding to the different grains
         """
         f = open('elset_list.txt', 'w')
         # TODO : test
@@ -2449,13 +2472,17 @@ class Microstructure(SampleData):
         ed = m.create_group('EnsembleData')
         ed.attrs['AttributeMatrixType'] = np.uint32(11)
         ed.attrs['TupleDimensions'] = np.uint64(2)
-        cryst_structure = ed.create_dataset('CrystalStructures', data=np.array([[999], [1]], dtype=np.uint32))
+        cryst_structure = ed.create_dataset('CrystalStructures',
+                                            data=np.array([[999], [1]],
+                                                          dtype=np.uint32))
         cryst_structure.attrs['ComponentDimensions'] = np.uint64(1)
         cryst_structure.attrs['DataArrayVersion'] = np.int32(2)
         cryst_structure.attrs['ObjectType'] = np.string_('DataArray<uint32_t>')
         cryst_structure.attrs['Tuple Axis Dimensions'] = np.string_('x=2')
         cryst_structure.attrs['TupleDimensions'] = np.uint64(2)
-        mat_name = ed.create_dataset('MaterialName', data=[a.encode('utf8') for a in ['Invalid Phase', 'Unknown']])
+        mat_name = ed.create_dataset('MaterialName',
+                                     data=[a.encode('utf8')
+                                           for a in ['Invalid Phase', 'Unknown']])
         mat_name.attrs['ComponentDimensions'] = np.uint64(1)
         mat_name.attrs['DataArrayVersion'] = np.int32(2)
         mat_name.attrs['ObjectType'] = np.string_('StringDataArray')
@@ -2492,15 +2519,15 @@ class Microstructure(SampleData):
         :param str file_path: the path to the hdf5 file to read.
         :param str main_key: the string describing the root key.
         :param str data_container: the string describing the data container
-                                   group in the hdf5 file.
+        group in the hdf5 file.
         :param str grain_data: the string describing the grain data group in the
-                               hdf5 file.
+        hdf5 file.
         :param str grain_orientations: the string describing the average grain
-                                       orientations in the hdf5 file.
+        orientations in the hdf5 file.
         :param str orientation_type: the string describing the descriptor used
-                                     for orientation data.
+        for orientation data.
         :param str grain_centroid: the string describing the grain centroid in
-                                   the hdf5 file.
+        the hdf5 file.
         :return: a `Microstructure` instance created from the hdf5 file.
         """
         # TODO: test
@@ -2517,7 +2544,8 @@ class Microstructure(SampleData):
             grain = micro.grains.row
             for i in range(len(orientations)):
                 grain['idnumber'] = i
-                if orientations[i, 0] == 0. and orientations[i, 1] == 0. and orientations[i, 2] == 0.:
+                if orientations[i, 0] == 0. and orientations[i, 1] == 0. and \
+                        orientations[i, 2] == 0.:
                     # skip grain 0 which is always (0., 0., 0.)
                     print('skipping (0., 0., 0.)')
                     continue
@@ -2548,10 +2576,12 @@ class Microstructure(SampleData):
     def from_neper(neper_file_path):
         """Create a microstructure from a neper tesselation.
 
-        Neper is an open source program to generate polycristalline microstructure using voronoi tesselations.
-        It is available at https://neper.info
+        Neper is an open source program to generate polycristalline
+        microstructure using voronoi tesselations. It is available at
+        https://neper.info
 
-        :param str neper_file_path: the path to the tesselation file generated by Neper.
+        :param str neper_file_path: the path to the tesselation file generated
+        by Neper.
         :return: a pymicro `Microstructure` instance.
         """
         neper_file = neper_file_path.split(os.sep)[-1]
@@ -2593,7 +2623,8 @@ class Microstructure(SampleData):
             print('grain ids are:', grain_ids)
             oridescriptor = f.readline().strip()  # must be euler-bunge:passive
             if oridescriptor != 'euler-bunge:passive':
-                print('Wrong orientation descriptor: %s, must be euler-bunge:passive' % oridescriptor)
+                print('Wrong orientation descriptor: %s, must be '
+                      'euler-bunge:passive' % oridescriptor)
             grain = micro.grains.row
             for i in range(n):
                 euler_angles = np.array(f.readline().split()).astype(float).tolist()
@@ -2612,7 +2643,8 @@ class Microstructure(SampleData):
             data = np.fromfile(f, dtype=np.uint16)[:-4]  # leave out the last 4 values
             print(data.shape)
             assert np.prod(dims) == data.shape[0]
-            micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0), voxel_size=voxel_size[0])  # swap X/Z axes
+            micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0),
+                                voxel_size=voxel_size[0])  # swap X/Z axes
             micro.recompute_grain_centers()
             micro.recompute_grain_volumes()
         print('done')
@@ -2713,7 +2745,8 @@ class Microstructure(SampleData):
 
     @staticmethod
     def from_legacy_h5(file_path):
-        """read a microstructure object from a HDF5 file created by pymicro until version 0.4.5.
+        """read a microstructure object from a HDF5 file created by pymicro
+        until version 0.4.5.
 
         :param str file_path: the path to the file to read.
         :return: the new `Microstructure` instance created from the file.
@@ -2723,7 +2756,8 @@ class Microstructure(SampleData):
             if 'symmetry' in f['EnsembleData/CrystalStructure'].attrs:
                 sym = f['EnsembleData/CrystalStructure'].attrs['symmetry']
                 parameters = f['EnsembleData/CrystalStructure/LatticeParameters'][()]
-                micro.set_lattice(Lattice.from_symmetry(Symmetry.from_string(sym), parameters))
+                micro.set_lattice(Lattice.from_symmetry(Symmetry.from_string(sym),
+                                                        parameters))
             if 'data_dir' in f.attrs:
                 micro.data_dir = f.attrs['data_dir']
             # load feature data
@@ -2749,9 +2783,11 @@ class Microstructure(SampleData):
                 micro.grains.flush()
             # load cell data
             if 'grain_ids' in f['CellData']:
-                micro.set_grain_map(f['CellData/grain_ids'][()], f['CellData/grain_ids'].attrs['voxel_size'])
+                micro.set_grain_map(f['CellData/grain_ids'][()],
+                                    f['CellData/grain_ids'].attrs['voxel_size'])
             if 'mask' in f['CellData']:
-                micro.set_mask(f['CellData/mask'][()], f['CellData/mask'].attrs['voxel_size'])
+                micro.set_mask(f['CellData/mask'][()],
+                               f['CellData/mask'].attrs['voxel_size'])
             return micro
 
     @staticmethod
@@ -2901,7 +2937,8 @@ class Microstructure(SampleData):
         print('moving centroid: {}'.format(moving_centroid))
 
         for j in range(n_points):
-            moved[j] = fixed_centroid + np.dot(transformation, moving[j] - moving_centroid)
+            moved[j] = fixed_centroid + 
+                       np.dot(transformation, moving[j] - moving_centroid)
             print('point %d will move to (%6.3f, %6.3f, %6.3f) to be compared with (%6.3f, %6.3f, %6.3f)' % (
                 j, moved[j, 0], moved[j, 1], moved[j, 2], fixed[j, 0], fixed[j, 1], fixed[j, 2]))
         print('transformation is:')

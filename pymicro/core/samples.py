@@ -76,8 +76,9 @@ class SampleData:
         .. note:: additional keywords arguments can be passed to specify global
                 compression options, see :func:`set_chunkshape_and_compression`
         """
+
         # check if filename has a file extension
-        if (filename.rfind('.') != -1):
+        if filename.rfind('.') != -1:
             filename_tmp = filename[:filename.rfind('.')]
         else:
             filename_tmp = filename
@@ -118,7 +119,7 @@ class SampleData:
                             self.xdmf_file))
             os.remove(self.h5_file)
             os.remove(self.xdmf_file)
-            if (os.path.exists(self.h5_file) or os.path.exists(self.xdmf_file)):
+            if os.path.exists(self.h5_file) or os.path.exists(self.xdmf_file):
                 raise RuntimeError('HDF5 and XDMF not removed')
         return
 

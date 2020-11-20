@@ -15,6 +15,7 @@ Subpackages
 .. toctree::
 
    pymicro.apps
+   pymicro.core
    pymicro.crystal
    pymicro.file
    pymicro.math

@@ -1,36 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-    Demonstrator package :
-        aimed at exploring the development of a software platform to handle
-        multi-modal datasets describing mechanical test samples,
-        comprised of CAO, tomographic and simulated datasets.
+"""DataPlatform module for the management of multimodal mechanical datasets.
 
-        The package capabilities include:
-            - handling data storage and hierachy through the hdf5 file format
+The samples modules provides a base class `SampleData` implementing a generic
+data model and data paltform API, allowing to define by inheritance specific
+data platform classes for specific mechanical applications.
 
-            - enabling a easy visualisation with paraview through the xdmf file
-              format
-
-            - prodive an easy interface to import data into from other mesh
-              data file format (.vtk, .geof)
-
-            - provide an easy interface to produce input files for the
-              simulation softwares AMITEX_FFTP (.vtk files) and Zset
-              (.geof files)
-
-@author: amarano
+ * :py:class:`~pymicro.crystal.microstructure.SampleData`
 """
 # TODO : Update documentation !!!
-
 import os
-from lxml import etree
-from lxml.builder import ElementMaker
-
 import shutil
 import numpy as np
 import tables
-
+import lxml.builder
+from lxml import etree
 from pymicro.core.images import ImageReader
 from pymicro.core.meshes import MeshReader
 
@@ -39,84 +23,59 @@ FIELD_TYPE = {1: 'Scalar', 2: 'Vector', 3: 'Vector', 6: 'Tensor6', 9: 'Tensor'}
 CENTERS_XDMF = {'3DImage': 'Cell', 'Mesh': 'Node'}
 
 # usefull lists to parse keyword arguments
-compression_keys = ['complib', 'complevel', 'shuffle', 'bitshuffle', 'checksum',
-                    'least_significant_digit', 'default_compression']
+compression_keys = ['complib', 'complevel', 'shuffle', 'bitshuffle',
+                    'checksum', 'least_significant_digit',
+                    'default_compression']
 
 
 class SampleData:
-    """ Base class to store multi-modal data for a material sample
+    """Base class to store organized multi-modal data for a material sample.
 
-    Attributes:
-    -----------
+    SampleData is a high level API to add/modifiy/remove data into a HDF5 data
+    file accordingly to a user defined data model. SampleData instances are
+    designed to gather volumic data defined on 3D meshes/images, classical
+    data arrays and associated metadata.
 
-        - filename (str)
-                name of the file used to initiliaze class instance
-                (.h5 or .xdmf file)
+    The class ensure visualization of data by synchronizing a XDMF file with
+    the HDF5 datafile (readable by Paraview), end ensuring geometrical
+    consistency between different grids.
 
-        - h5_file (str)
-                name of .h5 file containing the heavy data associated
-                to the sample
+    - **Class Attributes**
 
-        - xdmf_file (str)
-                name of .xdmf file containing the light metadata
-                associated to the sample, and directly readable with
-                the Paraview visualization software
-
-        - h5_dataset (file object from PyTables package)
-                file object associated to the heavy data structure contained in
-                the h5_file
-
-        - xdmf_tree (ElemenTree object from lxml.etree package)
-                ElemenTree associated to the data nodes tree in the .xdmf file
-                describing the light metadata assocaited to the h5_dataset
-
-        - name (str)
-                Name of the sample
-
-        - description (str)
-                description of the sample. Use it to store in the data
-                structure significant mechanical information about the sample
+        :h5_file: name of HDF5 file containing dataset (`str`)
+        :xdmf_file: name of XDMF file associated with `h5_file` (`str`)
+        :autodelete: autodelete flag (`bool`)
+        :Filters: instance of :py:class:`tables.Filters` specifying
+            general compression options
+        :content_index: Dictionnary of data items (nodes/groups)
+            names and pathes in HDF5 dataset (`dic`)
+        :aliases: Dictionnary of list of aliases for each item in
+            content_index (`dic`)
 
     """
 
     # =========================================================================
     # SampleData magic methods
     # =========================================================================
-    def __init__(self,
-                 filename,
-                 sample_name='name_to_fill',
-                 sample_description="""  """,
-                 verbose=False,
-                 overwrite_hdf5=False,
-                 autodelete=False,
+    def __init__(self, filename, sample_name='', sample_description=' ',
+                 verbose=False, overwrite_hdf5=False, autodelete=False,
                  **keywords):
-        """ DataSample initialization
+        """Sample Data constructor.
 
-        Create an data structure instance for a sample associated to the data
-        file 'filename'.
+        :param filename: name of HDF5/XDMF files to create/read
+        :type filename: str
+        :param str sample_name: optional, name of the sample associated to data
+        :param str sample_description: optional, short description of
+             the mechanical sample (material, type of tests....)
+        :param bool verbose: optional (False), set verbosity flag
+        :param bool overwrite_hdf5: optional (False), set to `True` to
+            overwrite existing HDF5/XDMF couple of files
+        :param bool autodelete: optional (False), set to `True` to remove
+            HDF5/XDMF files when deleting SampleData instance
 
-            - if filename.h5 and filename.xdmf exist, the data structure is
-              read from these file and stored into the SampleData instance
-              unless the overwrite_hdf5 flag is True, in which case, the file is deleted.
-
-            - if the files do not exist, they are created and an empty
-              SampleData is instantiated.
-
-        Arguments:
-            - filename (str)
-                name of the .h5 or .xdmf file used to instantiate the class
-                (existent or non existent)
-
-            - sample_name (str)
-                name of the mechanical sample described by this class
-                instance
-
-            - sample_description (str)
-                description string for the mechanical sample. Use it to
-                write significant mechanical information about the sample
-
+        .. note:: additional keywords arguments can be passed to specify global
+                compression options, see :func:`set_chunkshape_and_compression`
         """
-
         # check if filename has a file extension
         if (filename.rfind('.') != -1):
             filename_tmp = filename[:filename.rfind('.')]
@@ -194,14 +153,14 @@ class SampleData:
             self.h5_dataset = tables.File(self.h5_file, mode='r+')
             self._verbose_print('-- Opening file "{}" '.format(self.h5_file),
                                 line_break=False)
-            self.file_exist = True
+            self._file_exist = True
             self._init_xml_tree()
             self.Filters = self.h5_dataset.filters
             self._init_data_model()
             self._verbose_print('**** FILE CONTENT ****')
             self._verbose_print(SampleData.__repr__(self))
         except IOError:
-            self.file_exist = False
+            self._file_exist = False
             self._verbose_print('-- File "{}" not found : file'
                                 ' created'.format(self.h5_file),
                                 line_break=True)
@@ -519,7 +478,7 @@ class SampleData:
                 empty = (mesh_object is None)
             elif (not(empty) and replace):
                 msg += ('--- It will be replaced by the new MeshObject content')
-                self.remove_node(node_path=mesh_path, recursive=True)
+                self.remove_node(name=mesh_path, recursive=True)
                 self._verbose_print(msg)
                 self._verbose_print('Creating hdf5 group {} in file {}'.format(
                                      mesh_path, self.h5_file))
@@ -1638,7 +1597,7 @@ class SampleData:
                                 line_break=False)
 
             # create root element of xdmf tree structure
-            E = ElementMaker(namespace="http://www.w3.org/2003/XInclude",
+            E = lxml.builder.ElementMaker(namespace="http://www.w3.org/2003/XInclude",
                              nsmap={'xi': "http://www.w3.org/2003/XInclude"})
             root = E.root()
             root.tag = 'Xdmf'
@@ -1668,7 +1627,7 @@ class SampleData:
         self.content_index = {}
         self.aliases = {}
 
-        if self.file_exist:
+        if self._file_exist:
             self.content_index = self.get_dic_from_attributes(
                                                     node_path='/Index')
             self.aliases = self.get_dic_from_attributes(

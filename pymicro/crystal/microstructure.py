@@ -1478,7 +1478,7 @@ class Microstructure(SampleData):
     def _init_lattice(self, lattice):
         if lattice is None:
             lattice = Lattice.cubic(1.0)
-        if not (self.file_exist):
+        if not (self._file_exist):
             self._lattice = lattice
             sym = {'symmetry': self._lattice.get_symmetry().to_string()}
             params = np.array(self.get_lattice().get_lattice_parameters(),

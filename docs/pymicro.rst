@@ -18,7 +18,5 @@ Subpackages
    pymicro.core
    pymicro.crystal
    pymicro.file
-   pymicro.math
    pymicro.view
    pymicro.xray
-

@@ -7,11 +7,18 @@ apps Package
    :undoc-members:
    :show-inheritance:
 
-:mod:`wxPlotPanel` Module
+:mod:`View` Module
 -------------------------
 
-.. automodule:: pymicro.apps.wxPlotPanel
+.. automodule:: pymicro.apps.View
    :members:
    :undoc-members:
    :show-inheritance:
 
+:mod:`ImageViewer` Module
+-------------------------
+
+.. automodule:: pymicro.apps.ImageViewer
+   :members:
+   :undoc-members:
+   :show-inheritance:

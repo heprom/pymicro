@@ -16,9 +16,12 @@ import mock
 
 MOCK_MODULES = ['numpy', 'scipy', 'scipy.special', 'matplotlib',
                 'matplotlib.pyplot', 'matplotlib.image', 'matplotlib.cm',
-                'matplotlib.colors', 'scipy.ndimage', 'wx', 'wx.Panel', 'vtk',
-                'vtk.util', 'vtk.util.colors', 'skimage', 'skimage.transform',
-                '_tifffile', 'h5py', 'tables']  # , 'ImPanel', 'PlotPanel']
+                'matplotlib.colors', 'matplotlib.figure',
+                'matplotlib.backend_bases',
+                'matplotlib.backends.backend_qt4agg', 'scipy.ndimage', 'wx',
+                'wx.Panel', 'vtk', 'vtk.util', 'vtk.util.colors', 'skimage',
+                'skimage.transform', '_tifffile', 'h5py', 'tables']
+# , 'ImPanel', 'PlotPanel']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 # If extensions (or modules to document with autodoc) are in another directory,

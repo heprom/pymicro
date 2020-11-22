@@ -2,37 +2,13 @@ crystal Package
 ===============
 
 .. automodule:: pymicro.crystal
-   :members:
-   :special-members: __init__
-   :undoc-members:
-   :show-inheritance:
 
-   .. autosummary::
-      :toctree:
+Subpackages
+-----------
 
-:mod:`lattice` Module
----------------------
+.. toctree::
 
-.. automodule:: pymicro.crystal.lattice
-   :members:
-   :special-members: __init__
-   :undoc-members:
-   :show-inheritance:
+   crystal/lattice
+   crystal/microstructure
+   crystal/texture
 
-:mod:`microstructure` Module
-----------------------------
-
-.. automodule:: pymicro.crystal.microstructure
-   :members:
-   :special-members: __init__
-   :undoc-members:
-   :show-inheritance:
-
-:mod:`texture` Module
----------------------
-
-.. automodule:: pymicro.crystal.texture
-   :members:
-   :special-members: __init__
-   :undoc-members:
-   :show-inheritance:

@@ -63,7 +63,7 @@ class PoleFigure:
 
     def get_orientations(self):
         """Get the list of orientations in the PoleFigure.
-        
+
         :return: a list of `Orientation` instances.
         """
         return [grain.orientation for grain in self.microstructure.grains]
@@ -172,8 +172,9 @@ class PoleFigure:
         '''Function to plot a crystal direction on a pole figure.
 
         :param c_dir: A vector describing the crystal direction.
-        :param dict kwargs: a dictionnary of keyword/values to control the plot, it should at least contain a reference
-        to a pyplot axes to draw the pole using keywors 'ax'.
+        :param dict kwargs: a dictionnary of keyword/values to control the
+            plot, it should at least contain a reference to a pyplot axes
+            to draw the pole using keywors 'ax'.
         :raise ValueError: if the projection type is not supported
         '''
         if c_dir[2] < 0:
@@ -423,17 +424,17 @@ class PoleFigure:
 
     def get_color_from_field(self, grain):
         """Get the color of the given grain according to the chosen field.
-        
-        This function will return the color associated with the given grain. Depending on how the pole figure has been 
+
+        This function will return the color associated with the given grain. Depending on how the pole figure has been
         configured (see the `set_map_field` function), it will be obtained from:
-         
+
          * the grain id, according to the `Microstructure.rand_cmap` function
          * ipf the colour will reflect the orientation according to the IPF scheme
          * the field value mapped on a pyplot color map if the lut field of the PoleFigure instance is a string.
-         * a color directly read from the lut field; in this case the field value must reflect the category of the given grain. 
-        
+         * a color directly read from the lut field; in this case the field value must reflect the category of the given grain.
+
         :param grain: the `Grain` instance.
-        :return: the color as a 3 element numpy array representing the rgb values. 
+        :return: the color as a 3 element numpy array representing the rgb values.
         """
         if self.map_field:
             if self.map_field == 'grain_id':
@@ -530,7 +531,7 @@ class PoleFigure:
 
     def plot_ipf_symmetry(self, ax):
         """ Plot the inverse pole figure elements of symmetry.
-        
+
         This assume the symmetry from the `Lattice` associated with the first pole.
         :param ax: a reference to a pyplot ax to draw the poles.
         """

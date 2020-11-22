@@ -15,6 +15,6 @@ core Package
 
 .. automodule:: pymicro.core.samples
    :members:
-   :special-members: __init__
+   :special-members:
    :undoc-members:
    :show-inheritance:

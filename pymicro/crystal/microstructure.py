@@ -1432,12 +1432,12 @@ class Microstructure(SampleData):
         s += SampleData.__repr__(self)
         return s
 
-    def _minimal_data_model(self):
+    def minimal_data_model(self):
         """Data model for a polycrystalline microstructure.
 
         Specify the minimal contents of the hdf5 (Group names, paths and group
         types) in the form of a dictionary {content: location}. This extends
-        `~pymicro.core.SampleData._minimal_data_model` method.
+        `~pymicro.core.SampleData.minimal_data_model` method.
 
         :return: a tuple containing the two dictionnaries.
         """
@@ -2937,7 +2937,7 @@ class Microstructure(SampleData):
         print('moving centroid: {}'.format(moving_centroid))
 
         for j in range(n_points):
-            moved[j] = fixed_centroid + 
+            moved[j] = fixed_centroid +
                        np.dot(transformation, moving[j] - moving_centroid)
             print('point %d will move to (%6.3f, %6.3f, %6.3f) to be compared with (%6.3f, %6.3f, %6.3f)' % (
                 j, moved[j, 0], moved[j, 1], moved[j, 2], fixed[j, 0], fixed[j, 1], fixed[j, 2]))

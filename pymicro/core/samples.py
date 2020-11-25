@@ -195,9 +195,9 @@ class SampleData:
         | - the :py:class:`Test_DerivedClass` used in the `samples` module
     """
 
-    def __init__(self, filename, sample_name='', sample_description=' ',
-                 verbose=False, overwrite_hdf5=False, autodelete=False,
-                 **keywords):
+    def __init__(self, filename='sample_data', sample_name='',
+                 sample_description=' ', verbose=False, overwrite_hdf5=False,
+                 autodelete=False, **keywords):
         """Sample Data constructor."""
         # check if filename has a file extension
         if filename.rfind('.') != -1:
@@ -758,7 +758,6 @@ class SampleData:
             elif (not(empty) and replace):
                 msg += ('--- It will be replaced by the new ImageObject'
                         ' content')
-                # self.remove_node(node_path=image_path, recursive=True)
                 self.remove_node(name=imagename, recursive=True)
                 self._verbose_print(msg)
                 self._verbose_print('Creating hdf5 group {} in file {}'.format(
@@ -1458,7 +1457,7 @@ class SampleData:
 
     def get_sample_name(self):
         """Return the sample name."""
-        return self.get_attribute(attrname='sample_name', node_name='/')
+        return self.get_attribute(attrname='sample_name', nodename='/')
 
     def set_sample_name(self, sample_name):
         """Set the sample name.
@@ -1467,14 +1466,14 @@ class SampleData:
         """
         self.add_attributes({'sample_name': sample_name}, '/')
 
-    def get_description(self, node_name='/'):
+    def get_description(self, nodename='/'):
         """Get the string describing this node.
 
         By defaut the sample description is returned, from the root HDF5 Group.
 
-        :param str node_name: the path or name of the node of interest.
+        :param str nodename: the path or name of the node of interest.
         """
-        return self.get_attribute(attrname='description', node_name='/')
+        return self.get_attribute(attrname='description', nodename='/')
 
     def set_description(self, description, node='/'):
         """Set the description of a node.
@@ -1647,7 +1646,7 @@ class SampleData:
                    ' settings for a non array node')
             raise tables.NodeError(msg)
         node_tmp = self.get_node(node)
-        node_name = node_tmp._v_name
+        nodename = node_tmp._v_name
         node_indexname = self.get_indexname_from_path(node_tmp._v_pathname)
         node_path = os.path.dirname(node_tmp._v_pathname)
         node_chunkshape = node_tmp.chunkshape
@@ -1664,14 +1663,14 @@ class SampleData:
         array = node_tmp.read()
         if self._is_table(node):
             description = node_tmp.description
-            new_array = self.add_table(location=node_path, name=node_name,
+            new_array = self.add_table(location=node_path, name=nodename,
                                        description=description,
                                        indexname=node_indexname,
                                        chunkshape=node_chunkshape,
                                        replace=True, data=array,
                                        filters=node_filters, **keywords)
         else:
-            new_array = self.add_data_array(location=node_path, name=node_name,
+            new_array = self.add_data_array(location=node_path, name=nodename,
                                             indexname=node_indexname,
                                             array=array, filters=node_filters,
                                             chunkshape=node_chunkshape,
@@ -1966,14 +1965,14 @@ class SampleData:
 
         if self._file_exist:
             self.content_index = self.get_dic_from_attributes(
-                                                    node_path='/Index')
+                                                    nodename='/Index')
             self.aliases = self.get_dic_from_attributes(
-                                                    node_path='/Index/Aliases')
+                                                    nodename='/Index/Aliases')
         else:
             self.h5_dataset.create_group('/', name='Index')
             self.add_attributes(dic=self.minimal_content, nodename='/Index')
             self.content_index = self.get_dic_from_attributes(
-                    node_path='/Index')
+                    nodename='/Index')
             self.h5_dataset.create_group('/Index', name='Aliases')
         return
 
@@ -2212,8 +2211,8 @@ class SampleData:
         Grid_name = self._get_parent_name(name)
         attribute_center = CENTERS_XDMF[Grid_type]
         xdmf_path = self.get_attribute(attrname='xdmf_path',
-                                       node_name=Grid_name)
-        field_type = self.get_attribute(attrname='field_type', node_name=name)
+                                       nodename=Grid_name)
+        field_type = self.get_attribute(attrname='field_type', nodename=name)
         Xdmf_grid_node = self.xdmf_tree.find(xdmf_path)
 
         # create Attribute element
@@ -2287,7 +2286,7 @@ class SampleData:
 
     def _get_node_class(self, name):
         """Return Pytables Class type associated to the node name."""
-        return self.get_attribute(attrname='CLASS', node_name=name)
+        return self.get_attribute(attrname='CLASS', nodename=name)
 
     def _get_path_with_indexname(self, indexname):
         if indexname in self.content_index.keys():
@@ -2306,7 +2305,7 @@ class SampleData:
             return 'GROUP'
         if self._is_group(groupname):
             grouptype = self.get_attribute(attrname='group_type',
-                                           node_name=groupname)
+                                           nodename=groupname)
             if grouptype is None:
                 return 'GROUP'
             else:
@@ -2376,14 +2375,25 @@ class SampleData:
 
     def _get_compression_opt(self, **keywords):
         """Get inputed compression settings as `tables.Filters` instance."""
+        # get pre-defined compression settings
+        default_cp = False
+        global_cp = False
         if 'default' in keywords:
-            if keywords['default']:
-                Filters = self.set_default_compression()
-            else:
-                Filters = self.Filters
+            default_cp = keywords['default']
         else:
+            # use global Filters as base settings if defined
+            if hasattr(self, 'Filters'):
+                global_cp = True
+        # Apply pre-defined compression settings)
+        if default_cp:
+            Filters = self.set_default_compression()
+        elif global_cp:
             Filters = self.Filters
+        else:
+            Filters = tables.Filters()
         # ------ read specified values of compression options
+        #  These are prioritised over pre-defined settings when both are
+        #  specified
         for word in keywords:
             if (word == 'complib'):
                 Filters.complib = keywords[word]

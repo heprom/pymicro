@@ -1590,7 +1590,7 @@ class Microstructure(SampleData):
         """
         try:
             return self.get_attribute(attrname='spacing',
-                                      node_name='/CellData')[0]
+                                      nodename='/CellData')[0]
         except:
             return None
 
@@ -1702,7 +1702,7 @@ class Microstructure(SampleData):
         create_image = True
         print('VOXELSIZE', voxel_size)
         if self.__contains__('CellData'):
-            empty = self.get_attribute(attrname='empty', node_name='CellData')
+            empty = self.get_attribute(attrname='empty', nodename='CellData')
             if not empty:
                 create_image = False
         if create_image:
@@ -1737,7 +1737,7 @@ class Microstructure(SampleData):
         """
         create_image = True
         if self.__contains__('CellData'):
-            empty = self.get_attribute(attrname='empty', node_name='CellData')
+            empty = self.get_attribute(attrname='empty', nodename='CellData')
             if not (empty):
                 create_image = False
         if create_image:

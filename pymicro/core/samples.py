@@ -1904,6 +1904,8 @@ class SampleData:
             head, tail = os.path.split(value)
             if self.h5_dataset.__contains__(content_paths[key]):
                 if self._is_table(content_paths[key]):
+                    msg = ('Updating table {}'.format(content_paths[key]))
+                    self._verbose_print(msg)
                     self._update_table_columns(tablename=content_paths[key],
                                                Description=content_type[key])
                 if self._is_empty(content_paths[key]):
@@ -1912,19 +1914,24 @@ class SampleData:
                                         'is empty'.format(content_paths[key]))
                 continue
             elif content_type[key] == 'Group':
+                msg = ('Adding empty Group {}'.format(content_paths[key]))
                 self.add_group(path=head, groupname=tail, indexname=key,
                                replace=False, createparents=True)
             elif content_type[key] == '3DImage':
+                msg = ('Adding empty 3DImage  {}'.format(content_paths[key]))
                 self.add_image(imagename=tail, indexname=key, location=head)
             elif content_type[key] == 'Mesh':
+                msg = ('Adding empty Mesh  {}'.format(content_paths[key]))
                 self.add_mesh(meshname=tail, indexname=key, location=head)
             elif content_type[key] == 'Array':
+                msg = ('Adding empty Array  {}'.format(content_paths[key]))
                 empty_array = np.array([0])
                 self.add_data_array(location=head, name=tail,
                                     array=empty_array, empty=True,
                                     indexname=key)
             elif (isinstance(content_type[key], tables.IsDescription)
                   or issubclass(content_type[key], tables.IsDescription)):
+                msg = ('Adding empty Table  {}'.format(content_paths[key]))
                 self.add_table(location=head, name=tail, indexname=key,
                                description=content_type[key])
         self._verbose_print('Minimal data model initialization done\n')

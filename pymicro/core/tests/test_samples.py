@@ -21,7 +21,7 @@ class Test_DerivedClass(SampleData):
     """ Class to test the datamodel specification mechanism, via definition
         of classes derived from SampleData
     """
-    def _minimal_data_model(self):
+    def minimal_data_model(self):
         """
             Specify the minimal contents of the hdf5 (Group names, paths,, and
             group types) in the form of a dictionary {content:Location}
@@ -173,7 +173,8 @@ class SampleDataTests(unittest.TestCase):
             derived classes
         """
         derived_sample = Test_DerivedClass(filename=self.derived_filename,
-                                           autodelete=True, overwrite_hdf5=True)
+                                           autodelete=True, overwrite_hdf5=True,
+                                           verbose=True)
         # assert data model Nodes are contained in dataset
         self.assertTrue(derived_sample.__contains__('Image_data'))
         self.assertTrue(derived_sample.__contains__('grain_map'))

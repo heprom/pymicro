@@ -404,6 +404,7 @@ class Experiment:
                 grain.append()
             micro.grains.flush()
             sample.set_microstructure(micro)
+            sample.microstructure.autodelete = True
         # lazy behaviour, we load only the grain_ids path, the actual array is loaded in memory if needed
         sample.grain_ids_path = dict_exp['Sample']['Grain Ids Path']
         exp = Experiment()

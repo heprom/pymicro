@@ -17,6 +17,7 @@ class ExperimentTests(unittest.TestCase):
         self.assertEqual(self.experiment.get_number_of_detectors(), 0)
         self.experiment.add_detector(detector)
         self.assertEqual(self.experiment.get_number_of_detectors(), 1)
+        self.assertTrue(self.experiment.sample.microstructure.autodelete)
         del self.experiment
 
     def test_save(self):
@@ -38,4 +39,3 @@ class ExperimentTests(unittest.TestCase):
         exp = Experiment.load('experiment.txt')
         self.assertTrue(exp.get_source().max_energy == 120.)
         del self.experiment
-

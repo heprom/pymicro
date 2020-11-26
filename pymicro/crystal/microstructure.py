@@ -2733,14 +2733,22 @@ class Microstructure(SampleData):
         if os.path.exists(mask_path):
             try:
                 with h5py.File(mask_path, 'r') as f:
-                    micro.set_mask(f['vol'][()].transpose(2, 1, 0).astype(
-                        np.uint8), voxel_size)
+                    mask = f['vol'][()].transpose(2, 1, 0).astype(np.uint8)
+                    # check if mask shape needs to be zero padded
+                    if not mask.shape == micro.get_grain_map(as_numpy=True).shape:
+                        offset = np.array(micro.get_grain_map(
+                            as_numpy=True).shape) - np.array(mask.shape)
+                        padding = [(o // 2, o // 2) for o in offset]
+                        print('mask padding is {}'.format(padding))
+                        mask = np.pad(mask, padding, mode='constant')
+                    print('now mask shape is {}'.format(mask.shape))
+                    micro.set_mask(mask, voxel_size)
             except:
                 # fallback on matlab format
                 micro.set_mask(loadmat(mask_path)['vol'], voxel_size)
             if verbose:
                 print('loaded mask volume with shape: {}'
-                      ''.format(micro.mask.shape))
+                      ''.format(micro.get_mask(as_numpy=True).shape))
         return micro
 
     @staticmethod

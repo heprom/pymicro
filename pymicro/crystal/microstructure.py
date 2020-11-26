@@ -2532,7 +2532,7 @@ class Microstructure(SampleData):
         """
         # TODO: test
         head, tail = os.path.split(file_path)
-        micro = Microstructure(name=tail, file_path=head)
+        micro = Microstructure(name=tail, file_path=head, overwrite_hdf5=True)
         with h5py.File(file_path, 'r') as f:
             grain_data_path = '%s/%s/%s' % (main_key, data_container, grain_data)
             orientations = f[grain_data_path][grain_orientations].value
@@ -2590,7 +2590,7 @@ class Microstructure(SampleData):
         name, ext = os.path.splitext(neper_file)
         print(name, ext)
         assert ext == '.tesr'  # assuming raster tesselation
-        micro = Microstructure(name=name, file_path=neper_dir)
+        micro = Microstructure(name=name, file_path=neper_dir, overwrite_hdf5=True)
         with open(neper_file_path, 'r', encoding='latin-1') as f:
             line = f.readline()  # ***tesr
             # look for **general
@@ -2679,7 +2679,7 @@ class Microstructure(SampleData):
             data_dir = data_dir[:-1]
         scan = data_dir.split(os.sep)[-1]
         print('creating microstructure for DCT scan %s' % scan)
-        micro = Microstructure(name=scan, path=data_dir)
+        micro = Microstructure(name=scan, path=data_dir, overwrite_hdf5=True)
         micro.data_dir = data_dir
         if use_dct_path:
             index_path = os.path.join(data_dir, '4_grains', 'phase_01',
@@ -2760,7 +2760,8 @@ class Microstructure(SampleData):
         :return: the new `Microstructure` instance created from the file.
         """
         with h5py.File(file_path, 'r') as f:
-            micro = Microstructure(name=f.attrs['microstructure_name'])
+            micro = Microstructure(name=f.attrs['microstructure_name'],
+                                   overwrite_hdf5=True)
             if 'symmetry' in f['EnsembleData/CrystalStructure'].attrs:
                 sym = f['EnsembleData/CrystalStructure'].attrs['symmetry']
                 parameters = f['EnsembleData/CrystalStructure/LatticeParameters'][()]

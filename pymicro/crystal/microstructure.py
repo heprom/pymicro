@@ -2805,6 +2805,68 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
+    def from_ebsd(file_path, roi=None):
+        """"Create a microstructure from an EBSD scan.
+
+        :param str file_path: the path to the file to read.
+        :param list roi: a list of 4 integers to crop the EBSD scan.
+        :return: a new instance of `Microstructure`.
+        """
+        name = os.path.splitext(os.path.basename(file_path))[0]
+        micro = Microstructure(name=name, autodelete=False, overwrite_hdf5=True)
+        from pymicro.crystal.ebsd import OimScan
+        scan = OimScan.from_file(file_path)
+        if roi:
+            print('importing data from region {}'.format(roi))
+            scan.cols = roi[1] - roi[0]
+            scan.rows = roi[3] - roi[2]
+            scan.iq = scan.iq[roi[0]:roi[1], roi[2]:roi[3]]
+            scan.ci = scan.ci[roi[0]:roi[1], roi[2]:roi[3]]
+            scan.euler = scan.euler[roi[0]:roi[1], roi[2]:roi[3], :]
+        iq = scan.iq
+        ci = scan.ci
+        euler = scan.euler
+        mask = np.ones_like(iq)
+        # segment the grains
+        grain_ids = scan.segment_grains()
+        micro.set_grain_map(grain_ids, scan.xStep)
+
+        # add each array to the data file
+        mask_array = np.reshape(mask, (mask.shape[0], mask.shape[1], 1))
+        iq_array = np.reshape(iq, (iq.shape[0], iq.shape[1], 1))
+        ci_array = np.reshape(ci, (ci.shape[0], ci.shape[1], 1))
+        micro.add_data_array(location='CellData', name='mask', array=mask_array, replace=True)
+        micro.add_data_array(location='CellData', name='iq', array=iq_array, replace=True)
+        micro.add_data_array(location='CellData', name='ci', array=ci_array, replace=True)
+        from pymicro.core.images import ImageObject
+        image_euler = ImageObject()
+        image_euler.dimension = euler.shape
+        image_euler.spacing = np.array([scan.xStep, scan.xStep, scan.xStep])
+        image_euler.add_field(euler, 'euler')
+        micro.add_image(image_euler, imagename='OrientationData', location='/', replace=True)
+
+
+        grains = micro.grains.row
+        for gid in np.unique(grain_ids):
+            if gid == 0:
+                continue
+            print('adding grain %d' % gid)
+            # use the first pixel of the grain
+            pixel = np.where(grain_ids == gid)[0][0], np.where(grain_ids == gid)[1][0]
+            # TODO compute mean grain orientation
+            o_tsl = Orientation.from_euler(np.degrees(micro.get_node('euler')[pixel]))
+            # TODO link OimScan lattice to pymicro
+            # o_fz = o_tsl.move_to_FZ(symmetry=Ti7Al._symmetry)
+            grains['idnumber'] = gid
+            grains['orientation'] = o_tsl.rod
+            grains.append()
+        micro.grains.flush()
+        micro.recompute_grain_centers(verbose=False)
+        micro.recompute_grain_volumes(verbose=False)
+        micro.sync()
+        return micro
+
+    @staticmethod
     def merge_microstructures(micros, overlap, plot=False):
         """Merge two `Microstructure` instances together.
 

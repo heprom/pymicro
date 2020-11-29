@@ -780,25 +780,29 @@ class SlipSystem:
         return SlipSystem(plane, direction)
 
     @staticmethod
-    def get_slip_systems(plane_type='111'):
-        '''A static method to get all slip systems for a given hkl plane family.
+    def get_slip_systems(slip_type='oct', lattice=None):
+        """A static method to get all slip systems for a given hkl plane family.
 
-        :params str plane_type: a string of the 3 miller indices of the crystallographic plane family.
-        :returns list: a list of :py:class:`~pymicro.crystal.lattice.SlipSystem`.
+        A string is used to describe the slip system type:
+         * cube or 001, for [110] slip in (001) planes
+         * oct or 111 for [110] slip in (111) planes
+         * 112 for [111] slip in (112) planes
+         * basal for [11-20] slip in (0001) planes (hexagonal)
+         * prism for [11-20] slip in (1-100) planes (hexagonal)
 
-        .. warning::
+        :param str slip_type: a string describing the slip system type.
+        :return list: a list of :py:class:`~pymicro.crystal.lattice.SlipSystem`.
 
-          only working for 111 and 112 planes...
-        '''
+        """
         slip_systems = []
-        if plane_type == '001':
-            slip_systems.append(SlipSystem(HklPlane(0, 0, 1), HklDirection(-1, 1, 0)))  # E5
+        if slip_type in ['cube', '001']:
+            slip_systems.append(SlipSystem.from_indices((0, 0, 1), (-1, 1, 0), lattice))  # E5
             slip_systems.append(SlipSystem(HklPlane(0, 0, 1), HklDirection(1, 1, 0)))  # E6
             slip_systems.append(SlipSystem(HklPlane(1, 0, 0), HklDirection(0, 1, 1)))  # F1
             slip_systems.append(SlipSystem(HklPlane(1, 0, 0), HklDirection(0, -1, 1)))  # F2
             slip_systems.append(SlipSystem(HklPlane(0, 1, 0), HklDirection(-1, 0, 1)))  # G4
             slip_systems.append(SlipSystem(HklPlane(0, 1, 0), HklDirection(1, 0, 1)))  # G3
-        elif plane_type == '111':
+        elif slip_type in ['oct', '111']:
             slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(-1, 0, 1)))  # Bd
             slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(0, -1, 1)))  # Ba
             slip_systems.append(SlipSystem(HklPlane(1, 1, 1), HklDirection(-1, 1, 0)))  # Bc
@@ -811,7 +815,7 @@ class SlipSystem:
             slip_systems.append(SlipSystem(HklPlane(1, 1, -1), HklDirection(-1, 1, 0)))  # Cb
             slip_systems.append(SlipSystem(HklPlane(1, 1, -1), HklDirection(1, 0, 1)))  # Ca
             slip_systems.append(SlipSystem(HklPlane(1, 1, -1), HklDirection(0, 1, 1)))  # Cd
-        elif plane_type == '112':
+        elif slip_type == '112':
             slip_systems.append(SlipSystem(HklPlane(1, 1, 2), HklDirection(1, 1, -1)))
             slip_systems.append(SlipSystem(HklPlane(-1, 1, 2), HklDirection(1, -1, 1)))
             slip_systems.append(SlipSystem(HklPlane(1, -1, 2), HklDirection(-1, 1, 1)))
@@ -824,8 +828,24 @@ class SlipSystem:
             slip_systems.append(SlipSystem(HklPlane(-2, 1, 1), HklDirection(1, 1, 1)))
             slip_systems.append(SlipSystem(HklPlane(2, -1, 1), HklDirection(1, 1, -1)))
             slip_systems.append(SlipSystem(HklPlane(2, 1, -1), HklDirection(1, -1, 1)))
+        elif slip_type == 'basal':
+            p_basal = HklPlane(0, 0, 1, lattice)  # basal plane
+            # basal slip systems
+            bss1 = SlipSystem(p_basal, HklDirection(*HklDirection.four_to_three_indices(2, -1, -1, 0), lattice))
+            bss2 = SlipSystem(p_basal, HklDirection(*HklDirection.four_to_three_indices(-1, 2, -1, 0), lattice))
+            bss3 = SlipSystem(p_basal, HklDirection(*HklDirection.four_to_three_indices(-1, -1, 2, 0), lattice))
+            slip_systems = [bss1, bss2, bss3]
+        elif slip_type == 'prism':
+            p_prism1 = HklPlane(0, 1, 0, lattice)
+            p_prism2 = HklPlane(-1, 0, 0, lattice)
+            p_prism3 = HklPlane(-1, 1, 0, lattice)
+            # prismatic slip systems
+            pss1 = SlipSystem(p_prism1, HklDirection(*HklDirection.four_to_three_indices(2, -1, -1, 0), lattice))
+            pss2 = SlipSystem(p_prism2, HklDirection(*HklDirection.four_to_three_indices(-1, 2, -1, 0), lattice))
+            pss3 = SlipSystem(p_prism3, HklDirection(*HklDirection.four_to_three_indices(-1, -1, 2, 0), lattice))
+            slip_systems = [pss1, pss2, pss3]
         else:
-            print('warning only 001, 111 or 112 slip planes supported for the moment!')
+            print('unsupported slip system type: %s, try one of (cube, oct, 112, basal, prism)' % slip_type)
         return slip_systems
 
 

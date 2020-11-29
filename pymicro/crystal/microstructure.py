@@ -1509,12 +1509,19 @@ class Microstructure(SampleData):
         grain_map = self.get_node(name='grain_map', as_numpy=as_numpy)
         if self._is_empty('grain_map'):
             grain_map = None
+        elif grain_map.ndim == 2:
+            # reshape to 3D
+            grain_map = grain_map.reshape((grain_map.shape[0],
+                                           grain_map.shape[1], 1))
         return grain_map
 
     def get_mask(self, as_numpy=False):
         mask = self.get_node(name='mask', as_numpy=as_numpy)
         if self._is_empty('mask'):
             mask = None
+        elif mask.ndim == 2:
+            # reshape to 3D
+            mask = mask.reshape((mask.shape[0], mask.shape[1], 1))
         return mask
 
     def get_ids_from_grain_map(self):
@@ -2237,9 +2244,9 @@ class Microstructure(SampleData):
         :param bool verbose: flag for verbose mode.
         :return: a 1D array with all grain volumes.
         """
-        if not (self._is_empty('grain_map')):
-            print('warning: need a grain map to recompute the volumes '
-                  ' of the grains')
+        if self._is_empty('grain_map'):
+            print('warning: needs a grain map to recompute the volumes '
+                  'of the grains')
             return
         for g in self.grains:
             try:
@@ -2271,7 +2278,7 @@ class Microstructure(SampleData):
         :param bool verbose: flag for verbose mode.
         :return: a 1D array with all grain centers.
         """
-        if not (self._is_empty('grain_map')):
+        if self._is_empty('grain_map'):
             print('warning: need a grain map to recompute the center of mass'
                   ' of the grains')
             return
@@ -2303,7 +2310,7 @@ class Microstructure(SampleData):
 
         :param bool verbose: flag for verbose mode.
         """
-        if not (self.__contains__('grain_map')):
+        if self.__contains__('grain_map'):
             print('warning: need a grain map to recompute the bounding boxes'
                   ' of the grains')
             return
@@ -2735,9 +2742,8 @@ class Microstructure(SampleData):
                 with h5py.File(mask_path, 'r') as f:
                     mask = f['vol'][()].transpose(2, 1, 0).astype(np.uint8)
                     # check if mask shape needs to be zero padded
-                    if not mask.shape == micro.get_grain_map(as_numpy=True).shape:
-                        offset = np.array(micro.get_grain_map(
-                            as_numpy=True).shape) - np.array(mask.shape)
+                    if not mask.shape == micro.get_grain_map().shape:
+                        offset = np.array(micro.get_grain_map().shape) - np.array(mask.shape)
                         padding = [(o // 2, o // 2) for o in offset]
                         print('mask padding is {}'.format(padding))
                         mask = np.pad(mask, padding, mode='constant')
@@ -2747,8 +2753,7 @@ class Microstructure(SampleData):
                 # fallback on matlab format
                 micro.set_mask(loadmat(mask_path)['vol'], voxel_size)
             if verbose:
-                print('loaded mask volume with shape: {}'
-                      ''.format(micro.get_mask(as_numpy=True).shape))
+                print('loaded mask volume with shape: {}'.format(micro.get_mask().shape))
         return micro
 
     @staticmethod

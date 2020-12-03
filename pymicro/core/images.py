@@ -17,7 +17,7 @@ import h5py as h5
 # =============================================================================
 
 class ImageObject():
-    """ Base class to store 3D image data
+    """ Base class to store image data
 
         Attributes:
             - dimension [Nx,Ny,Nz] int64
@@ -88,16 +88,11 @@ class ImageObject():
             Fields are added to the mesh object as a dict :
                 field_name:field_values
         """
-
         # verify that number of field nodes and self.nodes are coherent
-        if (len(Field.shape) == 2) and (len(self.dimension) == 2):
-            new_shape = (Field.shape[0], Field.shape[1], 1)
-            Field = Field.reshape(new_shape)
-            self.dimension = new_shape
-        if (Field.shape != self.dimension):
-            raise ValueError(''' The array given for the field shape is {}
-                               which does not match ImageObject dimension : {}
-                             '''.format(Field.shape, self.dimension))
+        # if (Field.shape != self.dimension):
+        #     raise ValueError(''' The array given for the field shape is {}
+        #                        which does not match ImageObject dimension : {}
+        #                      '''.format(Field.shape, self.dimension))
         self.fields[Field_name] = Field
         return
 

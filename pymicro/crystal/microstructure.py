@@ -2310,21 +2310,21 @@ class Microstructure(SampleData):
 
         :param bool verbose: flag for verbose mode.
         """
-        if self.__contains__('grain_map'):
+        if self._is_empty('grain_map'):
             print('warning: need a grain map to recompute the bounding boxes'
                   ' of the grains')
             return
         for g in self.grains:
             try:
-                Bbox = self.compute_grain_bounding_box(g['idnumber'])
+                bbox = self.compute_grain_bounding_box(g['idnumber'])
             except ValueError:
                 print('skipping grain %d' % g['idnumber'])
                 continue
             if verbose:
                 print('grain %d bounding box: [%d:%d, %d:%d, %d:%d]'
-                      % (g['idnumber'], Bbox[0][0], Bbox[0][1], Bbox[1][0],
-                         Bbox[1][1], Bbox[2][0], Bbox[2][1]))
-            g['bounding_box'] = Bbox
+                      % (g['idnumber'], bbox[0][0], bbox[0][1], bbox[1][0],
+                         bbox[1][1], bbox[2][0], bbox[2][1]))
+            g['bounding_box'] = bbox
             g.update()
         self.grains.flush()
         return self.get_grain_bounding_boxes()
@@ -2350,7 +2350,8 @@ class Microstructure(SampleData):
         self.grains.flush()
         return
 
-    def to_amitex_fftp(self, binary=True):
+    def to_amitex_fftp(self, binary=True,
+                       add_buffer_layer=False, buffer_size=10):
         """Write orientation data to ascii files to prepare for FFT computation.
 
         AMITEX_FFTP can be used to compute the elastoplastic response of
@@ -2419,6 +2420,11 @@ class Microstructure(SampleData):
             # convert the grain map to vtk file
             from vtk.util import numpy_support
             grain_map = self.get_grain_map(as_numpy=True)
+            if add_buffer_layer:
+                # add a layer of zeros around the first two dimensions
+                grain_map = np.pad(grain_map, ((buffer_size, buffer_size),
+                                               (buffer_size, buffer_size),
+                                               (0, 0)))
             voxel_size = self.get_voxel_size()
             vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(grain_map,
                                                                  order='F'),
@@ -2436,6 +2442,29 @@ class Microstructure(SampleData):
             writer.SetInputData(grid)
             writer.Write()
             print('grain map written in legacy vtk form for AMITEX_FFTP')
+            if 0 in grain_map:
+                print('also writting a material ids files as the grain map '
+                      'contains label 0')
+                # also write a material ids file in VTK format
+                material_ids = grain_map.copy()
+                material_ids[material_ids > 1] = 1
+                print(material_ids.max())
+                vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(material_ids,
+                                                                     order='F'),
+                                                            deep=1)
+                vtk_data_array.SetName('MaterialIds')
+                grid = vtk.vtkImageData()
+                size = material_ids.shape
+                grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
+                grid.GetCellData().SetScalars(vtk_data_array)
+                grid.SetSpacing(voxel_size, voxel_size, voxel_size)
+                writer = vtk.vtkStructuredPointsWriter()
+                writer.SetFileName('%s_matids.vtk' % self.get_sample_name())
+                if binary:
+                    writer.SetFileTypeToBinary()
+                writer.SetInputData(grid)
+                writer.Write()
+                print('material ids file written in legacy vtk form for AMITEX_FFTP')
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """

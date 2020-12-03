@@ -609,6 +609,11 @@ class SampleData:
         """
         # TODO: Update mesh data models and add_mesh method accordingly
         # TODO: externalize in private methods XDMF construction
+        mesh_group = self.add_group(meshname, location, indexname, replace)
+        if (mesh_object is None):
+            self.add_attributes({'empty': True, 'group_type': 'Mesh'},
+                                mesh_group._v_pathname)
+            return
         # safety check
         if (len(mesh_object.element_topology) > 1):
             msg = ('number of element type found : {} \n add_mesh_from_file'
@@ -617,11 +622,6 @@ class SampleData:
             raise ValueError(msg)
         if (indexname == ''):
             indexname = meshname
-        mesh_group = self._init_SD_group(meshname, location, replace=replace)
-        if (mesh_object is None):
-            self.add_attributes({'empty': True, 'group_type': 'Mesh'},
-                                mesh_group._v_pathname)
-            return
         # store mesh metadata as HDF5 attributes
         Attribute_dic = {'element_topology': mesh_object.element_topology[0],
                          'description': description,
@@ -738,8 +738,6 @@ class SampleData:
         :param bool replace: remove Image group in the dataset with the same
             name/location if `True` and such group exists
         """
-        ### Check image dimension
-        image_type = self._get_image_type(image_object,imagename)
         ### Create or fetch image group
         image_group = self.add_group(imagename, location, indexname, replace)
         ### empty images creation
@@ -748,6 +746,8 @@ class SampleData:
             self.add_attributes({'empty': True, 'group_type': '3DImage'},
                                 image_group._v_pathname)
             return
+        ### Check image dimension
+        image_type = self._get_image_type(image_object,imagename)
         ### Add image Grid to xdmf file
         Xdmf_pathes = self._add_image_to_xdmf(imagename, image_object,
                                               image_type)
@@ -1756,8 +1756,8 @@ class SampleData:
                 continue
             elif content_type[key] == 'Group':
                 msg = ('Adding empty Group {}'.format(content_paths[key]))
-                self.add_group(path=head, groupname=tail, indexname=key,
-                               replace=False, createparents=True)
+                self.add_group(groupname=tail, location=head, indexname=key,
+                               replace=False)
             elif content_type[key] == '3DImage':
                 msg = ('Adding empty 3DImage  {}'.format(content_paths[key]))
                 self.add_image(imagename=tail, indexname=key, location=head)

@@ -105,7 +105,7 @@ class SampleDataTests(unittest.TestCase):
         sample.add_image(image,imagename='test_image',indexname='image',
                          location='/')
         # Add new group and array to SampleData dataset
-        sample.add_group(path='/',groupname='test_group',indexname='group')
+        sample.add_group(groupname='test_group',location='/',indexname='group')
         sample.add_data_array(location='group', name='test_array',
                               array=self.data_array, indexname='array')
         # close sample data instance

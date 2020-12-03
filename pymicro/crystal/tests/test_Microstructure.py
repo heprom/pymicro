@@ -142,7 +142,7 @@ class OrientationTests(unittest.TestCase):
 
     def test_MaxSchimdFactor(self):
         o = Orientation.from_euler([0., 0., 0.])
-        oct_ss = SlipSystem.get_slip_systems(plane_type='111')
+        oct_ss = SlipSystem.get_slip_systems(slip_type='111')
         self.assertAlmostEqual(max(o.compute_all_schmid_factors(oct_ss, verbose=True)), 0.4082, 4)
 
     def test_misorientation_matrix(self):

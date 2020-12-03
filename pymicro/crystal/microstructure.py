@@ -2310,21 +2310,21 @@ class Microstructure(SampleData):
 
         :param bool verbose: flag for verbose mode.
         """
-        if self.__contains__('grain_map'):
+        if self._is_empty('grain_map'):
             print('warning: need a grain map to recompute the bounding boxes'
                   ' of the grains')
             return
         for g in self.grains:
             try:
-                Bbox = self.compute_grain_bounding_box(g['idnumber'])
+                bbox = self.compute_grain_bounding_box(g['idnumber'])
             except ValueError:
                 print('skipping grain %d' % g['idnumber'])
                 continue
             if verbose:
                 print('grain %d bounding box: [%d:%d, %d:%d, %d:%d]'
-                      % (g['idnumber'], Bbox[0][0], Bbox[0][1], Bbox[1][0],
-                         Bbox[1][1], Bbox[2][0], Bbox[2][1]))
-            g['bounding_box'] = Bbox
+                      % (g['idnumber'], bbox[0][0], bbox[0][1], bbox[1][0],
+                         bbox[1][1], bbox[2][0], bbox[2][1]))
+            g['bounding_box'] = bbox
             g.update()
         self.grains.flush()
         return self.get_grain_bounding_boxes()

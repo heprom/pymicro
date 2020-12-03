@@ -1,0 +1,55 @@
+<?xml version='1.0' ?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>
+<Xdmf xmlns:xi="http://www.w3.org/2003/XInclude" Version="2.2">
+  <Domain>
+    <Grid Name="TestIm2D" GridType="Uniform">
+      <Topology TopologyType="2DCoRectMesh" Dimensions="26 26"/>
+      <Geometry Type="ORIGIN_DXDY">
+        <DataItem Format="XML" Dimensions="2">0. 0. 0.</DataItem>
+        <DataItem Format="XML" Dimensions="2">1. 1. 1.</DataItem>
+      </Geometry>
+      <Attribute Name="test_image" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="25  25" NumberType="Int" Precision="64">SD_images_ref.h5:/TestIm2D/test_image</DataItem>
+      </Attribute>
+    </Grid>
+    <Grid Name="TestIm2D_large" GridType="Uniform">
+      <Topology TopologyType="2DCoRectMesh" Dimensions="26 26"/>
+      <Geometry Type="ORIGIN_DXDY">
+        <DataItem Format="XML" Dimensions="2">0.0  30.0</DataItem>
+        <DataItem Format="XML" Dimensions="2">2.0  2.0</DataItem>
+      </Geometry>
+      <Attribute Name="test_image_large" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="25  25" NumberType="Int" Precision="64">SD_images_ref.h5:/TestIm2D_large/test_image_large</DataItem>
+      </Attribute>
+      <Attribute Name="vector_field_2D" AttributeType="Vector" Center="Cell">
+        <DataItem Format="HDF" Dimensions="25  25  3" NumberType="Float" Precision="64">SD_images_ref.h5:/TestIm2D_large/vector_field_2D</DataItem>
+      </Attribute>
+    </Grid>
+    <Grid Name="TestIm3D" GridType="Uniform">
+      <Topology TopologyType="3DCoRectMesh" Dimensions="26 26 26"/>
+      <Geometry Type="ORIGIN_DXDYDZ">
+        <DataItem Format="XML" Dimensions="3">0.0  0.0  10.0</DataItem>
+        <DataItem Format="XML" Dimensions="3">1. 1. 1.</DataItem>
+      </Geometry>
+      <Attribute Name="test_image_3D" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="25  25  25" NumberType="Int" Precision="64">SD_images_ref.h5:/TestIm3D/test_image_3D</DataItem>
+      </Attribute>
+    </Grid>
+    <Grid Name="TestIm3D_large" GridType="Uniform">
+      <Topology TopologyType="3DCoRectMesh" Dimensions="26 26 26"/>
+      <Geometry Type="ORIGIN_DXDYDZ">
+        <DataItem Format="XML" Dimensions="3">0.0  30.0  -60.0</DataItem>
+        <DataItem Format="XML" Dimensions="3">2.0  2.0  2.0</DataItem>
+      </Geometry>
+      <Attribute Name="test_image_3D_large" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="25  25  25" NumberType="Int" Precision="64">SD_images_ref.h5:/TestIm3D_large/test_image_3D_large</DataItem>
+      </Attribute>
+      <Attribute Name="vector_field_3D" AttributeType="Vector" Center="Cell">
+        <DataItem Format="HDF" Dimensions="25  25  25  3" NumberType="Float" Precision="64">SD_images_ref.h5:/TestIm3D_large/vector_field_3D</DataItem>
+      </Attribute>
+      <Attribute Name="tensor_field_3D" AttributeType="Tensor6" Center="Cell">
+        <DataItem Format="HDF" Dimensions="25  25  25  6" NumberType="Float" Precision="64">SD_images_ref.h5:/TestIm3D_large/tensor_field_3D</DataItem>
+      </Attribute>
+    </Grid>
+  </Domain>
+</Xdmf>

@@ -11,7 +11,6 @@ consists in volumic data defined on 3D meshes/images, classical data arrays,
 and associated metadata.
 
 """
-# TODO : Update documentation !!!
 import os
 import shutil
 import numpy as np
@@ -20,15 +19,15 @@ import lxml.builder
 from lxml import etree
 from pymicro.core.images import ImageReader
 from pymicro.core.meshes import MeshReader
-
-# Module global variables for xdmf compatibility
-FIELD_TYPE = {1: 'Scalar', 2: 'Vector', 3: 'Vector', 6: 'Tensor6', 9: 'Tensor'}
-CENTERS_XDMF = {'3DImage': 'Cell', 'Mesh': 'Node'}
-
-# usefull lists to parse keyword arguments
-compression_keys = ['complib', 'complevel', 'shuffle', 'bitshuffle',
-                    'checksum', 'least_significant_digit',
-                    'default_compression']
+# Import variables for XDMF binding
+from pymicro.core.global_variables import (XDMF_FIELD_TYPE,
+                                           XDMF_IMAGE_GEOMETRY,
+                                           XDMF_IMAGE_TOPOLOGY, XDMF_CENTERS)
+# Import variables for SampleData data model
+from pymicro.core.global_variables import (SD_GROUP_TYPES, SD_GRID_GROUPS,
+                                           SD_IMAGE_GROUPS, SD_RESERVED_NAMES)
+# Import variables for SampleData utilities
+from pymicro.core.global_variables import (COMPRESSION_KEYS)
 
 
 class SampleData:
@@ -60,14 +59,16 @@ class SampleData:
         :Group: Classical HDF5 Group node, used to organize data arrays.
         :3DImage: A Group to store data arrays representing fields defined on
             a 3D image (voxelized fields).
+        :2DImage: A Group to store data arrays representing fields defined on
+            a 2D image (pixelized fields).
         :Mesh: A Group to store data arrays representing fields defined on
             a mesh, and store mesh geometry.
 
     .. seealso::
         See :func:`add_group`, :func:`add_image` and :func:`add_mesh`.
 
-    Both `3DImage` and `Mesh` group types are synchronized with the XDMF file
-    to allow visualization of their content with Paraview
+    `3DImage`, `2DImage` and `Mesh` group types are synchronized with the XDMF
+    file to allow visualization of their content with Paraview
 
     - **SampleData datasets can be composed of three types of data items:**
 
@@ -464,6 +465,11 @@ class SampleData:
         After using the `sync` method, the XDMF file can be opened in Paraview
         and 3DImage and/or Mesh data visualized, even if the files are still
         open in the class instance.
+
+        .. important::
+            Paraview >=5 cannot read data from synchronized files, you must
+            close them first. In this case, use method
+            :func:`pause_for_visualization`.
         """
         message = ('.... Storing content index in {}:/Index attributes'
                    ''.format(self.h5_file))
@@ -478,6 +484,21 @@ class SampleData:
         self._verbose_print('File {} synchronized with in memory data tree'
                             ''.format(self.h5_file),
                             line_break=False)
+        return
+
+    def pause_for_visualization(self):
+        """Flushes data, close files and pause interpreter for visualization.
+
+        This method pauses the interpreter until you press the <Enter> key.
+        During the pause, the HDF5 file object is closed, so that it can be
+        read by visualization softwares like Paraview or ViTables.
+        """
+        self.sync()
+        self.h5_dataset.close()
+        input('File objects are closed, you can now visualize the dataset'
+              ' in Paraview. Press <Enter> when you want to resume data'
+              ' management')
+        self.h5_dataset = tables.File(self.h5_file, mode='r+')
         return
 
     def switch_verbosity(self):
@@ -587,48 +608,26 @@ class SampleData:
 
         """
         # TODO: Update mesh data models and add_mesh method accordingly
+        # TODO: externalize in private methods XDMF construction
+        # safety check
+        if (len(mesh_object.element_topology) > 1):
+            msg = ('number of element type found : {} \n add_mesh_from_file'
+                   'current implementation works only with meshes with only'
+                   'one type'.format(len(mesh_object.element_topology)))
+            raise ValueError(msg)
         if (indexname == ''):
-            warn_msg = (' (add_mesh) indexname not provided,the meshname {} is'
-                        ' used in content index'.format(meshname))
-            self._verbose_print(warn_msg)
             indexname = meshname
-        location = self._name_or_node_to_path(location)
-        mesh_path = os.path.join(location, meshname)
-        # Check mesh group existence and replacement
-        if self.h5_dataset.__contains__(mesh_path):
-            msg = ('(add_mesh) Mesh {} already exists.'.format(mesh_path))
-            empty = self.get_attribute('empty', mesh_path)
-            if empty:
-                mesh_group = self.get_node(mesh_path)
-                empty = (mesh_object is None)
-            elif (not(empty) and replace):
-                msg += ('-- It will be replaced by the new MeshObject content')
-                self.remove_node(name=mesh_path, recursive=True)
-                self._verbose_print(msg)
-                self._verbose_print('Creating hdf5 group {} in file {}'.format(
-                                     mesh_path, self.h5_file))
-                mesh_group = self.add_group(path=location, groupname=meshname,
-                                            indexname=indexname)
-            else:
-                msg += ('\n--- If you want to replace it by new MeshObject'
-                        ' content, please add `replace=True` to keyword'
-                        ' arguments of `add_mesh`')
-                self._verbose_print(msg)
-                return
-        else:
-            mesh_group = self.add_group(path=location, groupname=meshname,
-                                        indexname=indexname)
-            empty = (mesh_object is None)
-        if empty:
-            Attribute_dic = {'empty': True, 'group_type': 'Mesh'}
-            self.add_attributes(Attribute_dic, mesh_group._v_pathname)
+        mesh_group = self._init_SD_group(meshname, location, replace=replace)
+        if (mesh_object is None):
+            self.add_attributes({'empty': True, 'group_type': 'Mesh'},
+                                mesh_group._v_pathname)
             return
         # store mesh metadata as HDF5 attributes
         Attribute_dic = {'element_topology': mesh_object.element_topology[0],
                          'description': description,
                          'group_type': 'Mesh',
                          'empty': False}
-
+        mesh_path = mesh_group._v_pathname
         # TODO: Add Nodes ID ? Elements ID ?
         self._verbose_print('Creating Nodes data set in group {} in file {}'
                             ''.format(mesh_path, self.h5_file))
@@ -639,12 +638,6 @@ class SampleData:
                                               title=indexname + '_Nodes')
         Nodes_path = Nodes._v_pathname
 
-        # safety check
-        if (len(mesh_object.element_topology) > 1):
-            msg = ('number of element type found : {} \n add_mesh_from_file'
-                   'current implementation works only with meshes with only'
-                   'one type'.format(len(mesh_object.element_topology)))
-            raise ValueError(msg)
 
         self._verbose_print('Creating Elements data set in group {} in file {}'
                             ''.format(location + '/' + meshname, self.h5_file))
@@ -717,188 +710,89 @@ class SampleData:
         return
 
     def add_image(self, image_object=None, imagename='', indexname='',
-                  location='/', description=' ', replace=False, **keywords):
-        """Create a 3DImage group in the dataset from an ImageObject.
+                  location='/', description=' ', replace=False,
+                  **keywords):
+        """Create a 2D/3D Image group in the dataset from an ImageObject.
 
-        A 3DImage group is a HDF5 Group that contains arrays describing fields
-        defined on a 3D image (uniform grid of voxels). The image geometry
-        is defined by HDF5 attributes of the 3DImage Group, that are:
+        An Image group is a HDF5 Group that contains arrays describing fields
+        defined on an image (uniform grid of voxels/pixels). The image geometry
+        and topology is defined by HDF5 attributes of the Image Group,
+        that are:
 
             :dimension: np.array, number of voxels along each dimension of the
-                3DImage (Nx,Ny,Nz)
-            :spacing: np.array, voxel size along each dimension (dx,dy,dz)
+                Image (Nx,Ny,Nz) or (Nx,Ny)
+            :spacing: np.array, voxel size along each dimension (dx,dy,dz) or
+                (dx, dy)
             :origin: np.array, coordinates of the image grid origin,
                 corresponding to the first vertex of the voxel [0,0,0]
+                or pixel [0,0]
 
-        :param image_object: 3D image to add to dataset. It is an instance from
+        :param image_object: image to add to dataset. It is an instance from
             the :py:class:`pymicro.core.images.ImageObject` class
-        :param str imagename: name used to create the 3DImage group in dataset
-        :param indexname: Index name used to reference the 3DImage group
+        :param str imagename: name used to create the Image group in dataset
+        :param str indexname: Index name used to reference the Image. If none
+            is provided, `imagename` is used.
         :location str: Path, Name, Index Name or Alias of the parent group
-            where the 2DImage group is to be created
+            where the Image group is to be created
         :param str description: Description metadata for this 3D image
-        :param bool replace: remove 3DImage group in the dataset with the same
+        :param bool replace: remove Image group in the dataset with the same
             name/location if `True` and such group exists
         """
-        if indexname == '':
-            warn_msg = ('(add_image) indexname not provided, the image name {}'
-                        ' is used instead in content index'.format(imagename))
-            self._verbose_print(warn_msg)
-            indexname = imagename
-        location = self._name_or_node_to_path(location)
-        image_path = os.path.join(location, imagename)
-        # Check image group existence and replacement
-        if self.h5_dataset.__contains__(image_path):
-            msg = ('\n(add_image) Image group {} already exists.'
-                   ''.format(image_path))
-            empty = self.get_attribute('empty', image_path)
-            if empty:
-                image_group = self.get_node(image_path)
-                empty = (image_object is None)
-            elif (not(empty) and replace):
-                msg += ('--- It will be replaced by the new ImageObject'
-                        ' content')
-                self.remove_node(name=imagename, recursive=True)
-                self._verbose_print(msg)
-                self._verbose_print('Creating hdf5 group {} in file {}'.format(
-                                     image_path, self.h5_file))
-                image_group = self.add_group(path=location,
-                                             groupname=imagename,
-                                             indexname=indexname)
-            else:
-                msg += ('\n--- If you want to replace it by new ImageObject '
-                        'content, please add `replace=True` to keyword '
-                        'arguments of `add_image`.')
-                print(msg)
-                return
-        else:
-            image_group = self.add_group(path=location, groupname=imagename,
-                                         indexname=indexname)
-            empty = (image_object is None)
-        if empty:
-            Attribute_dic = {'empty': True, 'group_type': '3DImage'}
-            self.add_attributes(Attribute_dic, image_group._v_pathname)
+        ### Check image dimension
+        image_type = self._get_image_type(image_object,imagename)
+        ### Create or fetch image group
+        image_group = self.add_group(imagename, location, indexname, replace)
+        ### empty images creation
+        if (image_object is None):
+            # if empty, stored as a 3DImage. Required for self._is_grid
+            self.add_attributes({'empty': True, 'group_type': '3DImage'},
+                                image_group._v_pathname)
             return
-
-        self._verbose_print('Updating xdmf tree...', line_break=False)
-        image_xdmf = etree.Element(_tag='Grid', Name=imagename,
-                                   GridType='Uniform')
-
-        # create Topology element
-        # NOTE: Add 1 to each dimension of the image
-        #    --> image cell data is stored (i.e. value at voxel centers)
-        #        but xdmf intends 3DCoRectMesh dimension as number of points
-        #        which is equal to voxel number + 1 in each direction
-        Im_dim = (image_object.dimension +
-                  np.ones(len(image_object.dimension), dtype='int64'))
-        Dim = str(Im_dim).strip('(').strip(')')
-        Dim = Dim.strip('[').strip(']')
-        Dim = Dim.replace(',', ' ')
-
-        topology_xdmf = etree.Element(_tag='Topology',
-                                      TopologyType='3DCoRectMesh',
-                                      Dimensions=Dim)
-
-        geometry_xdmf = etree.Element(_tag='Geometry', Type='ORIGIN_DXDYDZ')
-
-        origin_data = etree.Element(_tag='DataItem', Format='XML',
-                                    Dimensions='3')
-        Origin = str(image_object.origin).strip('[').strip(']').replace(
-            ',', ' ')
-        origin_data.text = Origin
-
-        spacing_data = etree.Element(_tag='DataItem', Format='XML',
-                                     Dimensions='3')
-        Spacing = str(image_object.spacing).strip('[').strip(']').replace(
-            ',', ' ')
-        spacing_data.text = Spacing
-
-        # Add nodes DataItem as childrens of node Geometry
-        geometry_xdmf.append(origin_data)
-        geometry_xdmf.append(spacing_data)
-
-        # Add Geometry and Topology as childrens of Grid
-        image_xdmf.append(topology_xdmf)
-        image_xdmf.append(geometry_xdmf)
-
-        # Add Grid to node Domain
-        self.xdmf_tree.getroot()[0].append(image_xdmf)
-
-        # store image metadata as HDF5 attributes
+        ### Add image Grid to xdmf file
+        Xdmf_pathes = self._add_image_to_xdmf(imagename, image_object,
+                                              image_type)
+        ### store image metadata as HDF5 attributes
         Attribute_dic = {'dimension': np.array(image_object.dimension),
                          'spacing': np.array(image_object.spacing),
                          'origin': np.array(image_object.origin),
                          'description': description,
-                         'group_type': '3DImage',
-                         'empty': False}
-        # Get xdmf elements paths as HDF5 attributes
-        #     image group
-        el_path = self.xdmf_tree.getelementpath(image_xdmf)
-        Attribute_dic['xdmf_path'] = el_path
-        #     topology group
-        el_path = self.xdmf_tree.getelementpath(topology_xdmf)
-        Attribute_dic['xdmf_topology_path'] = el_path
-        #     geometry group
-        el_path = self.xdmf_tree.getelementpath(geometry_xdmf)
-        Attribute_dic['xdmf_geometry_path'] = el_path
+                         'group_type': image_type,
+                         'empty': False,
+                         'xdmf_path': Xdmf_pathes['image_path'],
+                         'xdmf_topology_path': Xdmf_pathes['topology_path'],
+                         'xdmf_geometry_path': Xdmf_pathes['geometry_path']}
         self.add_attributes(Attribute_dic, image_group._v_pathname)
-
-        # Add fields if some are stored in the image object
+        ### Add fields if some are stored in the image object
         for field_name, field in image_object.fields.items():
-            self.add_data_array(location=image_path, name=field_name,
-                                array=field, replace=True, **keywords)
+            self.add_data_array(location=image_group._v_pathname,
+                                name=field_name, array=field, replace=True,
+                                **keywords)
         return
 
-    def add_group(self, path, groupname, indexname='', replace=False,
-                  createparents=False):
-        """Create a classical HDF5 group at desired location in the dataset.
+    def add_group(self, groupname, location, indexname='', replace=False):
+        """Create a standard HDF5 group at location with no grid properties.
 
-        :param str path: Path where the group will be added in the HDF5 dataset
+        If the group parents in `location` do not exist, they are created.
+
         :param str groupname: Name of the group to create
-        :param str indexname: Index name used to reference the Group
+        :param str location: Path where the group will be added in the HDF5
+            dataset
+        :param str indexname: Index name used to reference the Group. If none
+            is provided, `groupname` is used.
         :param bool replace: remove 3DImage group in the dataset with the same
             name/location if `True` and such group exists
         :param bool createparents: if `True`, create parent nodes in `path` if
             they are not present in the dataset
         """
         if (indexname == ''):
-            warn_msg = ('\n(add_group) indexname not provided, the groupname '
-                        '{} is used in content index'.format(groupname))
-            self._verbose_print(warn_msg)
             indexname = groupname
-        self._verbose_print('Creating hdf5 group `{}` {} in file {}'.format(
-            groupname, path, self.h5_file))
-        group_path = os.path.join(path, groupname)
-        self.add_to_index(indexname, group_path)
-
-        try:
-            Group = self.h5_dataset.create_group(where=path, name=groupname,
-                                                 title=indexname,
-                                                 createparents=createparents)
-            self.add_attributes(dic={'group_type': 'Data'}, nodename=Group)
-            return Group
-        except tables.NodeError:
-            node_path = os.path.join(path, groupname)
-            if (self.h5_dataset.__contains__(node_path)):
-                if replace:
-                    self.remove_node(node_path, recursive=True)
-                    Group = self.h5_dataset.create_group(
-                        where=path, name=groupname, title=indexname,
-                        createparents=createparents)
-                    return Group
-                else:
-                    warn_msg = ('\n(add_group) group {} already exists,'
-                                ' group creation aborted'
-                                ''.format(path + groupname))
-                    warn_msg += ('\n--- If you want to replace it by an empty '
-                                 '{} Group please add `replace=True` to '
-                                 'keyword arguments of `add_group`.'
-                                 'WARNING This will erase the current Group '
-                                 'and its content'.format(groupname))
-                    self._verbose_print(warn_msg)
-                return None
-            else:
-                raise
+        Group = self._init_SD_group(groupname, location,
+                                    group_type='Group', replace=replace)
+        if Group is None:
+            raise tables.NodeError('Group {} could not be created or fetched.'
+                                   ' Unknown error.'.format(groupname))
+        self.add_to_index(indexname, Group._v_pathname)
+        return Group
 
     def add_data_array(self, location, name, array, indexname=None,
                        chunkshape=None, createparents=False, replace=False,
@@ -935,71 +829,21 @@ class SampleData:
         """
         self._verbose_print('Adding array `{}` into Group `{}`'
                             ''.format(name, location))
+        # Safety checks
+        self._check_SD_array_init(name, location, replace)
         # get location path
         location_path = self._name_or_node_to_path(location)
-        if location_path is None:
-            if createparents:
-                location_exists = False
-            else:
-                msg = ('(add_data_array): location {} does not exist, array'
-                       ' cannot be added. Use optional argument'
-                       ' "createparents=True" to force location Group creation'
-                       ''.format(location))
-                self._verbose_print(msg)
-                return
-        else:
-            location_exists = True
-            # check location nature
-            if not(self._get_node_class(location) == 'GROUP'):
-                msg = ('(add_data_array): location {} is not a Group nor '
-                       'empty. Please choose an empty location or a HDF5 '
-                       'Group to store data array'
-                       ' flag'.format(location))
-                self._verbose_print(msg)
-                return
-            # check if array location exists and remove node if asked
-            array_path = os.path.join(location_path, name)
-            if self.h5_dataset.__contains__(array_path):
-                if replace:
-                    msg = ('(add_data_array): existing node {} will be '
-                           'overwritten and all of its childrens removed'
-                           ''.format(array_path))
-                    self._verbose_print(msg)
-                    self.remove_node(array_path, recursive=True)
-                else:
-                    msg = ('(add_data_array): node {} already exists. To '
-                           'overwrite, use optional argument "replace=True"'
-                           ''.format(array_path))
-                    self._verbose_print(msg)
-
         # get compression options
-        # keywords compression options prioritized over input filters instance
-        if (filters is None) or bool(keywords):
-            Filters = self._get_compression_opt(**keywords)
-        else:
-            Filters = filters
-        self._verbose_print('-- Compression Options for dataset {}'
-                            ''.format(name))
-        if (self.Filters.complevel > 0):
-            msg_list = str(self.Filters).strip('Filters(').strip(')').split()
-            for msg in msg_list:
-                self._verbose_print('\t * {}'.format(msg), line_break=False)
-        else:
-            self._verbose_print('\t * No Compression')
+        Filters = self._get_compression_opt(filters, **keywords)
 
         # get location type
-        if (location_exists and self._is_grid(location) and not empty
+        if (self._is_grid(location) and not empty
            and not self._is_empty(location)):
             self._check_field_compatibility(location, array)
         # add to index
         if indexname is None:
-            warn_msg = (' (add_data_array) indexname not provided, '
-                        ' the array name `{}` is used as index name '
-                        ''.format(name))
-            self._verbose_print(warn_msg)
             indexname = name
         self.add_to_index(indexname, os.path.join(location_path, name))
-
         # Create dataset node to store array
         if empty:
             Node = self.h5_dataset.create_carray(
@@ -1010,13 +854,11 @@ class SampleData:
                     where=location_path, name=name, filters=Filters,
                     obj=array, chunkshape=chunkshape)
             self.add_attributes(dic={'empty': False}, nodename=name)
-
-        if (self._is_grid(location) and not empty
-                and not self._is_empty(location)):
-            ftype = self._get_xdmf_field_type(field=array,
+        # If field, add to XDMF
+        if self._is_field(indexname) and not empty:
+            ftype = self._get_xdmf_field_type(field_shape=array.shape,
                                               grid_location=location_path)
-            dic = {'field_type': ftype}
-            self.add_attributes(dic=dic, nodename=name)
+            self.add_attributes({'field_type': ftype}, nodename=name)
             self._add_field_to_xdmf(name, array)
         return Node
 
@@ -1073,7 +915,6 @@ class SampleData:
             # check if array location exists and remove node if asked
             table_path = os.path.join(location_path, name)
             if self.h5_dataset.__contains__(table_path):
-                print('coucouc les amish {}'.format(table_path))
                 if replace:
                     msg = ('(add_table): existing node {} will be '
                            'overwritten and all of its childrens removed'
@@ -1889,7 +1730,7 @@ class SampleData:
             self.h5_dataset.root._v_attrs.description = sample_description
             # get compression options
             Compression_keywords = {k: v for k, v in keywords.items() if k in
-                                    compression_keys}
+                                    COMPRESSION_KEYS}
             self.set_global_compression_opt(**Compression_keywords)
             # Generic Data Model initialization
             self._init_data_model()
@@ -1982,6 +1823,76 @@ class SampleData:
                     nodename='/Index')
             self.h5_dataset.create_group('/Index', name='Aliases')
         return
+
+    def _check_SD_array_init(self, arrayname='', location='/', replace=False):
+        """Safety check to create data array into location in dataset."""
+        location_path = self._name_or_node_to_path(location)
+        if location_path is None:
+            msg = ('No location `{}`, cannot create array/table {}.'
+                   ' Create parent groups before adding the array/table.'
+                   ''.format(arrayname, location))
+            raise tables.NodeError(msg)
+        else:
+            # check location nature
+            if not(self._get_node_class(location) == 'GROUP'):
+                msg = ('Location {} is not a HDF5 Group. Cannot create array/'
+                       'table there.'.format(location))
+                raise tables.NodeError(msg)
+            # check if array location exists and remove node if asked
+            array_path = os.path.join(location_path, arrayname)
+            if self.__contains__(array_path):
+                if replace:
+                    msg = ('Existing node {} will be overwritten to recreate '
+                           'array/table'.format(array_path))
+                    self._verbose_print(msg)
+                    self.remove_node(array_path, recursive=True)
+                else:
+                    msg = ('Array/table {} already exists. To overwrite, use '
+                           'optional argument "replace=True"'
+                           ''.format(array_path))
+                    raise tables.NodeError(msg)
+
+    def _init_SD_group(self, groupname='', location='/',
+                       group_type='Group', replace=False):
+        """Create or fetch a SampleData Group and returns it."""
+        Group = None
+        # init flags
+        fetch_group = False
+        # sanity checks
+        if groupname == '':
+            raise ValueError('Cannot create Group. Groupname must be'
+                             ' specified')
+        if group_type not in SD_GROUP_TYPES:
+            raise ValueError('{} is not a valid group type. Use on of {}'
+                             ''.format(group_type,SD_GROUP_TYPES))
+        location = self._name_or_node_to_path(location)
+        group_path = os.path.join(location, groupname)
+        # check existence and emptiness
+        if self.__contains__(group_path):
+            if self._is_grid(group_path):
+                if self._is_empty(group_path):
+                    fetch_group = True
+            if not(fetch_group or replace):
+                msg = ('Group {} already exists. Set arg. `replace=True` to'
+                       'to replace it by a new Group.'.format(groupname))
+                raise tables.NodeError(msg)
+        # create or fetch group
+        if fetch_group:
+            Group = self.get_node(group_path)
+        else:
+            if replace:
+                self._verbose_print('Removing group {} to replace it by new'
+                                    ' one.'.format(groupname))
+                self.remove_node(name=group_path,recursive=True)
+            self._verbose_print('Creating {} group `{}` in file {} at {}'
+                                ''.format(group_type, groupname,
+                                          self.h5_file,location))
+            Group = self.h5_dataset.create_group(where=location,
+                                                 name=groupname,
+                                                 title=groupname,
+                                                 createparents=True)
+            self.add_attributes(dic={'group_type': group_type}, nodename=Group)
+        return Group
 
     def _compatible_descriptions(self, desc_items1, desc_items2):
         if not(desc_items1.keys() <= desc_items2.keys()):
@@ -2106,39 +2017,38 @@ class SampleData:
         else:
             return self.get_attribute('empty', name)
 
+    def _is_image(self, name):
+        """Find out if name or path references an image groupe."""
+        return self._get_group_type(name) in SD_IMAGE_GROUPS
+
     def _is_array(self, name):
         """Find out if name or path references an array dataset."""
         name2 = self._name_or_node_to_path(name)
         Class = self._get_node_class(name2)
         List = ['CARRAY', 'EARRAY', 'VLARRAY', 'ARRAY', 'TABLE']
-        if (Class in List):
-            return True
-        else:
-            return False
+        return Class in List
 
     def _is_table(self, name):
         """Find out if name or path references an array dataset."""
-        if (self._get_node_class(name) == 'TABLE'):
-            return True
-        else:
-            return False
+        return self._get_node_class(name) == 'TABLE'
 
     def _is_group(self, name):
         """Find out if name or path references a HDF5 Group."""
-        Class = self._get_node_class(name)
-        if Class == 'GROUP':
-            return True
-        else:
-            return False
+        return self._get_node_class(name) == 'GROUP'
 
     def _is_grid(self, name):
         """Find out if name or path references a image or mesh HDF5 Group."""
-        gtype = self._get_group_type(name)
-        List = ['Mesh', '3DImage']
-        if (gtype in List):
-            return True
+        return self._get_group_type(name) in SD_GRID_GROUPS
+
+    def _is_field(self, name):
+        """Checks conditions to consider node `name` as a field data node."""
+        cond1 = self._is_grid(self._get_parent_name(name))
+        cond2 = name not in SD_RESERVED_NAMES
+        if cond1:
+            cond3 = not self._is_empty(self._get_parent_name(name))
         else:
-            return False
+            cond3 = False
+        return cond1 and cond2 and cond3
 
     def _is_in_index(self, name):
         return (name in self.content_index)
@@ -2165,7 +2075,7 @@ class SampleData:
         """Check if field dimension is compatible with the storing location."""
         group_type = self._get_group_type(name)
         msg = ''
-        if group_type == '3DImage':
+        if (group_type == '3DImage') or (group_type == '2DImage'):
             compatibility = self._compatibility_with_image(name, field)
             if self._is_empty(name):
                 msg += ('{} is an empty image. Use add_image to initialize'
@@ -2211,26 +2121,68 @@ class SampleData:
             self._verbose_print(msg)
         return compatibility
 
+    def _add_image_to_xdmf(self, imagename, image_object, image_type):
+        """Write grid geometry and topoly in xdmf tree/file."""
+        # Get image info
+        if image_type == '3DImage':
+            image_dim = '3'
+        elif  image_type == '2DImage':
+            image_dim = '2'
+        # add 1 to each dimension to get grid dimension (from cell number to
+        # point number --> XDMF indicates Grid points)
+        tmp_dim = (image_object.dimension
+                  + np.ones(len(image_object.dimension), dtype='int64'))
+        Dimension = self._np_to_xdmf_str(tmp_dim)
+        Spacing = self._np_to_xdmf_str(image_object.spacing)
+        Origin = self._np_to_xdmf_str(image_object.origin)
+        # Create Grid Tag
+        self._verbose_print('Updating xdmf tree...', line_break=False)
+        image_xdmf = etree.Element(_tag='Grid', Name=imagename,
+                                   GridType='Uniform')
+        # Create Topology element
+        Topotype = XDMF_IMAGE_TOPOLOGY[image_type]
+        topology_xdmf = etree.Element(_tag='Topology', TopologyType=Topotype,
+                                      Dimensions=Dimension)
+        # Create Geometry element
+        Geotype = XDMF_IMAGE_GEOMETRY[image_type]
+        geometry_xdmf = etree.Element(_tag='Geometry', Type=Geotype)
+        origin_data = etree.Element(_tag='DataItem', Format='XML',
+                                    Dimensions=image_dim)
+        origin_data.text = Origin
+        spacing_data = etree.Element(_tag='DataItem', Format='XML',
+                                     Dimensions=image_dim)
+        spacing_data.text = Spacing
+        # Add nodes DataItem as childrens of node Geometry
+        geometry_xdmf.append(origin_data)
+        geometry_xdmf.append(spacing_data)
+        # Add Geometry and Topology as childrens of Grid
+        image_xdmf.append(topology_xdmf)
+        image_xdmf.append(geometry_xdmf)
+        # Add Grid to node Domain and get XDMF pathes
+        self.xdmf_tree.getroot()[0].append(image_xdmf)
+        im_path = self.xdmf_tree.getelementpath(image_xdmf)
+        topo_path = self.xdmf_tree.getelementpath(topology_xdmf)
+        geo_path = self.xdmf_tree.getelementpath(geometry_xdmf)
+        # Return XDMF pathes
+        Path_dic = {'image_path': im_path, 'topology_path': topo_path,
+                    'geometry_path': geo_path}
+        return Path_dic
+
     def _add_field_to_xdmf(self, name, field):
         """Write field data as Grid Attribute in xdmf tree/file."""
         Node = self.get_node(name)
         Grid_type = self._get_parent_type(name)
         Grid_name = self._get_parent_name(name)
-        attribute_center = CENTERS_XDMF[Grid_type]
-        xdmf_path = self.get_attribute(attrname='xdmf_path',
-                                       nodename=Grid_name)
-        field_type = self.get_attribute(attrname='field_type', nodename=name)
+        attribute_center = XDMF_CENTERS[Grid_type]
+        xdmf_path = self.get_attribute('xdmf_path', Grid_name)
+        field_type = self.get_attribute('field_type', name)
         Xdmf_grid_node = self.xdmf_tree.find(xdmf_path)
-
         # create Attribute element
-        Attribute_xdmf = etree.Element(_tag='Attribute',
-                                       Name=name,
+        Attribute_xdmf = etree.Element(_tag='Attribute', Name=name,
                                        AttributeType=field_type,
                                        Center=attribute_center)
-
-        Dim = str(Node.shape).strip('(').strip(')').replace(',', ' ')
         # Create data item element
-
+        Dimension = self._np_to_xdmf_str(Node.shape)
         if (np.issubdtype(field.dtype, np.floating)):
             NumberType = 'Float'
             if (str(field.dtype) == 'float'):
@@ -2240,10 +2192,8 @@ class SampleData:
         elif (np.issubdtype(field.dtype, np.integer)):
             NumberType = 'Int'
             Precision = str(field.dtype).strip('int')
-
-        Attribute_data = etree.Element(_tag='DataItem',
-                                       Format='HDF',
-                                       Dimensions=Dim,
+        Attribute_data = etree.Element(_tag='DataItem', Format='HDF',
+                                       Dimensions=Dimension,
                                        NumberType=NumberType,
                                        Precision=Precision)
         Attribute_data.text = (self.h5_file + ':'
@@ -2253,11 +2203,10 @@ class SampleData:
         # add attribute to Grid
         Xdmf_grid_node.append(Attribute_xdmf)
         el_path = self.xdmf_tree.getelementpath(Attribute_xdmf)
-        dic = {'xdmf_path': el_path}
-        self.add_attributes(dic, name)
+        self.add_attributes({'xdmf_path': el_path}, name)
         return
 
-    def _get_xdmf_field_type(self, field, grid_location):
+    def _get_xdmf_field_type(self, field_shape, grid_location):
         """Get field's XDMF nature w.r.t. grid dimension."""
         field_type = None
         # get grid dimension
@@ -2269,26 +2218,37 @@ class SampleData:
         Type = self._get_group_type(grid_location)
         # analyze field shape
         if Type == 'Mesh':
-            if len(field.shape) != 2:
+            if len(field_shape) != 2:
                 msg = ('(_get_xdmf_field_type) wrong field shape. For a mesh'
                        'field, shape should be (Nnodes,Ndim) or (NIntPts,Ndim)'
                        '. None type returned')
                 self._verbose_print(msg)
                 return field_type
-            field_dim = field.shape[1]
+            field_dim = field_shape[1]
         elif Type == '3DImage':
-            if (len(field.shape) < 3) or (len(field.shape) > 4):
+            if (len(field_shape) < 3) or (len(field_shape) > 4):
                 msg = ('(_get_xdmf_field_type) wrong field shape. For a'
                        '3DImage field, shape should be (Nx1,Nx2,Nx3) or'
                        ' (Nx1,Nx2,Nx3,Ndim). None type returned')
                 self._verbose_print(msg)
                 return field_type
-            if (len(field.shape) == 3):
+            if (len(field_shape) == 3):
                 field_dim = 1
-            if (len(field.shape) == 4):
-                field_dim = field.shape[3]
+            if (len(field_shape) == 4):
+                field_dim = field_shape[3]
+        elif Type == '2DImage':
+            if (len(field_shape) < 2) or (len(field_shape) > 3):
+                msg = ('(_get_xdmf_field_type) wrong field shape. For a'
+                       '2DImage field, shape should be (Nx1,Nx2) or'
+                       ' (Nx1,Nx2,Ndim). None type returned')
+                self._verbose_print(msg)
+                return field_type
+            if (len(field_shape) == 2):
+                field_dim = 1
+            if (len(field_shape) == 3):
+                field_dim = field_shape[2]
         # determine field dimension and get name in dictionary
-        field_type = FIELD_TYPE[field_dim]
+        field_type = XDMF_FIELD_TYPE[field_dim]
         return field_type
 
     def _get_node_class(self, name):
@@ -2296,6 +2256,7 @@ class SampleData:
         return self.get_attribute(attrname='CLASS', nodename=name)
 
     def _get_path_with_indexname(self, indexname):
+        """Return node path from its indexname."""
         if indexname in self.content_index.keys():
             if isinstance(self.content_index[indexname], list):
                 return self.content_index[indexname][0]
@@ -2319,6 +2280,15 @@ class SampleData:
                 return grouptype
         else:
             return None
+
+    def _get_image_type(self, image_object, imagename = ''):
+        if len(image_object.dimension) == 3:
+            return '3DImage'
+        elif  len(image_object.dimension) == 2:
+            return '2DImage'
+        else:
+            raise ValueError('Image {} dimension must correspond to a 2D or'
+                             '3D image'.format(imagename))
 
     def _get_parent_type(self, name):
         """Get the SampleData group type of the node parent group."""
@@ -2380,7 +2350,7 @@ class SampleData:
             s = ''
         return s
 
-    def _get_compression_opt(self, **keywords):
+    def _get_compression_opt(self, filters=None, **keywords):
         """Get inputed compression settings as `tables.Filters` instance."""
         # get pre-defined compression settings
         default_cp = False
@@ -2394,6 +2364,8 @@ class SampleData:
         # Apply pre-defined compression settings)
         if default_cp:
             Filters = self.set_default_compression()
+        elif filters is not None:
+            Filters = filters
         elif global_cp:
             Filters = self.Filters
         else:
@@ -2424,3 +2396,9 @@ class SampleData:
         if self._verbose:
             print(Msg)
         return
+
+    def _np_to_xdmf_str(self, array):
+        Retstr =  str(array).strip('(').strip(')')
+        Retstr =  str(Retstr).strip('[').strip(']')
+        Retstr =  str(Retstr).replace(',', ' ')
+        return Retstr

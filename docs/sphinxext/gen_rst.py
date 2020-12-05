@@ -103,6 +103,8 @@ def generate_all_example_rst(app):
     """
     input_dir = os.path.abspath(app.builder.srcdir)
     input_dir = os.path.join(input_dir, 'auto_examples')
+    if not os.path.exists(input_dir):
+        os.makedirs(input_dir)
     print('*** input_dir = ', input_dir)
     # Walk all our source tree to find examples and generate them
     for file_name in os.listdir(input_dir):
@@ -249,7 +251,7 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
 
     docstring, short_desc, end_row = extract_docstring(example_file)
     #docstring, short_desc, end_row = '', '', 0
-    
+
     if plot_anim:
         image_fname = image_fname[:-4] + '.gif'
         gif_path = os.path.join(image_dir, image_fname)

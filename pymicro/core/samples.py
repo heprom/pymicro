@@ -12,6 +12,7 @@ and associated metadata.
 
 """
 import os
+import subprocess
 import shutil
 import numpy as np
 import tables
@@ -19,6 +20,8 @@ import lxml.builder
 from lxml import etree
 from pymicro.core.images import ImageReader
 from pymicro.core.meshes import MeshReader
+from BasicTools.Containers.ConstantRectilinearMesh import (
+                                                    ConstantRectilinearMesh)
 # Import variables for XDMF binding
 from pymicro.core.global_variables import (XDMF_FIELD_TYPE,
                                            XDMF_IMAGE_GEOMETRY,
@@ -486,19 +489,63 @@ class SampleData:
                             line_break=False)
         return
 
-    def pause_for_visualization(self):
+    def pause_for_visualization(self, Vitables=False, Paraview=False,
+                                **keywords):
         """Flushes data, close files and pause interpreter for visualization.
 
         This method pauses the interpreter until you press the <Enter> key.
         During the pause, the HDF5 file object is closed, so that it can be
-        read by visualization softwares like Paraview or ViTables.
+        read by visualization softwares like Paraview or ViTables. Two
+        optional arguments allow to directly open the dataset with Paraview
+        and/or Vitables, as a subprocess of Python. In these cases, the Python
+        interpreter is paused until you close the visualization software.
+
+        Paraview allows to visualize the volumic data that is stored in the
+        SampleData dataset, *i.e.* Mesh and Images groups (geometry and
+        stored fields). Vitables allows to visualize the content of the HDF5
+        dataset in term of data tree, arrays content and nodes attributes. If
+        both are requested, Vitables is executed before Paraview.
+
+
+        :param bool Vitables: set to `True` to launch Vitables on the HDF5 file
+            of the instance HDF5 dataset.
+        :param bool Paraview: set to `True` to launch Paraview on the XDMF file
+            of the instance.
         """
+        Pause = True
         self.sync()
         self.h5_dataset.close()
-        input('File objects are closed, you can now visualize the dataset'
-              ' in Paraview. Press <Enter> when you want to resume data'
-              ' management')
+        print('File objects are now closed, you can visualize dataset'
+              ' content.')
+        if Vitables:
+            software_cmd = 'vitables'
+            if 'Vitables_path' in keywords:
+                software_cmd = keywords['Vitables_path']
+            print('--- Lauching Vitables on file {} ---'.format(
+                   self.h5_file))
+            print('Once you will close Vitables, you may resume data'
+                  ' management with your SampleData instance.')
+            subprocess.run(args=[software_cmd,self.h5_file])
+            Pause = False
+        if Paraview:
+            software_cmd = 'paraview'
+            if 'Paraview_path' in keywords:
+                software_cmd = keywords['Paraview_path']
+            print('--- Lauching Paraview on file {} ---'.format(
+                   self.xdmf_file))
+            print('Once you will close Paraview, you may resume data'
+                  ' management with your SampleData instance.')
+            subprocess.run(args=[software_cmd,self.xdmf_file])
+            Pause = False
+        if Pause:
+            input('Paused interpreter, you may open {} and {} files with'
+                  ' other softwares during this pause.'
+                  ' Press <Enter> when you want to resume data management'
+                  ''.format(self.h5_file, self.xdmf_file))
         self.h5_dataset = tables.File(self.h5_file, mode='r+')
+        print('File objects {} and {} are opened again.\n You may use this'
+              ' SampleData instance normally.'.format(self.h5_file,
+                                                      self.xdmf_file))
         return
 
     def switch_verbosity(self):
@@ -749,12 +796,11 @@ class SampleData:
         ### Check image dimension
         image_type = self._get_image_type(image_object,imagename)
         ### Add image Grid to xdmf file
-        Xdmf_pathes = self._add_image_to_xdmf(imagename, image_object,
-                                              image_type)
+        Xdmf_pathes = self._add_image_to_xdmf(imagename, image_object)
         ### store image metadata as HDF5 attributes
-        Attribute_dic = {'dimension': np.array(image_object.dimension),
-                         'spacing': np.array(image_object.spacing),
-                         'origin': np.array(image_object.origin),
+        Attribute_dic = {'dimension': np.array(image_object.GetDimensions()),
+                         'spacing': np.array(image_object.GetSpacing()),
+                         'origin': np.array(image_object.GetOrigin()),
                          'description': description,
                          'group_type': image_type,
                          'empty': False,
@@ -763,10 +809,10 @@ class SampleData:
                          'xdmf_geometry_path': Xdmf_pathes['geometry_path']}
         self.add_attributes(Attribute_dic, image_group._v_pathname)
         ### Add fields if some are stored in the image object
-        for field_name, field in image_object.fields.items():
-            self.add_data_array(location=image_group._v_pathname,
-                                name=field_name, array=field, replace=True,
-                                **keywords)
+        # for field_name, field in image_object.fields.items():
+        #     self.add_data_array(location=image_group._v_pathname,
+        #                         name=field_name, array=field, replace=True,
+        #                         **keywords)
         return
 
     def add_group(self, groupname, location, indexname='', replace=False):
@@ -2121,21 +2167,15 @@ class SampleData:
             self._verbose_print(msg)
         return compatibility
 
-    def _add_image_to_xdmf(self, imagename, image_object, image_type):
+    def _add_image_to_xdmf(self, imagename, image_object):
         """Write grid geometry and topoly in xdmf tree/file."""
-        # Get image info
-        if image_type == '3DImage':
-            image_dim = '3'
-        elif  image_type == '2DImage':
-            image_dim = '2'
         # add 1 to each dimension to get grid dimension (from cell number to
         # point number --> XDMF indicates Grid points)
-        tmp_dim = (image_object.dimension
-                  + np.ones(len(image_object.dimension), dtype='int64'))
-        Dimension = self._np_to_xdmf_str(tmp_dim)
-        Spacing = self._np_to_xdmf_str(image_object.spacing)
-        Origin = self._np_to_xdmf_str(image_object.origin)
-        # Create Grid Tag
+        image_type = self._get_image_type(image_object)
+        Dimension = self._np_to_xdmf_str(image_object.GetDimensions())
+        Spacing = self._np_to_xdmf_str(image_object.GetSpacing())
+        Origin = self._np_to_xdmf_str(image_object.GetOrigin())
+        Dimensionality = str(image_object.GetDimensionality())
         self._verbose_print('Updating xdmf tree...', line_break=False)
         image_xdmf = etree.Element(_tag='Grid', Name=imagename,
                                    GridType='Uniform')
@@ -2147,10 +2187,10 @@ class SampleData:
         Geotype = XDMF_IMAGE_GEOMETRY[image_type]
         geometry_xdmf = etree.Element(_tag='Geometry', Type=Geotype)
         origin_data = etree.Element(_tag='DataItem', Format='XML',
-                                    Dimensions=image_dim)
+                                    Dimensions=Dimensionality)
         origin_data.text = Origin
         spacing_data = etree.Element(_tag='DataItem', Format='XML',
-                                     Dimensions=image_dim)
+                                     Dimensions=Dimensionality)
         spacing_data.text = Spacing
         # Add nodes DataItem as childrens of node Geometry
         geometry_xdmf.append(origin_data)
@@ -2282,13 +2322,13 @@ class SampleData:
             return None
 
     def _get_image_type(self, image_object, imagename = ''):
-        if len(image_object.dimension) == 3:
+        if image_object.GetDimensionality() == 3:
             return '3DImage'
-        elif  len(image_object.dimension) == 2:
+        elif image_object.GetDimensionality() == 2:
             return '2DImage'
         else:
-            raise ValueError('Image {} dimension must correspond to a 2D or'
-                             '3D image'.format(imagename))
+            raise ValueError('Image dimension must correspond to a 2D or'
+                             '3D image')
 
     def _get_parent_type(self, name):
         """Get the SampleData group type of the node parent group."""

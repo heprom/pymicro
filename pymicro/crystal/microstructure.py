@@ -1704,43 +1704,33 @@ class Microstructure(SampleData):
         """Set the grain map for this microstructure.
 
         :param ndarray grain_map: a 2D or 3D numpy array.
-        :param float voxel_size: the size of the voxels in mm unit.
+        :param float voxel_size: the size of the voxels in mm unit. Used only
+            if the CellData image Node must be created.
         """
         create_image = True
-        print('VOXELSIZE', voxel_size)
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
             if not empty:
                 create_image = False
         if create_image:
-            if voxel_size is None:
-                msg = '(set_grain_map) Please specify voxel size for CellData image'
+            if (voxel_size is None):
+                msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
-            image_object = ImageObject()
-            image_object.dimension = grain_map.shape
-            image_object.spacing = np.array([voxel_size, voxel_size,
-                                             voxel_size])
-            image_object.add_field(grain_map, 'grain_map')
-            self.add_image(image_object, imagename='CellData', location='/',
-                           replace=True, **keywords)
+            self.add_image_from_field(grain_map, 'grain_map',
+                                      imagename='CellData', location='/',
+                                      spacing=voxel_size*np.ones((3,)),
+                                      replace=True, **keywords)
         else:
-            im_vox_size = self.get_attribute('spacing', 'CellData')
-            mismatch = im_vox_size[0] != voxel_size or \
-                       im_vox_size[1] != voxel_size or \
-                       im_vox_size[0] != voxel_size
-            if (voxel_size is not None) and mismatch:
-                msg = 'Voxel size mismatch between input and CellData node ' \
-                      '`spacing` attribute'
-                raise ValueError(msg)
-            self.add_data_array(location='CellData', name='grain_map',
-                                array=grain_map, replace=True, **keywords)
+            self.add_field(gridname='CellData', fieldname='grain_map',
+                           array=grain_map, replace=True, **keywords)
         return
 
     def set_mask(self, mask, voxel_size=None, **keywords):
         """Set the mask for this microstructure.
 
         :param ndarray mask: a 2D or 3D numpy array.
-        :param float voxel_size: the size of the voxels in mm unit.
+        :param float voxel_size: the size of the voxels in mm unit. Used only
+            if the CellData image Node must be created.
         """
         create_image = True
         if self.__contains__('CellData'):
@@ -1749,21 +1739,13 @@ class Microstructure(SampleData):
                 create_image = False
         if create_image:
             if (voxel_size is None):
-                msg = '(set_mask) Please specify voxel size for CellData image'
+                msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
-            image_object = ImageObject()
-            image_object.dimension = mask.shape
-            image_object.spacing = np.array([voxel_size, voxel_size,
-                                             voxel_size])
-            image_object.add_field(mask, 'mask')
-            self.add_image(image_object, imagename='CellData', location='/',
-                           replace=True, **keywords)
+            self.add_image_from_field(mask, 'mask',
+                                      imagename='CellData', location='/',
+                                      spacing=voxel_size*np.ones((3,)),
+                                      replace=True, **keywords)
         else:
-            im_vox_size = self.get_attribute('spacing', 'CellData')[0]
-            if (voxel_size is not None) and (im_vox_size != voxel_size):
-                msg = ('Voxel size mismatch between input and CellData node'
-                       '`spacing` attribute')
-                raise ValueError(msg)
             self.add_data_array(location='CellData', name='mask',
                                 array=mask, replace=True, **keywords)
         return

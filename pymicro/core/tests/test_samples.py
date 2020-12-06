@@ -5,7 +5,7 @@ import math
 from tables import IsDescription, Int32Col, Float32Col
 from pymicro.core.samples import SampleData
 from pymicro.core.meshes import MeshObject
-from pymicro.core.images import ImageObject
+from BasicTools.Containers.ConstantRectilinearMesh import ConstantRectilinearMesh
 from config import PYMICRO_EXAMPLES_DATA_DIR
 
 
@@ -81,7 +81,7 @@ class SampleDataTests(unittest.TestCase):
                                      'test_sampledata_ref')
 
     def test_create_sample(self):
-        """ test creation of a SampleData instance/file and  data storage """
+        """Test creation of a SampleData instance/file and  data storage."""
         sample = SampleData(filename=self.filename,
                             sample_name='validation_test_sample',
                             overwrite_hdf5=True)
@@ -98,10 +98,11 @@ class SampleDataTests(unittest.TestCase):
         sample.add_mesh(mesh, meshname='test_mesh',indexname='mesh',
                         location='/')
         # Add image data into SampleData dataset
-        image = ImageObject(dimension=self.image.shape,
-                            origin= self.image_origin,
-                            spacing=self.image_voxel_size)
-        image.add_field(self.image,'test_image_field')
+        image = ConstantRectilinearMesh(dim=len(self.image.shape))
+        image.SetDimensions(self.image.shape)
+        image.SetOrigin(self.image_origin)
+        image.SetSpacing(self.image_voxel_size)
+        image.elemFields['test_image_field'] = self.image
         sample.add_image(image,imagename='test_image',indexname='image',
                          location='/')
         # Add new group and array to SampleData dataset

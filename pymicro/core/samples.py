@@ -821,13 +821,73 @@ class SampleData:
         self.add_attributes(Attribute_dic, image_group._v_pathname)
         ### Add fields if some are stored in the image object
         for field_name, field in image_object.nodeFields.items():
-            self.add_data_array(location=image_group._v_pathname,
-                                name=field_name, array=field, replace=True,
-                                **keywords)
-        for field_name, field in image_object.elemFields .items():
-            self.add_data_array(location=image_group._v_pathname,
-                                name=field_name, array=field, replace=True,
-                                **keywords)
+            self.add_field(gridname=image_group._v_pathname,
+                           fieldname=field_name, array=field,
+                           replace=replace, **keywords)
+        for field_name, field in image_object.elemFields.items():
+            self.add_field(gridname=image_group._v_pathname,
+                           fieldname=field_name, array=field,
+                           replace=replace, **keywords)
+        return
+
+    def add_image_from_field(self, field_array, fieldname, imagename='',
+                             indexname='', location='/', description=' ',
+                             replace=False, origin=np.array([0.,0.,0.]),
+                             spacing=np.array([1.,1.,1.]),
+                             is_scalar=True, is_elemField=True,
+                             **keywords):
+        """Create a 2D/3M Image group in the dataset from a field data array.
+
+        Construct an image object from the inputed field array. This array is
+        interpreted by default as an element field of a pixelized/voxelized
+        grid. Hence, if the field is of shape (Nx,Ny), the image group will
+        store a (Nx,Ny) image (*i.e.* a regular grid of Nx+1,Ny+1 nodes). If
+        specified, the field can be interpreted as a nodal field (values at
+        pixels/voxels vertexes). In this case the method will create a
+        (Nx-1,Ny-1) image of (Nx,Ny) nodes. The same applies in 3D.
+
+        If the field is not a scalar field, the last dimension of the field
+        array is interpreted as the dimension containing the field components
+
+        :param numpy.array field_array: data array of the field values on the
+            image regular grid.
+        :param str fieldname: add the field to HDF5 dataset and image Group
+            with this name.
+        :param str imagename: name used to create the Image group in dataset
+        :param str indexname: Index name used to reference the Image. If none
+            is provided, `imagename` is used.
+        :location str: Path, Name, Index Name or Alias of the parent group
+            where the Image group is to be created
+        :param str description: Description metadata for this 3D image
+        :param bool replace: remove Image group in the dataset with the same
+            name/location if `True` and such group exists
+        :param np.array(3,) origin: Coordinates of the first node of the
+            regular grid of squares/cubes constituting the image geometry
+        :param np.array(3,) spacing: Size along each dimension of the
+            pixels/voxels composing the image.
+        :param bool is_scalar: If `True` (default value), the field is
+            considered as a scalar field to compute the image dimensions from
+            the field array shape.
+        :param bool is_elemField: If `True` (default value), the array is
+            considered as a pixel/voxel wise field value array. If `False`, the
+            field is considered as a nodal value array.
+
+        """
+        if is_scalar:
+            field_dim = len(field_array.shape)
+            field_dimensions = field_array.shape
+        else:
+            field_dim = len(field_array.shape)-1
+            field_dimensions = field_array.shape[:-1]
+        if is_elemField:
+            field_dimensions = field_dimensions + np.ones((field_dim,))
+        image_object = ConstantRectilinearMesh(dim=field_dim)
+        image_object.SetDimensions(field_dimensions)
+        image_object.SetOrigin(origin)
+        image_object.SetSpacing(spacing)
+        image_object.elemFields[fieldname] = field_array
+        self.add_image(image_object, imagename, indexname, location,
+                       description, replace, **keywords)
         return
 
     def add_group(self, groupname, location, indexname='', replace=False):
@@ -1129,7 +1189,7 @@ class SampleData:
             reference a column (named field) of the table with this indexname
         """
         Is_present = (self._is_in_index(indexname)
-                      and self._is_alias(indexname))
+                      or self._is_alias(indexname))
         if Is_present:
             raise ValueError('Name `{}` already in '
                              'content_index : duplicates not allowed in Index'
@@ -1172,6 +1232,39 @@ class SampleData:
             msg = 'No node with path {} referenced in content index'.format(
                 node_path)
             raise tables.NodeError(msg)
+
+    def get_image(self, imagename):
+        """Return data of an image group as a BasicTools mesh object.
+
+        This methods gathers the data of a 2DImage or 3DImage group, including
+        grid geometry and fields, into a BasicTools
+        :class:`ConstantRectilinearMesh` object.
+
+        :param imagename: Name, Path or Indexname of the image group to get
+        :type imagename: str
+        :return: image_object
+        :rtype: ConstantRectilinearMesh
+        """
+        # Get image informations
+        dimensions = self.get_attribute('nodes_dimension', imagename)
+        spacing =  self.get_attribute('spacing', imagename)
+        origin =  self.get_attribute('origin', imagename)
+        Field_list =  self.get_attribute('Field_index', imagename)
+        # Create ConstantRectilinearMesh to serve as image_object
+        image_object = ConstantRectilinearMesh(dim=len(dimensions))
+        image_object.SetDimensions(dimensions)
+        image_object.SetSpacing(spacing)
+        image_object.SetOrigin(origin)
+        # Get image fields
+        for fieldname in Field_list:
+            field_type = self.get_attribute('field_type', fieldname)
+            if field_type == 'Nodal_field':
+                data = self.get_node(fieldname,as_numpy=True)
+                image_object.nodeFields[fieldname] = data
+            elif field_type == 'Element_field':
+                data = self.get_node(fieldname,as_numpy=True)
+                image_object.elemFields[fieldname] = data
+        return image_object
 
     def get_tablecol(self, tablename, colname):
         """Return a column of a table as a numpy array.
@@ -1234,7 +1327,7 @@ class SampleData:
             if as_numpy and self._is_array(name) and (colname is None):
                 # note : np.atleast_1d is used here to avoid returning a 0d
                 # array when squeezing a scalar node
-                node = np.atleast_1d(np.squeeze(node.read()))
+                node = np.atleast_1d(node.read())
         return node
 
     def get_mesh_nodes(self, meshname, as_numpy=False):
@@ -1856,7 +1949,8 @@ class SampleData:
     def _init_data_model(self):
         """Initialize the minimal data model specified for the class."""
         content_paths, content_type = self.minimal_data_model()
-        self._init_content_index(content_paths)
+        self.minimal_content = content_paths
+        self._init_content_index()
         self._verbose_print('Minimal data model initialization....')
         for key, value in content_paths.items():
             head, tail = os.path.split(value)
@@ -1922,12 +2016,10 @@ class SampleData:
             self.write_xdmf()
         return
 
-    def _init_content_index(self, path_dic):
+    def _init_content_index(self):
         """Initialize content_index dictionary."""
-        self.minimal_content = {key: '' for key in path_dic}
         self.content_index = {}
         self.aliases = {}
-
         if self._file_exist:
             self.content_index = self.get_dic_from_attributes(
                                                     nodename='/Index')
@@ -1935,9 +2027,6 @@ class SampleData:
                                                     nodename='/Index/Aliases')
         else:
             self.h5_dataset.create_group('/', name='Index')
-            self.add_attributes(dic=self.minimal_content, nodename='/Index')
-            self.content_index = self.get_dic_from_attributes(
-                    nodename='/Index')
             self.h5_dataset.create_group('/Index', name='Aliases')
         return
 

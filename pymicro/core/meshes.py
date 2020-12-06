@@ -193,8 +193,8 @@ class MeshObject():
 
         # in case of a two dimensional array : reshape to 3dim array with
         # singleton last dimension
-        if (Field.ndim < 2):
-            Field = Field.reshape([Field.shape[0], 1])
+        # if (Field.ndim < 2):
+        #     Field = Field.reshape([Field.shape[0], 1])
         self.fields[Field_name]= Field
         #        print('\t field {} of dimension {} added to the mesh'.format(Field_name,
         #              Field.shape))

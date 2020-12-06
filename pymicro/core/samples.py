@@ -793,12 +793,23 @@ class SampleData:
             self.add_attributes({'empty': True, 'group_type': '3DImage'},
                                 image_group._v_pathname)
             return
-        ### Check image dimension
-        image_type = self._get_image_type(image_object,imagename)
+        else:
+            # safety check --> image_object should be a BasicTools
+            # ConstantRectilinearMesh
+            if not(isinstance(image_object, ConstantRectilinearMesh)):
+                print('WARNING : `add_image` got an unknown image object.'
+                      ' It should be receiving a BasicTools'
+                      'ConstantRectilinearMesh instance. Odds things may'
+                      ' happen while adding the image.')
         ### Add image Grid to xdmf file
         Xdmf_pathes = self._add_image_to_xdmf(imagename, image_object)
         ### store image metadata as HDF5 attributes
-        Attribute_dic = {'dimension': np.array(image_object.GetDimensions()),
+        image_type = self._get_image_type(image_object,imagename)
+        image_nodes_dim = np.array(image_object.GetDimensions())
+        image_cell_dim = image_nodes_dim - np.ones(image_nodes_dim.shape,
+                                                   dtype=image_nodes_dim.dtype)
+        Attribute_dic = {'nodes_dimension': image_nodes_dim,
+                         'dimension': image_cell_dim,
                          'spacing': np.array(image_object.GetSpacing()),
                          'origin': np.array(image_object.GetOrigin()),
                          'description': description,
@@ -809,10 +820,14 @@ class SampleData:
                          'xdmf_geometry_path': Xdmf_pathes['geometry_path']}
         self.add_attributes(Attribute_dic, image_group._v_pathname)
         ### Add fields if some are stored in the image object
-        # for field_name, field in image_object.fields.items():
-        #     self.add_data_array(location=image_group._v_pathname,
-        #                         name=field_name, array=field, replace=True,
-        #                         **keywords)
+        for field_name, field in image_object.nodeFields.items():
+            self.add_data_array(location=image_group._v_pathname,
+                                name=field_name, array=field, replace=True,
+                                **keywords)
+        for field_name, field in image_object.elemFields .items():
+            self.add_data_array(location=image_group._v_pathname,
+                                name=field_name, array=field, replace=True,
+                                **keywords)
         return
 
     def add_group(self, groupname, location, indexname='', replace=False):
@@ -840,14 +855,87 @@ class SampleData:
         self.add_to_index(indexname, Group._v_pathname)
         return Group
 
+    def add_field(self, gridname, fieldname, array, location=None,
+                  indexname=None, chunkshape=None, replace=False,
+                  filters=None, empty=False, **keywords):
+        """Add a field to a grid (Mesh or 2D/3DImage) group from a numpy array.
+
+        This methods checks the compatibility of the input field array with the
+        grid dimensionality and geometry, adds it to the HDF5 dataset, and
+        the XDMF file. Metadata describing the field type, dimensionality are
+        stored as field HDF node attributes. The path of the field is added to
+        the grid Group as a HDF5 attribute.
+
+        :param str gridname: Path, name or indexname of the grid Group on which
+            the field will be added
+        :param str fieldname: Name of the HDF5 node to create that will contain
+            the field value array
+        :param np.array array: Array containing the field values to add in the
+            dataset
+        ;param str location: Path, name or indexname of the Group in which the
+            field array will be stored. This Group must be a children of the
+            `gridname` Group. If not provided, the field is stored in the
+            `gridname` Group.
+        :param str indexname: Index name used to reference the field node
+        :param tuple  chunkshape: The shape of the data chunk to be read or
+            written in a single HDF5 I/O operation
+        :param bool replace: remove 3DImage group in the dataset with the same
+            name/location if `True` and such group exists
+        :param Filters filters: instance of :py:class:`tables.Filters` class
+            specifying compression settings.
+        :param bool empty: if `True` create the path, Index Name in dataset and
+            store an empty array. Set the node attribute `empty` to True.
+
+        .. note:: additional keywords arguments can be passed to specify global
+                compression options, see :func:`set_chunkshape_and_compression`
+                documentation for their definition. If some are passed, they
+                are prioritised over the settings in the inputed Filter object.
+
+        """
+        self._verbose_print('Adding field `{}` into Grid `{}`'
+                            ''.format(fieldname, gridname))
+        # Fields can only be added to grid Groups --> sanity check
+        if not(self._is_grid(gridname)):
+            raise tables.NodeError('{} is not a grid, cannot add a field data'
+                                   ' array in this group.'.format(gridname))
+        # Check if the array shape is consistent with the grid geometry
+        # and returns field dimension and xdmf Center attribute
+        field_type, dimensionality = self._check_field_compatibility(
+            gridname,array.shape)
+        if location is None:
+            # FIELD STORAGE DEFAULT CONVENTION :
+            # fields are stored directly into the HDF5 grid group
+            array_location = gridname
+        else:
+            # check if the given location is a subgroup of the grid group
+            if self._is_children_of(location, gridname):
+                array_location = location
+            else:
+                raise tables.NodeError('Cannot add field at location `{}`.'
+                                       ' Field location must be a grid group'
+                                       ' (Mesh or Image), or a grid group'
+                                       ' children'.format(location))
+        # Add data array into HDF5 dataset
+        self.add_data_array(array_location, fieldname, array, indexname,
+                            chunkshape, replace, filters, empty,
+                            **keywords)
+        Attribute_dic = {'field_type': field_type,
+                         'field_dimensionality': dimensionality,
+                         'parent_grid_path': self._name_or_node_to_path(
+                             gridname)
+                         }
+        self.add_attributes(Attribute_dic, nodename=fieldname)
+        # Add field description to XDMF file
+        self._add_field_to_xdmf(fieldname, array)
+        # Add field path to grid node Field_list attribute
+        self._append_field_index(gridname, fieldname)
+
     def add_data_array(self, location, name, array, indexname=None,
-                       chunkshape=None, createparents=False, replace=False,
-                       filters=None, empty=False, **keywords):
+                       chunkshape=None, replace=False, filters=None,
+                       empty=False, **keywords):
         """Add a data array node at the given location in the HDF5 dataset.
 
-        If the data array is added to a Mesh or 3DImage group, the method
-        ensure dimension and shape compatibility of the data array to add as a
-        field of the grid group. The method uses the :py:class:`CArray` and
+        The method uses the :py:class:`CArray` and
         :py:class:`tables.Filters` classes of the
         `Pytables <https://www.pytables.org/index.html>`_ package to add
         data arrays in the dataset and control their chunkshape and compression
@@ -859,8 +947,6 @@ class SampleData:
         :param str indexname: Index name used to reference the node
         :param tuple  chunkshape: The shape of the data chunk to be read or
             written in a single HDF5 I/O operation
-        :param bool createparents: if `True`, create parent nodes in `path` if
-            they are not present in the dataset
         :param bool replace: remove 3DImage group in the dataset with the same
             name/location if `True` and such group exists
         :param Filters filters: instance of :py:class:`tables.Filters` class
@@ -881,11 +967,6 @@ class SampleData:
         location_path = self._name_or_node_to_path(location)
         # get compression options
         Filters = self._get_compression_opt(filters, **keywords)
-
-        # get location type
-        if (self._is_grid(location) and not empty
-           and not self._is_empty(location)):
-            self._check_field_compatibility(location, array)
         # add to index
         if indexname is None:
             indexname = name
@@ -900,17 +981,11 @@ class SampleData:
                     where=location_path, name=name, filters=Filters,
                     obj=array, chunkshape=chunkshape)
             self.add_attributes(dic={'empty': False}, nodename=name)
-        # If field, add to XDMF
-        if self._is_field(indexname) and not empty:
-            ftype = self._get_xdmf_field_type(field_shape=array.shape,
-                                              grid_location=location_path)
-            self.add_attributes({'field_type': ftype}, nodename=name)
-            self._add_field_to_xdmf(name, array)
         return Node
 
     def add_table(self, location, name, description, indexname=None,
-                  chunkshape=None, replace=False, createparents=False,
-                  data=None, filters=None, **keywords):
+                  chunkshape=None, replace=False, data=None, filters=None,
+                  **keywords):
         """Add a structured storage table in HDF5 dataset.
 
         :param str location: Path where the array will be added in the dataset
@@ -925,8 +1000,6 @@ class SampleData:
             written in a single HDF5 I/O operation
         :param bool replace: remove 3DImage group in the dataset with the same
             name/location if `True` and such group exists
-        :param bool createparents: if `True`, create parent nodes in `path` if
-            they are not present in the dataset
         :param np.array(np.void) data: Array to store in the HDF5 node. `dtype`
             must be consistent with the table `description`.
         :param Filters filters: instance of :py:class:`tables.Filters` class
@@ -943,7 +1016,7 @@ class SampleData:
                             ''.format(name, location))
         # get location path
         location_path = self._name_or_node_to_path(location)
-        if (location_path is None) and not(createparents):
+        if (location_path is None):
             msg = ('(add_table): location {} does not exist, table'
                    ' cannot be added. Use optional argument'
                    ' "createparents=True" to force location Group creation'
@@ -991,9 +1064,7 @@ class SampleData:
         table = self.h5_dataset.create_table(where=location_path, name=name,
                                              description=description,
                                              filters=Filters,
-                                             chunkshape=chunkshape,
-                                             createparents=createparents)
-
+                                             chunkshape=chunkshape)
         if data is not None:
             table.append(data)
             table.flush()
@@ -2086,6 +2157,27 @@ class SampleData:
         """Find out if name or path references a image or mesh HDF5 Group."""
         return self._get_group_type(name) in SD_GRID_GROUPS
 
+    def _is_children_of(self, node, parent_group):
+        """Find out if location is a subgroup of the grid."""
+        if not self.__contains__(node):
+            return False
+        if not self.__contains__(parent_group):
+            return False
+        node_path = self._name_or_node_to_path(node)
+        bool_return = False
+        group = self.get_node(parent_group)
+        for n in group._f_iter_nodes():
+            if n._v_pathname == node_path:
+                bool_return = True
+                break
+            else:
+                if self._is_group(n._v_pathname):
+                    bool_return = self._is_children_of(node, n._v_pathname)
+                if bool_return:
+                    break
+        return bool_return
+
+
     def _is_field(self, name):
         """Checks conditions to consider node `name` as a field data node."""
         cond1 = self._is_grid(self._get_parent_name(name))
@@ -2117,29 +2209,25 @@ class SampleData:
                 break
         return Indexname
 
-    def _check_field_compatibility(self, name, field):
+    def _check_field_compatibility(self, gridname, field_shape):
         """Check if field dimension is compatible with the storing location."""
-        group_type = self._get_group_type(name)
-        msg = ''
-        if (group_type == '3DImage') or (group_type == '2DImage'):
-            compatibility = self._compatibility_with_image(name, field)
-            if self._is_empty(name):
-                msg += ('{} is an empty image. Use add_image to initialize'
-                        ''.format(name))
+        group_type = self._get_group_type(gridname)
+        if self._is_empty(gridname):
+            # TODO : solve pb when image is empty ? create image ?
+            # method create_image from array
+            raise ValueError('{} is an empty image. Use add_image to'
+                             ' initialize'.format(gridname))
+        elif (group_type == '3DImage') or (group_type == '2DImage'):
+            field_type, dimensionality = self._compatibility_with_image(
+                gridname, field_shape)
         elif group_type == 'Mesh':
-            compatibility = self._compatibility_with_mesh(name, field)
-            if self._is_empty(name):
-                msg += ('{} is an empty mesh. Use add_mesh to initialize'
-                        ''.format(name))
+            # TODO: adapt this method
+            field_type, dimensionality = self._compatibility_with_mesh(
+                gridname, field_shape)
         else:
-            msg = ('location {} is not a grid.'.format(name))
-            raise tables.NodeError(msg)
-
-        if not(compatibility):
-            msg = ('Array dimensions not compatible with {} `{}`'
-                   ''.format(group_type, name))
-            raise ValueError(msg)
-        return
+            raise tables.NodeError('location {} is not a grid.'
+                                   ''.format(gridname))
+        return field_type, dimensionality
 
     def _compatibility_with_mesh(self, name, field):
         """Check if field has a number of values compatible with the mesh."""
@@ -2152,20 +2240,49 @@ class SampleData:
             self._verbose_print(msg)
         return compatibility
 
-    def _compatibility_with_image(self, name, field):
-        """Check if field has a number of values compatible with the image."""
-        image = self.get_node(name)
+    def _compatibility_with_image(self, imagename, field_shape):
+        """Check if field has a number of values compatible with the image.
+
+        Returns the type of field values (nodal or element field), and the
+        dimensonality of the field in the XDMF convention (Scalar, Vector,
+        Tensor6 or Tensor)
+        """
         compatibility = True
-        for i in range(len(image._v_attrs.dimension)):
-            if image._v_attrs.dimension[i] != field.shape[i]:
-                compatibility = False
-                break
+        node_field = True
+        elem_field = True
+        image_node_dim = self.get_attribute('nodes_dimension', imagename)
+        image_cell_dim = self.get_attribute('dimension', imagename)
+        # Should never be equal but sanity check
+        if np.all(image_node_dim == image_cell_dim):
+            raise ValueError('Image group {} has identical node and cell'
+                             ' dimensions. Please correct your image Group'
+                             ' attributes.')
+        for i in range(len(image_cell_dim)):
+            if np.any(image_node_dim[i] != field_shape[i]):
+                node_field = False
+            if np.any(image_cell_dim[i] != field_shape[i]):
+                elem_field = False
+        if node_field:
+            field_type='Nodal_field'
+        elif elem_field:
+            field_type='Element_field'
+        compatibility = node_field or elem_field
         if not compatibility:
-            msg = ('Field number of values ({}) is not conformant with image '
-                   '`{}` dimensions ({})'.format(field.shape, name,
-                                                 image._v_attrs.dimension))
-            self._verbose_print(msg)
-        return compatibility
+            raise ValueError('Field number of values ({}) is not conformant'
+                             ' with image `{}` dimensions'
+                             ''.format(field_shape, imagename))
+        else:
+            if len(field_shape) == len(image_node_dim):
+                dimension = 1
+            else:
+                dimension = field_shape[-1]
+        if dimension not in XDMF_FIELD_TYPE:
+            raise ValueError('Field dimensionnality `{}` is not know. '
+                             'Supported dimensionnalities are Scalar (1),'
+                             'Vector (3), Tensor6 (6), Tensor (9).'
+                             'Maybe are you trying to add a 3D field into a'
+                             '3D grid.')
+        return field_type, XDMF_FIELD_TYPE[dimension]
 
     def _add_image_to_xdmf(self, imagename, image_object):
         """Write grid geometry and topoly in xdmf tree/file."""
@@ -2208,19 +2325,35 @@ class SampleData:
                     'geometry_path': geo_path}
         return Path_dic
 
-    def _add_field_to_xdmf(self, name, field):
+    def _append_field_index(self, gridname, field_path):
+        """Append field_path to the field index of a grid group."""
+        Field_index = self.get_attribute('Field_index', gridname)
+        if Field_index is None:
+            Field_index = []
+        Field_index.append(field_path)
+        self.add_attributes({'Field_index': Field_index}, gridname)
+        return
+
+    def _add_field_to_xdmf(self, fieldname, field):
         """Write field data as Grid Attribute in xdmf tree/file."""
-        Node = self.get_node(name)
-        Grid_type = self._get_parent_type(name)
-        Grid_name = self._get_parent_name(name)
-        attribute_center = XDMF_CENTERS[Grid_type]
+        Node = self.get_node(fieldname)
+        Grid_name = self._get_parent_name(fieldname)
         xdmf_path = self.get_attribute('xdmf_path', Grid_name)
-        field_type = self.get_attribute('field_type', name)
+        field_type = self.get_attribute('field_type', fieldname)
+        if field_type == 'Nodal_field':
+            Center_type = 'Node'
+        elif field_type == 'Element_field':
+            Center_type = 'Cell'
+        else:
+            raise ValueError('unknown field type, should be `Nodal_field`'
+                             ' or `Element_field`.')
+        field_dimensionality = self.get_attribute('field_dimensionality',
+                                                  fieldname)
         Xdmf_grid_node = self.xdmf_tree.find(xdmf_path)
         # create Attribute element
-        Attribute_xdmf = etree.Element(_tag='Attribute', Name=name,
-                                       AttributeType=field_type,
-                                       Center=attribute_center)
+        Attribute_xdmf = etree.Element(_tag='Attribute', Name=fieldname,
+                                       AttributeType=field_dimensionality,
+                                       Center=Center_type)
         # Create data item element
         Dimension = self._np_to_xdmf_str(Node.shape)
         if (np.issubdtype(field.dtype, np.floating)):
@@ -2237,25 +2370,27 @@ class SampleData:
                                        NumberType=NumberType,
                                        Precision=Precision)
         Attribute_data.text = (self.h5_file + ':'
-                               + self._name_or_node_to_path(name))
+                               + self._name_or_node_to_path(fieldname))
         # add data item to attribute
         Attribute_xdmf.append(Attribute_data)
         # add attribute to Grid
         Xdmf_grid_node.append(Attribute_xdmf)
         el_path = self.xdmf_tree.getelementpath(Attribute_xdmf)
-        self.add_attributes({'xdmf_path': el_path}, name)
+        self.add_attributes({'xdmf_path': el_path}, fieldname)
         return
 
-    def _get_xdmf_field_type(self, field_shape, grid_location):
+    def _get_xdmf_field_type(self, field_shape, gridname):
         """Get field's XDMF nature w.r.t. grid dimension."""
+        # TODO : remove this method ?
         field_type = None
+        field_center = None
         # get grid dimension
-        if not(self._is_grid(grid_location)):
+        if not(self._is_grid(gridname)):
             msg = ('(_get_xdmf_field_type) name or path `{}` is not a grid.'
-                   'Field type detection impossible'.format(grid_location))
+                   'Field type detection impossible'.format(gridname))
             self._verbose_print(msg)
             return None
-        Type = self._get_group_type(grid_location)
+        Type = self._get_group_type(gridname)
         # analyze field shape
         if Type == 'Mesh':
             if len(field_shape) != 2:
@@ -2265,7 +2400,7 @@ class SampleData:
                 self._verbose_print(msg)
                 return field_type
             field_dim = field_shape[1]
-        elif Type == '3DImage':
+        elif (Type == '3DImage' or Type == '2DImage'):
             if (len(field_shape) < 3) or (len(field_shape) > 4):
                 msg = ('(_get_xdmf_field_type) wrong field shape. For a'
                        '3DImage field, shape should be (Nx1,Nx2,Nx3) or'
@@ -2289,7 +2424,7 @@ class SampleData:
                 field_dim = field_shape[2]
         # determine field dimension and get name in dictionary
         field_type = XDMF_FIELD_TYPE[field_dim]
-        return field_type
+        return field_type, field_center
 
     def _get_node_class(self, name):
         """Return Pytables Class type associated to the node name."""

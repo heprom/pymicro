@@ -21,7 +21,6 @@ from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
-from pymicro.core.images import ImageObject
 import tables
 from math import atan2, pi
 
@@ -1426,9 +1425,9 @@ class Microstructure(SampleData):
         s += '* name: %s\n' % self.get_sample_name()
         s += '* lattice: %s\n' % self.get_lattice()
         s += '\n'
-        if self._verbose:
-            for g in self.grains:
-                s += '* %s' % g.__repr__
+        # if self._verbose:
+        #     for g in self.grains:
+        #         s += '* %s' % g.__repr__
         s += SampleData.__repr__(self)
         return s
 

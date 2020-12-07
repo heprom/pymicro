@@ -18,14 +18,13 @@ import numpy as np
 import tables
 import lxml.builder
 from lxml import etree
-from pymicro.core.images import ImageReader
 from pymicro.core.meshes import MeshReader
 from BasicTools.Containers.ConstantRectilinearMesh import (
                                                     ConstantRectilinearMesh)
 # Import variables for XDMF binding
 from pymicro.core.global_variables import (XDMF_FIELD_TYPE,
                                            XDMF_IMAGE_GEOMETRY,
-                                           XDMF_IMAGE_TOPOLOGY, XDMF_CENTERS)
+                                           XDMF_IMAGE_TOPOLOGY)
 # Import variables for SampleData data model
 from pymicro.core.global_variables import (SD_GROUP_TYPES, SD_GRID_GROUPS,
                                            SD_IMAGE_GROUPS, SD_RESERVED_NAMES)
@@ -587,36 +586,6 @@ class SampleData:
                       description=description, replace=replace)
         return
 
-    def add_image_from_file(self, imagefile, imagename, location='/',
-                            description='', indexname='', replace=False,
-                            **keywords):
-        """Load image data in a file into a 3DImage group in the dataset.
-
-        :param str imagefile: path of the file containing the data to store
-        :param str imagename: name used to create the 3DImage group in dataset
-        :param indexname: Index name used to reference the 3DImage group
-        :location str: Path, Name, Index Name or Alias of the parent group
-            where the 3DImage grou is to be created
-        :param str description: Description metadata for this 3D image
-        :param bool replace: remove 3DImage  group in the dataset with the same
-            name/location if `True` and such group exists
-
-        .. rubric:: Additional arguments for `Matlab` files
-
-        :param list matlab_variables: list of (str) of the names of variables
-            in the `.m` file to load into dataset
-
-        .. warning:: Method not stabilized, Image and Mesh generic data objects
-            as well as many files readers needs to be implemented
-        """
-        self._verbose_print('Lauching image reader on {}...'.format(imagefile))
-        Reader = ImageReader(imagefile, **keywords)
-        Image_object = Reader.image
-        self.add_image(image_object=Image_object, imagename=imagename,
-                       indexname=indexname, location=location,
-                       description=description, replace=replace)
-        return
-
     def add_mesh(self, mesh_object=None, meshname='', indexname='',
                  location='/', description=' ', replace=False, **keywords):
         """Create a Mesh group in the dataset from a MeshObject.
@@ -1139,6 +1108,50 @@ class SampleData:
         self.add_to_index(indexname, table._v_pathname)
         return table
 
+    def add_tablecols(self, tablename, description, data=None):
+        """Add new columns to a table node.
+
+        :param tablename: Name, Path or Indexname of the table where the
+            columns must be added.
+        :type tablename: str
+        :param description: Description of the fields constituting the
+            new columns to add the table.
+        :type description: np.dtype or tables.IsDescription
+        :param data: values to add into the new columns, defaults to None. The
+            dtype of this array must be constitent with the `description`
+            argument.
+        :type data: np.array, optional
+        :raises ValueError: If `data.dtype` and `description` do no match
+        """
+        table = self.get_node(tablename)
+        current_dtype = tables.dtype_from_descr(table.description)
+        if isinstance(description, tables.IsDescription):
+            descr_dtype = tables.dtype_from_descr(description)
+        elif isinstance(description, np.dtype):
+            descr_dtype = description
+        else:
+            raise ValueError('description must be a tables.IsDescription'
+                             ' instance or a numpy.dtype instance.')
+        new_dtype = SampleData._merge_dtypes(current_dtype,descr_dtype)
+        new_desc = tables.descr_from_dtype(new_dtype)[0]
+        print(type(new_desc))
+        print(new_desc)
+        self._update_table_columns(tablename, new_desc)
+        # if data is provided, safety check. Must be adequate array dtype
+        if data is not None:
+            if not(data.dtype == descr_dtype):
+                raise ValueError('Data provided to add to the new columns'
+                                 ' dtype is not consistent with the new'
+                                 ' columns description inputed.\n'
+                                 'Provided data dtype : {}\n'
+                                 'Provided description : {}\n'
+                                 ''.format(data.dtype, descr_dtype))
+            for colname in descr_dtype.names:
+                column = data[colname]
+                self.set_tablecol(tablename, colname, column)
+        return
+
+
     def add_attributes(self, dic, nodename):
         """Add a dictionary entries as HDF5 Attributes to a Node or Group.
 
@@ -1445,7 +1458,7 @@ class SampleData:
                                                           attrname=attrname)
             except AttributeError:
                 self._verbose_print(' (get_attribute) node {} has no attribute'
-                                    ' `empty`'.format(nodename))
+                                    ' `{}`'.format(nodename,attrname))
                 return None
             if isinstance(attribute, bytes):
                 attribute = attribute.decode()
@@ -1587,6 +1600,9 @@ class SampleData:
     def set_tablecol(self, tablename, colname, column):
         """Store an array into a structured table column.
 
+        If the column is not in the table description, a new field
+        corresponding to the inputed column is added to the table description.
+
         :param str tablename: Name, Path, Index name or Alias of the table
         :param str colname: Name of the column to set (analogous to name of a
             field in a `Numpy` structured array)
@@ -1596,15 +1612,15 @@ class SampleData:
         if not self._is_table(tablename):
             raise tables.NodeError('{} is not a structured table node'
                                    ''.format(tablename))
-        tab = self.get_node(tablename)
+        table = self.get_node(tablename)
         col_shape = self.get_tablecol(tablename, colname).shape
         if (column.shape != col_shape):
             raise ValueError('inputed column shape {} does not match the shape'
                              '{} of column {} in table {}'
                              ''.format(column.shape, col_shape, colname,
                                        tablename))
-        tab.modify_column(column=column, colname=colname)
-        tab.flush()
+        table.modify_column(column=column, colname=colname)
+        table.flush()
         return
 
     def set_nodes_compression_chunkshape(self, node_list=None, chunkshape=None,
@@ -1797,7 +1813,7 @@ class SampleData:
             self._verbose_print(msg)
             return
 
-        Node = self.h5_dataset.get_node(node_path)
+        Node = self.get_node(node_path)
         isGroup = False
         remove_flag = False
 
@@ -1832,8 +1848,8 @@ class SampleData:
         if (remove_flag or not (isGroup)):
 
             # remove node in xdmf tree
-            xdmf_path = self.get_attribute('xdmf_path', Node)
-            if xdmf_path is not None:
+            if self.get_attribute('xdmf_path', Node) is not None:
+                xdmf_path = self.get_attribute('xdmf_path', Node)
                 group_xdmf = self.xdmf_tree.find(xdmf_path)
                 self._verbose_print('Removing  node {} in xdmf'
                                     ' tree....'.format(xdmf_path))
@@ -1962,8 +1978,8 @@ class SampleData:
                                                Description=content_type[key])
                 if self._is_empty(content_paths[key]):
                     self._verbose_print('Warning: node {} specified in the'
-                                        'minimal data model for this class'
-                                        'is empty'.format(content_paths[key]))
+                                        ' minimal data model for this class'
+                                        ' is empty'.format(content_paths[key]))
                 continue
             elif content_type[key] == 'Group':
                 msg = ('Adding empty Group {}'.format(content_paths[key]))
@@ -2047,10 +2063,12 @@ class SampleData:
             # check if array location exists and remove node if asked
             array_path = os.path.join(location_path, arrayname)
             if self.__contains__(array_path):
+                empty = self.get_attribute('empty', array_path)
                 if replace:
                     msg = ('Existing node {} will be overwritten to recreate '
                            'array/table'.format(array_path))
-                    self._verbose_print(msg)
+                    if not(empty):
+                        self._verbose_print(msg)
                     self.remove_node(array_path, recursive=True)
                 else:
                     msg = ('Array/table {} already exists. To overwrite, use '
@@ -2100,7 +2118,16 @@ class SampleData:
             self.add_attributes(dic={'group_type': group_type}, nodename=Group)
         return Group
 
-    def _compatible_descriptions(self, desc_items1, desc_items2):
+    @staticmethod
+    def _merge_dtypes(dtype1, dtype2):
+        """Merge 2 numpy.void dtypes to creates a new one."""
+        descr = dtype1.descr
+        for item in dtype2.descr:
+            descr.append(item)
+        return np.dtype(descr)
+
+    @staticmethod
+    def _compatible_descriptions(desc_items1, desc_items2):
         if not(desc_items1.keys() <= desc_items2.keys()):
             return False
         else:
@@ -2113,13 +2140,23 @@ class SampleData:
 
     def _update_table_columns(self, tablename, Description):
         """Update table if associated table description Class has evolved."""
+        # check format of Description
+        if isinstance(Description, tables.IsDescription):
+            Description = tables.description.Description(Description)
+        if isinstance(Description, tables.description.MetaIsDescription):
+            Description = tables.dtype_from_descr(Description)
+            Description = tables.descr_from_dtype(Description)[0]
+        elif isinstance(Description, np.dtype):
+            Description = tables.descr_from_dtype(Description)
         table = self.get_node(tablename)
         current_desc = table.description._v_colobjects
+        print(str(Description))
+        new_desc = Description._v_colobjects
         desc_dtype = tables.dtype_from_descr(Description)
         # Check if current table description is contained or equal to
         # Class defined table description
-        compatibility = self._compatible_descriptions(current_desc,
-                                                      Description.columns)
+        compatibility = SampleData._compatible_descriptions(current_desc,
+                                                            new_desc)
         if not(compatibility):
             msg = ('Table `{}` has a Description (column specification) '
                    'that does not match the Class `{}` Description `{}` for '
@@ -2130,7 +2167,7 @@ class SampleData:
                                      Description.columns))
             raise tables.NodeError(msg)
         elif compatibility and (current_desc.keys()
-                                < Description.columns.keys()):
+                                < new_desc.keys()):
             msg = ('Updating `{}` with current class Table description'.format(
                     tablename))
             self._verbose_print(msg)
@@ -2269,6 +2306,7 @@ class SampleData:
 
     def _is_field(self, name):
         """Checks conditions to consider node `name` as a field data node."""
+        # TODO : update to get first grid parent (but not only parent group)
         cond1 = self._is_grid(self._get_parent_name(name))
         cond2 = name not in SD_RESERVED_NAMES
         if cond1:

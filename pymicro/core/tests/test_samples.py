@@ -171,11 +171,12 @@ class SampleDataTests(unittest.TestCase):
 
     def test_derived_class(self):
         """ Test application specific data model specification through
-            derived classes
+            derived classes.
+            Also test table functionalities.
         """
         derived_sample = Test_DerivedClass(filename=self.derived_filename,
-                                           autodelete=True, overwrite_hdf5=True,
-                                           verbose=True)
+                                           autodelete=False,
+                                           overwrite_hdf5=True, verbose=False)
         # assert data model Nodes are contained in dataset
         self.assertTrue(derived_sample.__contains__('Image_data'))
         self.assertTrue(derived_sample.__contains__('grain_map'))
@@ -192,6 +193,21 @@ class SampleDataTests(unittest.TestCase):
         tab = derived_sample.get_node('GrainDataTable')
         self.assertEqual(Test_GrainData.columns,
                          tab.description._v_colobjects)
+        # add columns to the table
+        dtype = np.dtype([('name', np.str_, 16),('floats', np.float64, (2,))])
+        derived_sample.add_tablecols('GrainDataTable', description=dtype)
+        tab = derived_sample.get_node('GrainDataTable')
+        self.assertTrue('name' in tab.colnames)
+        self.assertTrue('floats' in tab.colnames)
+        del derived_sample
+        # reopen file and check that neqw columns have been added
+        derived_sample = Test_DerivedClass(filename=self.derived_filename,
+                                           autodelete=True,
+                                           overwrite_hdf5=False, verbose=True)
+        derived_sample.get_node_info('GrainDataTable')
+        tab = derived_sample.get_node('GrainDataTable')
+        self.assertTrue('name' in tab.colnames)
+        self.assertTrue('floats' in tab.colnames)
         del derived_sample
         self.assertTrue(not os.path.exists(self.derived_filename+'.h5'))
         self.assertTrue(not os.path.exists(self.derived_filename+'.xdmf'))

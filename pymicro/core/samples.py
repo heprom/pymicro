@@ -1134,8 +1134,6 @@ class SampleData:
                              ' instance or a numpy.dtype instance.')
         new_dtype = SampleData._merge_dtypes(current_dtype,descr_dtype)
         new_desc = tables.descr_from_dtype(new_dtype)[0]
-        print(type(new_desc))
-        print(new_desc)
         self._update_table_columns(tablename, new_desc)
         # if data is provided, safety check. Must be adequate array dtype
         if data is not None:
@@ -2123,76 +2121,54 @@ class SampleData:
         """Merge 2 numpy.void dtypes to creates a new one."""
         descr = dtype1.descr
         for item in dtype2.descr:
-            descr.append(item)
+            if not(item in descr) and not(item[0]==''):
+                descr.append(item)
         return np.dtype(descr)
 
-    @staticmethod
-    def _compatible_descriptions(desc_items1, desc_items2):
-        if not(desc_items1.keys() <= desc_items2.keys()):
-            return False
-        else:
-            for key in desc_items1:
-                kind_comp = (desc_items1[key].kind == desc_items2[key].kind)
-                shape_comp = (desc_items1[key].shape == desc_items2[key].shape)
-                if not(kind_comp and shape_comp):
-                    return False
-            return True
-
     def _update_table_columns(self, tablename, Description):
-        """Update table if associated table description Class has evolved."""
-        # check format of Description
-        if isinstance(Description, tables.IsDescription):
-            Description = tables.description.Description(Description)
-        if isinstance(Description, tables.description.MetaIsDescription):
-            Description = tables.dtype_from_descr(Description)
-            Description = tables.descr_from_dtype(Description)[0]
-        elif isinstance(Description, np.dtype):
-            Description = tables.descr_from_dtype(Description)
+        """Extends table with new fields in input Description."""
         table = self.get_node(tablename)
-        current_desc = table.description._v_colobjects
-        print(str(Description))
-        new_desc = Description._v_colobjects
+        current_desc = table.description
+        current_dtype = tables.dtype_from_descr(table.description)
         desc_dtype = tables.dtype_from_descr(Description)
-        # Check if current table description is contained or equal to
-        # Class defined table description
-        compatibility = SampleData._compatible_descriptions(current_desc,
-                                                            new_desc)
-        if not(compatibility):
-            msg = ('Table `{}` has a Description (column specification) '
-                   'that does not match the Class `{}` Description `{}` for '
-                   'this table\n'.format(tablename, self.__class__.__name__,
-                                         Description.__name__))
-            msg += ('Current table description: \n {}\nClass table description'
-                    ': \n {}'.format(current_desc.items,
-                                     Description.columns))
-            raise tables.NodeError(msg)
-        elif compatibility and (current_desc.keys()
-                                < new_desc.keys()):
-            msg = ('Updating `{}` with current class Table description'.format(
-                    tablename))
-            self._verbose_print(msg)
-            Nrows = table.nrows
-            tab_name = table._v_name
-            tab_indexname = self.get_indexname_from_path(table._v_pathname)
-            tab_path = os.path.dirname(table._v_pathname)
-            tab_chunkshape = table.chunkshape
-            tab_filters = table.filters
-            data = np.array(np.zeros((Nrows,)), dtype=desc_dtype)
-            for key in current_desc:
-                data[key] = self.get_tablecol(tablename=tablename,
-                                              colname=key)
-            if self.aliases.__contains__(tab_indexname):
-                tab_aliases = self.aliases[tab_indexname]
-            else:
-                tab_aliases = []
-            self.remove_node(tab_name)
-            new_tab = self.add_table(location=tab_path, name=tab_name,
-                                     description=Description,
-                                     indexname=tab_indexname,
-                                     chunkshape=tab_chunkshape, replace=True,
-                                     data=data, filters=tab_filters)
-            for alias in tab_aliases:
-                self.add_alias(aliasname=alias, indexname=new_tab._v_pathname)
+        new_dtype = SampleData._merge_dtypes(current_dtype, desc_dtype)
+        new_descr = tables.descr_from_dtype(new_dtype)[0]
+        if current_dtype == new_dtype:
+            self._verbose_print('Nothing to update for table `{}`'
+                                ''.format(tablename))
+            return
+        self._verbose_print('Updating `{}` with fields {}'
+                            ''.format(tablename, desc_dtype.fields))
+        self._verbose_print('New table description is `{}`'
+                            ''.format(new_dtype.fields))
+        Nrows = table.nrows
+        tab_name = table._v_name
+        tab_indexname = self.get_indexname_from_path(table._v_pathname)
+        tab_path = os.path.dirname(table._v_pathname)
+        tab_chunkshape = table.chunkshape
+        tab_filters = table.filters
+        # Create a new array with modified dtype
+        data = np.array(np.zeros((Nrows,)), dtype=new_dtype)
+        self._verbose_print('data is:',data)
+        # Get data from old table
+        for key in current_desc._v_names:
+            data[key] = self.get_tablecol(tablename=tablename,
+                                          colname=key)
+        # get table aliases
+        if self.aliases.__contains__(tab_indexname):
+            tab_aliases = self.aliases[tab_indexname]
+        else:
+            tab_aliases = []
+        # remove old table
+        self.remove_node(tab_name)
+        # create new table
+        new_tab = self.add_table(location=tab_path, name=tab_name,
+                                 description=new_descr,
+                                 indexname=tab_indexname,
+                                 chunkshape=tab_chunkshape, replace=True,
+                                 data=data, filters=tab_filters)
+        for alias in tab_aliases:
+            self.add_alias(aliasname=alias, indexname=new_tab._v_pathname)
         return
 
     def _remove_from_index(self, node_path):

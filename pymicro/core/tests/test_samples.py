@@ -6,6 +6,7 @@ from tables import IsDescription, Int32Col, Float32Col
 from pymicro.core.samples import SampleData
 from pymicro.core.meshes import MeshObject
 from BasicTools.Containers.ConstantRectilinearMesh import ConstantRectilinearMesh
+from BasicTools.Containers.UnstructuredMeshCreationTools import CreateMeshOfTriangles
 from config import PYMICRO_EXAMPLES_DATA_DIR
 
 
@@ -88,15 +89,11 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(os.path.exists(self.filename+'.h5'))
         self.assertTrue(os.path.exists(self.filename+'.xdmf'))
         # Add mesh data into SampleData dataset
-        mesh = MeshObject()
-        mesh.add_nodes(self.mesh_nodes)
-        mesh.add_elements(Elements_topology=['Triangle', 1],
-                          Elements_Id=np.arange(self.mesh_nodes.shape[0])+1,
-                          Elements_connectivity=self.mesh_elements)
-        mesh.add_field(self.mesh_shape_f1,'Test_field1')
-        mesh.add_field(self.mesh_shape_f2,'Test_field2')
+        mesh = CreateMeshOfTriangles(self.mesh_nodes, self.mesh_elements)
+        mesh.nodeFields['Test_field1'] = self.mesh_shape_f1
+        mesh.nodeFields['Test_field2'] = self.mesh_shape_f2
         sample.add_mesh(mesh, meshname='test_mesh',indexname='mesh',
-                        location='/')
+                        location='/', extended_data=False)
         # Add image data into SampleData dataset
         image = ConstantRectilinearMesh(dim=len(self.image.shape))
         image.SetDimensions(self.image.shape)
@@ -118,6 +115,7 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(np.all(mesh_nodes==self.mesh_nodes))
         mesh_elements = sample.get_mesh_elements(meshname='mesh',
                                                   as_numpy=True)
+        mesh_elements = mesh_elements.reshape(self.mesh_elements.shape)
         self.assertTrue(np.all(mesh_elements==self.mesh_elements))
         # test mesh field recovery
         shape_f1 = sample.get_field(gridname='mesh',fieldname='Test_field1',

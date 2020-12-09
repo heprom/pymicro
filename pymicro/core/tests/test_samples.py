@@ -4,9 +4,8 @@ import numpy as np
 import math
 from tables import IsDescription, Int32Col, Float32Col
 from pymicro.core.samples import SampleData
-from pymicro.core.meshes import MeshObject
 from BasicTools.Containers.ConstantRectilinearMesh import ConstantRectilinearMesh
-from BasicTools.Containers.UnstructuredMeshCreationTools import CreateMeshOfTriangles
+import BasicTools.Containers.UnstructuredMeshCreationTools as UMCT
 from config import PYMICRO_EXAMPLES_DATA_DIR
 
 
@@ -89,7 +88,7 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(os.path.exists(self.filename+'.h5'))
         self.assertTrue(os.path.exists(self.filename+'.xdmf'))
         # Add mesh data into SampleData dataset
-        mesh = CreateMeshOfTriangles(self.mesh_nodes, self.mesh_elements)
+        mesh = UMCT.CreateMeshOfTriangles(self.mesh_nodes, self.mesh_elements)
         mesh.nodeFields['Test_field1'] = self.mesh_shape_f1
         mesh.nodeFields['Test_field2'] = self.mesh_shape_f2
         sample.add_mesh(mesh, meshname='test_mesh',indexname='mesh',
@@ -113,8 +112,8 @@ class SampleDataTests(unittest.TestCase):
         # test mesh geometry data recovery
         mesh_nodes = sample.get_mesh_nodes(meshname='mesh',as_numpy=True)
         self.assertTrue(np.all(mesh_nodes==self.mesh_nodes))
-        mesh_elements = sample.get_mesh_elements(meshname='mesh',
-                                                  as_numpy=True)
+        mesh_elements = sample.get_mesh_xdmf_connectivity(meshname='mesh',
+                                                          as_numpy=True)
         mesh_elements = mesh_elements.reshape(self.mesh_elements.shape)
         self.assertTrue(np.all(mesh_elements==self.mesh_elements))
         # test mesh field recovery
@@ -210,6 +209,21 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(not os.path.exists(self.derived_filename+'.h5'))
         self.assertTrue(not os.path.exists(self.derived_filename+'.xdmf'))
 
-
-
-
+    def test_BasicTools_binding(self):
+        """Test BasicTools to SampleData to BasicTools."""
+        # create mesh of triangles
+        myMesh = UMCT.CreateSquare(dimensions=[3,3], ofTris=True)
+        # get into a SampleData instance
+        sample = SampleData(filename='square', verbose=False, autodelete=True)
+        sample.add_mesh(mesh_object=myMesh, meshname='BT_mesh',indexname='BTM',
+                          replace=True, extended_data=True)
+        # get mesh object from SampleData file/instance
+        myMesh2 = sample.get_mesh('BTM')
+        # delete SampleData object and test values
+        self.assertTrue(np.all(myMesh.nodes == myMesh2.nodes))
+        connectivity = myMesh.elements['tri3'].connectivity
+        connectivity2 = myMesh2.elements['tri3'].connectivity
+        self.assertTrue(np.all(connectivity == connectivity2))
+        elements_in_tag = myMesh.GetElementsInTag('ExteriorSurf')
+        elements_in_tag2 = myMesh2.GetElementsInTag('ExteriorSurf')
+        self.assertTrue(np.all(elements_in_tag == elements_in_tag2))

@@ -18,16 +18,19 @@ import numpy as np
 import tables
 import lxml.builder
 from lxml import etree
-from pymicro.core.meshes import MeshReader
 from BasicTools.Containers.ConstantRectilinearMesh import (
-                                                    ConstantRectilinearMesh)
+    ConstantRectilinearMesh)
+from BasicTools.Containers.UnstructuredMesh import (UnstructuredMesh,
+                                                    AllElements)
+from BasicTools.Containers.MeshBase import MeshBase
+from BasicTools.IO.XdmfTools import XdmfName,XdmfNumber
 # Import variables for XDMF binding
 from pymicro.core.global_variables import (XDMF_FIELD_TYPE,
                                            XDMF_IMAGE_GEOMETRY,
                                            XDMF_IMAGE_TOPOLOGY)
 # Import variables for SampleData data model
 from pymicro.core.global_variables import (SD_GROUP_TYPES, SD_GRID_GROUPS,
-                                           SD_IMAGE_GROUPS, SD_RESERVED_NAMES)
+                                           SD_IMAGE_GROUPS, SD_MESH_GROUPS)
 # Import variables for SampleData utilities
 from pymicro.core.global_variables import (COMPRESSION_KEYS)
 
@@ -552,52 +555,22 @@ class SampleData:
         self._verbose = not (self._verbose)
         return
 
-    def add_mesh_from_file(self, meshfile, meshname, indexname='',
-                           location='/', description=' ', replace=False,
-                           **keywords):
-        """Load mesh data in a file into a Mesh group in dataset.
-
-        :param str meshfile: path of the file containing the data to store
-        :param str meshname: name used to create the Mesh group in dataset
-        :param indexname: Index name used to reference the Mesh group
-        :location str: Path, Name, Index Name or Alias of the parent group
-            where the Mesh group is to be created
-        :param str description: Description metadata for this mesh
-        :param bool replace: remove Mesh group in the dataset with the same
-            name/location if `True` and such group exists
-
-        .. rubric:: Additional arguments for `Matlab` files
-
-        :param list matlab_variables: list of (str) of the names of variables
-            in the `.m` file to load into dataset
-
-        .. rubric:: Currently supported file formats:
-            * .geof
-            * .mat
-
-        .. warning:: Method not stabilized, Image and Mesh generic data objects
-            as well as many files readers needs to be implemented
-        """
-        self._verbose_print('Lauching mesh reader on  {}...'.format(meshfile))
-        Reader = MeshReader(meshfile, **keywords)
-        Mesh_object = Reader.mesh
-        self.add_mesh(mesh_object=Mesh_object, meshname=meshname,
-                      indexname=indexname, location=location,
-                      description=description, replace=replace)
-        return
-
     def add_mesh(self, mesh_object=None, meshname='', indexname='',
-                 location='/', description=' ', replace=False, **keywords):
+                 location='/', description=' ', replace=False,
+                 extended_data=True, **keywords):
         """Create a Mesh group in the dataset from a MeshObject.
 
         A Mesh group is a HDF5 Group that contains arrays describing mesh
         geometry, and fields defined on this mesh. The mesh geometry HDF5 nodes
-        pathes and content are:
+        are: This methods adds a Mesh group to the dataset from a BasicTools
+        :py:class:`UnstructuredMesh` class instance.
 
             :Nodes: array of shape `(Nnodes,Ndim)` with path
-               ``'/Mesh_Path/Nodes'`` and Index name ``'Meshname_Nodes'``
+               ``'/Mesh_Path/Geometry/Nodes'`` and Index name
+               ``'Meshname_Nodes'``
             :Elements: array of shape `(Nelements,Nelement_nodes)` with path
-               ``'/Mesh_Path/Elements'`` and Index name ``'Meshname_Elements'``
+               ``'/Mesh_Path/Geometry/Elements'`` and Index name
+               ``'Meshname_Elements'``
 
         Mesh group may also contain data array to describe fields, whose
         pathes, index names and content can be set using the class method
@@ -614,115 +587,51 @@ class SampleData:
         :param str description: Description metadata for this mesh
         :param bool replace: remove Mesh group in the dataset with the same
             name/location if `True` and such group exists
+        :param bool extended_data: If `True`, stores all Node and Element Tags
+            in mesh_object as fields
 
         .. warning::
 
-            - Mesh data model and Mesh Object have not been stabilized. Their
-                manipulation may change in the future.
             - Handling of fields defined at integration points not implemented
                yet
 
         """
-        # TODO: Update mesh data models and add_mesh method accordingly
-        # TODO: externalize in private methods XDMF construction
+        ### Create or fetch mesh group
         mesh_group = self.add_group(meshname, location, indexname, replace)
+        ### empty meshes creation
         if (mesh_object is None):
-            self.add_attributes({'empty': True, 'group_type': 'Mesh'},
+            self.add_attributes({'empty': True, 'group_type': 'emptyMesh'},
                                 mesh_group._v_pathname)
             return
-        # safety check
-        if (len(mesh_object.element_topology) > 1):
-            msg = ('number of element type found : {} \n add_mesh_from_file'
-                   'current implementation works only with meshes with only'
-                   'one type'.format(len(mesh_object.element_topology)))
-            raise ValueError(msg)
-        if (indexname == ''):
-            indexname = meshname
+        else:
+            self._check_mesh_object_support(mesh_object)
+        ### Add Mesh Geometry to HDF5 dataset
+        self._add_mesh_geometry(mesh_object,mesh_group, replace, extended_data)
+        ### Add mesh Grid to xdmf file
+        Xdmf_pathes = self._add_mesh_to_xdmf(mesh_group._v_pathname)
         # store mesh metadata as HDF5 attributes
-        Attribute_dic = {'element_topology': mesh_object.element_topology[0],
-                         'description': description,
-                         'group_type': 'Mesh',
-                         'empty': False}
-        mesh_path = mesh_group._v_pathname
-        # TODO: Add Nodes ID ? Elements ID ?
-        self._verbose_print('Creating Nodes data set in group {} in file {}'
-                            ''.format(mesh_path, self.h5_file))
-        # TODO: replace by add_data_array
-        Nodes = self.h5_dataset.create_carray(where=mesh_path, name='Nodes',
-                                              filters=self.Filters,
-                                              obj=mesh_object.nodes,
-                                              title=indexname + '_Nodes')
-        Nodes_path = Nodes._v_pathname
-
-
-        self._verbose_print('Creating Elements data set in group {} in file {}'
-                            ''.format(location + '/' + meshname, self.h5_file))
-        Connectivity = mesh_object.element_connectivity[0]
-        # TODO: replace by add_data_array
-        Elements = self.h5_dataset.create_carray(where=mesh_path,
-                                                 name='Elements',
-                                                 filters=self.Filters,
-                                                 obj=Connectivity,
-                                                 title=indexname + '_Elements')
-        Elements_path = Elements._v_pathname
-        self._verbose_print('...Updating xdmf tree...', line_break=False)
-        mesh_xdmf = etree.Element(_tag='Grid', Name=meshname,
-                                  GridType='Uniform')
-
-        NElements = str(mesh_object.element_connectivity[0].shape[0])
-        Dim = str(mesh_object.element_connectivity[0].shape).strip(
-                    '(').strip(')')
-        Dim = Dim.replace(',', ' ')
-
-        TopoType = mesh_object.element_topology[0][0]
-        topology_xdmf = etree.Element(_tag='Topology', TopologyType=TopoType,
-                                      NumberOfElements=NElements)
-        topology_data = etree.Element(_tag='DataItem', Format='HDF',
-                                      Dimensions=Dim, NumberType='Int',
-                                      Precision='64')
-        topology_data.text = self.h5_file + ':' + mesh_path + '/Elements'
-        # Add node DataItem as children of node Topology
-        topology_xdmf.append(topology_data)
-
-        # create Geometry element
-        geometry_xdmf = etree.Element(_tag='Geometry', Type='XYZ')
-        Dim = str(mesh_object.nodes.shape).strip('(').strip(')').replace(
-                  ',', ' ')
-        geometry_data = etree.Element(_tag='DataItem', Format='HDF',
-                                      Dimensions=Dim, NumberType='Float',
-                                      Precision='64')
-        geometry_data.text = self.h5_file + ':' + mesh_path + '/Nodes'
-        # Add node DataItem as children of node Geometry
-        geometry_xdmf.append(geometry_data)
-
-        # Add Geometry and Topology as childrens of Grid
-        mesh_xdmf.append(topology_xdmf)
-        mesh_xdmf.append(geometry_xdmf)
-
-        # Add Grid to node Domain
-        self.xdmf_tree.getroot()[0].append(mesh_xdmf)
-
-        # Get xdmf elements paths as attributes
-        #   mesh group
-        el_path = self.xdmf_tree.getelementpath(mesh_xdmf)
-        Attribute_dic['xdmf_path'] = el_path
-        #   topology element
-        el_path = self.xdmf_tree.getelementpath(topology_xdmf)
-        Attribute_dic['xdmf_topology_path'] = el_path
-        Topology_attribute_dic = {'xdmf_path': el_path}
-        #   geometry  element
-        el_path = self.xdmf_tree.getelementpath(geometry_xdmf)
-        Attribute_dic['xdmf_geometry_path'] = el_path
-        Geometry_attribute_dic = {'xdmf_path': el_path}
-
+        Attribute_dic = {'description': description,
+                         'empty': False,
+                         'xdmf_path': Xdmf_pathes['mesh_path'],
+                         'xdmf_topology_path': Xdmf_pathes['topology_path'],
+                         'xdmf_geometry_path': Xdmf_pathes['geometry_path']}
         self.add_attributes(Attribute_dic, indexname)
-        self.add_attributes(Topology_attribute_dic, Elements_path)
-        self.add_attributes(Geometry_attribute_dic, Nodes_path)
-
-        # Add mesh fields if some are stored
-        for field_name, field in mesh_object.fields.items():
-            self.add_data_array(location=mesh_path, name=field_name,
-                                array=field, **keywords)
+        self.add_attributes({'xdmf_path': Xdmf_pathes['topology_path']},
+                            mesh_group._v_name+'_Elements')
+        self.add_attributes({'xdmf_path': Xdmf_pathes['geometry_path']},
+                            mesh_group._v_name+'_Nodes')
+        ### Add node and element tags, eventually as fields if extended=True
+        self._add_nodes_elements_tags(mesh_object, mesh_group, replace,
+                                      extended_data)
+        ### Add fields if some are stored in the mesh object
+        for field_name, field in mesh_object.nodeFields.items():
+            self.add_field(gridname=mesh_group._v_pathname,
+                           fieldname=field_name, array=field,
+                           replace=replace, **keywords)
+        for field_name, field in mesh_object.elemFields.items():
+            self.add_field(gridname=mesh_group._v_pathname,
+                           fieldname=field_name, array=field,
+                           replace=replace, **keywords)
         return
 
     def add_image(self, image_object=None, imagename='', indexname='',
@@ -731,10 +640,18 @@ class SampleData:
         """Create a 2D/3D Image group in the dataset from an ImageObject.
 
         An Image group is a HDF5 Group that contains arrays describing fields
-        defined on an image (uniform grid of voxels/pixels). The image geometry
-        and topology is defined by HDF5 attributes of the Image Group,
-        that are:
+        defined on an image (uniform grid of voxels/pixels). This methods adds
+        an Image group to the dataset from a BasicTools
+        :py:class:`ConstantRectilinearMesh` class instance.This class
+        represents regular meshes of square/cubes, *i.e.* pixels/voxels.
 
+
+        The image geometry and topology is defined by HDF5 attributes of the
+        Image Group, that are:
+
+            :nodes_dimension: np.array, number of grid points along each
+                dimension of the Image. This number is array is equal to
+                the `dimension` attribute array +1 for each value.
             :dimension: np.array, number of voxels along each dimension of the
                 Image (Nx,Ny,Nz) or (Nx,Ny)
             :spacing: np.array, voxel size along each dimension (dx,dy,dz) or
@@ -743,8 +660,19 @@ class SampleData:
                 corresponding to the first vertex of the voxel [0,0,0]
                 or pixel [0,0]
 
+        The Image group may also contain arrays of field values on the image.
+        These fields can be elementFields (defined at pixel/voxel centers) or
+        nodefields (defined at pixel/voxel vertexes). Their
+        pathes, index names and content can be set using the class method
+        :func:`add_field`. Fields defined on nodes must have a shape equal
+        to the `nodes_dimension` attribute. Fields defined on elements must
+        have a shape equal to the `dimension` attribute. Both can have an
+        additional last dimension if they have a higher dimensionality than
+        scalar fields (for instance [Nx,Ny,Nz,3] for a vector field).
+
         :param image_object: image to add to dataset. It is an instance from
-            the :py:class:`pymicro.core.images.ImageObject` class
+            the :py:class:`ConstantRectilinearMesh` class of the BasicTools
+            Python package.
         :param str imagename: name used to create the Image group in dataset
         :param str indexname: Index name used to reference the Image. If none
             is provided, `imagename` is used.
@@ -758,22 +686,15 @@ class SampleData:
         image_group = self.add_group(imagename, location, indexname, replace)
         ### empty images creation
         if (image_object is None):
-            # if empty, stored as a 3DImage. Required for self._is_grid
-            self.add_attributes({'empty': True, 'group_type': '3DImage'},
+            self.add_attributes({'empty': True, 'group_type': 'emptyImage'},
                                 image_group._v_pathname)
             return
         else:
-            # safety check --> image_object should be a BasicTools
-            # ConstantRectilinearMesh
-            if not(isinstance(image_object, ConstantRectilinearMesh)):
-                print('WARNING : `add_image` got an unknown image object.'
-                      ' It should be receiving a BasicTools'
-                      'ConstantRectilinearMesh instance. Odds things may'
-                      ' happen while adding the image.')
+            self._check_image_object_support(image_object)
         ### Add image Grid to xdmf file
         Xdmf_pathes = self._add_image_to_xdmf(imagename, image_object)
         ### store image metadata as HDF5 attributes
-        image_type = self._get_image_type(image_object,imagename)
+        image_type = self._get_image_type(image_object)
         image_nodes_dim = np.array(image_object.GetDimensions())
         image_cell_dim = image_nodes_dim - np.ones(image_nodes_dim.shape,
                                                    dtype=image_nodes_dim.dtype)
@@ -959,7 +880,7 @@ class SampleData:
         # Add field path to grid node Field_list attribute
         self._append_field_index(gridname, fieldname)
 
-    def add_data_array(self, location, name, array, indexname=None,
+    def add_data_array(self, location, name, array=None, indexname=None,
                        chunkshape=None, replace=False, filters=None,
                        empty=False, **keywords):
         """Add a data array node at the given location in the HDF5 dataset.
@@ -992,6 +913,8 @@ class SampleData:
                             ''.format(name, location))
         # Safety checks
         self._check_SD_array_init(name, location, replace)
+        if array is None:
+            raise ValueError('Received a `None` array. Cannot add data array.')
         # get location path
         location_path = self._name_or_node_to_path(location)
         # get compression options
@@ -1003,13 +926,15 @@ class SampleData:
         # Create dataset node to store array
         if empty:
             Node = self.h5_dataset.create_carray(
-                    where=location_path, name=name, obj=np.array([0]))
-            self.add_attributes(dic={'empty': True}, nodename=name)
+                    where=location_path, name=name, obj=np.array([0]),
+                    title=indexname)
+            self.add_attributes({'empty': True}, Node._v_pathname)
         else:
             Node = self.h5_dataset.create_carray(
                     where=location_path, name=name, filters=Filters,
-                    obj=array, chunkshape=chunkshape)
-            self.add_attributes(dic={'empty': False}, nodename=name)
+                    obj=array, chunkshape=chunkshape,
+                    title=indexname)
+            self.add_attributes({'empty': False}, Node._v_pathname)
         return Node
 
     def add_table(self, location, name, description, indexname=None,
@@ -1244,7 +1169,120 @@ class SampleData:
                 node_path)
             raise tables.NodeError(msg)
 
-    def get_image(self, imagename):
+    def get_mesh(self, meshname, with_fields=True):
+        """Return data of a mesh group as BasicTools UnstructuredMesh object.
+
+        This methods gathers the data of a 2DMesh or 3DMesh group, including
+        nodes coordinates, elements types and connectivity and fields, into a
+        BasicTools :class:`ConstantRectilinearMesh` object.
+
+        :param str meshname: Name, Path or Indexname of the mesh group to get
+
+        """
+        # Create mesh object
+        mesh_object = UnstructuredMesh()
+        # Get mesh nodes
+        mesh_object.nodes = self.get_mesh_nodes(meshname, as_numpy=True)
+        # Get node tags
+        self._load_nodes_tags(meshname, mesh_object)
+        # Get mesh elements and element tags
+        mesh_object.elements = self.get_mesh_elements(meshname)
+        # Get mesh fields
+        Field_list =  self.get_attribute('Field_index', meshname)
+        if with_fields:
+            for fieldname in Field_list:
+                field_type = self.get_attribute('field_type', fieldname)
+                if field_type == 'Nodal_field':
+                    data = self.get_node(fieldname,as_numpy=True)
+                    mesh_object.nodeFields[meshname] = data
+                elif field_type == 'Element_field':
+                    data = self.get_node(fieldname,as_numpy=True)
+                    mesh_object.elemFields[meshname] = data
+        return mesh_object
+
+    def get_mesh_nodes(self, meshname, as_numpy=False):
+        """Return the mesh node coordinates as a HDF5 node or Numpy array.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :param bool as_numpy: if `True`, returns the Node as a `numpy.array`.
+            If `False`, returns the node as a Node or Group object.
+        :return: Return the mesh Nodes coordinates array as a
+            :py:class:`tables.Node` object or a `numpy.array`
+        """
+        nodes_path = self.get_attribute('nodes_path', meshname)
+        return self.get_node(nodes_path, as_numpy)
+
+    def get_mesh_xdmf_connectivity(self, meshname, as_numpy=False):
+        """Return the mesh elements connectivity as HDF5 node or Numpy array.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :param bool as_numpy: if `True`, returns the Node as a `numpy.array`.
+            If `False`, returns the node as a Node or Group object.
+        :return: Return the mesh elements connectivity referenced in the XDMF
+            file as a :py:class:`tables.Node` object or a `numpy.array`
+        """
+        elems_path = self.get_attribute('elements_path', meshname)
+        return self.get_node(elems_path, as_numpy)
+
+    def get_mesh_elements(self, meshname):
+        """Return the mesh elements connectivity as HDF5 node or Numpy array.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :return: Return the mesh elements containers as a
+            BasicTools :py:class:`AllElements` object
+        """
+        # Create AllElementsContainer
+        AElements = AllElements()
+        connectivity = self.get_mesh_xdmf_connectivity(meshname,
+                                                       as_numpy=False)
+        # Get Elements Metadata
+        Mesh_attrs = self.get_dic_from_attributes(meshname)
+        Topology = Mesh_attrs['Topology']
+        element_type = Mesh_attrs['element_type']
+        Nelems = Mesh_attrs['Number_of_elements']
+        Xdmf_code = Mesh_attrs['Xdmf_elements_code']
+        offset = 0
+        # For each element type, create an Element container and fill
+        # connectivity
+        for i in range(len(element_type)):
+            # Create elements container
+            Elements = AElements.GetElementsOfType(element_type[i])
+            # get parameters for element type elements in mesh
+            Nnode_per_el = Elements.GetNumberOfNodesPerElement()
+            Nvalues = (1+Nnode_per_el)*Nelems[i]
+            id_offset = 1
+            local_code = Xdmf_code[i]
+            # For bar2 and point1 elements, 2 integers are stored as XDMF code
+            # before each element connectivity
+            if (element_type[i] == 'bar2') or (element_type[i] == 'point1'):
+                Nvalues += Nelems[i]
+                id_offset += 1
+                Nnode_per_el += 1
+            if Topology == 'Mixed':
+                # Get connectivity chunk for this element type and reshape it
+                local_connect = connectivity[offset:offset+Nvalues]
+                local_connect = local_connect.reshape((Nelems[i],
+                                                       Nnode_per_el+1))
+                # Safety check
+                if not(np.all(local_connect[:,0] == local_code)):
+                    raise ValueError('Local connectivity for element type {}'
+                                     ' is ill-shaped : Xdmf code value wrong'
+                                     ' for at least one element.'
+                                     ''.format(element_type[i]))
+                Elements.connectivity = local_connect[:,id_offset:]
+                Elements.cpt = Nelems[i]
+                offset = Nvalues
+            elif Topology == 'Uniform':
+                Elements.connectivity = connectivity
+                Elements.cpt = connectivity.shape[0]
+        self._load_elements_tags(meshname, AElements)
+        return AElements
+
+
+    def get_image(self, imagename, with_fields=True):
         """Return data of an image group as a BasicTools mesh object.
 
         This methods gathers the data of a 2DImage or 3DImage group, including
@@ -1260,21 +1298,22 @@ class SampleData:
         dimensions = self.get_attribute('nodes_dimension', imagename)
         spacing =  self.get_attribute('spacing', imagename)
         origin =  self.get_attribute('origin', imagename)
-        Field_list =  self.get_attribute('Field_index', imagename)
         # Create ConstantRectilinearMesh to serve as image_object
         image_object = ConstantRectilinearMesh(dim=len(dimensions))
         image_object.SetDimensions(dimensions)
         image_object.SetSpacing(spacing)
         image_object.SetOrigin(origin)
         # Get image fields
-        for fieldname in Field_list:
-            field_type = self.get_attribute('field_type', fieldname)
-            if field_type == 'Nodal_field':
-                data = self.get_node(fieldname,as_numpy=True)
-                image_object.nodeFields[fieldname] = data
-            elif field_type == 'Element_field':
-                data = self.get_node(fieldname,as_numpy=True)
-                image_object.elemFields[fieldname] = data
+        Field_list =  self.get_attribute('Field_index', imagename)
+        if with_fields:
+            for fieldname in Field_list:
+                field_type = self.get_attribute('field_type', fieldname)
+                if field_type == 'Nodal_field':
+                    data = self.get_node(fieldname,as_numpy=True)
+                    image_object.nodeFields[fieldname] = data
+                elif field_type == 'Element_field':
+                    data = self.get_node(fieldname,as_numpy=True)
+                    image_object.elemFields[fieldname] = data
         return image_object
 
     def get_tablecol(self, tablename, colname):
@@ -1341,33 +1380,6 @@ class SampleData:
                 node = np.atleast_1d(node.read())
         return node
 
-    def get_mesh_nodes(self, meshname, as_numpy=False):
-        """Return the mesh node coordinates as a HDF5 node or Numpy array.
-
-        :param str meshname: Name, Path, Index name or Alias of the Mesh group
-            in dataset
-        :param bool as_numpy: if `True`, returns the Node as a `numpy.array`.
-            If `False`, returns the node as a Node or Group object.
-        :return: Return the mesh Nodes coordinates array as a
-            :py:class:`tables.Node` object or a `numpy.array`
-        """
-        Mesh = self.get_node(meshname)
-        return self.get_node(os.path.join(Mesh._v_pathname, 'Nodes'),
-                             as_numpy)
-
-    def get_mesh_elements(self, meshname, as_numpy=False):
-        """Return the mesh elements connectivity as HDF5 node or Numpy array.
-
-        :param str meshname: Name, Path, Index name or Alias of the Mesh group
-            in dataset
-        :param bool as_numpy: if `True`, returns the Node as a `numpy.array`.
-            If `False`, returns the node as a Node or Group object.
-        :return: Return the mesh elements connectivity coordinates array as a
-            :py:class:`tables.Node` object or a `numpy.array`
-        """
-        Mesh = self.get_node(meshname)
-        return self.get_node(os.path.join(Mesh._v_pathname, 'Elements'),
-                             as_numpy)
 
     def get_field(self, gridname, fieldname, as_numpy=False):
         """Return a field in a Mesh/3DImage group as a Node or Numpy array.
@@ -1432,7 +1444,7 @@ class SampleData:
         :param str nodename: Name, Path, Index name or Alias of the HDF5 group
         :return: Dictionary of the form ``{'Attribute_name': Attribute_value}``
         """
-        Node = self.h5_dataset.get_node(nodename)
+        Node = self.get_node(nodename)
         dic = {}
         for key in Node._v_attrs._f_list():
             dic[key] = Node._v_attrs[key]
@@ -1818,7 +1830,6 @@ class SampleData:
         # determine if node is an HDF5 Group
         if (Node._v_attrs.CLASS == 'GROUP'):
             isGroup = True
-
         if (isGroup):
             print('WARGNING : node {} is a hdf5 group with  {} children(s)'
                   ' :'.format(node_path, Node._v_nchildren))
@@ -1841,7 +1852,6 @@ class SampleData:
                     return
             else:
                 remove_flag = True
-
         # remove node
         if (remove_flag or not (isGroup)):
 
@@ -1983,10 +1993,10 @@ class SampleData:
                 msg = ('Adding empty Group {}'.format(content_paths[key]))
                 self.add_group(groupname=tail, location=head, indexname=key,
                                replace=False)
-            elif content_type[key] == '3DImage':
-                msg = ('Adding empty 3DImage  {}'.format(content_paths[key]))
+            elif content_type[key] in SD_IMAGE_GROUPS.values():
+                msg = ('Adding empty Image  {}'.format(content_paths[key]))
                 self.add_image(imagename=tail, indexname=key, location=head)
-            elif content_type[key] == 'Mesh':
+            elif content_type[key] in SD_MESH_GROUPS.values():
                 msg = ('Adding empty Mesh  {}'.format(content_paths[key]))
                 self.add_mesh(meshname=tail, indexname=key, location=head)
             elif content_type[key] == 'Array':
@@ -2094,6 +2104,10 @@ class SampleData:
             if self._is_grid(group_path):
                 if self._is_empty(group_path):
                     fetch_group = True
+            if not(fetch_group) and replace:
+                self._verbose_print('Removing group {} to replace it by new'
+                                    ' one.'.format(groupname))
+                self.remove_node(name=group_path,recursive=True)
             if not(fetch_group or replace):
                 msg = ('Group {} already exists. Set arg. `replace=True` to'
                        'to replace it by a new Group.'.format(groupname))
@@ -2102,10 +2116,6 @@ class SampleData:
         if fetch_group:
             Group = self.get_node(group_path)
         else:
-            if replace:
-                self._verbose_print('Removing group {} to replace it by new'
-                                    ' one.'.format(groupname))
-                self.remove_node(name=group_path,recursive=True)
             self._verbose_print('Creating {} group `{}` in file {} at {}'
                                 ''.format(group_type, groupname,
                                           self.h5_file,location))
@@ -2238,7 +2248,7 @@ class SampleData:
 
     def _is_image(self, name):
         """Find out if name or path references an image groupe."""
-        return self._get_group_type(name) in SD_IMAGE_GROUPS
+        return self._get_group_type(name) in SD_IMAGE_GROUPS.values()
 
     def _is_array(self, name):
         """Find out if name or path references an array dataset."""
@@ -2280,16 +2290,10 @@ class SampleData:
         return bool_return
 
 
-    def _is_field(self, name):
+    def _is_field(self, fieldname):
         """Checks conditions to consider node `name` as a field data node."""
-        # TODO : update to get first grid parent (but not only parent group)
-        cond1 = self._is_grid(self._get_parent_name(name))
-        cond2 = name not in SD_RESERVED_NAMES
-        if cond1:
-            cond3 = not self._is_empty(self._get_parent_name(name))
-        else:
-            cond3 = False
-        return cond1 and cond2 and cond3
+        test = self.get_attribute('field_type', fieldname)
+        return (test is not None)
 
     def _is_in_index(self, name):
         return (name in self.content_index)
@@ -2312,19 +2316,32 @@ class SampleData:
                 break
         return Indexname
 
+    def _check_image_object_support(self, image_object):
+        """Return `True` if image_object type is supported by the class."""
+        if not(isinstance(image_object, ConstantRectilinearMesh)):
+            raise ValueError('WARNING : unknown image object. Supported objects'
+                             ' are BasicTools ConstantRectilinearMesh'
+                             ' instances.')
+
+    def _check_mesh_object_support(self, mesh_object):
+        """Return `True` if image_object type is supported by the class."""
+        if not(isinstance(mesh_object, MeshBase)):
+            raise ValueError('WARNING : unknown mesh object. Supported objects'
+                             ' are BasicTools ConstantRectilinearMesh'
+                             '  instances.')
+
     def _check_field_compatibility(self, gridname, field_shape):
         """Check if field dimension is compatible with the storing location."""
         group_type = self._get_group_type(gridname)
         if self._is_empty(gridname):
-            # TODO : solve pb when image is empty ? create image ?
             # method create_image from array
-            raise ValueError('{} is an empty image. Use add_image to'
-                             ' initialize'.format(gridname))
-        elif (group_type == '3DImage') or (group_type == '2DImage'):
+            raise ValueError('{} is an empty grid. Use add_image, add_mesh,'
+                             ' or add_imamge_from_field to initialize grid'
+                             ''.format(gridname))
+        elif group_type in SD_IMAGE_GROUPS.values():
             field_type, dimensionality = self._compatibility_with_image(
                 gridname, field_shape)
-        elif group_type == 'Mesh':
-            # TODO: adapt this method
+        elif group_type in SD_MESH_GROUPS.values():
             field_type, dimensionality = self._compatibility_with_mesh(
                 gridname, field_shape)
         else:
@@ -2332,16 +2349,41 @@ class SampleData:
                                    ''.format(gridname))
         return field_type, dimensionality
 
-    def _compatibility_with_mesh(self, name, field):
+    def _compatibility_with_mesh(self, meshname, field_shape):
         """Check if field has a number of values compatible with the mesh."""
-        mesh = self.get_node(name)
-        compatibility = (mesh.Nodes.shape[0] == field.shape[0])
+        # Safety check: field must be a vector or a (Nvalues,Dim) array
+        if len(field_shape) > 2:
+            raise ValueError('Forbidden field shape. The field array must be'
+                             ' of shape (Nvalues) or (Nvalues,Ndim). Received'
+                             ' {}'.format(field_shape))
+        node_field = True
+        elem_field = True
+        Nnodes = self.get_attribute('number_of_nodes', meshname)
+        Nelem = np.sum(self.get_attribute('Number_of_elements', meshname))
+        Nfield_values = field_shape[0]
+        if len(field_shape) == 2:
+            Field_dim = field_shape[1]
+        else:
+            Field_dim = 1
+        if Nfield_values == Nnodes:
+            node_field = True
+            field_type='Nodal_field'
+        elif Nfield_values == Nelem:
+            elem_field = True
+            field_type='Element_field'
+        compatibility = node_field or elem_field
         if not(compatibility):
-            msg = ('Field number of values ({}) is not conformant with mesh '
-                   '`{}` node numbers ({})'.format(field.shape[0], name,
-                                                   mesh.Nodes.shape[0]))
-            self._verbose_print(msg)
-        return compatibility
+            raise ValueError('Field number of values ({}) is not conformant'
+                             ' with mesh number of nodes ({}) or number of'
+                             ' elements ({}). IP fields not implemented yet.'
+                             ''.format(field_shape, Nnodes, Nelem))
+        if Field_dim not in XDMF_FIELD_TYPE:
+            raise ValueError('Field dimensionnality `{}` is not know. '
+                             'Supported dimensionnalities are Scalar (1),'
+                             'Vector (3), Tensor6 (6), Tensor (9).'
+                             'Maybe are you trying to add a 3D field into a'
+                             '3D grid.')
+        return field_type, XDMF_FIELD_TYPE[Field_dim]
 
     def _compatibility_with_image(self, imagename, field_shape):
         """Check if field has a number of values compatible with the image.
@@ -2350,7 +2392,6 @@ class SampleData:
         dimensonality of the field in the XDMF convention (Scalar, Vector,
         Tensor6 or Tensor)
         """
-        compatibility = True
         node_field = True
         elem_field = True
         image_node_dim = self.get_attribute('nodes_dimension', imagename)
@@ -2387,6 +2428,231 @@ class SampleData:
                              '3D grid.')
         return field_type, XDMF_FIELD_TYPE[dimension]
 
+    def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
+                           extended_data):
+        """Add Geometry data items of a mesh object to mesh group/xdmf."""
+        self._verbose_print('Adding Geometry for mesh group {}'
+                            ''.format(mesh_group._v_name))
+        mesh_object.PrepareForOutput()
+        # create Geometry group
+        geo_group = self.add_group(groupname='Geometry',
+                                   location=mesh_group._v_pathname,
+                                   indexname=mesh_group._v_name+'_Geometry',
+                                   replace=replace)
+        # Add Nodes, NodesID and NodeTags
+        self._add_mesh_nodes(mesh_object, mesh_group, geo_group, replace,
+                             extended_data)
+        # Add Elements, ElementsID and ElementTags
+        self._add_mesh_elements(mesh_object, mesh_group, geo_group, replace,
+                                extended_data)
+
+    def _add_mesh_nodes(self, mesh_object, mesh_group, geo_group, replace,
+                        extended_data):
+        """Add Nodes, NodesID and NodeTags arrays in mesh geometry group."""
+        # Add Nodes coordinates
+        self._verbose_print('Creating Nodes data set in group {} in file {}'
+                            ''.format(geo_group._v_pathname, self.h5_file))
+        nodes_array = mesh_object.GetPosOfNodes()
+        indexname = mesh_group._v_name+'_Nodes'
+        Nodes = self.add_data_array(location=geo_group._v_pathname,
+                                    name='Nodes', array=nodes_array,
+                                    indexname=indexname)
+        Node_attributes = {'number_of_nodes': mesh_object.nodes.shape[0],
+                           'group_type': self._get_mesh_type(mesh_object),
+                           'nodes_path':Nodes._v_pathname}
+        self.add_attributes(Node_attributes, mesh_group._v_pathname)
+        # Add Nodes ID : NOT INCLUDED FOR NOW BUT FONCTIONAL
+        # if isinstance(mesh_object, UnstructuredMesh):
+        #     self._verbose_print('Creating Nodes ID data set in group {}'
+        #                         ' in file {}'
+        #                         ''.format(geo_group._v_pathname, self.h5_file))
+        #     self.add_data_array(location=geo_group._v_pathname,
+        #                         name='Nodes_ID',
+        #                         array=mesh_object.originalIDNodes,
+        #                         indexname=mesh_group._v_name+'_Nodes_ID')
+        return
+
+    def _add_mesh_elements(self, mesh_object, mesh_group, geo_group, replace,
+                           extended_data):
+        """Add Elements, ElementsID and ElementsTags in mesh geometry group."""
+        # Determine Topology type
+        if len(mesh_object.elements) > 1:
+            topology_attributes = self._from_BT_mixed_topology(mesh_object)
+        else:
+            topology_attributes = self._from_BT_uniform_topology(mesh_object)
+        # Add elements array
+        self._add_topology(topology_attributes, mesh_object,mesh_group,
+                           geo_group, replace)
+        self.add_attributes(topology_attributes, mesh_group._v_pathname)
+        return
+
+    def _add_nodes_elements_tags(self,  mesh_object, mesh_group, replace,
+                                 extended_data):
+        """Add Node and ElemTags in mesh geometry group from mesh object."""
+        geo_group = self.get_node(mesh_group._v_name+'_Geometry')
+        # Add node tags
+        self._add_mesh_nodes_tags(mesh_object, mesh_group, geo_group, replace,
+                                  extended_data)
+        # Add element tags
+        self._add_mesh_elems_tags(mesh_object, mesh_group, geo_group, replace,
+                                  extended_data)
+        return
+
+    def _add_mesh_nodes_tags(self, mesh_object, mesh_group, geo_group,
+                             replace, extended_data):
+        """Add NodeTags arrays in mesh geometry group from mesh object."""
+        # create Noe tags group
+        Ntags_group = self.add_group(groupname='NodeTags',
+                                     location=geo_group._v_pathname,
+                                     indexname=mesh_group._v_name+'_NodeTags',
+                                     replace=replace)
+        Node_tags_list = []
+        for tag in mesh_object.nodesTags:
+            # Add the node list of the tag in a data array
+            name = tag.name
+            Node_tags_list.append(name)
+            node_list = mesh_object.nodesTags[tag.name].GetIds()
+            self.add_data_array(location=Ntags_group._v_pathname,
+                                name='NT_'+name, array=node_list,
+                                replace=replace)
+            if extended_data:
+                # Add node tags as fields in the dataset and XDMF file
+                data = np.zeros((mesh_object.GetNumberOfNodes(),1),
+                                dtype=np.int8)
+                data[node_list] = 1;
+                self.add_field(mesh_group._v_pathname, fieldname='field_'+name,
+                               array=data, replace=replace,
+                               location=Ntags_group._v_pathname)
+        self.add_attributes({'Node_tags_list': Node_tags_list},
+                            mesh_group._v_pathname)
+
+    def _add_mesh_elems_tags(self, mesh_object, mesh_group, geo_group,
+                             replace, extended_data):
+        """Add ElementsTags arrays in mesh geometry group from mesh object."""
+        # create Noe tags group
+        Etags_group = self.add_group(groupname='ElementsTags',
+                                     location=geo_group._v_pathname,
+                                     indexname=mesh_group._v_name+'_ElemTags',
+                                     replace=replace)
+        Elem_tags_list = []
+        Elem_tag_type_list = []
+        for elem_type in mesh_object.elements:
+            element_container = mesh_object.elements[elem_type]
+            celtags = element_container.tags.keys()
+            for tagname in celtags:
+                name = tagname
+                Elem_tags_list.append(name)
+                Elem_tag_type_list.append(elem_type)
+                elem_list = mesh_object.GetElementsInTag(tagname)
+                self.add_data_array(location=Etags_group._v_pathname,
+                                    name='ET_'+name, array=elem_list,
+                                    replace=replace)
+                if extended_data:
+                    # Add elem tags as fields in the dataset and XDMF file
+                    data = np.zeros((mesh_object.GetNumberOfElements(),1),
+                                    dtype=np.int8)
+                    data[elem_list] = 1;
+                    self.add_field(mesh_group._v_pathname, fieldname='field_'+name,
+                                   array=data, replace=replace,
+                                   location=Etags_group._v_pathname)
+        self.add_attributes({'Elem_tags_list': Elem_tags_list,
+                             'Elem_tag_type_list': Elem_tag_type_list},
+                            mesh_group._v_pathname)
+
+    def _load_nodes_tags(self, meshname, mesh_object):
+        """Add Node and ElemTags in mesh geometry group from mesh object."""
+        mesh_group = self.get_node(meshname)
+        Ntags_group = self.get_node(mesh_group._v_name+'_NodeTags')
+        if Ntags_group is not None:
+            Ntag_list = self.get_attribute('Node_tags_list', meshname)
+            for tag_name in Ntag_list:
+                tag = mesh_object.GetNodalTag(tag_name)
+                tag_path = os.path.join(Ntags_group._v_pathname,'NT_'+tag_name)
+                tag.SetIds(self.get_node(tag_path,as_numpy=True))
+        return mesh_object
+
+    def _load_elements_tags(self, meshname, AllElements):
+        """Add Node and ElemTags in mesh geometry group from mesh object."""
+        mesh_group = self.get_node(meshname)
+        Etags_group = self.get_node(mesh_group._v_name+'_ElemTags')
+        if Etags_group is not None:
+            Etag_list = self.get_attribute('Elem_tags_list', meshname)
+            Etag_Etype_list = self.get_attribute('Elem_tag_type_list',
+                                                 meshname)
+            for i in range(len(Etag_list)):
+                tag_name = Etag_list[i]
+                el_type = Etag_Etype_list[i]
+                elem_container = AllElements.GetElementsOfType(el_type)
+                tag = elem_container.tags.CreateTag(tag_name,False)
+                tag_path = os.path.join(Etags_group._v_pathname,'ET_'+tag_name)
+                tag.SetIds(self.get_node(tag_path,as_numpy=True))
+        return AllElements
+
+    def _from_BT_mixed_topology(self, mesh_object):
+        """Read mesh elements information/metadata from mesh_object."""
+        topology_attributes = {}
+        topology_attributes['Topology'] = 'Mixed'
+        element_type = []
+        Number_of_elements = []
+        Xdmf_elements_code = []
+        # for each element type in the mesh_object, read type, number and
+        # xdmf code for the elements
+        for ntype, data in mesh_object.elements.items():
+            element_type.append(ntype)
+            Number_of_elements.append(data.GetNumberOfElements())
+            Xdmf_elements_code.append(XdmfNumber[ntype])
+        # Return them in topology_attributes dic
+        topology_attributes['element_type'] = element_type
+        topology_attributes['Number_of_elements'] = np.array(
+            Number_of_elements)
+        topology_attributes['Xdmf_elements_code'] = Xdmf_elements_code
+        return topology_attributes
+
+    def _from_BT_uniform_topology(self, mesh_object):
+        """Read mesh elements information/metadata from mesh_object."""
+        topology_attributes = {}
+        topology_attributes['Topology'] = 'Uniform'
+        element_type =  mesh_object.elements.keys()[0]
+        topology_attributes['element_type'] = [element_type]
+        n_elements = mesh_object.GetNumberOfElements()
+        topology_attributes['Number_of_elements'] = np.array([n_elements])
+        topology_attributes['Xdmf_elements_code'] = [XdmfName[element_type]]
+        return topology_attributes
+
+    def _add_topology(self,topology_attributes, mesh_object, mesh_group,
+                            geo_group, replace):
+        """Add Elements array into mesh geometry group from mesh_object."""
+        # Add Elements connectivity
+        self._verbose_print('Creating Elements connectivity array in group {}'
+                            ' in file {}'
+                            ''.format(geo_group._v_pathname, self.h5_file))
+        # Creating topology array
+        data = np.empty((0,),dtype=np.int)
+        for i in range(len(topology_attributes['element_type'])):
+            element_type = topology_attributes['element_type'][i]
+            elements = mesh_object.elements[element_type]
+            data_tmp = elements.connectivity
+            if topology_attributes['Topology'] == 'Mixed':
+                # If mixed topology, add XDMF element type ID number
+                # before Nodes ID
+                xdmf_code = topology_attributes['Xdmf_elements_code'][i]
+                type_col = np.ones(shape=(data_tmp.shape[0],1), dtype=np.int)
+                if element_type == 'bar2':
+                    data_tmp = np.concatenate((2*type_col, data_tmp),1)
+                if element_type == 'point1':
+                    data_tmp = np.concatenate((type_col, data_tmp),1)
+                type_col = xdmf_code*type_col
+                data_tmp = np.concatenate((type_col, data_tmp),1)
+            data = np.concatenate((data, data_tmp.ravel()))
+        # Add data array to HDF5 data set in mesh geometry node
+        indexname = mesh_group._v_name+'_Elements'
+        Elems = self.add_data_array(location=geo_group._v_pathname,
+                                    name='Elements', array=data,
+                                    indexname=indexname)
+        self.add_attributes({'elements_path': Elems._v_pathname},
+                            mesh_group._v_pathname)
+        return
+
     def _add_image_to_xdmf(self, imagename, image_object):
         """Write grid geometry and topoly in xdmf tree/file."""
         # add 1 to each dimension to get grid dimension (from cell number to
@@ -2397,6 +2663,7 @@ class SampleData:
         Origin = self._np_to_xdmf_str(image_object.GetOrigin())
         Dimensionality = str(image_object.GetDimensionality())
         self._verbose_print('Updating xdmf tree...', line_break=False)
+        # Creatge Grid element
         image_xdmf = etree.Element(_tag='Grid', Name=imagename,
                                    GridType='Uniform')
         # Create Topology element
@@ -2420,11 +2687,65 @@ class SampleData:
         image_xdmf.append(geometry_xdmf)
         # Add Grid to node Domain and get XDMF pathes
         self.xdmf_tree.getroot()[0].append(image_xdmf)
+        # Return XDMF pathes
         im_path = self.xdmf_tree.getelementpath(image_xdmf)
         topo_path = self.xdmf_tree.getelementpath(topology_xdmf)
         geo_path = self.xdmf_tree.getelementpath(geometry_xdmf)
-        # Return XDMF pathes
         Path_dic = {'image_path': im_path, 'topology_path': topo_path,
+                    'geometry_path': geo_path}
+        return Path_dic
+
+    def _add_mesh_to_xdmf(self, mesh_path):
+        """Write mesh grid element geometry and topoly in xdmf tree/file."""
+        # get mesh group
+        mesh_group = self.get_node(mesh_path)
+        # Creatge Grid element
+        mesh_xdmf = etree.Element(_tag='Grid', Name=mesh_group._v_name,
+                                  GridType='Uniform')
+        # Create Geometry element
+        mesh_type = self.get_attribute('group_type', mesh_path)
+        if mesh_type == '2DMesh':
+            geometry_xdmf = etree.Element(_tag='Geometry', Type='XY')
+        elif mesh_type == '3DMesh':
+            geometry_xdmf = etree.Element(_tag='Geometry', Type='XYZ')
+        # Add geometry DataItem
+        nodes = self.get_node(mesh_group._v_name+'_Nodes', as_numpy=False)
+        Dim = self._np_to_xdmf_str(nodes.shape)
+        geometry_data = etree.Element(_tag='DataItem', Format='HDF',
+                                      Dimensions=Dim, NumberType='Float',
+                                      Precision='64')
+        geometry_data.text = self.h5_file + ':' + nodes._v_pathname
+        # Add node DataItem as children of node Geometry
+        geometry_xdmf.append(geometry_data)
+        # Create Topology element
+        Topology = self.get_attribute('Topology', mesh_path)
+        if Topology == 'Uniform':
+            Topotype = self.get_attribute('Xdmf_elements_code', mesh_path)[0]
+        else:
+            Topotype = 'Mixed'
+        NElements_list = self.get_attribute('Number_of_elements', mesh_path)
+        NElements = self._np_to_xdmf_str(np.sum(NElements_list))
+        topology_xdmf = etree.Element(_tag='Topology', TopologyType=Topotype,
+                                      NumberOfElements=NElements)
+        # Create Topology DataItem
+        elems =  self.get_node(mesh_group._v_name+'_Elements', as_numpy=False)
+        Dim = self._np_to_xdmf_str(elems.shape)
+        topology_data = etree.Element(_tag='DataItem', Format='HDF',
+                                      Dimensions=Dim, NumberType='Int',
+                                      Precision='64')
+        topology_data.text = self.h5_file + ':' + elems._v_pathname
+        # Add node DataItem as children of node Topology
+        topology_xdmf.append(topology_data)
+        # Add Geometry and Topology as childrens of Grid
+        mesh_xdmf.append(geometry_xdmf)
+        mesh_xdmf.append(topology_xdmf)
+        # Add Grid to node Domain
+        self.xdmf_tree.getroot()[0].append(mesh_xdmf)
+        # Return XDMF pathes
+        mesh_xdmf_path = self.xdmf_tree.getelementpath(mesh_xdmf)
+        topo_path = self.xdmf_tree.getelementpath(topology_xdmf)
+        geo_path = self.xdmf_tree.getelementpath(geometry_xdmf)
+        Path_dic = {'mesh_path': mesh_xdmf_path, 'topology_path': topo_path,
                     'geometry_path': geo_path}
         return Path_dic
 
@@ -2440,7 +2761,7 @@ class SampleData:
     def _add_field_to_xdmf(self, fieldname, field):
         """Write field data as Grid Attribute in xdmf tree/file."""
         Node = self.get_node(fieldname)
-        Grid_name = self._get_parent_name(fieldname)
+        Grid_name = self.get_attribute('parent_grid_path', fieldname)
         xdmf_path = self.get_attribute('xdmf_path', Grid_name)
         field_type = self.get_attribute('field_type', fieldname)
         if field_type == 'Nodal_field':
@@ -2482,53 +2803,6 @@ class SampleData:
         self.add_attributes({'xdmf_path': el_path}, fieldname)
         return
 
-    def _get_xdmf_field_type(self, field_shape, gridname):
-        """Get field's XDMF nature w.r.t. grid dimension."""
-        # TODO : remove this method ?
-        field_type = None
-        field_center = None
-        # get grid dimension
-        if not(self._is_grid(gridname)):
-            msg = ('(_get_xdmf_field_type) name or path `{}` is not a grid.'
-                   'Field type detection impossible'.format(gridname))
-            self._verbose_print(msg)
-            return None
-        Type = self._get_group_type(gridname)
-        # analyze field shape
-        if Type == 'Mesh':
-            if len(field_shape) != 2:
-                msg = ('(_get_xdmf_field_type) wrong field shape. For a mesh'
-                       'field, shape should be (Nnodes,Ndim) or (NIntPts,Ndim)'
-                       '. None type returned')
-                self._verbose_print(msg)
-                return field_type
-            field_dim = field_shape[1]
-        elif (Type == '3DImage' or Type == '2DImage'):
-            if (len(field_shape) < 3) or (len(field_shape) > 4):
-                msg = ('(_get_xdmf_field_type) wrong field shape. For a'
-                       '3DImage field, shape should be (Nx1,Nx2,Nx3) or'
-                       ' (Nx1,Nx2,Nx3,Ndim). None type returned')
-                self._verbose_print(msg)
-                return field_type
-            if (len(field_shape) == 3):
-                field_dim = 1
-            if (len(field_shape) == 4):
-                field_dim = field_shape[3]
-        elif Type == '2DImage':
-            if (len(field_shape) < 2) or (len(field_shape) > 3):
-                msg = ('(_get_xdmf_field_type) wrong field shape. For a'
-                       '2DImage field, shape should be (Nx1,Nx2) or'
-                       ' (Nx1,Nx2,Ndim). None type returned')
-                self._verbose_print(msg)
-                return field_type
-            if (len(field_shape) == 2):
-                field_dim = 1
-            if (len(field_shape) == 3):
-                field_dim = field_shape[2]
-        # determine field dimension and get name in dictionary
-        field_type = XDMF_FIELD_TYPE[field_dim]
-        return field_type, field_center
-
     def _get_node_class(self, name):
         """Return Pytables Class type associated to the node name."""
         return self.get_attribute(attrname='CLASS', nodename=name)
@@ -2559,14 +2833,19 @@ class SampleData:
         else:
             return None
 
-    def _get_image_type(self, image_object, imagename = ''):
-        if image_object.GetDimensionality() == 3:
-            return '3DImage'
-        elif image_object.GetDimensionality() == 2:
-            return '2DImage'
-        else:
+    def _get_image_type(self, image_object):
+        try:
+            return SD_IMAGE_GROUPS[image_object.GetDimensionality()]
+        except:
             raise ValueError('Image dimension must correspond to a 2D or'
-                             '3D image')
+                             '3D image.')
+
+    def _get_mesh_type(self, mesh_object):
+        try:
+            return SD_MESH_GROUPS[mesh_object.nodes.shape[1]]
+        except:
+            raise ValueError('Mesh dimension must correspond to a 2D or'
+                             '3D mesh.')
 
     def _get_parent_type(self, name):
         """Get the SampleData group type of the node parent group."""

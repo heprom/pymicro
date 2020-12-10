@@ -227,3 +227,37 @@ class SampleDataTests(unittest.TestCase):
         elements_in_tag = myMesh.GetElementsInTag('ExteriorSurf')
         elements_in_tag2 = myMesh2.GetElementsInTag('ExteriorSurf')
         self.assertTrue(np.all(elements_in_tag == elements_in_tag2))
+        del sample
+
+    def test_mesh_from_image(self):
+        """Test BasicTools to SDimage to SDmesh."""
+        # 3D image parameters
+        dimensions = [11,11,11]
+        origin = [0.,0.,0.]
+        spacing = [1.,1.,1.]
+        # create BasicTools image object
+        myMesh = ConstantRectilinearMesh(dim=3)
+        myMesh.SetDimensions(dimensions)
+        myMesh.SetOrigin(origin)
+        myMesh.SetSpacing(spacing)
+        # create data field
+        data = np.zeros(shape=dimensions)
+        data[:,3:8,3:8] = 1
+        myMesh.nodeFields['test_field'] = data
+        # create SD instance and image group
+        sample = SampleData(filename='cube', verbose=False, autodelete=True)
+        sample.add_image(image_object=myMesh, imagename='Image_3D',
+                          indexname='Im3D', replace=True)
+        # create mesh group of tetra from image group
+        sample.add_mesh_from_image('Im3D', with_fields=True, ofTetras=True,
+                                    meshname='Tetra_mesh',
+                                    indexname='Tmsh', replace=True)
+        self.assertTrue(sample.__contains__('Im3D'))
+        self.assertTrue(sample.__contains__('Tmsh'))
+        field1 = sample.get_node('test_field', as_numpy=True)
+        self.assertEqual(field1.shape,(11,11,11))
+        field2 = sample.get_node('test_field_Tetra_mesh', as_numpy=True)
+        self.assertEqual(field2.shape,(11*11*11,1))
+        self.assertEqual(field1.ravel()[37], field2.ravel()[37])
+        del sample
+

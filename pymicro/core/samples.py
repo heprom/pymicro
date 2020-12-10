@@ -22,6 +22,7 @@ from BasicTools.Containers.ConstantRectilinearMesh import (
     ConstantRectilinearMesh)
 from BasicTools.Containers.UnstructuredMesh import (UnstructuredMesh,
                                                     AllElements)
+import BasicTools.Containers.UnstructuredMeshCreationTools as UMCT
 from BasicTools.Containers.MeshBase import MeshBase
 from BasicTools.IO.XdmfTools import XdmfName,XdmfNumber
 # Import variables for XDMF binding
@@ -634,6 +635,46 @@ class SampleData:
                            replace=replace, **keywords)
         return
 
+    def add_mesh_from_image(self, imagename, with_fields=True, ofTetras=False,
+                            meshname='', indexname='', location='/',
+                            description=' ', replace=False, extended_data=True,
+                            **keywords):
+        """Create a Mesh group in the dataset from an Image dataset.
+
+        The mesh group created can represent a mesh of tetrahedra or a mesh of
+        hexaedra, of the image domain (square/triangles in 2D). The fields in
+        the mesh groups are restored, with an adequate shape, and a suffix
+        '_msh' in their indexname.
+
+        :param str imagename: Name, Path or Indexname of the mesh group to get
+        :param bool with_fields: If `True`, load the nodes and elements fields
+            from the image group into the mesh object.
+        :param bool ofTetras: if `True`, returns a mesh with tetrahedron
+            elements. If `False`, return a rectilinera mesh of hexaedron
+            elements.
+        :param str meshname: name used to create the Mesh group in dataset
+        :param indexname: Index name used to reference the Mesh group
+        :location str: Path, Name, Index Name or Alias of the parent group
+            where the Mesh group is to be created
+        :param str description: Description metadata for this mesh
+        :param bool replace: remove Mesh group in the dataset with the same
+            name/location if `True` and such group exists
+        :param bool extended_data: If `True`, stores all Node and Element Tags
+            in mesh_object as fields
+        """
+
+        Mesh_o = self.get_mesh_from_image(imagename, with_fields, ofTetras)
+        # Rename mesh fields to avoid duplicate in content_index
+        field_names = list(Mesh_o.nodeFields.keys())
+        for key in field_names:
+            Mesh_o.nodeFields[key+'_'+meshname] = Mesh_o.nodeFields.pop(key)
+        field_names = list(Mesh_o.elemFields.keys())
+        for key in field_names:
+            Mesh_o.elemFields[key+'_'+meshname] = Mesh_o.elemFields.pop(key)
+        self.add_mesh(Mesh_o, meshname, indexname, location, description,
+                      replace, extended_data)
+        return
+
     def add_image(self, image_object=None, imagename='', indexname='',
                   location='/', description=' ', replace=False,
                   **keywords):
@@ -1177,6 +1218,12 @@ class SampleData:
         BasicTools :class:`ConstantRectilinearMesh` object.
 
         :param str meshname: Name, Path or Indexname of the mesh group to get
+        :param with_fields: If `True`, store mesh group fields into the
+            mesh_object, defaults to True
+        :type with_fields: bool, optional
+        :return: Mesh_object containing all data (nodes, elements, nodes and
+                elements sets, fields), contained in the mesh data group.
+        :rtype:  BasicTools :class:`UnstructuredMesh` object.
 
         """
         # Create mesh object
@@ -1203,6 +1250,29 @@ class SampleData:
                     mesh_object.elemFields[meshname] = data
         mesh_object.PrepareForOutput()
         return mesh_object
+
+    def get_mesh_from_image(self, imagename, with_fields=True, ofTetras=False):
+        """Return an UnstructuredMesh instance from an Image data group.
+
+        :param str imagename: Name, Path or Indexname of the mesh group to get
+        :param bool with_fields: If `True`, load the nodes and elements fields
+            from the image group into the mesh object.
+        :param bool ofTetras: if `True`, returns a mesh with tetrahedron
+            elements. If `False`, return a rectilinera mesh of hexaedron
+            elements.
+        :return: Mesh_object containing all data (nodes, elements, nodes and
+                elements sets, fields), corresponding to the Image data group
+                content.
+        :rtype:  BasicTools :class:`UnstructuredMesh` object.
+        """
+        mesh_CR = self.get_image(imagename, with_fields)
+        mesh_obj = UMCT.CreateMeshFromConstantRectilinearMesh(mesh_CR,
+                                                              ofTetras)
+        n_elems = mesh_obj.GetNumberOfNodes()
+        if with_fields:
+            for key,val in mesh_CR.nodeFields.items():
+                mesh_obj.nodeFields[key] = val.reshape((n_elems,1))
+        return mesh_obj
 
     def get_mesh_nodes(self, meshname, as_numpy=False):
         """Return the mesh node coordinates as a HDF5 node or Numpy array.
@@ -1308,8 +1378,11 @@ class SampleData:
 
         :param imagename: Name, Path or Indexname of the image group to get
         :type imagename: str
-        :return: image_object
-        :rtype: ConstantRectilinearMesh
+        :param bool with_fields: If `True`, load the nodes and elements fields
+            from the image group into the mesh object.
+        :return: Returns a BasicTools rectilinear mesh object with image group
+            data.
+        :rtype: :class:`ConstantRectilinearMesh`
         """
         # Get image informations
         dimensions = self.get_attribute('nodes_dimension', imagename)
@@ -1322,7 +1395,7 @@ class SampleData:
         image_object.SetOrigin(origin)
         # Get image fields
         Field_list =  self.get_attribute('Field_index', imagename)
-        if with_fields:
+        if with_fields and (Field_list is not None):
             for fieldname in Field_list:
                 field_type = self.get_attribute('field_type', fieldname)
                 if field_type == 'Nodal_field':

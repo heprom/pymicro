@@ -367,11 +367,16 @@ class SampleData:
 
         return
 
-    def print_dataset_content(self, as_string=False):
+    def print_dataset_content(self, as_string=False, max_depth=1000):
         """Print information on all nodes in the HDF5 file.
 
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
+        :param int max_depth: Control the maximum depth of the node/groups
+            informations that are printed. Depth is the number of parents that
+            the node has to root group, including root group. For instance,
+            max_depth=2 will print info on the root group children and their
+            childrens.
         :return str s: string representation of HDF5 nodes information
         """
         size, unit = self.get_file_disk_size(print_flag=False)
@@ -385,17 +390,21 @@ class SampleData:
         if not(as_string):
             print('\n************************************************')
         for node in self.h5_dataset.root:
+            if node._v_depth > max_depth:
+                continue
             if not(node._v_name == 'Index'):
                 s += self.get_node_info(node._v_name, as_string)
                 s += self.print_group_content(node._v_name,
                                               recursive=True,
-                                              as_string=as_string)
+                                              as_string=as_string,
+                                              max_depth=max_depth)
                 s += '\n************************************************'
                 if not(as_string):
                     print('\n************************************************')
         return s
 
-    def print_group_content(self, groupname, recursive=False, as_string=False):
+    def print_group_content(self, groupname, recursive=False, as_string=False,
+                            max_depth=1000):
         """Print information on all nodes in a HDF5 group.
 
         :param str groupname: Name, Path, Index name or Alias of the HDF5 group
@@ -406,17 +415,19 @@ class SampleData:
         """
         s = '\n\n****** Group {} CONTENT ******'.format(groupname)
         group = self.get_node(groupname)
+        if group._v_depth > max_depth:
+            return ''
         if group._v_nchildren == 0:
             return ''
         else:
             if not(as_string):
                 print(s)
-
         for node in group._f_iter_nodes():
             s += self.get_node_info(node._v_name, as_string)
             if (self._is_group(node._v_name) and recursive):
                 s += self.print_group_content(node._v_pathname, recursive=True,
-                                              as_string=as_string)
+                                              as_string=as_string,
+                                              max_depth=max_depth-1)
         return s
 
     def print_data_arrays_info(self, as_string=False):
@@ -432,7 +443,8 @@ class SampleData:
                 s += self.get_node_info(node._v_name, as_string)
         return s
 
-    def print_index(self, as_string=False):
+    def print_index(self, as_string=False, max_depth=1000, node_type=[],
+                    local_root='/'):
         """Print a list of the datasets in HDF5 and their Index names.
 
         :param bool as_string: If `True` solely returns string representation.
@@ -442,6 +454,8 @@ class SampleData:
         s = ''
         s += str('Dataset Content Index :\n')
         s += str('------------------------:\n')
+        s += str('index printed with max depth `{}` and under local root'
+                 ' `{}`\n\n'.format(max_depth, local_root))
         for key, value in self.content_index.items():
             col = None
             if isinstance(value, list):
@@ -449,6 +463,11 @@ class SampleData:
                 col = value[1]
             else:
                 path = value
+            node = self.get_node(path)
+            if not(self._is_children_of(node, local_root)):
+                continue
+            if node._v_depth > max_depth:
+                continue
             if col is None:
                 s += str('\t Name : {:20}  H5_Path : {} \t\n'.format(
                          key, path))

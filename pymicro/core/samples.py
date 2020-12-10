@@ -926,6 +926,9 @@ class SampleData:
                                        ' (Mesh or Image), or a grid group'
                                        ' children'.format(location))
         # Add data array into HDF5 dataset
+        if self._is_image(gridname):
+            array, transpose_indices = self._transpose_image_array(
+                dimensionality, array)
         self.add_data_array(array_location, fieldname, array, indexname,
                             chunkshape, replace, filters, empty,
                             **keywords)
@@ -934,6 +937,8 @@ class SampleData:
                          'parent_grid_path': self._name_or_node_to_path(
                              gridname)
                          }
+        if self._is_image(gridname):
+            Attribute_dic['transpose_indices'] = transpose_indices
         self.add_attributes(Attribute_dic, nodename=fieldname)
         # Add field description to XDMF file
         self._add_field_to_xdmf(fieldname, array)
@@ -1486,24 +1491,12 @@ class SampleData:
             if as_numpy and self._is_array(name) and (colname is None):
                 # note : np.atleast_1d is used here to avoid returning a 0d
                 # array when squeezing a scalar node
+                transpose_indices = self.get_attribute('transpose_indices',
+                                                       name)
                 node = np.atleast_1d(node.read())
+                if transpose_indices is not None:
+                    node = node.transpose(transpose_indices)
         return node
-
-
-    def get_field(self, gridname, fieldname, as_numpy=False):
-        """Return a field in a Mesh/3DImage group as a Node or Numpy array.
-
-        :param str gridname: Name, Path, Index name or Alias of the Mesh group
-            in dataset
-        :param str fieldname: Name of the field node in the grid node
-        :param bool as_numpy: if `True`, returns the Node as a `numpy.array`.
-            If `False`, returns the node as a Node or Group object.
-        :return: Return the field values array as a
-            :py:class:`tables.Node` object or a `numpy.array`
-        """
-        Grid = self.get_node(gridname)
-        return self.get_node(os.path.join(Grid._v_pathname, fieldname),
-                             as_numpy)
 
     def get_node_info(self, name, as_string=False):
         """Print information on a node in the HDF5 tree.
@@ -2867,6 +2860,29 @@ class SampleData:
         Field_index.append(field_path)
         self.add_attributes({'Field_index': Field_index}, gridname)
         return
+
+    def _transpose_image_array(self, dimensionality, array):
+        """Transpose the array X,Y,Z dimensions for XDMF conventions."""
+        if dimensionality in ['Vector', 'Tensor6', 'Tensor']:
+            # vector or tensor field
+            if len(array.shape) == 3:
+                # 2D image
+                transpose_indices = [1,0,2]
+            elif len(array.shape) == 4:
+                # 3D image
+                transpose_indices = [2,1,0,3]
+        elif dimensionality == 'Scalar':
+            # scalar field
+            if len(array.shape) == 2:
+                # 2D image
+                transpose_indices = [1,0]
+            elif len(array.shape) == 3:
+                # 3D image
+                transpose_indices = [2,1,0]
+        else:
+            raise ValueError('Unknown field dimensionality. Possible values'
+                             ' are {}'.format(XDMF_FIELD_TYPE.values()))
+        return array.transpose(transpose_indices), transpose_indices
 
     def _add_field_to_xdmf(self, fieldname, field):
         """Write field data as Grid Attribute in xdmf tree/file."""

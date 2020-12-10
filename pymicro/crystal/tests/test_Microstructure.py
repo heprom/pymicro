@@ -93,7 +93,7 @@ class MicrostructureTests(unittest.TestCase):
         self.assertAlmostEqual(m.get_voxel_size(), 0.018, 2)
         dims = (54, 65, 75)
         for i in range(3):
-            self.assertEqual(m.get_grain_map().shape[i], dims[i])
+            self.assertEqual(m.get_grain_map(as_numpy=True).shape[i], dims[i])
         del m
 
     def test_find_neighbors(self):

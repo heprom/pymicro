@@ -117,13 +117,10 @@ class SampleDataTests(unittest.TestCase):
         mesh_elements = mesh_elements.reshape(self.mesh_elements.shape)
         self.assertTrue(np.all(mesh_elements==self.mesh_elements))
         # test mesh field recovery
-        shape_f1 = sample.get_field(gridname='mesh',fieldname='Test_field1',
-                                    as_numpy=True)
+        shape_f1 = sample.get_node('Test_field1', as_numpy=True)
         self.assertTrue(np.all(shape_f1==self.mesh_shape_f1))
         # test image field recovery
-        image_field = sample.get_field(gridname='image',
-                                       fieldname='test_image_field',
-                                       as_numpy=True)
+        image_field = sample.get_node('test_image_field', as_numpy=True)
         self.assertTrue(np.all(image_field==self.image))
         # test sampledata instance and file autodelete function
         sample.autodelete = True

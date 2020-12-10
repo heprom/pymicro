@@ -1183,6 +1183,9 @@ class SampleData:
         mesh_object = UnstructuredMesh()
         # Get mesh nodes
         mesh_object.nodes = self.get_mesh_nodes(meshname, as_numpy=True)
+        # No mesh ID for now --> create mesh Ids
+        mesh_object.originalIDNodes = self.get_mesh_nodesID(meshname,
+                                                            as_numpy=True)
         # Get node tags
         self._load_nodes_tags(meshname, mesh_object)
         # Get mesh elements and element tags
@@ -1198,6 +1201,7 @@ class SampleData:
                 elif field_type == 'Element_field':
                     data = self.get_node(fieldname,as_numpy=True)
                     mesh_object.elemFields[meshname] = data
+        mesh_object.PrepareForOutput()
         return mesh_object
 
     def get_mesh_nodes(self, meshname, as_numpy=False):
@@ -1211,6 +1215,19 @@ class SampleData:
             :py:class:`tables.Node` object or a `numpy.array`
         """
         nodes_path = self.get_attribute('nodes_path', meshname)
+        return self.get_node(nodes_path, as_numpy)
+
+    def get_mesh_nodesID(self, meshname, as_numpy=False):
+        """Return the mesh node ID as a HDF5 node or Numpy array.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :param bool as_numpy: if `True`, returns the Node as a `numpy.array`.
+            If `False`, returns the node as a Node or Group object.
+        :return: Return the mesh Nodes ID array as a
+            :py:class:`tables.Node` object or a `numpy.array`
+        """
+        nodes_path = self.get_attribute('nodesID_path', meshname)
         return self.get_node(nodes_path, as_numpy)
 
     def get_mesh_xdmf_connectivity(self, meshname, as_numpy=False):
@@ -2461,15 +2478,16 @@ class SampleData:
                            'group_type': self._get_mesh_type(mesh_object),
                            'nodes_path':Nodes._v_pathname}
         self.add_attributes(Node_attributes, mesh_group._v_pathname)
-        # Add Nodes ID : NOT INCLUDED FOR NOW BUT FONCTIONAL
-        # if isinstance(mesh_object, UnstructuredMesh):
-        #     self._verbose_print('Creating Nodes ID data set in group {}'
-        #                         ' in file {}'
-        #                         ''.format(geo_group._v_pathname, self.h5_file))
-        #     self.add_data_array(location=geo_group._v_pathname,
-        #                         name='Nodes_ID',
-        #                         array=mesh_object.originalIDNodes,
-        #                         indexname=mesh_group._v_name+'_Nodes_ID')
+        if isinstance(mesh_object, UnstructuredMesh):
+            self._verbose_print('Creating Nodes ID data set in group {}'
+                                ' in file {}'
+                                ''.format(geo_group._v_pathname, self.h5_file))
+            self.add_data_array(location=geo_group._v_pathname,
+                                name='Nodes_ID',
+                                array=mesh_object.originalIDNodes,
+                                indexname=mesh_group._v_name+'_Nodes_ID')
+        Node_attributes = {'nodesID_path':Nodes._v_pathname}
+        self.add_attributes(Node_attributes, mesh_group._v_pathname)
         return
 
     def _add_mesh_elements(self, mesh_object, mesh_group, geo_group, replace,
@@ -2538,20 +2556,20 @@ class SampleData:
         Elem_tag_type_list = []
         for elem_type in mesh_object.elements:
             element_container = mesh_object.elements[elem_type]
-            celtags = element_container.tags.keys()
-            for tagname in celtags:
+            for tagname in element_container.tags.keys():
                 name = tagname
                 Elem_tags_list.append(name)
                 Elem_tag_type_list.append(elem_type)
-                elem_list = mesh_object.GetElementsInTag(tagname)
+                elem_list = element_container.tags[tagname].GetIds()
                 self.add_data_array(location=Etags_group._v_pathname,
                                     name='ET_'+name, array=elem_list,
                                     replace=replace)
                 if extended_data:
                     # Add elem tags as fields in the dataset and XDMF file
+                    elem_list_field = mesh_object.GetElementsInTag(tagname)
                     data = np.zeros((mesh_object.GetNumberOfElements(),1),
                                     dtype=np.int8)
-                    data[elem_list] = 1;
+                    data[elem_list_field] = 1;
                     self.add_field(mesh_group._v_pathname, fieldname='field_'+name,
                                    array=data, replace=replace,
                                    location=Etags_group._v_pathname)

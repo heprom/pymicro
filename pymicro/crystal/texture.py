@@ -114,18 +114,21 @@ class PoleFigure:
         self.lut = lut
         if field_name in ['grain_id', 'ipf']:
             self.field = self.microstructure.get_grain_ids()
+        if field_name in ['grain_size', 'volume']:
+            self.field = self.microstructure.get_grain_volumes()
         else:
-            if len(field) < len(self.microstructure.get_number_of_grains()):
-                raise ValueError('The field must contain a record for each grain in the microstructure')
+            if len(field) != self.microstructure.get_number_of_grains():
+                raise ValueError('The field must contain exactly one record '
+                                 'for each grain in the microstructure')
             self.field = field
-            if not field_min_level:
-                self.field_min_level = field.min()
-            else:
-                self.field_min_level = field_min_level
-            if not field_max_level:
-                self.field_max_level = field.max()
-            else:
-                self.field_max_level = field_max_level
+        if not field_min_level:
+            self.field_min_level = self.field.min()
+        else:
+            self.field_min_level = field_min_level
+        if not field_max_level:
+            self.field_max_level = self.field.max()
+        else:
+            self.field_max_level = field_max_level
 
     def plot_pole_figures(self, plot_sst=True, display=True, save_as='pdf'):
         """Plot and save a picture with both direct and inverse pole figures.
@@ -477,11 +480,11 @@ class PoleFigure:
                     axis = np.array([0., 1., 0.])
                 else:
                     axis = np.array([0., 0., 1.])
-                #FIXME change the behaviour here
-                col = grain.orientation.get_ipf_colour(axis=axis)
+                col = Orientation.from_rodrigues(
+                    grain['orientation']).get_ipf_colour(axis=axis)
             else:
                 # retrieve the position of the grain in the list
-                rank = self.microstructure.grains.index(grain)
+                rank = self.microstructure.get_grain_ids().tolist().index(grain['idnumber'])
                 if type(self.lut) is str:
                     # get the color map from pyplot
                     color_map = cm.get_cmap(self.lut, 256)

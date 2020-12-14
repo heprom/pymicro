@@ -13,12 +13,16 @@ if __name__ == '__main__':
     (both direct and inverse) are drawn by calling the plot_pole_figures() method.
     '''
     micro = Microstructure(name='Au_6grains')
-    micro.grains.append(Grain(1158, Orientation.from_euler(np.array([344.776, 52.2589, 53.9933]))))
-    micro.grains.append(Grain(1349, Orientation.from_euler(np.array([344.899, 125.961, 217.330]))))
-    micro.grains.append(Grain(1585, Orientation.from_euler(np.array([228.039, 57.4791, 143.171]))))
-    micro.grains.append(Grain(1805, Orientation.from_euler(np.array([186.741, 60.333, 43.311]))))
-    micro.grains.append(Grain(1833, Orientation.from_euler(np.array([151.709, 55.0406, 44.1051]))))
-    micro.grains.append(Grain(2268, Orientation.from_euler(np.array([237.262, 125.149, 225.615]))))
+    micro.autodelete = True
+    gid_list = [1158, 1349, 1585, 1805, 1833, 2268]
+    euler_list = [(344.776, 52.2589, 53.9933), 
+                  (344.899, 125.961, 217.330),
+                  (228.039, 57.4791, 143.171),
+                  (186.741, 60.333, 43.311),
+                  (151.709, 55.0406, 44.1051),
+                  (237.262, 125.149, 225.615),
+                  ]
+    micro.add_grains(euler_list, grain_ids=gid_list)
 
     # create pole figure (both direct and inverse)
     pf = PoleFigure(hkl='111', axis='Z', proj='stereo', microstructure=micro)

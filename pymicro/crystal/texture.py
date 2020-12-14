@@ -101,8 +101,8 @@ class PoleFigure:
         values and the colors can be specify, if not they are directly taken
         as the min() and max() of the field.
 
-        :param str field_name: The field name, could be 'grain_id', or any other
-        name describing the field.
+        :param str field_name: The field name, could be 'grain_id', 'ipf',
+        'grain_size' or any other name describing the field.
         :param list field: A list containing a record for each grain.
         :param float field_min_level: The minimum value to use for this field.
         :param float field_max_level: The maximum value to use for this field.

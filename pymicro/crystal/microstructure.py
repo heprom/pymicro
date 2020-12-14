@@ -1777,6 +1777,31 @@ class Microstructure(SampleData):
         self.grains.flush()
         return
 
+    def add_grains(self, euler_list, grain_ids=None):
+        """A a list of grains to this microstructure.
+
+        This function adds a list of grains represented by a list of Euler
+        angles triplets, to the microstructure. If provided, the `grain_ids`
+        list will be used for the grain ids.
+
+        :param list euler_list: the list of euler angles (Bunge passive convention).
+        :param list grain_ids: an optional list for the ids of the new grains.
+        """
+        grain = self.grains.row
+        # build a list of grain ids if it is not given
+        if not grain_ids:
+            if self.get_number_of_grains() > 0:
+                min_id = max(self.get_grain_ids())
+            else:
+                min_id = 0
+            grain_ids = range(min_id, min_id + len(euler_list))
+        for gid, euler in zip(grain_ids, euler_list):
+            grain['idnumber'] = gid
+            o = Orientation.from_euler(euler)
+            grain['orientation'] = o.rod
+            grain.append()
+        self.grains.flush()
+
     @staticmethod
     def random_texture(n=100):
         """Generate a random texture microstructure.

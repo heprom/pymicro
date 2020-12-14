@@ -12,16 +12,16 @@ class MicrostructureTests(unittest.TestCase):
         print('testing the Microstructure class')
         self.test_eulers = [(45., 45, 0.), (10., 20, 30.), (191.9, 69.9, 138.9)]
 
+    def test_add_grains(self):
+        micro = Microstructure(name='test', autodelete=True)
+        self.assertEqual(micro.get_number_of_grains(), 0)
+        micro.add_grains(self.test_eulers)
+        self.assertEqual(micro.get_number_of_grains(), 3)
+        del micro
+
     def test_base(self):
         micro = Microstructure(name='test', autodelete=True)
-        gr = micro.grains.row
-        for i in range(len(self.test_eulers)):
-            euler = self.test_eulers[i]
-            gr['idnumber'] = i
-            gr['orientation'] = Orientation.from_euler(euler).rod
-            gr.append()
-        micro.grains.flush()
-        self.assertEqual(micro.grains.nrows,3)
+        micro.add_grains(self.test_eulers)
         self.assertTrue(micro.get_sample_name() == 'test')
         self.assertTrue(os.path.exists(micro.h5_file))
         self.assertTrue(os.path.exists(micro.xdmf_file))

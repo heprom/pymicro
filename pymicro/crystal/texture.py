@@ -114,7 +114,7 @@ class PoleFigure:
         self.lut = lut
         if field_name in ['grain_id', 'ipf']:
             self.field = self.microstructure.get_grain_ids()
-        if field_name in ['grain_size', 'volume']:
+        elif field_name in ['grain_size', 'volume']:
             self.field = self.microstructure.get_grain_volumes()
         else:
             if len(field) != self.microstructure.get_number_of_grains():
@@ -601,12 +601,12 @@ class PoleFigure:
         :param orientations: the list of crystalline
         :py:class:`~pymicro.crystal.microstructure.Orientation` to plot.
         """
-        micro = Microstructure()
+        micro = Microstructure(autodelete=True)
         if isinstance(orientations, list):
             for i in range(len(orientations)):
-                micro.grains.append(Grain(i + 1, orientations[i]))
+                micro.add_grains([o.euler for o in orientations])
         elif isinstance(orientations, Orientation):
-            micro.grains.append(Grain(1, orientations))
+            micro.add_grains([orientations.euler])
         else:
             print('Unrecognized argument: %s' % orientations.__repr__)
         pf = PoleFigure(microstructure=micro, **kwargs)

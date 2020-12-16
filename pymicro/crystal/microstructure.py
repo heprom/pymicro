@@ -1504,7 +1504,7 @@ class Microstructure(SampleData):
         """
         return self._lattice
 
-    def get_grain_map(self, as_numpy=False):
+    def get_grain_map(self, as_numpy=True):
         grain_map = self.get_node(name='grain_map', as_numpy=as_numpy)
         if self._is_empty('grain_map'):
             grain_map = None
@@ -1745,8 +1745,8 @@ class Microstructure(SampleData):
                                       spacing=voxel_size*np.ones((3,)),
                                       replace=True, **keywords)
         else:
-            self.add_data_array(location='CellData', name='mask',
-                                array=mask, replace=True, **keywords)
+            self.add_field(gridname='CellData', fieldname='mask',
+                           array=mask, replace=True, **keywords)
         return
 
     def set_random_orientations(self):
@@ -1780,6 +1780,53 @@ class Microstructure(SampleData):
         # TODO : create a dedicated node in h5_dataset
         self.vtkmesh = mesh
 
+    def create_orientation_map(self, store=True):
+        """Create a vector field in CellData of grain orientations.
+
+        Creates a (Nx,Ny,Nz,3) or (Nx,Ny,3) field from the microsctructure
+        `grain_map`, adding to each voxel the value of the Rodrigues vector
+        of the local grain Id, as it is and if it is referenced in the
+        `GrainDataTable` node.
+
+        :param bool store: If `True`, store the orientation map in `CellData`
+            image group, with name `orientation_map`
+        """
+        # safety check
+        if self._is_empty('grain_map'):
+            raise RuntimeError('The microstructure instance has an empty'
+                                '`grain_map` node. Cannot create orientation'
+                                ' map')
+        grain_map = self.get_grain_map()
+        grainIds = self.get_grain_ids()
+        grain_orientations = self.get_grain_rodrigues()
+        # safety check n°2
+        grain_list = np.unique(grain_map)
+        # remove -1 and 0 from the list of grains in grain map (Ids reserved
+        # for background and overlaps in non-dilated reconstructed grain maps)
+        grain_list = np.delete(grain_list, np.isin(grain_list, [-1,0]))
+        if not np.all(np.isin(grain_list,grainIds)):
+            raise ValueError('Some grain Ids in `grain_map` are not referenced'
+                             ' in the `GrainDataTable` array. Cannot create'
+                             ' orientation map.')
+        # create empty orientation map with right dimensions
+        im_dim = self.get_attribute('dimension','CellData')
+        shape_orientation_map = np.empty(shape=(len(im_dim)+1), dtype='int32')
+        shape_orientation_map[:-1] = im_dim
+        shape_orientation_map[-1] = 3
+        orientation_map = np.zeros(shape=shape_orientation_map,dtype=float)
+        omap_X = orientation_map[...,0]
+        omap_Y = orientation_map[...,1]
+        omap_Z = orientation_map[...,2]
+        for i in range(len(grainIds)):
+            slc = np.where(grain_map == grainIds[i])
+            omap_X[slc] = grain_orientations[i,0]
+            omap_Y[slc] = grain_orientations[i,1]
+            omap_Z[slc] = grain_orientations[i,2]
+        if store:
+            self.add_field(gridname='CellData', fieldname='orientation_map',
+                           array=orientation_map)
+        return orientation_map
+
     def view_slice(self, slice=None, color='random', show_mask=True):
         """A simple utility method to show one microstructure slice.
 
@@ -1791,7 +1838,7 @@ class Microstructure(SampleData):
             print('Microstructure instance mush have a grain_map field to use '
                   'this method')
             return
-        grain_map = self.get_grain_map()
+        grain_map = self.get_grain_map(as_numpy=True)
         if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
             slice = grain_map.shape[2] // 2
             print('using slice value %d' % slice)
@@ -2767,7 +2814,7 @@ class Microstructure(SampleData):
         return micro
 
     @staticmethod
-    def from_legacy_h5(file_path):
+    def from_legacy_h5(file_path, filename=None):
         """read a microstructure object from a HDF5 file created by pymicro
         until version 0.4.5.
 
@@ -2775,8 +2822,9 @@ class Microstructure(SampleData):
         :return: the new `Microstructure` instance created from the file.
         """
         with h5py.File(file_path, 'r') as f:
-            micro = Microstructure(name=f.attrs['microstructure_name'],
-                                   overwrite_hdf5=True)
+            if filename is None:
+                filename = f.attrs['microstructure_name']
+            micro = Microstructure(name=filename, overwrite_hdf5=True)
             if 'symmetry' in f['EnsembleData/CrystalStructure'].attrs:
                 sym = f['EnsembleData/CrystalStructure'].attrs['symmetry']
                 parameters = f['EnsembleData/CrystalStructure/LatticeParameters'][()]

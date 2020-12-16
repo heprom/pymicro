@@ -234,7 +234,7 @@ class SampleData:
         """
         self._verbose_print('Deleting DataSample object ')
         self.sync()
-        self.repack_h5file()
+        # self.repack_h5file()
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
         if self.autodelete:
@@ -616,6 +616,9 @@ class SampleData:
                yet
 
         """
+        # Check if the input array is in an external file
+        if 'file' in keywords:
+            mesh_object = self._read_mesh_from_file(**keywords)
         ### Create or fetch mesh group
         mesh_group = self.add_group(meshname, location, indexname, replace)
         ### empty meshes creation
@@ -758,7 +761,12 @@ class SampleData:
         image_nodes_dim = np.array(image_object.GetDimensions())
         image_cell_dim = image_nodes_dim - np.ones(image_nodes_dim.shape,
                                                    dtype=image_nodes_dim.dtype)
+        if len(image_nodes_dim) == 2:
+            image_xdmf_dim = image_nodes_dim[[1,0]]
+        elif len(image_nodes_dim) == 3:
+            image_xdmf_dim = image_nodes_dim[[1,0,2]]
         Attribute_dic = {'nodes_dimension': image_nodes_dim,
+                         'nodes_dimension_xdmf': image_xdmf_dim,
                          'dimension': image_cell_dim,
                          'spacing': np.array(image_object.GetSpacing()),
                          'origin': np.array(image_object.GetOrigin()),
@@ -968,16 +976,23 @@ class SampleData:
             specifying compression settings.
         :param bool empty: if `True` create the path, Index Name in dataset and
             store an empty array. Set the node attribute `empty` to True.
+        :param file:
+        :type str, optional:
 
         .. note:: additional keywords arguments can be passed to specify global
-                compression options, see :func:`set_chunkshape_and_compression`
-                documentation for their definition. If some are passed, they
-                are prioritised over the settings in the inputed Filter object.
+            compression options, see :func:`set_chunkshape_and_compression`
+            documentation for their definition. If some are passed, they are
+            prioritised over the settings in the inputed Filter object.
+
+        .. note:: The data array can
         """
         self._verbose_print('Adding array `{}` into Group `{}`'
                             ''.format(name, location))
         # Safety checks
         self._check_SD_array_init(name, location, replace)
+        # Check if the input array is in an external file
+        if 'file' in keywords:
+            array = self._read_array_from_file(**keywords)
         if array is None:
             raise ValueError('Received a `None` array. Cannot add data array.')
         # get location path
@@ -1904,6 +1919,46 @@ class SampleData:
         self._verbose = verbosity
         return
 
+    def rename_node(self, nodename, newname, replace=False,
+                    new_indexname=None):
+        """Rename a node in the HDF5 tree, XDMF file and content index.
+
+        This method do not change the indexname of the node, if one exists.
+
+        :param nodename: Name, Path or Index name of the node to modify
+        :type nodename: str
+        :param newname: New name to give to the HDF5 node
+        :type newname: str
+        :param replace: If `True`, overwrite a possibily existing node with
+            name `newname` defaults to False
+        :type replace: bool, optional
+        """
+        self.sync()
+        node = self.get_node(nodename)
+        indexname = self.get_indexname_from_path(node._v_pathname)
+        if new_indexname is not None:
+            self.content_index.pop(indexname)
+            indexname = new_indexname
+        elif indexname == node._v_name:
+            self.content_index.pop(indexname)
+            indexname = newname
+        # change nodename in XDMF file
+        xdmf_lines = []
+        with open(self.xdmf_file, 'r') as f:
+            old_xdmf_lines = f.readlines()
+        for line in old_xdmf_lines:
+            xdmf_lines.append(line.replace(node._v_name, newname))
+        with open(self.xdmf_file, 'w') as f:
+            f.writelines(xdmf_lines)
+        # change HDF5 node name
+        self.h5_dataset.rename_node(node, newname, overwrite=replace)
+        # change index
+        self.content_index[indexname] = node._v_pathname
+        self.xdmf_tree = etree.parse(self.xdmf_file)
+        self.sync()
+        return
+
+
     def remove_node(self, name, recursive=False):
         """Remove a node from the dataset.
 
@@ -1992,10 +2047,15 @@ class SampleData:
         the HDF5 tree or reducing a node space by changing its compression
         settings. This method is called also by the class destructor.
         """
+        # BUG: copy_file from tables returns exception with large mesh and lot
+        # of elsets. Use external utility ptrepack ? For now, taken out of
+        # class destructor
         head, tail = os.path.split(self.h5_file)
         tmp_file = os.path.join(head, 'tmp_'+tail)
         self.h5_dataset.copy_file(tmp_file)
+        self.h5_dataset.close()
         shutil.move(tmp_file, self.h5_file)
+        self.h5_dataset = tables.File(self.h5_file, mode='r+')
         return
 
     @staticmethod
@@ -2761,7 +2821,14 @@ class SampleData:
         # add 1 to each dimension to get grid dimension (from cell number to
         # point number --> XDMF indicates Grid points)
         image_type = self._get_image_type(image_object)
-        Dimension = self._np_to_xdmf_str(image_object.GetDimensions())
+        # Get image dimension with reverted shape to compensate for Paraview
+        # X,Y,Z indexing convention
+        Dimension_tmp = image_object.GetDimensions()
+        if len(Dimension_tmp) == 2:
+            Dimension_tmp = Dimension_tmp[[1,0]]
+        elif len(Dimension_tmp) == 3:
+            Dimension_tmp = Dimension_tmp[[2,1,0]]
+        Dimension = self._np_to_xdmf_str(Dimension_tmp)
         Spacing = self._np_to_xdmf_str(image_object.GetSpacing())
         Origin = self._np_to_xdmf_str(image_object.GetOrigin())
         Dimensionality = str(image_object.GetDimensionality())
@@ -2901,7 +2968,7 @@ class SampleData:
                                                   fieldname)
         Xdmf_grid_node = self.xdmf_tree.find(xdmf_path)
         # create Attribute element
-        Attribute_xdmf = etree.Element(_tag='Attribute', Name=fieldname,
+        Attribute_xdmf = etree.Element(_tag='Attribute', Name=Node._v_name,
                                        AttributeType=field_dimensionality,
                                        Center=Center_type)
         # Create data item element
@@ -3070,6 +3137,30 @@ class SampleData:
             elif (word == 'least_significant_digit'):
                 Filters.least_significant_digit = keywords[word]
         return Filters
+
+    def _read_mesh_from_file(self, file=None, **keywords):
+        """Read a data array from a file, depending on the extension."""
+        mesh_object = None
+        # Get file extension
+        _, tail = os.path.splitext(file)
+        # HDF5 files
+        if tail == '.geof':
+            import BasicTools.IO.GeofReader as GR
+            mesh_object = GR.ReadGeof(file)
+        return mesh_object
+
+    def _read_array_from_file(self, file=None, **keywords):
+        """Read a data array from a file, depending on the extension."""
+        array = None
+        # Get file extension
+        _, tail = os.path.splitext(file)
+        # HDF5 files
+        if tail == '.h5':
+            with tables.File(file, mode='r') as f:
+                if 'h5_path' in keywords:
+                    h5_path = keywords['h5_path']
+                array = f.get_node(where=h5_path).read()
+        return array
 
     def _verbose_print(self, message, line_break=True):
         """Print message if verbose flag is `True`."""

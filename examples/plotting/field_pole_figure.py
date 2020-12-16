@@ -7,10 +7,12 @@ if __name__ == '__main__':
     symbol on the pole figure with the :py:meth:~`pymicro.crystal.texture.set_map_field`
     method.
     '''
-    orientations = Orientation.read_euler_txt('../data/orientation_set.inp')
-    micro = Microstructure(name='field')
-    for i in range(600):
-        micro.grains.append(Grain(i, orientations[i + 1]))
+    #orientations = Orientation.read_euler_txt('../data/orientation_set.inp')
+    #for i in range(600):
+    #    micro.grains.append(Grain(i, orientations[i + 1]))
+    euler_list = np.genfromtxt('../data/orientation_set.inp').tolist()
+    micro = Microstructure(name='field', autodelete=True)
+    micro.add_grains(euler_list)
 
     # load strain from dat files
     strain_field = np.genfromtxt('../data/strain_avg_per_grain.dat')[19, ::2]
@@ -34,6 +36,7 @@ if __name__ == '__main__':
     image_name = os.path.splitext(__file__)[0] + '.png'
     print('writting %s' % image_name)
     plt.savefig('%s' % image_name, format='png')
+    del micro
 
     from matplotlib import image
 

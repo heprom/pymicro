@@ -1,4 +1,5 @@
-"""The texture module provide some utilities to generate, analyse and plot crystallographic textures.
+"""The texture module provide some utilities to generate, analyse and plot
+crystallographic textures.
 """
 import numpy as np
 from pymicro.crystal.lattice import Symmetry, Lattice, HklPlane, SlipSystem
@@ -7,9 +8,9 @@ from matplotlib import pyplot as plt, colors, cm
 
 
 class PoleFigure:
-    """A class to handle pole figures.
+    """A class to create pole figures.
 
-    A pole figure is a popular tool to plot multiple crystal orientations,
+    A pole figure is a useful tool to plot multiple crystal orientations,
     either in the sample coordinate system (direct pole figure) or
     alternatively plotting a particular direction in the crystal
     coordinate system (inverse pole figure).
@@ -18,17 +19,18 @@ class PoleFigure:
     def __init__(self, microstructure=None, lattice=None, axis='Z', hkl='111',
                  proj='stereo', verbose=False):
         """
-        Create an empty PoleFigure object associated with an empty Microstructure.
-
-        :param microstructure: the :py:class:`~pymicro.crystal.microstructure.Microstructure` containing the collection of orientations to plot (None by default).
-        :param lattice: the crystal :py:class:`~pymicro.crystal.lattice.Lattice`.
-        :param str axis: the pole figure axis ('Z' by default), vertical axis in the direct pole figure and direction plotted on the inverse pole figure.
+        Create an empty PoleFigure object associated with a Microstructure.
 
         .. warning::
 
            Any crystal structure is now supported (you have to set the proper
            crystal lattice) but it has only really be tested for cubic.
 
+        :param microstructure: the :py:class:`~pymicro.crystal.microstructure.Microstructure`
+        containing the collection of orientations to plot (None by default).
+        :param lattice: the crystal :py:class:`~pymicro.crystal.lattice.Lattice`.
+        :param str axis: the pole figure axis ('Z' by default), vertical axis in
+        the direct pole figure and direction plotted on the inverse pole figure.
         :param str hkl: slip plane family ('111' by default)
         :param str proj: projection type, can be either 'stereo' (default) or 'flat'
         :param bool verbose: verbose mode (False by default)
@@ -56,22 +58,23 @@ class PoleFigure:
         self.z = np.array([0., 0., 1.])
 
         # list all crystal directions
-        self.c001s = np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=np.float)
-        self.c011s = np.array([[0, 1, 1], [1, 0, 1], [1, 1, 0], [0, -1, 1], [-1, 0, 1], [-1, 1, 0]],
-                              dtype=np.float) / np.sqrt(2)
-        self.c111s = np.array([[1, 1, 1], [-1, -1, 1], [1, -1, 1], [-1, 1, 1]], dtype=np.float) / np.sqrt(3)
+        #self.c001s = np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=np.float)
+        #self.c011s = np.array([[0, 1, 1], [1, 0, 1], [1, 1, 0], [0, -1, 1], [-1, 0, 1], [-1, 1, 0]],
+        #                      dtype=np.float) / np.sqrt(2)
+        #self.c111s = np.array([[1, 1, 1], [-1, -1, 1], [1, -1, 1], [-1, 1, 1]], dtype=np.float) / np.sqrt(3)
 
     def get_orientations(self):
         """Get the list of orientations in the PoleFigure.
 
         :return: a list of `Orientation` instances.
         """
-        return [grain.orientation for grain in self.microstructure.grains]
+        return self.microstructure.get_grain_orientations()
 
     def set_hkl_poles(self, hkl='111'):
         """Set the pole (aka hkl planes) list to to use in the `PoleFigure`.
 
-        The list of poles can be given by the family type or directly by a list of `HklPlanes` objects.
+        The list of poles can be given by the family type or directly by a list
+        of `HklPlanes` objects.
 
         :params str/list hkl: slip plane family ('111' by default)
         """
@@ -81,10 +84,10 @@ class PoleFigure:
         elif type(hkl) is list:
             self.family = None
             hkl_planes = hkl
-        self.poles = hkl_planes  #[p.normal() for p in hkl_planes]
+        self.poles = hkl_planes
 
     def set_map_field(self, field_name, field=None, field_min_level=None, field_max_level=None, lut='hot'):
-        '''Set the PoleFigure to color poles with the given field.
+        """Set the PoleFigure to color poles with the given field.
 
         This method activates a mode where each symbol in the pole figure
         is color coded with respect to a field, which can be either the
@@ -98,40 +101,43 @@ class PoleFigure:
         values and the colors can be specify, if not they are directly taken
         as the min() and max() of the field.
 
-        :param str field_name: The field name, could be 'grain_id', or any other name describing the field.
+        :param str field_name: The field name, could be 'grain_id', 'ipf',
+        'grain_size' or any other name describing the field.
         :param list field: A list containing a record for each grain.
         :param float field_min_level: The minimum value to use for this field.
         :param float field_max_level: The maximum value to use for this field.
-        :param str lut: A string describing the colormap to use (among matplotlib ones available).
+        :param str lut: A string describing the colormap to use (among
+        matplotlib ones available).
         :raise ValueError: If the given field does not contain enough values.
-        '''
+        """
         self.map_field = field_name
         self.lut = lut
-        if field_name == 'grain_id':
-            self.field = [g.id for g in self.microstructure.grains]
-        elif field_name == 'ipf':
-            self.field = [g.id for g in self.microstructure.grains]
+        if field_name in ['grain_id', 'ipf']:
+            self.field = self.microstructure.get_grain_ids()
+        elif field_name in ['grain_size', 'volume']:
+            self.field = self.microstructure.get_grain_volumes()
         else:
-            if len(field) < len(self.microstructure.grains):
-                raise ValueError('The field must contain a record for each grain in the microstructure')
+            if len(field) != self.microstructure.get_number_of_grains():
+                raise ValueError('The field must contain exactly one record '
+                                 'for each grain in the microstructure')
             self.field = field
-            if not field_min_level:
-                self.field_min_level = field.min()
-            else:
-                self.field_min_level = field_min_level
-            if not field_max_level:
-                self.field_max_level = field.max()
-            else:
-                self.field_max_level = field_max_level
+        if not field_min_level:
+            self.field_min_level = self.field.min()
+        else:
+            self.field_min_level = field_min_level
+        if not field_max_level:
+            self.field_max_level = self.field.max()
+        else:
+            self.field_max_level = field_max_level
 
     def plot_pole_figures(self, plot_sst=True, display=True, save_as='pdf'):
-        '''Plot and save a picture with both direct and inverse pole figures.
+        """Plot and save a picture with both direct and inverse pole figures.
 
-        :param bool plot_sst: controls wether to plot the full inverse pole \
+        :param bool plot_sst: controls wether to plot the full inverse pole
         figure or only the standard stereographic triangle (True by default).
-        :param bool display: display the plot if True, else save a picture \
-        of the pole figures (True by default)
-        :param str save_as: File format used to save the image such as pdf \
+        :param bool display: display the plot if True, else save a picture of
+        the pole figures (True by default)
+        :param str save_as: File format used to save the image such as pdf
         or png ('pdf' by default)
 
         ::
@@ -152,7 +158,7 @@ class PoleFigure:
             :align: center
 
             A 111 pole figure plotted for a single crystal orientation.
-        '''
+        """
         fig = plt.figure(figsize=(10, 5))
         # direct PF
         ax1 = fig.add_subplot(121, aspect='equal')
@@ -169,14 +175,14 @@ class PoleFigure:
             plt.savefig('%s_pole_figure.%s' % (self.microstructure.name, save_as), format=save_as)
 
     def plot_crystal_dir(self, c_dir, **kwargs):
-        '''Function to plot a crystal direction on a pole figure.
+        """Function to plot a crystal direction on a pole figure.
 
         :param c_dir: A vector describing the crystal direction.
         :param dict kwargs: a dictionnary of keyword/values to control the
             plot, it should at least contain a reference to a pyplot axes
-            to draw the pole using keywors 'ax'.
+            to draw the pole using keyword 'ax'.
         :raise ValueError: if the projection type is not supported
-        '''
+        """
         if c_dir[2] < 0:
             c_dir *= -1  # make unit vector have z>0
         if self.proj == 'flat':
@@ -198,18 +204,20 @@ class PoleFigure:
         #ax.plot(cp[0], cp[1], linewidth=0, markerfacecolor=col, marker=mk,
         #        markeredgecolor=edge_col, markersize=self.mksize, label=lab)
         mksize = kwargs.get('mksize', self.mksize)
-        ax.scatter(cp[0], cp[1], linewidth=0, c=col, marker=mk, edgecolors=edge_col, s=mksize, label=lab)
+        ax.scatter(cp[0], cp[1],
+                   linewidth=0, c=col, marker=mk,
+                   edgecolors=edge_col, s=mksize, label=lab)
         # Next 3 lines are necessary in case c_dir[2]=0, as for Euler angles [45, 45, 0]
         if c_dir[2] < 0.000001:
-            ax.scatter(-cp[0], -cp[1], linewidth=0, c=col, marker=mk, s=mksize, label=lab)
-            #ax.plot(-cp[0], -cp[1], linewidth=0, markerfacecolor=col, marker=mk,
-            #        markersize=self.mksize, label=lab)
+            ax.scatter(-cp[0], -cp[1],
+                       linewidth=0, c=col, marker=mk, s=mksize, label=lab)
         if ann:
             ax.annotate(c_dir.view(), (cp[0], cp[1] - 0.1), xycoords='data',
-                        fontsize=8, horizontalalignment='center', verticalalignment='center')
+                        fontsize=8, horizontalalignment='center',
+                        verticalalignment='center')
 
     def plot_line_between_crystal_dir(self, c1, c2, ax=None, steps=11, col='k'):
-        '''Plot a curve between two crystal directions.
+        """Plot a curve between two crystal directions.
 
         The curve is actually composed of several straight lines segments to
         draw from direction 1 to direction 2.
@@ -217,9 +225,10 @@ class PoleFigure:
         :param c1: vector describing crystal direction 1
         :param c2: vector describing crystal direction 2
         :param ax: a reference to a pyplot ax to draw the line
-        :param int steps: number of straight lines composing the curve (11 by default)
+        :param int steps: number of straight lines composing the curve
+        (11 by default)
         :param col: line color (black by default)
-        '''
+        """
         path = np.zeros((steps, 2), dtype=float)
         for j, i in enumerate(np.linspace(0., 1., steps)):
             ci = i * c1 + (1 - i) * c2
@@ -229,16 +238,16 @@ class PoleFigure:
                 ci /= ci[2]
             path[j, 0] = ci[0]
             path[j, 1] = ci[1]
-        ax.plot(path[:, 0], path[:, 1], color=col, markersize=self.mksize, linewidth=2)
+        ax.plot(path[:, 0], path[:, 1],
+                color=col, markersize=self.mksize, linewidth=2)
 
     def plot_pf_background(self, ax, labels=True):
-        '''Function to plot the background of the pole figure.
+        """Function to plot the background of the pole figure.
 
         :param ax: a reference to a pyplot ax to draw the backgroud.
         :param bool labels: add lables to axes (True by default).
-        '''
+        """
         an = np.linspace(0, 2 * np.pi, 100)
-        #plt.hold('on')
         ax.plot(np.cos(an), np.sin(an), 'k-')
         ax.plot([-1, 1], [0, 0], 'k-')
         ax.plot([0, 0], [-1, 1], 'k-')
@@ -256,7 +265,13 @@ class PoleFigure:
                         horizontalalignment='center', verticalalignment='bottom')
 
     def plot_pf_dir(self, c_dir, **kwargs):
-        '''Plot a crystal direction in a direct pole figure.'''
+        """Plot a crystal direction in a direct pole figure.
+
+        :param c_dir: a vector describing the crystal direction.
+        :param dict kwargs: a dictionnary of keyword/values to control the
+            plot, it should at least contain a reference to a pyplot axes
+            to draw the pole using keyword 'ax'.
+        """
         if self.axis == 'Z':
             (h, v, u) = (0, 1, 2)
         elif self.axis == 'Y':
@@ -269,27 +284,26 @@ class PoleFigure:
         self.plot_crystal_dir(c_dir[[h, v, u]], **kwargs)
 
     def plot_pf(self, ax=None, mk='o', ann=False):
-        '''Create the direct pole figure.
+        """Create the direct pole figure.
 
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (disc by default).
-        :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
-        '''
+        :param bool ann: Annotate the pole with the coordinates of the vector
+        if True (False by default).
+        """
         self.plot_pf_background(ax)
         kwargs = {'ax': ax, 'mk': mk, 'ann': ann}
         if self.resize_markers:
-            # compute a list of the grain volume fractions
-            fracs = self.microstructure.get_grain_volume_fractions()
-            frac_max = max(fracs)
-            print('frac max', frac_max)
-        for ii, grain in enumerate(self.microstructure.grains):
-            g = grain.orientation_matrix()
+            # compute the max grain volume to normalize
+            volume_max = max(self.microstructure.get_grain_volumes())
+        for grain in self.microstructure.grains:
+            g = Orientation.Rodrigues2OrientationMatrix(grain['orientation'])
             gt = g.transpose()
             if self.resize_markers:
-                kwargs['mksize'] = 0.15 * np.sqrt(fracs[ii] / frac_max) * 1000
+                kwargs['mksize'] = 0.15 * np.sqrt(grain['volume'] / volume_max) * 1000
             label = ''
             if self.map_field == 'grain_id':
-                label = 'grain ' + str(grain.id)
+                label = 'grain ' + str(grain['idnumber'])
             kwargs['lab'] = label
 
             for i, hkl_plane in enumerate(self.poles):
@@ -299,7 +313,8 @@ class PoleFigure:
                 c_rot = gt.dot(c)
                 if self.verbose:
                     h, k, l = hkl_plane.miller_indices()
-                    print('plotting (%d%d%d) with normal %s in sample CS (corrected for pf axis): %s' % (h, k, l, c, c_rot))
+                    print('plotting (%d%d%d) with normal %s in sample CS '
+                          '(corrected for pf axis): %s' % (h, k, l, c, c_rot))
                 col = self.get_color_from_field(grain)
                 kwargs['col'] = col
                 self.plot_pf_dir(c_rot, **kwargs)
@@ -310,7 +325,7 @@ class PoleFigure:
         ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
     def create_pf_contour(self, ax=None, ang_step=10):
-        '''Compute the distribution of orientation and plot it using contouring.
+        """Compute the distribution of orientation and plot it using contouring.
 
         This plot the distribution of orientation in the microstructure
         associated with this PoleFigure instance, as a continuous
@@ -319,9 +334,14 @@ class PoleFigure:
         angular space and counting the number of poles in each bin.
         Then the plot_pf_contour method is called to actually plot the data.
 
+        .. warning::
+
+           This function has not been tested properly, use at your own risk.
+
         :param ax: a reference to a pyplot ax to draw the contours.
-        :param int ang_step: angular step in degrees to use for constructing the orientation distribution data (10 degrees by default)
-        '''
+        :param int ang_step: angular step in degrees to use for constructing
+        the orientation distribution data (10 degrees by default)
+        """
         # discretise the angular space (azimuth and altitude)
         ang_step *= np.pi / 180  # change to radians
         n_phi = int(1 + 2 * np.pi / ang_step)
@@ -331,7 +351,7 @@ class PoleFigure:
         xv, yv = np.meshgrid(phis, psis)
         values = np.zeros((n_psi, n_phi), dtype=int)
         for grain in self.microstructure.grains:
-            g = grain.orientation_matrix()
+            g = Orientation.Rodrigues2OrientationMatrix(grain['orientation'])
             gt = g.transpose()
             for hkl_plane in self.poles:
                 c = hkl_plane.normal()
@@ -340,9 +360,12 @@ class PoleFigure:
                 if c_rot[2] < 0:
                     c_rot *= -1  # make unit vector have z>0
                 if c_rot[1] >= 0:
-                    phi = np.arccos(c_rot[0] / np.sqrt(c_rot[0] ** 2 + c_rot[1] ** 2))
+                    phi = np.arccos(c_rot[0] / np.sqrt(c_rot[0] ** 2 +
+                                                       c_rot[1] ** 2))
                 else:
-                    phi = 2 * np.pi - np.arccos(c_rot[0] / np.sqrt(c_rot[0] ** 2 + c_rot[1] ** 2))
+                    phi = 2 * np.pi - np.arccos(c_rot[0] /
+                                                np.sqrt(c_rot[0] ** 2 +
+                                                        c_rot[1] ** 2))
                 psi = np.arccos(c_rot[2])  # since c_rot is normed
                 i_phi = int((phi + 0.5 * ang_step) / ang_step) % n_phi
                 j_psi = int((psi + 0.5 * ang_step) / ang_step) % n_psi
@@ -358,7 +381,13 @@ class PoleFigure:
         self.plot_pf_contour(ax, x, y, values)
 
     def plot_pf_contour(self, ax, x, y, values):
-        '''Plot the direct pole figure using contours. '''
+        """Plot the direct pole figure using contours.
+
+        .. warning::
+
+           This function has not been tested properly, use at your own risk.
+
+        """
         self.plot_pf_background(ax)
         ax.contourf(x, y, values)
         # ax.plot(x, y, 'ko')
@@ -367,9 +396,11 @@ class PoleFigure:
         ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
     def sst_symmetry(self, v):
-        """Transform a given vector according to the lattice symmetry associated with the pole figure.
+        """Transform a given vector according to the lattice symmetry associated
+        with the pole figure.
 
-        This function transform a vector so that it lies in the smallest symmetry equivalent zone.
+        This function transform a vector so that it lies in the smallest
+        symmetry equivalent zone.
 
         :param v: the vector to transform.
         :return: the transformed vector.
@@ -395,50 +426,53 @@ class PoleFigure:
                     break
             return v_sym
         else:
-            print('unsupported symmetry for the moment: %s' % symmetry)
+            print('unsupported symmetry: %s' % symmetry)
             return None
 
     @staticmethod
     def sst_symmetry_cubic(z_rot):
-        '''Transform a given vector according to the cubic symmetry.
+        """Transform a given vector according to the cubic symmetry.
 
         This function transform a vector so that it lies in the unit SST triangle.
 
         :param z_rot: vector to transform.
         :return: the transformed vector.
-        '''
-        if z_rot[0] < 0: z_rot[0] = -z_rot[0]
-        if z_rot[1] < 0: z_rot[1] = -z_rot[1]
-        if z_rot[2] < 0: z_rot[2] = -z_rot[2]
-
-        if (z_rot[2] > z_rot[1]):
+        """
+        if z_rot[0] < 0:
+            z_rot[0] = -z_rot[0]
+        if z_rot[1] < 0:
+            z_rot[1] = -z_rot[1]
+        if z_rot[2] < 0:
+            z_rot[2] = -z_rot[2]
+        if z_rot[2] > z_rot[1]:
             z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
-
-        if (z_rot[1] > z_rot[0]):
+        if z_rot[1] > z_rot[0]:
             z_rot[0], z_rot[1] = z_rot[1], z_rot[0]
-
-        if (z_rot[2] > z_rot[1]):
+        if z_rot[2] > z_rot[1]:
             z_rot[1], z_rot[2] = z_rot[2], z_rot[1]
-
         return np.array([z_rot[1], z_rot[2], z_rot[0]])
 
     def get_color_from_field(self, grain):
         """Get the color of the given grain according to the chosen field.
 
-        This function will return the color associated with the given grain. Depending on how the pole figure has been
-        configured (see the `set_map_field` function), it will be obtained from:
+        This function will return the color associated with the given grain.
+        Depending on how the pole figure has been configured (see the
+        `set_map_field` function), it will be obtained from:
 
          * the grain id, according to the `Microstructure.rand_cmap` function
-         * ipf the colour will reflect the orientation according to the IPF scheme
-         * the field value mapped on a pyplot color map if the lut field of the PoleFigure instance is a string.
-         * a color directly read from the lut field; in this case the field value must reflect the category of the given grain.
+         * ipf the colour will reflect the orientation according to the IPF
+         coloring scheme
+         * the field value mapped on a pyplot color map if the lut field of
+         the PoleFigure instance is a string.
+         * a color directly read from the lut field; in this case the field
+         value must reflect the category of the given grain.
 
         :param grain: the `Grain` instance.
         :return: the color as a 3 element numpy array representing the rgb values.
         """
         if self.map_field:
             if self.map_field == 'grain_id':
-                col = Microstructure.rand_cmap().colors[grain.id]
+                col = Microstructure.rand_cmap().colors[grain['idnumber']]
             elif self.map_field == 'ipf':
                 if self.axis == 'X':
                     axis = np.array([1., 0., 0.])
@@ -446,10 +480,11 @@ class PoleFigure:
                     axis = np.array([0., 1., 0.])
                 else:
                     axis = np.array([0., 0., 1.])
-                col = grain.orientation.get_ipf_colour(axis=axis)
+                col = Orientation.from_rodrigues(
+                    grain['orientation']).get_ipf_colour(axis=axis)
             else:
-                # retreive the position of the grain in the list
-                rank = self.microstructure.grains.index(grain)
+                # retrieve the position of the grain in the list
+                rank = self.microstructure.get_grain_ids().tolist().index(grain['idnumber'])
                 if type(self.lut) is str:
                     # get the color map from pyplot
                     color_map = cm.get_cmap(self.lut, 256)
@@ -468,9 +503,11 @@ class PoleFigure:
 
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
-        :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
+        :param bool ann: Annotate the pole with the coordinates of the vector
+        if True (False by default).
         """
-        # first draw the boundary of the symmetry domain limited by 3 hkl plane normals, called here A, B and C
+        # first draw the boundary of the symmetry domain limited by 3 hkl plane
+        # normals, called here A, B and C
         symmetry = self.lattice.get_symmetry()
         ax = kwargs.get('ax')
         if symmetry is Symmetry.cubic:
@@ -480,7 +517,7 @@ class PoleFigure:
             sst_poles = [(0, 0, 1), (2, -1, 0), (1, 0, 0)]
             ax.axis([-0.05, 1.05, -0.05, 0.6])
         else:
-            print('unssuported symmetry: %s' % symmetry)
+            print('unsuported symmetry: %s' % symmetry)
         A = HklPlane(*sst_poles[0], lattice=self.lattice)
         B = HklPlane(*sst_poles[1], lattice=self.lattice)
         C = HklPlane(*sst_poles[2], lattice=self.lattice)
@@ -503,13 +540,12 @@ class PoleFigure:
 
         # now plot the sample axis
         if self.resize_markers:
-            # compute a list of the grain volume fractions
-            fracs = self.microstructure.get_grain_volume_fractions()
-            frac_max = max(fracs)
-        for ii, grain in enumerate(self.microstructure.grains):
-            g = grain.orientation_matrix()
+            # compute the max grain volume to normalize
+            volume_max = max(self.microstructure.get_grain_volumes())
+        for grain in self.microstructure.grains:
+            g = Orientation.Rodrigues2OrientationMatrix(grain['orientation'])
             if self.resize_markers:
-                kwargs['mksize'] = 0.15 * np.sqrt(fracs[ii] / frac_max) * 1000
+                kwargs['mksize'] = 0.15 * np.sqrt(grain['volume'] / volume_max) * 1000
             # compute axis and apply SST symmetry
             if self.axis == 'Z':
                 axis = self.z
@@ -520,7 +556,7 @@ class PoleFigure:
             axis_rot = self.sst_symmetry(g.dot(axis))
             label = ''
             if self.map_field == 'grain_id':
-                label = 'grain ' + str(grain.id)
+                label = 'grain ' + str(grain['idnumber'])
             kwargs['lab'] = label
             kwargs['col'] = self.get_color_from_field(grain)
             self.plot_crystal_dir(axis_rot, **kwargs)
@@ -529,53 +565,19 @@ class PoleFigure:
         ax.axis('off')
         ax.set_title('%s-axis SST inverse %s projection' % (self.axis, self.proj))
 
-    def plot_ipf_symmetry(self, ax):
-        """ Plot the inverse pole figure elements of symmetry.
-
-        This assume the symmetry from the `Lattice` associated with the first pole.
-        :param ax: a reference to a pyplot ax to draw the poles.
-        """
-        kwargs = {'ax': ax, 'col': 'k', 'ann': False}
-        symmetry = self.lattice.get_symmetry()
-        if symmetry is Symmetry.cubic:
-            for c in self.c111s:
-                for i in range(3):
-                    d = c.copy()
-                    d[i] = 0
-                    e = np.zeros_like(c)
-                    e[i] = c[i]
-                    self.plot_line_between_crystal_dir(c, d, ax=ax)
-                    self.plot_line_between_crystal_dir(c, e, ax=ax)
-            markers = ['s', 'o', '^']
-            for i, dirs in enumerate([self.c001s, self.c011s, self.c111s]):
-                kwargs['mk'] = markers[i]
-                [self.plot_crystal_dir(c, **kwargs) for c in dirs]
-                # also plot the negative direction of those lying in the plane z==0
-                for c in dirs:
-                    if np.dot(c, self.z) == 0.0:
-                        self.plot_crystal_dir(-c, **kwargs)
-        elif symmetry is Symmetry.hexagonal:
-            from math import sin, cos, pi
-            for angle in np.linspace(0, 2 * pi, 12, endpoint=False):
-                ax.plot([0, cos(angle)], [0, sin(angle)], color='k', markersize=self.mksize, linewidth=2)
-        else:
-            print('skipping unsupported symmetry for now')
-
-    def plot_ipf(self, plot_symmetry=False, **kwargs):
+    def plot_ipf(self, **kwargs):
         """ Create the inverse pole figure for direction Z.
 
-        :param bool plot_symmetry: if True plot the lines representing the symmetry of the lattice.
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
-        :param bool ann: Annotate the pole with the coordinates of the vector if True (False by default).
+        :param bool ann: Annotate the pole with the coordinates of the vector
+        if True (False by default).
         """
         ax = kwargs.get('ax')
         self.plot_pf_background(ax, labels=False)
-        if plot_symmetry:
-            self.plot_ipf_symmetry(ax)
         # now plot the sample axis
         for grain in self.microstructure.grains:
-            g = grain.orientation_matrix()
+            g = Orientation.Rodrigues2OrientationMatrix(grain['orientation'])
             if self.axis == 'Z':
                 axis = self.z
             elif self.axis == 'Y':
@@ -593,16 +595,18 @@ class PoleFigure:
 
     @staticmethod
     def plot(orientations, **kwargs):
-        '''Plot a pole figure (both direct and inverse) for a list of orientations.
+        """Plot a pole figure (both direct and inverse) for a list of crystal
+        orientations.
 
-        :param orientations: the list of crystalline :py:class:`~pymicro.crystal.microstructure.Orientation` to plot.
-        '''
-        micro = Microstructure()
+        :param orientations: the list of crystalline
+        :py:class:`~pymicro.crystal.microstructure.Orientation` to plot.
+        """
+        micro = Microstructure(autodelete=True)
         if isinstance(orientations, list):
             for i in range(len(orientations)):
-                micro.grains.append(Grain(i + 1, orientations[i]))
+                micro.add_grains([o.euler for o in orientations])
         elif isinstance(orientations, Orientation):
-            micro.grains.append(Grain(1, orientations))
+            micro.add_grains([orientations.euler])
         else:
             print('Unrecognized argument: %s' % orientations.__repr__)
         pf = PoleFigure(microstructure=micro, **kwargs)
@@ -610,7 +614,7 @@ class PoleFigure:
 
     @staticmethod
     def plot_euler(phi1, Phi, phi2, **kwargs):
-        '''Directly plot a pole figure for a single orientation given its
+        """Directly plot a pole figure for a single orientation given its
         three Euler angles.
 
         ::
@@ -620,15 +624,15 @@ class PoleFigure:
         :param float phi1: first Euler angle (in degree).
         :param float Phi: second Euler angle (in degree).
         :param float phi2: third Euler angle (in degree).
-        '''
+        """
         PoleFigure.plot(Orientation.from_euler(np.array([phi1, Phi, phi2])), **kwargs)
 
 
 class TaylorModel:
-    '''A class to carry out texture evolution with the Taylor model.
+    """A class to carry out texture evolution with the Taylor model.
 
     Briefly explain the full constrained Taylor model [ref 1938].
-    '''
+    """
 
     def __init__(self, microstructure):
         self.micro = microstructure  # Microstructure instance

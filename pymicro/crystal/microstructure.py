@@ -1758,6 +1758,31 @@ class Microstructure(SampleData):
         self.grains.flush()
         return
 
+    def add_grains(self, euler_list, grain_ids=None):
+        """A a list of grains to this microstructure.
+
+        This function adds a list of grains represented by a list of Euler
+        angles triplets, to the microstructure. If provided, the `grain_ids`
+        list will be used for the grain ids.
+
+        :param list euler_list: the list of euler angles (Bunge passive convention).
+        :param list grain_ids: an optional list for the ids of the new grains.
+        """
+        grain = self.grains.row
+        # build a list of grain ids if it is not given
+        if not grain_ids:
+            if self.get_number_of_grains() > 0:
+                min_id = max(self.get_grain_ids())
+            else:
+                min_id = 0
+            grain_ids = range(min_id, min_id + len(euler_list))
+        for gid, euler in zip(grain_ids, euler_list):
+            grain['idnumber'] = gid
+            o = Orientation.from_euler(euler)
+            grain['orientation'] = o.rod
+            grain.append()
+        self.grains.flush()
+
     @staticmethod
     def random_texture(n=100):
         """Generate a random texture microstructure.
@@ -2379,7 +2404,8 @@ class Microstructure(SampleData):
         return
 
     def to_amitex_fftp(self, binary=True,
-                       add_buffer_layer=False, buffer_size=10):
+                       add_grips=False, grip_size=10,
+                       add_exterior=False, exterior_size=10):
         """Write orientation data to ascii files to prepare for FFT computation.
 
         AMITEX_FFTP can be used to compute the elastoplastic response of
@@ -2391,7 +2417,17 @@ class Microstructure(SampleData):
         containing n values with n the number of grains. The data is written
         either in BINARY or in ASCII form.
 
+        Additional options exist to pad the grain map with two constant regions.
+        One region called grips can be added on the top and bottom (third axis).
+        The second region is around the sample (first and second axes).
+
         :param bool binary: flag to write the files in binary or ascii format.
+        :param bool add_grips: add a constant region at the beginning and the
+        end of the third axis.
+        :param int grip_size: thickness of the region.
+        :param bool add_exterior: add a constant region around the sample at
+        the beginning and the end of the first two axes.
+        :param int exterior_size: thickness of the exterior region.
         """
         ext = 'bin' if binary else 'txt'
         n1x = open('N1X.%s' % ext, 'w')
@@ -2414,9 +2450,9 @@ class Microstructure(SampleData):
             n2z = open('N2Z.%s' % ext, 'ab')
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
-                gt = o.orientation_matrix().T
-                n1 = gt[0]
-                n2 = gt[1]
+                g = o.orientation_matrix()
+                n1 = g[0]
+                n2 = g[1]
                 n1x.write(struct.pack('>d', n1[0]))
                 n1y.write(struct.pack('>d', n1[1]))
                 n1z.write(struct.pack('>d', n1[2]))
@@ -2426,9 +2462,9 @@ class Microstructure(SampleData):
         else:
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
-                gt = o.orientation_matrix().T
-                n1 = gt[0]
-                n2 = gt[1]
+                g = o.orientation_matrix()
+                n1 = g[0]
+                n2 = g[1]
                 n1x.write('%f\n' % n1[0])
                 n1y.write('%f\n' % n1[1])
                 n1z.write('%f\n' % n1[2])
@@ -2447,52 +2483,52 @@ class Microstructure(SampleData):
         if self.__contains__('grain_map'):
             # convert the grain map to vtk file
             from vtk.util import numpy_support
-            grain_map = self.get_grain_map(as_numpy=True)
-            if add_buffer_layer:
-                # add a layer of zeros around the first two dimensions
-                grain_map = np.pad(grain_map, ((buffer_size, buffer_size),
-                                               (buffer_size, buffer_size),
-                                               (0, 0)))
+            #TODO build a continuous grain map for amitex
+            grain_ids = self.get_grain_map(as_numpy=True)
+            material_ids = np.zeros_like(grain_ids)
+            if add_grips:
+                grain_ids = np.pad(grain_ids, ((0, 0),
+                                               (0, 0),
+                                               (grip_size, grip_size)),
+                                   mode='constant', constant_values=1)
+                material_ids = np.pad(material_ids, ((0, 0),
+                                                     (0, 0),
+                                                     (grip_size, grip_size)),
+                                      mode='constant', constant_values=1)
+            if add_exterior:
+                # add a layer of ones (the value must actually be the first
+                # grain id) around the first two dimensions
+                grain_ids = np.pad(grain_ids, ((exterior_size, exterior_size),
+                                               (exterior_size, exterior_size),
+                                               (0, 0)),
+                                   mode='constant', constant_values=1)
+                material_ids = np.pad(material_ids,
+                                      ((exterior_size, exterior_size),
+                                       (exterior_size, exterior_size),
+                                       (0, 0)),
+                                      mode='constant', constant_values=2)
+            # write both arrays as VTK files for amitex
             voxel_size = self.get_voxel_size()
-            vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(grain_map,
-                                                                 order='F'),
-                                                        deep=1)
-            vtk_data_array.SetName('GrainIds')
-            grid = vtk.vtkImageData()
-            size = grain_map.shape
-            grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
-            grid.GetCellData().SetScalars(vtk_data_array)
-            grid.SetSpacing(voxel_size, voxel_size, voxel_size)
-            writer = vtk.vtkStructuredPointsWriter()
-            writer.SetFileName('%s_pymicro.vtk' % self.get_sample_name())
-            if binary:
-                writer.SetFileTypeToBinary()
-            writer.SetInputData(grid)
-            writer.Write()
-            print('grain map written in legacy vtk form for AMITEX_FFTP')
-            if 0 in grain_map:
-                print('also writting a material ids files as the grain map '
-                      'contains label 0')
-                # also write a material ids file in VTK format
-                material_ids = grain_map.copy()
-                material_ids[material_ids > 1] = 1
-                print(material_ids.max())
-                vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(material_ids,
+            for array, array_name in zip([grain_ids, material_ids],
+                                         ['grain_ids', 'material_ids']):
+                vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array,
                                                                      order='F'),
                                                             deep=1)
-                vtk_data_array.SetName('MaterialIds')
+                vtk_data_array.SetName(array_name)
                 grid = vtk.vtkImageData()
-                size = material_ids.shape
+                size = array.shape
                 grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
                 grid.GetCellData().SetScalars(vtk_data_array)
                 grid.SetSpacing(voxel_size, voxel_size, voxel_size)
                 writer = vtk.vtkStructuredPointsWriter()
-                writer.SetFileName('%s_matids.vtk' % self.get_sample_name())
+                writer.SetFileName('%s_%s.vtk' % (self.get_sample_name(),
+                                                  array_name))
                 if binary:
                     writer.SetFileTypeToBinary()
                 writer.SetInputData(grid)
                 writer.Write()
-                print('material ids file written in legacy vtk form for AMITEX_FFTP')
+                print('%s array written in legacy vtk form for AMITEX_FFTP' %
+                      array_name)
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """

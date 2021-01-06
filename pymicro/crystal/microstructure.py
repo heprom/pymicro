@@ -1727,7 +1727,7 @@ class Microstructure(SampleData):
             im_vox_size = self.get_attribute('spacing', 'CellData')
             mismatch = im_vox_size[0] != voxel_size or \
                        im_vox_size[1] != voxel_size or \
-                       im_vox_size[0] != voxel_size
+                       im_vox_size[2] != voxel_size
             if (voxel_size is not None) and mismatch:
                 msg = 'Voxel size mismatch between input and CellData node ' \
                       '`spacing` attribute'
@@ -2210,13 +2210,17 @@ class Microstructure(SampleData):
     def compute_grain_volume(self, gid):
         """Compute the volume of the grain given its id.
 
+        The total number of voxels with the given id is computed. The value is
+        converted to mm unit using the `voxel_size`. The unit will be mm² for a
+        2D grain map or mm³ for a 3D grain map.
+
         :param int gid: the grain id to consider.
-        :return: the volume of the grain in mm units
-                 (or voxel if the voxel_size is not specified).
+        :return: the volume of the grain.
         """
-        grain_map = self.get_grain_map()
+        grain_map = self.get_grain_map(as_numpy=True)
         voxel_size = self.get_attribute('spacing', 'CellData')
-        return np.sum(grain_map[:] == np.array(gid)) * voxel_size[0]
+        volume_vx = np.sum(grain_map == np.array(gid))
+        return volume_vx * np.prod(voxel_size)
 
     def compute_grain_center(self, gid):
         """Compute the center of masses of a grain given its id.

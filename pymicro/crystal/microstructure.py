@@ -1403,17 +1403,17 @@ class Microstructure(SampleData):
     """
 
     def __init__(self,
-                 name='micro', description='empty', filename=None,
+                 filename=None, name='micro', description='empty',
                  verbose=False, overwrite_hdf5=False, lattice=None,
                  autodelete=False, **keywords):
-
         if filename is None:
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
 
         SampleData.__init__(self, filename, name, description, verbose,
                             overwrite_hdf5, autodelete, **keywords)
-        self.set_sample_name(name)
+        # TODO find a way not to overwrite the sample name when an existing file is read
+        #self.set_sample_name(name)
         self.grains = self.get_node('GrainDataTable')
         self._init_lattice(lattice)
         self.vtkmesh = None
@@ -2171,7 +2171,8 @@ class Microstructure(SampleData):
         # finally assign the dilated grain map to the microstructure
         self.set_grain_map(grain_map)
 
-    def crop(self, x_start, x_end, y_start, y_end, z_start, z_end):
+    def crop(self, x_start=None, x_end=None, y_start=None, y_end=None,
+             z_start=None, z_end=None, autodelete=False):
         """Crop the microstructure to create a new one.
 
         :param int x_start: start value for slicing the first axis.
@@ -2180,24 +2181,42 @@ class Microstructure(SampleData):
         :param int y_end: end value for slicing the second axis.
         :param int z_start: start value for slicing the third axis.
         :param int z_end: end value for slicing the third axis.
+        :param bool autodelete: a flag to delete the microstructure files
+        on the disk when it is not needed anymore.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
+        if self._is_empty('grain_map'):
+            print('warning: needs a grain map to crop the microstructure')
+            return
+        # input default values for bounds if not specified
+        if not x_start:
+            x_start = 0
+        if not y_start:
+            y_start = 0
+        if not z_start:
+            z_start = 0
+        if not x_end:
+            x_end = self.get_grain_map().shape[0]
+        if not y_end:
+            y_end = self.get_grain_map().shape[1]
+        if not z_end:
+            z_end = self.get_grain_map().shape[2]
         # TODO: Test
         crop_name = self.get_sample_name() + '_crop'
         path = os.path.dirname(self.h5_file)
-        micro_crop = Microstructure(name=crop_name, file_path=path)
-        micro_crop.set_lattice(self.lattice)
+        micro_crop = Microstructure(name=crop_name, overwrite_hdf5=True)
+        micro_crop.set_lattice(self.get_lattice())
         print('cropping microstructure to %s' % micro_crop.h5_file)
-        grain_map = self.get_grain_map()
-        voxel_size = self.get_attribute('spacing', 'CellData')
-        micro_crop.set_grain_map(grain_map[x_start:x_end, y_start:y_end,
-                                 z_start:z_end],
-                                 voxel_size=voxel_size)
-        if self.__contains__('mask'):
-            mask = self.get_mask()
-            micro_crop.set_mask(mask[x_start:x_end, y_start:y_end,
-                                z_start:z_end])
-        grain_ids = np.unique(micro_crop.get_grain_map())
+        grain_map_crop = self.get_grain_map()[x_start:x_end,
+                         y_start:y_end, z_start:z_end]
+        print(micro_crop.h5_dataset)
+        micro_crop.set_grain_map(grain_map_crop,
+                                 voxel_size=self.get_voxel_size())
+        if self.get_mask():
+            mask_crop = self.get_mask()[x_start:x_end, y_start:y_end,
+                                z_start:z_end]
+            micro_crop.set_mask(mask_crop)
+        grain_ids = np.unique(grain_map_crop)
         for gid in grain_ids:
             if not gid > 0:
                 continue
@@ -2205,6 +2224,7 @@ class Microstructure(SampleData):
             micro_crop.grains.append(grain)
         print('%d grains in cropped microstructure' % micro_crop.grains.nrows)
         micro_crop.grains.flush()
+        # TODO: recompute geometry
         return micro_crop
 
     def compute_grain_volume(self, gid):

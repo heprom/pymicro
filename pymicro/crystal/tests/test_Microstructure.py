@@ -56,7 +56,7 @@ class MicrostructureTests(unittest.TestCase):
         # create new microstructure copy of an already existing file
         filename = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,
                                 't5_dct_slice_data.h5')
-        new_file = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,'tmp_slice_dct')
+        new_file = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'tmp_slice_dct')
         m = Microstructure.copy_sample(filename, new_file, autodelete=True,
                                        get_object=True)
         h5_file = m.h5_file
@@ -71,7 +71,7 @@ class MicrostructureTests(unittest.TestCase):
         for i in range(m_ref.grains.nrows):
             self.assertEqual(m.grains[i], m_ref.grains[i])
         volume = np.sum(m.get_mask(as_numpy=True))
-        self.assertEqual(volume,194025)
+        self.assertEqual(volume, 194025)
         del m
         self.assertTrue(not os.path.exists(h5_file))
         self.assertTrue(not os.path.exists(xdmf_file))

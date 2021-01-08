@@ -3026,6 +3026,8 @@ class Microstructure(SampleData):
         translation_voxel = (translation_mm / voxel_size).astype(int)
         print('translation is in mm: {}'.format(translation_mm))
         print('translation is in voxels {}'.format(translation_voxel))
+        # manually correct the result if necessary
+        translation_voxel += translation_offset
 
         # now delete overlapping microstructures
         del micro1_ol, micro2_ol
@@ -3059,7 +3061,6 @@ class Microstructure(SampleData):
         for match in matched:
             ref_id, other_id = match
             print('replacing %d by %d' % (other_id, ref_id))
-            # TODO should flag those grains so their center can be recomputed
             grain_map_translated[micros[1].get_grain_map() == other_id] = ref_id
             try:
                 ids_mrg_list.remove(other_id)
@@ -3242,8 +3243,10 @@ class Microstructure(SampleData):
 
         # add the full grain map
         merged_micro.set_grain_map(grain_ids_merged, voxel_size)
-        # TODO recompute center of masses of grains in the overlap region
+        # recompute the geometry of the grains
         merged_micro.recompute_grain_centers()
+        merged_micro.recompute_grain_volumes()
+        merged_micro.recompute_grain_bounding_boxes()
         if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
             merged_micro.set_mask(mask_merged, voxel_size)
         merged_micro.sync()

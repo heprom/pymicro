@@ -3242,12 +3242,15 @@ class Microstructure(SampleData):
         merged_micro.grains.flush()
 
         # add the full grain map
+        print('assigning merged grain map')
         merged_micro.set_grain_map(grain_ids_merged, voxel_size)
         # recompute the geometry of the grains
+        print('updating grain geometry')
         merged_micro.recompute_grain_centers()
         merged_micro.recompute_grain_volumes()
         merged_micro.recompute_grain_bounding_boxes()
         if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
+            print('assigning merged mask')
             merged_micro.set_mask(mask_merged, voxel_size)
         merged_micro.sync()
         return merged_micro

@@ -3156,11 +3156,11 @@ class Microstructure(SampleData):
         if plot:
             fig = plt.figure(figsize=(14, 10))
             ax1 = fig.add_subplot(1, 2, 1)
-            ax1.imshow(grain_ids_merged[:, 320, :].T)
+            ax1.imshow(grain_ids_merged[:, grain_ids_merged.shape[1] // 2, :].T)
             plt.axis('off')
             plt.title('XZ slice')
             ax2 = fig.add_subplot(1, 2, 2)
-            ax2.imshow(grain_ids_merged[320, :, :].T)
+            ax2.imshow(grain_ids_merged[grain_ids_merged.shape[0] // 2, :, :].T)
             plt.axis('off')
             plt.title('YZ slice')
             plt.savefig('merging_check2.pdf')
@@ -3239,11 +3239,11 @@ class Microstructure(SampleData):
         print('%d grains in merged microstructure'
               % merged_micro.get_number_of_grains())
         merged_micro.grains.flush()
-        # TODO recompute center of masses of grains in the overlap region
-        merged_micro.recompute_grain_centers()
 
         # add the full grain map
         merged_micro.set_grain_map(grain_ids_merged, voxel_size)
+        # TODO recompute center of masses of grains in the overlap region
+        merged_micro.recompute_grain_centers()
         if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
             merged_micro.set_mask(mask_merged, voxel_size)
         merged_micro.sync()

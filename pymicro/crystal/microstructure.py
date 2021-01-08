@@ -1810,7 +1810,7 @@ class Microstructure(SampleData):
 
         *n* The number of grain orientations in the microstructure.
         """
-        m = Microstructure(name='random_texture')
+        m = Microstructure(name='random_texture', overwrite_hdf5=True)
         grain = m.grains.row
         for i in range(n):
             grain['idnumber'] = i + 1
@@ -1895,19 +1895,18 @@ class Microstructure(SampleData):
     @staticmethod
     def from_grain_file(grain_file_path, col_id=0, col_phi1=1, col_phi=2,
                         col_phi2=3, col_x=4, col_y=5, col_z=None,
-                        col_volume=None):
+                        col_volume=None, autodelete=True):
         """Create a `Microstructure` reading grain infos from a file.
 
         This file is typically created using EBSD. the usual pattern is:
             grain_id, phi1, phi, phi2, x, y, volume.
         The column number are tunable using the function arguments.
         """
-        # TODO : test
         # get the file name without extension
         name = os.path.splitext(os.path.basename(grain_file_path))[0]
-        path = os.path.split(grain_file_path)[0]
         print('creating microstructure %s' % name)
-        micro = Microstructure(name=name, file_path=path)
+        micro = Microstructure(name=name, overwrite_hdf5=True,
+                               autodelete=autodelete)
         grain = micro.grains.row
         # read grain infos from the grain file
         grains_EBSD = np.genfromtxt(grain_file_path)
@@ -2054,7 +2053,7 @@ class Microstructure(SampleData):
                the dilation will be limite by it.
         """
         # TODO : test
-        grain_map = self.get_grain_map()
+        grain_map = self.get_grain_map(as_numpy=True)
         grain_volume_init = (grain_map == grain_id).sum()
         grain_data = grain_map == grain_id
         grain_data = ndimage.binary_dilation(grain_data,
@@ -2065,6 +2064,7 @@ class Microstructure(SampleData):
         grain_volume_final = (grain_map == grain_id).sum()
         print('grain %s was dilated by %d voxels' % (grain_id,
                                                      grain_volume_final - grain_volume_init))
+        self.set_grain_map(grain_map, self.get_voxel_size())
         self.sync()
 
     @staticmethod

@@ -2172,7 +2172,7 @@ class Microstructure(SampleData):
         self.set_grain_map(grain_map)
 
     def crop(self, x_start=None, x_end=None, y_start=None, y_end=None,
-             z_start=None, z_end=None, autodelete=False):
+             z_start=None, z_end=None, crop_name=None, autodelete=False):
         """Crop the microstructure to create a new one.
 
         :param int x_start: start value for slicing the first axis.
@@ -2181,6 +2181,8 @@ class Microstructure(SampleData):
         :param int y_end: end value for slicing the second axis.
         :param int z_start: start value for slicing the third axis.
         :param int z_end: end value for slicing the third axis.
+        :param str crop name: the name for the cropped microstructure
+        (the default is to append '_crop' to the initial name).
         :param bool autodelete: a flag to delete the microstructure files
         on the disk when it is not needed anymore.
         :return: a new `Microstructure` instance with the cropped grain map.
@@ -2202,9 +2204,9 @@ class Microstructure(SampleData):
         if not z_end:
             z_end = self.get_grain_map().shape[2]
         # TODO: Test this function
-        crop_name = self.get_sample_name() + \
+        if not crop_name:
+            crop_name = self.get_sample_name() + \
                     (not self.get_sample_name().endswith('_')) * '_' + 'crop'
-        path = os.path.dirname(self.h5_file)
         micro_crop = Microstructure(name=crop_name, overwrite_hdf5=True,
                                     autodelete=autodelete)
         micro_crop.set_lattice(self.get_lattice())

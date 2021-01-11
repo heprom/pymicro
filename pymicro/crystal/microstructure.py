@@ -2202,7 +2202,8 @@ class Microstructure(SampleData):
         if not z_end:
             z_end = self.get_grain_map().shape[2]
         # TODO: Test this function
-        crop_name = self.get_sample_name() + '_crop'
+        crop_name = self.get_sample_name() + \
+                    (not self.get_sample_name().endswith('_')) * '_' + 'crop'
         path = os.path.dirname(self.h5_file)
         micro_crop = Microstructure(name=crop_name, overwrite_hdf5=True,
                                     autodelete=autodelete)
@@ -3002,7 +3003,8 @@ class Microstructure(SampleData):
 
         # create two microstructures for the two overlapping regions:
         # end slices in first scan and first slices in second scan
-        micro1_ol = micros[0].crop(z_start=micros[0].get_grain_map().shape[2] - overlap, autodelete=True)
+        micro1_ol = micros[0].crop(z_start=micros[0].get_grain_map().shape[2] -
+                                           overlap, autodelete=True)
         micro2_ol = micros[1].crop(z_end=overlap, autodelete=True)
         micros_ol = [micro1_ol, micro2_ol]
 
@@ -3021,7 +3023,8 @@ class Microstructure(SampleData):
             translation_mm += delta
         translation_mm /= len(matched)
         # account for the origin of the overlap region
-        translation_mm[2] += (micros[0].get_grain_map().shape[2] - overlap) * voxel_size
+        translation_mm[2] += (micros[0].get_grain_map().shape[2] -
+                              overlap) * voxel_size
         print('average shift (voxels): {}'.format(translation_mm / voxel_size))
         translation_voxel = (translation_mm / voxel_size).astype(int)
         print('translation is in mm: {}'.format(translation_mm))
@@ -3055,23 +3058,24 @@ class Microstructure(SampleData):
 
         # prepare a volume with the same size as the second grain map,
         # with grain ids renumbered and (X, Y) translations applied.
-        grain_map_translated = micros[1].get_grain_map(as_numpy=True).copy()
+        grain_map = micros[1].get_grain_map(as_numpy=True)
+        grain_map_translated = grain_map.copy()
         print('renumbering grains in the overlap region of volume %s'
               % micros[1].get_sample_name())
         for match in matched:
             ref_id, other_id = match
             print('replacing %d by %d' % (other_id, ref_id))
-            grain_map_translated[micros[1].get_grain_map() == other_id] = ref_id
+            grain_map_translated[grain_map == other_id] = ref_id
             try:
                 ids_mrg_list.remove(other_id)
             except ValueError:
-                # this can happend if a grain in reference volume was matched to more than 1 grain
+                # this can happend if a reference grain was matched to more than 1 grain
                 print('%d was not in list anymore' % other_id)
         # also renumber the rest using the offset
         renumbered_grains = []
         for i, other_id in enumerate(ids_mrg_list):
             new_id = id_offset + i + 1
-            grain_map_translated[micros[1].get_grain_map() == other_id] = new_id
+            grain_map_translated[grain_map == other_id] = new_id
             print('replacing %d by %d' % (other_id, new_id))
             renumbered_grains.append([other_id, new_id])
 
@@ -3084,23 +3088,25 @@ class Microstructure(SampleData):
         print(overlap)
         print(translation_voxel[2] + check)
         if plot:
+            slice_ref = micros[0].get_grain_map()[:, :,
+                                                  translation_voxel[2] + check]
+            slice_renum = grain_map_translated[:, :, check]
+            id_max = max(slice_ref.max(), slice_renum.max())
             fig = plt.figure(figsize=(15, 7))
             ax1 = fig.add_subplot(1, 3, 1)
             ax1.imshow(micros[0].get_grain_map()[:, :, translation_voxel[2]
-                                                 + check].T, vmin=0)
+                                                 + check].T, vmin=0, vmax=id_max)
             plt.axis('off')
             plt.title('micros[0].grain_map (ref)')
             ax2 = fig.add_subplot(1, 3, 2)
-            ax2.imshow(grain_map_translated[:, :, check].T, vmin=0)
+            ax2.imshow(grain_map_translated[:, :, check].T, vmin=0, vmax=id_max)
             plt.axis('off')
             plt.title('micros[1].grain_map (renumbered)')
             ax3 = fig.add_subplot(1, 3, 3)
             same_voxel = (micros[0].get_grain_map()[:, :,
                           translation_voxel[2] + check]
                           == grain_map_translated[:, :, check])
-            print(same_voxel)
-            # print(same_voxel.shape)
-            # ax3.imshow(same_voxel.T, vmin=0, vmax=2)
+            ax3.imshow(same_voxel.T, vmin=0, vmax=2)
             plt.axis('off')
             plt.title('voxels that are identicals')
             plt.savefig('merging_check1.pdf')
@@ -3224,7 +3230,8 @@ class Microstructure(SampleData):
         merged_path = os.path.dirname(micros[0].h5_file)
         desc = 'merged microstructure from %s and %s' % \
                (micros[0].get_sample_name(), micros[1].get_sample_name())
-        merged_micro = Microstructure(name=merged_name, description=desc)
+        merged_micro = Microstructure(name=merged_name, description=desc,
+                                      overwrite_hdf5=True)
         merged_micro.set_lattice(lattice)
         # add all grains from the reference volume
         grains_0 = micros[0].grains.read()

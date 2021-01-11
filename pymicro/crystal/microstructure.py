@@ -2203,7 +2203,6 @@ class Microstructure(SampleData):
             y_end = self.get_grain_map().shape[1]
         if not z_end:
             z_end = self.get_grain_map().shape[2]
-        # TODO: Test this function
         if not crop_name:
             crop_name = self.get_sample_name() + \
                     (not self.get_sample_name().endswith('_')) * '_' + 'crop'
@@ -3244,6 +3243,7 @@ class Microstructure(SampleData):
         for i in range(len(renumbered_grains)):
             other_id, new_id = renumbered_grains[i]
             g = micros[1].grains.read_where('idnumber == other_id')
+            g['idnumber'] = new_id
             merged_micro.grains.append(g)
             print('adding grain with new id %d (was %d)' % (new_id, other_id))
         print('%d grains in merged microstructure'

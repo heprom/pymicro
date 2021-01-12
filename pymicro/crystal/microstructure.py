@@ -2256,7 +2256,7 @@ class Microstructure(SampleData):
                  (or voxel if the voxel_size is not specified).
         """
         # isolate the grain within the complete grain map
-        grain_map = self.get_grain_map()
+        grain_map = self.get_grain_map(as_numpy=True)
         voxel_size = self.get_attribute('spacing', 'CellData')
         slices = ndimage.find_objects(grain_map == np.array(gid))
         if not len(slices) > 0:
@@ -2369,10 +2369,16 @@ class Microstructure(SampleData):
             print('warning: need a grain map to recompute the bounding boxes'
                   ' of the grains')
             return
+        # find_objects will return a list of N slices with N being the max grain id
+        slices = ndimage.find_objects(self.get_grain_map(as_numpy=True))
         for g in self.grains:
             try:
-                bbox = self.compute_grain_bounding_box(g['idnumber'])
-            except ValueError:
+                g_slice = slices[g['idnumber'] - 1]
+                x_indices = (g_slice[0].start, g_slice[0].stop)
+                y_indices = (g_slice[1].start, g_slice[1].stop)
+                z_indices = (g_slice[2].start, g_slice[2].stop)
+                bbox = x_indices, y_indices, z_indices
+            except (ValueError, TypeError):
                 print('skipping grain %d' % g['idnumber'])
                 continue
             if verbose:
@@ -3257,7 +3263,7 @@ class Microstructure(SampleData):
         print('updating grain geometry')
         merged_micro.recompute_grain_centers()
         merged_micro.recompute_grain_volumes()
-        merged_micro.recompute_grain_bounding_boxes()
+        #merged_micro.recompute_grain_bounding_boxes()
         if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
             print('assigning merged mask')
             merged_micro.set_mask(mask_merged, voxel_size)

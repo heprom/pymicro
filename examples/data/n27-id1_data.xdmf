@@ -1,0 +1,16 @@
+<?xml version='1.0' ?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>
+<Xdmf xmlns:xi="http://www.w3.org/2003/XInclude" Version="2.2">
+  <Domain>
+    <Grid Name="CellData" GridType="Uniform">
+      <Topology TopologyType="3DCoRectMesh" Dimensions="65 65 65"/>
+      <Geometry Type="ORIGIN_DXDYDZ">
+        <DataItem Format="XML" Dimensions="3">0. 0. 0.</DataItem>
+        <DataItem Format="XML" Dimensions="3">0.015625 0.015625 0.015625</DataItem>
+      </Geometry>
+      <Attribute Name="grain_map" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="64  64  64" NumberType="Int" Precision="uint16">n27-id1_data.h5:/CellData/grain_map</DataItem>
+      </Attribute>
+    </Grid>
+  </Domain>
+</Xdmf>

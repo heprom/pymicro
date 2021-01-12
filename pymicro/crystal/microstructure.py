@@ -2234,6 +2234,40 @@ class Microstructure(SampleData):
         micro_crop.recompute_grain_volumes()
         return micro_crop
 
+    def renumber_grains(self, sort_by_size=False):
+        """Renumber the grains in the microstructure.
+
+        Renumber the grains from 1 to n, with n the total number of grains
+        so that the numbering is consecutive. Only positive grain ids are taken
+        into account (the id 0 is reserved for the background).
+
+        :param bool sort_by_size: use the grain volume to sort the grain ids
+        (the larger grain will become grain 1, etc).
+        """
+        if self._is_empty('grain_map'):
+            print('warning: a grain map is needed to renumber the grains')
+            return
+        if sort_by_size:
+            print('sorting ids by grain size')
+            sizes = self.get_grain_volumes()
+            new_ids = self.get_grain_ids()[np.argsort(sizes)][::-1]
+        else:
+            new_ids = range(1, self.get_number_of_grains() + 1)
+        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map_renum = grain_map.copy()
+        for i, g in enumerate(self.grains):
+            gid = g['idnumber']
+            if not gid > 0:
+                # only renumber positive grain ids
+                continue
+            new_id = new_ids[i]
+            grain_map_renum[grain_map == gid] = new_id
+            g['idnumber'] = new_id
+            g.update()
+        print('maxium grain id is now %d' % max(new_ids))
+        # assign the renumbered grain_map to the microstructure
+        self.set_grain_map(grain_map_renum, self.get_voxel_size())
+
     def compute_grain_volume(self, gid):
         """Compute the volume of the grain given its id.
 

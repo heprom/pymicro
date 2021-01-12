@@ -2228,8 +2228,9 @@ class Microstructure(SampleData):
         print('%d grains in cropped microstructure' % micro_crop.grains.nrows)
         micro_crop.grains.flush()
         # recompute the grain geometry
-        micro_crop.recompute_grain_centers()
+        print('updating grain geometry')
         micro_crop.recompute_grain_bounding_boxes()
+        micro_crop.recompute_grain_centers()
         micro_crop.recompute_grain_volumes()
         return micro_crop
 
@@ -2240,10 +2241,18 @@ class Microstructure(SampleData):
         converted to mm unit using the `voxel_size`. The unit will be mm² for a
         2D grain map or mm³ for a 3D grain map.
 
+        .. warning::
+
+          This function assume the grain bounding box is correct, call
+          `recompute_grain_bounding_boxes()` if this is not the case.
+
         :param int gid: the grain id to consider.
         :return: the volume of the grain.
         """
-        grain_map = self.get_grain_map(as_numpy=True)
+        bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
+        grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                         bb[1][0]:bb[1][1],
+                                         bb[2][0]:bb[2][1]]
         voxel_size = self.get_attribute('spacing', 'CellData')
         volume_vx = np.sum(grain_map == np.array(gid))
         return volume_vx * np.prod(voxel_size)
@@ -2251,19 +2260,23 @@ class Microstructure(SampleData):
     def compute_grain_center(self, gid):
         """Compute the center of masses of a grain given its id.
 
+        .. warning::
+
+          This function assume the grain bounding box is correct, call
+          `recompute_grain_bounding_boxes()` if this is not the case.
+
         :param int gid: the grain id to consider.
         :return: a tuple with the center of mass in mm units
                  (or voxel if the voxel_size is not specified).
         """
         # isolate the grain within the complete grain map
-        grain_map = self.get_grain_map(as_numpy=True)
+        bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
+        grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                         bb[1][0]:bb[1][1],
+                                         bb[2][0]:bb[2][1]]
         voxel_size = self.get_attribute('spacing', 'CellData')
-        slices = ndimage.find_objects(grain_map == np.array(gid))
-        if not len(slices) > 0:
-            raise ValueError('warning grain %d not found in grain map' % gid)
-        sl = slices[0]
-        offset = np.array([sl[0].start, sl[1].start, sl[2].start])
-        grain_data_bin = (grain_map[sl] == gid).astype(np.uint8)
+        offset = bb[:, 0]
+        grain_data_bin = (grain_map == gid).astype(np.uint8)
         local_com = ndimage.measurements.center_of_mass(grain_data_bin)
         com = voxel_size * (offset + local_com - 0.5 * np.array(grain_map.shape))
         return com
@@ -2306,13 +2319,12 @@ class Microstructure(SampleData):
         for g in self.grains:
             try:
                 vol = self.compute_grain_volume(g['idnumber'])
-                print('grain {}, computed volume is {}'.format(g['idnumber'],
-                                                               vol))
             except ValueError:
                 print('skipping grain %d' % g['idnumber'])
                 continue
             if verbose:
-                print('grain %d volume: %.3f ' % (g['idnumber'], vol))
+                print('grain {}, computed volume is {}'.format(g['idnumber'],
+                                                               vol))
             g['volume'] = vol
             g.update()
         self.grains.flush()
@@ -2753,6 +2765,8 @@ class Microstructure(SampleData):
             assert np.prod(dims) == data.shape[0]
             micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0),
                                 voxel_size=voxel_size[0])  # swap X/Z axes
+            print('updating grain geometry')
+            micro.recompute_grain_bounding_boxes()
             micro.recompute_grain_centers()
             micro.recompute_grain_volumes()
         print('done')
@@ -3261,9 +3275,9 @@ class Microstructure(SampleData):
         merged_micro.set_grain_map(grain_ids_merged, voxel_size)
         # recompute the geometry of the grains
         print('updating grain geometry')
+        merged_micro.recompute_grain_bounding_boxes()
         merged_micro.recompute_grain_centers()
         merged_micro.recompute_grain_volumes()
-        #merged_micro.recompute_grain_bounding_boxes()
         if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
             print('assigning merged mask')
             merged_micro.set_mask(mask_merged, voxel_size)

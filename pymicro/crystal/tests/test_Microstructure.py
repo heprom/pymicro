@@ -63,10 +63,9 @@ class MicrostructureTests(unittest.TestCase):
         xdmf_file = m.xdmf_file
         self.assertTrue(os.path.exists(h5_file))
         self.assertTrue(os.path.exists(xdmf_file))
-        m.set_centers(np.zeros(m.grains.cols.center.shape))
-        m.set_volumes(np.zeros(m.grains.cols.volume.shape))
-        m.set_bounding_boxes(np.zeros(m.grains.cols.bounding_box.shape))
-        m.compute_grains_geometry()
+        m.recompute_grain_bounding_boxes()
+        m.recompute_grain_centers()
+        m.recompute_grain_volumes()
         m_ref = Microstructure(filename=filename)
         for i in range(m_ref.grains.nrows):
             self.assertEqual(m.grains[i], m_ref.grains[i])

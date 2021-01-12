@@ -97,6 +97,19 @@ class MicrostructureTests(unittest.TestCase):
         self.assertTrue(not os.path.exists(xdmf_file))
         del m
 
+    def test_renumber_grains(self):
+        # read and copy a microstructure
+        m1_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5')
+        copy_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_copy_data.h5')
+        m1 = Microstructure.copy_sample(m1_path, copy_path, autodelete=True,
+                                        get_object=True)
+        self.assertTrue(8 not in m1.get_grain_ids())
+        m1.renumber_grains()
+        self.assertTrue(8 in m1.get_grain_ids())
+        m1.renumber_grains(sort_by_size=True)
+        self.assertEqual(m1.get_grain_ids()[0], 18)
+        del m1
+
     def test_merge_microstructures(self):
         m1 = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5'))
         m2 = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm2_data.h5'))

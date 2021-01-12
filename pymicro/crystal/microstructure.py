@@ -2404,8 +2404,9 @@ class Microstructure(SampleData):
 
     def compute_grains_geometry(self, overwrite_table=False):
         """ Compute grain centers, volume and bounding box from grain_map """
+        #TODO revisit this method as we now rely on the grain bounding boxes to compute the geometry
         grains_id = self.get_ids_from_grain_map()
-        if (self.grains.nrows > 0) and overwrite_table:
+        if self.grains.nrows > 0 and overwrite_table:
             self.grains.remove_rows(start=0)
         for i in grains_id:
             gidx = self.grains.get_where_list('(idnumber == i)')
@@ -2413,9 +2414,9 @@ class Microstructure(SampleData):
                 gr = self.grains[gidx]
             else:
                 gr = np.zeros((1,), dtype=self.grains.dtype)
+            gr['bounding_box'] = self.compute_grain_bounding_box(i)
             gr['center'] = self.compute_grain_center(i)
             gr['volume'] = self.compute_grain_volume(i)
-            gr['bounding_box'] = self.compute_grain_bounding_box(i)
             if len(gidx) > 0:
                 self.grains[gidx] = gr
             else:

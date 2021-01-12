@@ -1,5 +1,10 @@
 language: python
 
+addons:
+  apt:
+    packages:
+    - hdf5-tools
+
 python:
   - "3.5"
 

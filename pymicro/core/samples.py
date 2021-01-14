@@ -2412,6 +2412,10 @@ class SampleData:
         """Find out if name or path references an image groupe."""
         return self._get_group_type(name) in SD_IMAGE_GROUPS.values()
 
+    def _is_mesh(self, name):
+        """Find out if name or path references an image groupe."""
+        return self._get_group_type(name) in SD_MESH_GROUPS.values()
+
     def _is_array(self, name):
         """Find out if name or path references an array dataset."""
         name2 = self._name_or_node_to_path(name)

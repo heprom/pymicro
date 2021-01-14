@@ -1805,6 +1805,85 @@ class Microstructure(SampleData):
         # TODO : create a dedicated node in h5_dataset
         self.vtkmesh = mesh
 
+    def create_grain_ids_field(self, meshname=None, store=True):
+        """Create a grain Id field of grain orientations on the inputed mesh.
+
+        Creates a element wise field from the microsctructure mesh provided,
+        adding to each element the value of the Rodrigues vector
+        of the local grain element set, as it is and if it is referenced in the
+        `GrainDataTable` node.
+
+        :param str mesh: Name, Path or index name of the mesh on which an
+            orientation map element field must be constructed
+        :param bool store: If `True`, store the orientation map in `CellData`
+            image group, with name `orientation_map`
+        """
+        # TODO : adapt data model to include microstructure mesh and adapt
+        # routine arugments and code to the new data model
+        # input a mesh_object or a mesh group ?
+        # check if mesh is provided
+        if meshname is None:
+                raise ValueError('meshname do not refer to an existing mesh')
+        if not(self._is_mesh(meshname)) or  self._is_empty(meshname):
+                raise ValueError('meshname do not refer to a non empty mesh'
+                                 'group')
+        # create empty element vector field
+        Nelements = int(self.get_attribute('Number_of_elements',meshname))
+        mesh = self.get_node(meshname)
+        El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
+        orientation_field = np.zeros((Nelements,1),dtype=float)
+        grainIds = self.get_grain_ids()
+        # if mesh is provided
+        for i in range(len(grainIds)):
+            set_name = 'ET_grain_'+str(grainIds[i]).strip()
+            elset_path = os.path.join(El_tag_path, set_name)
+            element_ids = self.get_node(elset_path, as_numpy=True)
+            orientation_field[element_ids] = grainIds[i]
+        if store:
+            self.add_field(gridname=meshname, fieldname='grain_ids',
+                           array=orientation_field)
+        return orientation_field
+
+    def create_orientation_field(self, meshname=None, store=True):
+        """Create a vector field of grain orientations on the inputed mesh.
+
+        Creates a element wise field from the microsctructure mesh provided,
+        adding to each element the value of the Rodrigues vector
+        of the local grain element set, as it is and if it is referenced in the
+        `GrainDataTable` node.
+
+        :param str mesh: Name, Path or index name of the mesh on which an
+            orientation map element field must be constructed
+        :param bool store: If `True`, store the orientation map in `CellData`
+            image group, with name `orientation_map`
+        """
+        # TODO : adapt data model to include microstructure mesh and adapt
+        # routine arugments and code to the new data model
+        # input a mesh_object or a mesh group ?
+        # check if mesh is provided
+        if meshname is None:
+                raise ValueError('meshname do not refer to an existing mesh')
+        if not(self._is_mesh(meshname)) or  self._is_empty(meshname):
+                raise ValueError('meshname do not refer to a non empty mesh'
+                                 'group')
+        # create empty element vector field
+        Nelements = int(self.get_attribute('Number_of_elements',meshname))
+        mesh = self.get_node(meshname)
+        El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
+        orientation_field = np.zeros((Nelements,3),dtype=float)
+        grainIds = self.get_grain_ids()
+        grain_orientations = self.get_grain_rodrigues()
+        # if mesh is provided
+        for i in range(len(grainIds)):
+            set_name = 'ET_grain_'+str(grainIds[i]).strip()
+            elset_path = os.path.join(El_tag_path, set_name)
+            element_ids = self.get_node(elset_path, as_numpy=True)
+            orientation_field[element_ids,:] = grain_orientations[i,:]
+        if store:
+            self.add_field(gridname=meshname, fieldname='grain_orientations',
+                           array=orientation_field)
+        return orientation_field
+
     def create_orientation_map(self, store=True):
         """Create a vector field in CellData of grain orientations.
 
@@ -2485,16 +2564,8 @@ class Microstructure(SampleData):
             from vtk.util import numpy_support
             #TODO build a continuous grain map for amitex
             grain_ids = self.get_grain_map(as_numpy=True)
-            material_ids = np.zeros_like(grain_ids)
-            if add_grips:
-                grain_ids = np.pad(grain_ids, ((0, 0),
-                                               (0, 0),
-                                               (grip_size, grip_size)),
-                                   mode='constant', constant_values=1)
-                material_ids = np.pad(material_ids, ((0, 0),
-                                                     (0, 0),
-                                                     (grip_size, grip_size)),
-                                      mode='constant', constant_values=1)
+            material_ids = np.ones_like(grain_ids)
+            nmat = 2
             if add_exterior:
                 # add a layer of ones (the value must actually be the first
                 # grain id) around the first two dimensions
@@ -2506,7 +2577,23 @@ class Microstructure(SampleData):
                                       ((exterior_size, exterior_size),
                                        (exterior_size, exterior_size),
                                        (0, 0)),
-                                      mode='constant', constant_values=2)
+                                      mode='constant', constant_values=nmat)
+                nmat = nmat+1
+            if add_grips:
+                grain_ids = np.pad(grain_ids, ((0, 0),
+                                               (0, 0),
+                                               (grip_size, grip_size)),
+                                   mode='constant', constant_values=1)
+                material_ids = np.pad(material_ids, ((0, 0),
+                                                     (0, 0),
+                                                     (grip_size, grip_size)),
+                                      mode='constant', constant_values=nmat)
+            # renumber grain_map
+            Ids = self.get_grain_ids()
+            k = 1
+            for Id in Ids:
+                grain_ids[np.where(grain_ids == Id)] = k
+                k += 1
             # write both arrays as VTK files for amitex
             voxel_size = self.get_voxel_size()
             for array, array_name in zip([grain_ids, material_ids],
@@ -2893,6 +2980,8 @@ class Microstructure(SampleData):
             if 'grain_ids' in f['CellData']:
                 micro.set_grain_map(f['CellData/grain_ids'][()],
                                     f['CellData/grain_ids'].attrs['voxel_size'])
+                micro.recompute_grain_bounding_boxes()
+                micro.recompute_grain_volumes()
             if 'mask' in f['CellData']:
                 micro.set_mask(f['CellData/mask'][()],
                                f['CellData/mask'].attrs['voxel_size'])

@@ -2312,7 +2312,8 @@ class Microstructure(SampleData):
         offset = bb[:, 0]
         grain_data_bin = (grain_map == gid).astype(np.uint8)
         local_com = ndimage.measurements.center_of_mass(grain_data_bin)
-        com = voxel_size * (offset + local_com - 0.5 * np.array(grain_map.shape))
+        com = voxel_size * (offset + local_com
+                            - 0.5 * np.array(self.get_grain_map().shape))
         return com
 
     def compute_grain_bounding_box(self, gid, as_slice=False):

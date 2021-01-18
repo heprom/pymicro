@@ -69,6 +69,44 @@ class Orientation:
         s += '\nQuaternion = %s' % self.OrientationMatrix2Quaternion(self._matrix, P=1)
         return s
 
+    def to_crystal(self, v):
+        """Transform a vector or a matrix from the sample frame to the crystal
+        frame.
+
+        :param ndarray v: a 3 component vector or a 3x3 array expressed in
+        the sample frame.
+        :return: the vector or matrix expressed in the crystal frame.
+        """
+        if v.size not in [3, 9]:
+            raise ValueError('input arg must be a 3 components vector '
+                             'or a 3x3 matrix, got %d vlaues' % v.size)
+        g = self.orientation_matrix()
+        if v.size == 3:
+            # input is vector
+            return np.dot(g, v)
+        else:
+            # input is 3x3 matrix
+            return np.dot(g, np.got(v, g.T))
+
+    def to_sample(self, v):
+        """Transform a vector or a matrix from the crystal frame to the sample
+        frame.
+
+        :param ndarray v: a 3 component vector or a 3x3 array expressed in
+        the crystal frame.
+        :return: the vector or matrix expressed in the sample frame.
+        """
+        if v.size not in [3, 9]:
+            raise ValueError('input arg must be a 3 components vector '
+                             'or a 3x3 matrix, got %d vlaues' % v.size)
+        g = self.orientation_matrix()
+        if v.size == 3:
+            # input is vector
+            return np.dot(g.T, v)
+        else:
+            # input is 3x3 matrix
+            return np.dot(g.T, np.got(v, g))
+
     @staticmethod
     def cube():
         """Create the particular crystal orientation called Cube and which
@@ -2468,7 +2506,7 @@ class Microstructure(SampleData):
         polycrystalline microstructures. The calculation needs orientation data
         for each grain written in the form of the coordinates of the first two
         basis vectors expressed in the crystal local frame which is given by
-        the first two columns of the orientation matrix. The values are written
+        the first two rows of the orientation matrix. The values are written
         in 6 files N1X.txt, N1Y.txt, N1Z.txt, N2X.txt, N2Y.txt, N2Z.txt, each
         containing n values with n the number of grains. The data is written
         either in BINARY or in ASCII form.
@@ -2507,8 +2545,8 @@ class Microstructure(SampleData):
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
                 g = o.orientation_matrix()
-                n1 = g[0]
-                n2 = g[1]
+                n1 = g[0]  # first row
+                n2 = g[1]  # second row
                 n1x.write(struct.pack('>d', n1[0]))
                 n1y.write(struct.pack('>d', n1[1]))
                 n1z.write(struct.pack('>d', n1[2]))
@@ -2519,8 +2557,8 @@ class Microstructure(SampleData):
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
                 g = o.orientation_matrix()
-                n1 = g[0]
-                n2 = g[1]
+                n1 = g[0]  # first row
+                n2 = g[1]  # second row
                 n1x.write('%f\n' % n1[0])
                 n1y.write('%f\n' % n1[1])
                 n1z.write('%f\n' % n1[2])

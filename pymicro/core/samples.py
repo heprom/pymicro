@@ -2098,6 +2098,69 @@ class SampleData:
             del new_sample
             return
 
+    def multi_phase_mesher(self, multiphase_image_name='', meshname='',
+                           indexname='', location='', replace=False,
+                           extended_data=True):
+        """Create a conformal mesh from a multiphase image.
+        
+        A Matlab multiphase mesher is called to create a conformal mesh of a
+        multiphase image: a voxelized/pixelized field of integers identifying
+        the different phases of a microstructure. Then, the mesh is stored in
+        the calling SampleData instance at the desired location with the
+        desired name and Indexname.
+        
+        The mesher path must be correctly set in the `global_variables.py`
+        file, as well as the definition and path of the Matlab command. The
+        multiphase mesher is a Matlab program that has been developed by
+        Franck Nguyen (Centre des Matériaux).
+
+        :param str multiphase_image_name: Path, Name, Index Name or Alias of 
+            the multiphase image field to mesh.
+        :param str meshname: name used to create the Mesh group in dataset
+        :param indexname: Index name used to reference the Mesh group
+        :location str: Path, Name, Index Name or Alias of the parent group
+            where the Mesh group is to be created
+
+        """
+        # global variables import
+        from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
+        from pymicro.core.global_variables import MESHER_TEMPLATE, MESHER_TMP
+        
+        # Set data and file pathes
+        DATA_DIR, DATA_H5FILE = os.path.split(self.h5_file)
+        print(DATA_DIR)
+        if DATA_DIR == '':
+            DATA_DIR = os.getcwd()
+        print(DATA_DIR)
+        DATA_H5FILE = os.path.join(DATA_DIR,DATA_H5FILE)
+        DATA_PATH = self._name_or_node_to_path(multiphase_image_name)
+        OUT_DIR = os.path.join(DATA_DIR, 'Tmp/')
+        # create temp directory for mesh files
+        os.mkdir(OUT_DIR)
+        # Create specific mesher script
+        shutil.copyfile(MESHER_TEMPLATE, MESHER_TMP)
+        with open(MESHER_TMP,'r') as file:
+            lines = file.read()
+        lines = lines.replace('DATA_PATH', DATA_PATH)
+        lines = lines.replace('DATA_H5FILE', DATA_H5FILE)
+        lines = lines.replace('OUT_DIR', OUT_DIR)
+        with open(MESHER_TMP,'w') as file:
+            file.write(lines)
+        # Launch mesher         
+        CWD = os.getcwd()
+        matlab_command = '"'+"run('" + MESHER_TMP + "');exit;"+'"'
+        subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
+        os.chdir(CWD)
+        os.remove(MESHER_TMP)
+        # Add mesh to SD instance
+        out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra.geof')
+        self.add_mesh(file=out_file, meshname=meshname, indexname=indexname,
+                      location=location, replace=replace,
+                      extended_data=extended_data)
+        # Remove tmp mesh files
+        shutil.rmtree(OUT_DIR)
+        return
+
     # =========================================================================
     #  SampleData private methods
     # =========================================================================

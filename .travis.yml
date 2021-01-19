@@ -1,9 +1,9 @@
-language: python
+Blanguage: python
 
 addons:
   apt:
     packages:
-    - hdf5-tools
+    - libhdf5-dev
 
 python:
   - "3.5"

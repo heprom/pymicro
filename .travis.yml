@@ -1,4 +1,4 @@
-Blanguage: python
+language: python
 
 addons:
   apt:

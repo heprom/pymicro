@@ -3,7 +3,9 @@ language: python
 addons:
   apt:
     packages:
-    - hdf5-tools
+    - libbz2-dev
+    - libhdf5-dev
+    - liblzo2-dev
 
 python:
   - "3.5"
@@ -13,6 +15,7 @@ virtualenv:
 
 # command to install dependencies
 install:
+  - pip install numpy 
   - pip install -r requirements.txt
   - pip install coveralls
 

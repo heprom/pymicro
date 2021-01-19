@@ -249,8 +249,8 @@ class SampleData:
 
     def __repr__(self):
         """Return a string representation of the dataset content."""
-        s = self.print_index(as_string=True)
-        s += self.print_dataset_content(as_string=True)
+        s = self.print_index(as_string=True, max_depth=3)
+        s += self.print_dataset_content(as_string=True, max_depth=3)
         return s
 
     def __contains__(self, name):
@@ -367,7 +367,7 @@ class SampleData:
 
         return
 
-    def print_dataset_content(self, as_string=False, max_depth=1000):
+    def print_dataset_content(self, as_string=False, max_depth=3):
         """Print information on all nodes in the HDF5 file.
 
         :param bool as_string: If `True` solely returns string representation.
@@ -443,7 +443,7 @@ class SampleData:
                 s += self.get_node_info(node._v_name, as_string)
         return s
 
-    def print_index(self, as_string=False, max_depth=1000, node_type=[],
+    def print_index(self, as_string=False, max_depth=3, node_type=[],
                     local_root='/'):
         """Print a list of the datasets in HDF5 and their Index names.
 
@@ -577,7 +577,7 @@ class SampleData:
 
     def add_mesh(self, mesh_object=None, meshname='', indexname='',
                  location='/', description=' ', replace=False,
-                 extended_data=True, **keywords):
+                 bin_fields_from_sets=True, **keywords):
         """Create a Mesh group in the dataset from a MeshObject.
 
         A Mesh group is a HDF5 Group that contains arrays describing mesh
@@ -607,8 +607,8 @@ class SampleData:
         :param str description: Description metadata for this mesh
         :param bool replace: remove Mesh group in the dataset with the same
             name/location if `True` and such group exists
-        :param bool extended_data: If `True`, stores all Node and Element Tags
-            in mesh_object as fields
+        :param bool bin_fields_from_sets: If `True`, stores all Node and
+            Element Sets in mesh_object as binary fields (1 on Set, 0 else)
 
         .. warning::
 
@@ -629,7 +629,8 @@ class SampleData:
         else:
             self._check_mesh_object_support(mesh_object)
         ### Add Mesh Geometry to HDF5 dataset
-        self._add_mesh_geometry(mesh_object,mesh_group, replace, extended_data)
+        self._add_mesh_geometry(mesh_object,mesh_group, replace,
+                                bin_fields_from_sets)
         ### Add mesh Grid to xdmf file
         Xdmf_pathes = self._add_mesh_to_xdmf(mesh_group._v_pathname)
         # store mesh metadata as HDF5 attributes
@@ -645,7 +646,7 @@ class SampleData:
                             mesh_group._v_name+'_Nodes')
         ### Add node and element tags, eventually as fields if extended=True
         self._add_nodes_elements_tags(mesh_object, mesh_group, replace,
-                                      extended_data)
+                                      bin_fields_from_sets)
         ### Add fields if some are stored in the mesh object
         for field_name, field in mesh_object.nodeFields.items():
             self.add_field(gridname=mesh_group._v_pathname,
@@ -659,8 +660,8 @@ class SampleData:
 
     def add_mesh_from_image(self, imagename, with_fields=True, ofTetras=False,
                             meshname='', indexname='', location='/',
-                            description=' ', replace=False, extended_data=True,
-                            **keywords):
+                            description=' ', replace=False,
+                            bin_fields_from_sets=True, **keywords):
         """Create a Mesh group in the dataset from an Image dataset.
 
         The mesh group created can represent a mesh of tetrahedra or a mesh of
@@ -681,8 +682,8 @@ class SampleData:
         :param str description: Description metadata for this mesh
         :param bool replace: remove Mesh group in the dataset with the same
             name/location if `True` and such group exists
-        :param bool extended_data: If `True`, stores all Node and Element Tags
-            in mesh_object as fields
+        :param bool bin_fields_from_sets: If `True`, stores all Node and
+            Element Sets in mesh_object as binary fields
         """
 
         Mesh_o = self.get_mesh_from_image(imagename, with_fields, ofTetras)
@@ -694,7 +695,7 @@ class SampleData:
         for key in field_names:
             Mesh_o.elemFields[key+'_'+meshname] = Mesh_o.elemFields.pop(key)
         self.add_mesh(Mesh_o, meshname, indexname, location, description,
-                      replace, extended_data)
+                      replace, bin_fields_from_sets)
         return
 
     def add_image(self, image_object=None, imagename='', indexname='',
@@ -1407,6 +1408,28 @@ class SampleData:
         self._load_elements_tags(meshname, AElements)
         return AElements
 
+    def get_mesh_elem_tags_names(self, meshname):
+        """Returns the list and types of elements tags defined on a mesh.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :return list elem_tags: list of element tag names defined on this mesh
+        :return list elem_types: list of element types for each element tag
+        """
+        elem_tags = self.get_attribute('Elem_tag_type_list', meshname)
+        elem_types = self.get_attribute('Elem_tags_list', meshname)
+        return elem_tags, elem_types
+
+    def get_mesh_node_tags_names(self, meshname):
+        """Returns the list of node tags defined on a mesh.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :return list node_tags: list of node tag names defined on this mesh
+        """
+        node_tags = self.get_attribute('Node_tags_list', meshname)
+        return node_tags
+
 
     def get_image(self, imagename, with_fields=True):
         """Return data of an image group as a BasicTools mesh object.
@@ -2100,21 +2123,21 @@ class SampleData:
 
     def multi_phase_mesher(self, multiphase_image_name='', meshname='',
                            indexname='', location='', replace=False,
-                           extended_data=True):
+                           bin_fields_from_sets=True):
         """Create a conformal mesh from a multiphase image.
-        
+
         A Matlab multiphase mesher is called to create a conformal mesh of a
         multiphase image: a voxelized/pixelized field of integers identifying
         the different phases of a microstructure. Then, the mesh is stored in
         the calling SampleData instance at the desired location with the
         desired name and Indexname.
-        
+
         The mesher path must be correctly set in the `global_variables.py`
         file, as well as the definition and path of the Matlab command. The
         multiphase mesher is a Matlab program that has been developed by
         Franck Nguyen (Centre des Matériaux).
 
-        :param str multiphase_image_name: Path, Name, Index Name or Alias of 
+        :param str multiphase_image_name: Path, Name, Index Name or Alias of
             the multiphase image field to mesh.
         :param str meshname: name used to create the Mesh group in dataset
         :param indexname: Index name used to reference the Mesh group
@@ -2125,7 +2148,7 @@ class SampleData:
         # global variables import
         from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
         from pymicro.core.global_variables import MESHER_TEMPLATE, MESHER_TMP
-        
+
         # Set data and file pathes
         DATA_DIR, DATA_H5FILE = os.path.split(self.h5_file)
         print(DATA_DIR)
@@ -2146,7 +2169,7 @@ class SampleData:
         lines = lines.replace('OUT_DIR', OUT_DIR)
         with open(MESHER_TMP,'w') as file:
             file.write(lines)
-        # Launch mesher         
+        # Launch mesher
         CWD = os.getcwd()
         matlab_command = '"'+"run('" + MESHER_TMP + "');exit;"+'"'
         subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
@@ -2156,7 +2179,7 @@ class SampleData:
         out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra.geof')
         self.add_mesh(file=out_file, meshname=meshname, indexname=indexname,
                       location=location, replace=replace,
-                      extended_data=extended_data)
+                      bin_fields_from_sets=bin_fields_from_sets)
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
         return
@@ -2658,7 +2681,7 @@ class SampleData:
         return field_type, XDMF_FIELD_TYPE[dimension]
 
     def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
-                           extended_data):
+                           bin_fields_from_sets):
         """Add Geometry data items of a mesh object to mesh group/xdmf."""
         self._verbose_print('Adding Geometry for mesh group {}'
                             ''.format(mesh_group._v_name))
@@ -2669,14 +2692,11 @@ class SampleData:
                                    indexname=mesh_group._v_name+'_Geometry',
                                    replace=replace)
         # Add Nodes, NodesID and NodeTags
-        self._add_mesh_nodes(mesh_object, mesh_group, geo_group, replace,
-                             extended_data)
+        self._add_mesh_nodes(mesh_object, mesh_group, geo_group, replace)
         # Add Elements, ElementsID and ElementTags
-        self._add_mesh_elements(mesh_object, mesh_group, geo_group, replace,
-                                extended_data)
+        self._add_mesh_elements(mesh_object, mesh_group, geo_group, replace)
 
-    def _add_mesh_nodes(self, mesh_object, mesh_group, geo_group, replace,
-                        extended_data):
+    def _add_mesh_nodes(self, mesh_object, mesh_group, geo_group, replace):
         """Add Nodes, NodesID and NodeTags arrays in mesh geometry group."""
         # Add Nodes coordinates
         self._verbose_print('Creating Nodes data set in group {} in file {}'
@@ -2702,8 +2722,7 @@ class SampleData:
         self.add_attributes(Node_attributes, mesh_group._v_pathname)
         return
 
-    def _add_mesh_elements(self, mesh_object, mesh_group, geo_group, replace,
-                           extended_data):
+    def _add_mesh_elements(self, mesh_object, mesh_group, geo_group, replace):
         """Add Elements, ElementsID and ElementsTags in mesh geometry group."""
         # Determine Topology type
         if len(mesh_object.elements) > 1:
@@ -2717,19 +2736,19 @@ class SampleData:
         return
 
     def _add_nodes_elements_tags(self,  mesh_object, mesh_group, replace,
-                                 extended_data):
+                                 bin_fields_from_sets):
         """Add Node and ElemTags in mesh geometry group from mesh object."""
         geo_group = self.get_node(mesh_group._v_name+'_Geometry')
         # Add node tags
         self._add_mesh_nodes_tags(mesh_object, mesh_group, geo_group, replace,
-                                  extended_data)
+                                  bin_fields_from_sets)
         # Add element tags
         self._add_mesh_elems_tags(mesh_object, mesh_group, geo_group, replace,
-                                  extended_data)
+                                  bin_fields_from_sets)
         return
 
     def _add_mesh_nodes_tags(self, mesh_object, mesh_group, geo_group,
-                             replace, extended_data):
+                             replace, bin_fields_from_sets):
         """Add NodeTags arrays in mesh geometry group from mesh object."""
         # create Noe tags group
         Ntags_group = self.add_group(groupname='NodeTags',
@@ -2745,19 +2764,26 @@ class SampleData:
             self.add_data_array(location=Ntags_group._v_pathname,
                                 name='NT_'+name, array=node_list,
                                 replace=replace)
-            if extended_data:
+            # ???: Xdmf Sets --> utility not clear for now, code kept as
+            # comments as a precaution
+            # node_list_path = os.path.join(Ntags_group._v_pathname,'NT_'+name)
+            # self._add_xdmf_node_element_set(
+            #     subset_list_path=node_list_path, set_type='Node',
+            #     setname=name, grid_name=mesh_group._v_pathname,
+            #     attributename=name)
+            if bin_fields_from_sets:
                 # Add node tags as fields in the dataset and XDMF file
                 data = np.zeros((mesh_object.GetNumberOfNodes(),1),
                                 dtype=np.int8)
                 data[node_list] = 1;
                 self.add_field(mesh_group._v_pathname, fieldname='field_'+name,
-                               array=data, replace=replace,
-                               location=Ntags_group._v_pathname)
+                                array=data, replace=replace,
+                                location=Ntags_group._v_pathname)
         self.add_attributes({'Node_tags_list': Node_tags_list},
                             mesh_group._v_pathname)
 
     def _add_mesh_elems_tags(self, mesh_object, mesh_group, geo_group,
-                             replace, extended_data):
+                             replace, bin_fields_from_sets):
         """Add ElementsTags arrays in mesh geometry group from mesh object."""
         # create Noe tags group
         Etags_group = self.add_group(groupname='ElementsTags',
@@ -2772,22 +2798,80 @@ class SampleData:
                 name = tagname
                 Elem_tags_list.append(name)
                 Elem_tag_type_list.append(elem_type)
-                elem_list = element_container.tags[tagname].GetIds()
+                elem_list = mesh_object.GetElementsInTag(tagname)
                 self.add_data_array(location=Etags_group._v_pathname,
                                     name='ET_'+name, array=elem_list,
                                     replace=replace)
-                if extended_data:
+                # ???: Xdmf Sets --> utility not clear for now, code kept as
+                # comments as a precaution
+                # elem_list_path = os.path.join(Etags_group._v_pathname,
+                #                               'ET_'+name)
+                # self._add_xdmf_node_element_set(
+                #     subset_list_path=elem_list_path, set_type='Cell',
+                #     setname=name, grid_name=mesh_group._v_pathname,
+                #     attributename=name)
+                if bin_fields_from_sets:
                     # Add elem tags as fields in the dataset and XDMF file
                     elem_list_field = mesh_object.GetElementsInTag(tagname)
                     data = np.zeros((mesh_object.GetNumberOfElements(),1),
                                     dtype=np.int8)
                     data[elem_list_field] = 1;
                     self.add_field(mesh_group._v_pathname, fieldname='field_'+name,
-                                   array=data, replace=replace,
-                                   location=Etags_group._v_pathname)
+                                    array=data, replace=replace,
+                                    location=Etags_group._v_pathname)
         self.add_attributes({'Elem_tags_list': Elem_tags_list,
                              'Elem_tag_type_list': Elem_tag_type_list},
                             mesh_group._v_pathname)
+
+    def _add_xdmf_node_element_set(self, subset_list_path, set_type='Cell',
+                                   setname='', grid_name='',
+                                   attributename=None):
+        """Adds an xdmf set with an optional attribute to the xdmf file.
+
+        For now, only Node and Cell Sets supporting scalar attributes
+        are handled.
+        """
+        subset_list = self.get_node(subset_list_path)
+        xdmf_grid_path = self.get_attribute('xdmf_path', grid_name)
+        Xdmf_grid_node = self.xdmf_tree.find(xdmf_grid_path)
+        # Create xdmf Set node
+        Set_xdmf = etree.Element(_tag='Set', Name=setname,
+                                       SetType=set_type)
+        # create Set Node/Cells subset
+        Dimension = self._np_to_xdmf_str(subset_list.shape)
+        NumberType = 'Int'
+        Precision = str(subset_list.dtype).strip('int')
+        Set_subset = etree.Element(_tag='DataItem', Format='HDF',
+                                   Dimensions=Dimension,
+                                   NumberType=NumberType,
+                                   Precision=Precision)
+        Set_subset.text = (self.h5_file + ':'
+                           + self._name_or_node_to_path(subset_list_path))
+        # add Subset Data Item to Set node
+        Set_xdmf.append(Set_subset)
+        # Create Attribute element if required
+        if attributename is not None:
+            Attribute_xdmf = etree.Element(_tag='Attribute',
+                                           Name=attributename,
+                                           AttributeType='Scalar',
+                                           Center=set_type)
+            # create data item element
+            data = np.ones(subset_list.shape, dtype='int8')
+            Dimension = self._np_to_xdmf_str(data.shape)
+            NumberType = 'Int'
+            Precision = str(data.dtype).strip('int')
+            Attribute_data = etree.Element(_tag='DataItem', Format='XML',
+                                           Dimensions=Dimension,
+                                           NumberType=NumberType,
+                                           Precision=Precision)
+            Attribute_data.text = self._np_to_xdmf_str(data)
+            # add data item to attribute
+            Attribute_xdmf.append(Attribute_data)
+            # add attribute to Set
+            Set_xdmf.append(Attribute_xdmf)
+        # add Set node to Grid node
+        Xdmf_grid_node.append(Set_xdmf)
+        return
 
     def _load_nodes_tags(self, meshname, mesh_object):
         """Add Node and ElemTags in mesh geometry group from mesh object."""

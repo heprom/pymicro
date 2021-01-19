@@ -47,6 +47,25 @@ class Crystal:
             self._colors = basis_colors
 
 
+class CrystallinePhase:
+
+    def __init__(self, phase_id=1):
+        """Create a new crystalline phase.
+
+        The `phase_id` attribute is used to identify the phase in data sets
+        where it can be referred to in phase_map for instance."""
+        self.phase_id = phase_id
+        self.name = ''
+        self.description = ''
+        self.formula = ''
+        # symmetry should be an instance of Symmetry
+        self.symmetry = None
+        # lattice constants: a, b, c, alpha, beta, gamma (degrees)
+        self.lattice_parameters = [0, 0, 0, 0, 0, 0]
+        # a list of C_IJ values
+        self.elastic_constants = []
+
+
 class Symmetry(enum.Enum):
     """
     Class to describe crystal symmetry defined by its Laue class symbol.
@@ -216,6 +235,92 @@ class Symmetry(enum.Enum):
             print(omegas)
             print('moving to FZ, index = %d' % index)
         return np.dot(syms[index], g)
+
+    def stiffness_matrix(self, elastic_constants):
+        """Build the stiffness matrix for this symmetry.
+
+        :param list elastic_constants: the elastic constants (the number must
+        correspond to the type of symmetry, eg 3 for cubic).
+        :return ndarray: a numpy array of shape (6, 6) representing
+        the stiffness matrix.
+        """
+        if self is Symmetry.cubic:
+            if len(elastic_constants) is not 3:
+                raise ValueError('Error: need 3 elastic constants for cubic '
+                                 'symmetry, got %d' % len(elastic_constants))
+            C11, C12, C44 = elastic_constants
+            C = np.array([[C11, C12, C12,   0,   0,   0],
+                          [C12, C11, C12,   0,   0,   0],
+                          [C12, C12, C11,   0,   0,   0],
+                          [  0,   0,   0, C44,   0,   0],
+                          [  0,   0,   0,   0, C44,   0],
+                          [  0,   0,   0,   0,   0, C44]])
+            return C
+        elif self is Symmetry.hexagonal:
+            if len(elastic_constants) is not 5:
+                raise ValueError('Error: need 5 elastic constants for hexagonal '
+                                 'symmetry, got %d' % len(elastic_constants))
+                C11, C12, C13, C33, C44 = elastic_constants
+                C66 = (C11 - C12) / 2
+                C = np.array([[C11, C12, C13,   0,   0,   0],
+                              [C12, C11, C13,   0,   0,   0],
+                              [C13, C13, C33,   0,   0,   0],
+                              [  0,   0,   0, C44,   0,   0],
+                              [  0,   0,   0,   0, C44,   0],
+                              [  0,   0,   0,   0,   0, C66]])
+                return C
+        elif self is Symmetry.tetragonal:
+            if len(elastic_constants) is not 6:
+                raise ValueError('Error: need 6 elastic constants for tetragonal '
+                                 'symmetry, got %d' % len(elastic_constants))
+                C11, C12, C13, C33, C44, C66 = elastic_constants
+                C = np.array([[C11, C12, C13,   0,   0,   0],
+                              [C12, C11, C13,   0,   0,   0],
+                              [C13, C13, C33,   0,   0,   0],
+                              [  0,   0,   0, C44,   0,   0],
+                              [  0,   0,   0,   0, C44,   0],
+                              [  0,   0,   0,   0,   0, C66]])
+                return C
+        elif self is Symmetry.orthorhombic:
+            if len(elastic_constants) is not 9:
+                raise ValueError('Error: need 9 elastic constants for tetragonal '
+                                 'symmetry, got %d' % len(elastic_constants))
+                C11, C12, C13, C22, C23, C33, C44, C55, C66 = elastic_constants
+                C = np.array([[C11, C12, C13,   0,   0,   0],
+                              [C12, C22, C23,   0,   0,   0],
+                              [C13, C23, C33,   0,   0,   0],
+                              [  0,   0,   0, C44,   0,   0],
+                              [  0,   0,   0,   0, C55,   0],
+                              [  0,   0,   0,   0,   0, C66]])
+                return C
+        elif self is Symmetry.monoclinic:
+            if len(elastic_constants) is not 13:
+                raise ValueError('Error: need 13 elastic constants for monoclinic '
+                                 'symmetry, got %d' % len(elastic_constants))
+                C11, C12, C13, C16, C22, C23, C26, C33, C36, C44, C45, \
+                C55, C66 = elastic_constants
+                C = np.array([[C11, C12, C13,   0,   0, C16],
+                              [C12, C22, C23,   0,   0, C26],
+                              [C13, C23, C33,   0,   0, C36],
+                              [  0,   0,   0, C44, C45,   0],
+                              [  0,   0,   0, C45, C55, C56],
+                              [C16, C26, C36,   0,   0, C66]])
+                return C
+        elif self is Symmetry.triclinic:
+            if len(elastic_constants) is not 21:
+                raise ValueError('Error: need 21 elastic constants for triclinic '
+                                 'symmetry, got %d' % len(elastic_constants))
+                C11, C12, C13, C14, C15, C16, C22, C23, C24, C25, C26, C33, \
+                C34, C35, C36, C44, C45, C46, C55, C56, C66 = elastic_constants
+                C = np.array([[C11, C12, C13, C14, C15, C16],
+                              [C12, C22, C23, C24, C25, C26],
+                              [C13, C23, C33, C34, C35, C36],
+                              [C14, C24, C34, C44, C45, C46],
+                              [C15, C25, C35, C45, C55, C56],
+                              [C16, C26, C36, C46, C56, C66]])
+                return C
+        else:
+            raise ValueError('warning, symmetry not supported: %s' % self)
 
 
 class Lattice:

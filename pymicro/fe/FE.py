@@ -208,10 +208,10 @@ class FE_Calc():
         print('building vtk stuff for FE_calc')
         vtk_mesh = self._mesh.build_vtk()
         # also store some meta data
-        model = vtk.vtkModelMetadata()
-        model.SetTitle(self._name)
-        model.Pack(vtk_mesh)
-        print('grid has meta data ?', vtk.vtkModelMetadata.HasMetadata(vtk_mesh))
+        #model = vtk.vtkModelMetadata()
+        #model.SetTitle(self._name)
+        #model.Pack(vtk_mesh)
+        #print('grid has meta data ?', vtk.vtkModelMetadata.HasMetadata(vtk_mesh))
         from vtk.util import numpy_support
         # add the displacement field if present
         if self.U:
@@ -533,8 +533,9 @@ class FE_Mesh():
             el_id = int(tokens[0])
             el_type = tokens[1]
             el_node_nb = int(el_type[3:].split('_')[0].split('r')[0])
-            if (el_type not in ['c2d3', 's3d3', 'c3d4', 'c3d6', 'c3d20', 'c3d20r', 'c3d15', 'c3d13', 'c3d10', 'c3d10_4',
-                                'c3d8', 'c2d4', 'c2d8', 'c2d8r']):
+            if (el_type not in ['c2d3', 's3d3', 'c3d4', 'c3d6', 'c3d20',
+                                'c3d20r', 'c3d15', 'c3d13', 'c3d10', 'c3d10_4',
+                                'c3d8', 'c3d8r', 'c2d4', 'c2d8', 'c2d8r']):
                 print('error, element type %s is not supported yet' % el_type)
                 continue
             element = FE_Element(el_id, el_type)
@@ -726,7 +727,7 @@ class FE_Mesh():
             return vtk.VTK_TETRA  # 10
         if el_type.startswith('c3d10'):
             return vtk.VTK_QUADRATIC_TETRA  # 24
-        if el_type == 'c3d8':
+        if el_type.startswith('c3d8'):
             return vtk.VTK_HEXAHEDRON  # 12
         if el_type.startswith('c2d3') or el_type.startswith('s3d3'):
             return vtk.VTK_TRIANGLE  # 5
@@ -765,7 +766,8 @@ class FE_Mesh():
             vtk_type = FE_Mesh.to_vtk_element_type(el._type)
             # allocate memory for this element type
             # vtk_mesh.Allocate(vtk_type, numpy.shape(el_list)[0])
-            if el._type in ['c2d3', 's3d3', 'c3d4', 'c3d6', 'c3d8', 'c3d13']:
+            if el._type in ['c2d3', 's3d3', 'c3d4', 'c3d6', 'c3d8',
+                            'c3d8r', 'c3d13']:
                 Ids = vtk.vtkIdList()
                 for j in range(len(el._nodelist)):
                     Ids.InsertNextId(el._nodelist[j].give_rank())
@@ -933,7 +935,7 @@ class FE_Element():
             return 6
         elif self._type in ['c3d10', 'c3d13r']:
             return 5
-        elif self._type in ['c2d8r']:
+        elif self._type in ['c2d8r', 'c3d8r']:
             return 1
 
     def give_id(self):

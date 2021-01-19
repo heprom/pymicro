@@ -3,7 +3,9 @@ language: python
 addons:
   apt:
     packages:
+    - libbz2-dev
     - libhdf5-dev
+    - liblzo2-dev
 
 python:
   - "3.5"

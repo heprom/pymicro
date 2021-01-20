@@ -206,20 +206,25 @@ class SampleData:
                  sample_description=' ', verbose=False, overwrite_hdf5=False,
                  autodelete=False, **keywords):
         """Sample Data constructor."""
+        # get file directory and file name
+        file_dir, filename_tmp = os.path.split(filename)
+        if file_dir == '':
+            file_dir = os.getcwd()
         # check if filename has a file extension
-        if filename.rfind('.') != -1:
-            filename_tmp = filename[:filename.rfind('.')]
-        else:
-            filename_tmp = filename
+        if filename_tmp.rfind('.') != -1:
+            filename_tmp = filename_tmp[:filename_tmp.rfind('.')]
 
         self.h5_file = filename_tmp + '.h5'
         self.xdmf_file = filename_tmp + '.xdmf'
+        self.file_dir = file_dir
+        self.h5_path = os.path.join(self.file_dir,self.h5_file)
+        self.xdmf_path = os.path.join(self.file_dir,self.xdmf_file)
         self._verbose = verbose
         self.autodelete = autodelete
-        if os.path.exists(self.h5_file) and overwrite_hdf5:
+        if os.path.exists(self.h5_path) and overwrite_hdf5:
             self._verbose_print('-- File "{}" exists  and will be '
-                                'overwritten'.format(self.h5_file))
-            os.remove(self.h5_file)
+                                'overwritten'.format(self.h5_path))
+            os.remove(self.h5_path)
             os.remove(self.xdmf_file)
         self._init_file_object(sample_name, sample_description, **keywords)
         self.sync()
@@ -241,9 +246,9 @@ class SampleData:
             print('{} Autodelete: \n Removing hdf5 file {} and xdmf file {}'
                   ''.format(self.__class__.__name__, self.h5_file,
                             self.xdmf_file))
-            os.remove(self.h5_file)
+            os.remove(self.h5_path)
             os.remove(self.xdmf_file)
-            if os.path.exists(self.h5_file) or os.path.exists(self.xdmf_file):
+            if os.path.exists(self.h5_path) or os.path.exists(self.xdmf_path):
                 raise RuntimeError('HDF5 and XDMF not removed')
         return
 
@@ -393,8 +398,8 @@ class SampleData:
             if node._v_depth > max_depth:
                 continue
             if not(node._v_name == 'Index'):
-                s += self.get_node_info(node._v_name, as_string)
-                s += self.print_group_content(node._v_name,
+                s += self.get_node_info(node._v_pathname, as_string)
+                s += self.print_group_content(node._v_pathname,
                                               recursive=True,
                                               as_string=as_string,
                                               max_depth=max_depth)
@@ -423,8 +428,8 @@ class SampleData:
             if not(as_string):
                 print(s)
         for node in group._f_iter_nodes():
-            s += self.get_node_info(node._v_name, as_string)
-            if (self._is_group(node._v_name) and recursive):
+            s += self.get_node_info(node._v_pathname, as_string)
+            if (self._is_group(node._v_pathname) and recursive):
                 s += self.print_group_content(node._v_pathname, recursive=True,
                                               as_string=as_string,
                                               max_depth=max_depth-1)
@@ -469,10 +474,10 @@ class SampleData:
             if node._v_depth > max_depth:
                 continue
             if col is None:
-                s += str('\t Name : {:20}  H5_Path : {} \t\n'.format(
+                s += str('\t Name : {:40}  H5_Path : {} \t\n'.format(
                          key, path))
             else:
-                s += str('\t Name : {:20}  H5_Path : {}|col:{} \t\n'.format(
+                s += str('\t Name : {:40}  H5_Path : {}|col:{} \t\n'.format(
                          key, path, col))
             if key in self.aliases:
                 s += str('\t        {} aliases -->'.format(key))
@@ -547,7 +552,7 @@ class SampleData:
                    self.h5_file))
             print('Once you will close Vitables, you may resume data'
                   ' management with your SampleData instance.')
-            subprocess.run(args=[software_cmd,self.h5_file])
+            subprocess.run(args=[software_cmd,self.h5_path])
             Pause = False
         if Paraview:
             software_cmd = 'paraview'
@@ -564,7 +569,7 @@ class SampleData:
                   ' other softwares during this pause.'
                   ' Press <Enter> when you want to resume data management'
                   ''.format(self.h5_file, self.xdmf_file))
-        self.h5_dataset = tables.File(self.h5_file, mode='r+')
+        self.h5_dataset = tables.File(self.h5_path, mode='r+')
         print('File objects {} and {} are opened again.\n You may use this'
               ' SampleData instance normally.'.format(self.h5_file,
                                                       self.xdmf_file))
@@ -639,7 +644,7 @@ class SampleData:
                          'xdmf_path': Xdmf_pathes['mesh_path'],
                          'xdmf_topology_path': Xdmf_pathes['topology_path'],
                          'xdmf_geometry_path': Xdmf_pathes['geometry_path']}
-        self.add_attributes(Attribute_dic, indexname)
+        self.add_attributes(Attribute_dic, mesh_group._v_pathname)
         self.add_attributes({'xdmf_path': Xdmf_pathes['topology_path']},
                             mesh_group._v_name+'_Elements')
         self.add_attributes({'xdmf_path': Xdmf_pathes['geometry_path']},
@@ -938,9 +943,9 @@ class SampleData:
         if self._is_image(gridname):
             array, transpose_indices = self._transpose_image_array(
                 dimensionality, array)
-        self.add_data_array(array_location, fieldname, array, indexname,
-                            chunkshape, replace, filters, empty,
-                            **keywords)
+        node = self.add_data_array(array_location, fieldname, array, indexname,
+                                   chunkshape, replace, filters, empty,
+                                   **keywords)
         Attribute_dic = {'field_type': field_type,
                          'field_dimensionality': dimensionality,
                          'parent_grid_path': self._name_or_node_to_path(
@@ -953,6 +958,7 @@ class SampleData:
         self._add_field_to_xdmf(fieldname, array)
         # Add field path to grid node Field_list attribute
         self._append_field_index(gridname, fieldname)
+        return node
 
     def add_data_array(self, location, name, array=None, indexname=None,
                        chunkshape=None, replace=False, filters=None,
@@ -985,7 +991,6 @@ class SampleData:
             documentation for their definition. If some are passed, they are
             prioritised over the settings in the inputed Filter object.
 
-        .. note:: The data array can
         """
         self._verbose_print('Adding array `{}` into Group `{}`'
                             ''.format(name, location))
@@ -1416,8 +1421,8 @@ class SampleData:
         :return list elem_tags: list of element tag names defined on this mesh
         :return list elem_types: list of element types for each element tag
         """
-        elem_tags = self.get_attribute('Elem_tag_type_list', meshname)
-        elem_types = self.get_attribute('Elem_tags_list', meshname)
+        elem_tags = self.get_attribute('Elem_tags_list', meshname)
+        elem_types = self.get_attribute('Elem_tag_type_list', meshname)
         return elem_tags, elem_types
 
     def get_mesh_node_tags_names(self, meshname):
@@ -1624,7 +1629,7 @@ class SampleData:
         :return str unit: Unit of `fsize`. `bytes` is the default
         """
         units = ['bytes', 'Kb',  'Mb', 'Gb', 'Tb', 'Pb']
-        fsize = os.path.getsize(self.h5_file)
+        fsize = os.path.getsize(self.h5_path)
         k = 0
         unit = units[k]
         if convert:
@@ -2073,12 +2078,12 @@ class SampleData:
         # BUG: copy_file from tables returns exception with large mesh and lot
         # of elsets. Use external utility ptrepack ? For now, taken out of
         # class destructor
-        head, tail = os.path.split(self.h5_file)
+        head, tail = os.path.split(self.h5_path)
         tmp_file = os.path.join(head, 'tmp_'+tail)
         self.h5_dataset.copy_file(tmp_file)
         self.h5_dataset.close()
-        shutil.move(tmp_file, self.h5_file)
-        self.h5_dataset = tables.File(self.h5_file, mode='r+')
+        shutil.move(tmp_file, self.h5_path)
+        self.h5_dataset = tables.File(self.h5_path, mode='r+')
         return
 
     @staticmethod
@@ -2107,7 +2112,7 @@ class SampleData:
         with open(sample.xdmf_file, 'r') as f:
             src_xdmf_lines = f.readlines()
         for line in src_xdmf_lines:
-            dst_xdmf_lines.append(line.replace(sample.h5_file,
+            dst_xdmf_lines.append(line.replace(sample.h5_path,
                                                dst_sample_file_h5))
         with open(dst_sample_file_xdmf, 'w') as f:
             f.writelines(dst_xdmf_lines)
@@ -2122,7 +2127,9 @@ class SampleData:
             return
 
     def multi_phase_mesher(self, multiphase_image_name='', meshname='',
-                           indexname='', location='', replace=False,
+                           indexname='', location='', load_surface_mesh=False,
+                           load_clean_image=False, clean_imagename='',
+                           clean_image_location='', replace=False,
                            bin_fields_from_sets=True):
         """Create a conformal mesh from a multiphase image.
 
@@ -2145,12 +2152,14 @@ class SampleData:
             where the Mesh group is to be created
 
         """
+        self.sync()
         # global variables import
         from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
         from pymicro.core.global_variables import MESHER_TEMPLATE, MESHER_TMP
+        from scipy.io import loadmat
 
         # Set data and file pathes
-        DATA_DIR, DATA_H5FILE = os.path.split(self.h5_file)
+        DATA_DIR, DATA_H5FILE = os.path.split(self.h5_path)
         print(DATA_DIR)
         if DATA_DIR == '':
             DATA_DIR = os.getcwd()
@@ -2180,9 +2189,81 @@ class SampleData:
         self.add_mesh(file=out_file, meshname=meshname, indexname=indexname,
                       location=location, replace=replace,
                       bin_fields_from_sets=bin_fields_from_sets)
+        # Add surface mesh if required
+        if load_surface_mesh:
+            out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor.geof')
+            self.add_mesh(file=out_file, meshname=meshname+'_surface',
+                          indexname=indexname, location=location,
+                          replace=replace, 
+                          bin_fields_from_sets=bin_fields_from_sets)
+        # Add cleaned multiphase image to dataset if required
+        if load_clean_image:
+            out_file = os.path.join(OUT_DIR,'Tmp_mesh_clean.mat')
+            mat_dic = loadmat(out_file)
+            # original_image = self.get_node(multiphase_image_name, as_numpy=True)
+            image_tmp = mat_dic['mat3D_clean']
+            # image_tmp = image_tmp[2:-3,2:-3,2:-3]
+            image = image_tmp.transpose(1,0,2)
+            # check if location is an image group
+            if self._is_image(clean_image_location):
+                self.add_field(gridname=clean_image_location,
+                                fieldname=clean_imagename,
+                                array=image)
+            # self.add_image_from_field(image, 'grain_map_clean', 
+            #                           imagename='CleanImage')
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
-        return
+        return    
+    
+    def create_elset_ids_field(self, meshname=None, store=True, 
+                               get_sets_IDs=False, tags_prefix='elset'):
+        """Create an element tag Id field on the inputed mesh.
+
+        Creates a element wise field from the provided mesh,
+        adding to each element the value of the Elset it belongs to.
+
+        .. warning::
+
+            - CAUTION : the methods is designed to work with non intersecting
+              element tags/sets. In this case, the produce field will indicate
+              the value of the last elset containing it for each element.
+
+        :param str mesh: Name, Path or index name of the mesh on which an
+            orientation map element field must be constructed
+        :param bool store: If `True`, store the field on the mesh
+        :param bool get_sets_IDs: If `True`, get the sets ID numbers from their
+            names by substracting the input prefix. If `False`, use the set
+            position in the mesh elset list as ID number.
+        :param str tags_prefix: Remove from element sets/tags names
+            prefix to determine the set/tag ID. This supposes that sets
+            names have the form prefix+ID
+        """
+        if meshname is None:
+                raise ValueError('meshname do not refer to an existing mesh')
+        if not(self._is_mesh(meshname)) or  self._is_empty(meshname):
+                raise ValueError('meshname do not refer to a non empty mesh'
+                                 'group')
+        # create empty element vector field
+        Nelements = int(self.get_attribute('Number_of_elements',meshname))
+        mesh = self.get_node(meshname)
+        El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
+        ID_field = np.zeros((Nelements,1),dtype=float)
+        elem_tags,_ = self.get_mesh_elem_tags_names(meshname)
+        print(elem_tags)
+        # if mesh is provided
+        for i in range(len(elem_tags)):
+            set_name = elem_tags[i]
+            elset_path = os.path.join(El_tag_path, 'ET_'+set_name)
+            element_ids = self.get_node(elset_path, as_numpy=True)
+            if get_sets_IDs:
+                set_ID = int(set_name.strip(tags_prefix))
+            else:
+                set_ID = i
+            ID_field[element_ids] = set_ID
+        if store:
+            self.add_field(gridname=meshname, fieldname=meshname+'_elset_ids',
+                           array=ID_field, replace=True)
+        return ID_field
 
     # =========================================================================
     #  SampleData private methods
@@ -2191,7 +2272,7 @@ class SampleData:
                           **keywords):
         """Initiate or create PyTable HDF5 file object."""
         try:
-            self.h5_dataset = tables.File(self.h5_file, mode='r+')
+            self.h5_dataset = tables.File(self.h5_path, mode='r+')
             self._verbose_print('-- Opening file "{}" '.format(self.h5_file),
                                 line_break=False)
             self._file_exist = True
@@ -2199,13 +2280,13 @@ class SampleData:
             self.Filters = self.h5_dataset.filters
             self._init_data_model()
             self._verbose_print('**** FILE CONTENT ****')
-            self._verbose_print(SampleData.__repr__(self))
+            # self._verbose_print(SampleData.__repr__(self))
         except IOError:
             self._file_exist = False
             self._verbose_print('-- File "{}" not found : file'
                                 ' created'.format(self.h5_file),
                                 line_break=True)
-            self.h5_dataset = tables.File(self.h5_file, mode='a')
+            self.h5_dataset = tables.File(self.h5_path, mode='a')
             self._init_xml_tree()
             # add sample name and description
             self.h5_dataset.root._v_attrs.sample_name = sample_name
@@ -2488,6 +2569,8 @@ class SampleData:
 
     def _is_empty(self, name):
         """Find out if name or path references an empty node."""
+        if not self.__contains__(name):
+            return True
         if self._is_table(name):
             tab = self.get_node(name)
             return tab.nrows <= 0
@@ -2761,9 +2844,12 @@ class SampleData:
             name = tag.name
             Node_tags_list.append(name)
             node_list = mesh_object.nodesTags[tag.name].GetIds()
-            self.add_data_array(location=Ntags_group._v_pathname,
-                                name='NT_'+name, array=node_list,
-                                replace=replace)
+            node = self.add_data_array(location=Ntags_group._v_pathname,
+                                       name='NT_'+name, array=node_list,
+                                       replace=replace)
+            # remove from index : Nodesets may be too numerous and overload
+            # content index --> actual choice is to remove them from index
+            self._remove_from_index(node._v_pathname)
             # ???: Xdmf Sets --> utility not clear for now, code kept as
             # comments as a precaution
             # node_list_path = os.path.join(Ntags_group._v_pathname,'NT_'+name)
@@ -2776,9 +2862,14 @@ class SampleData:
                 data = np.zeros((mesh_object.GetNumberOfNodes(),1),
                                 dtype=np.int8)
                 data[node_list] = 1;
-                self.add_field(mesh_group._v_pathname, fieldname='field_'+name,
-                                array=data, replace=replace,
-                                location=Ntags_group._v_pathname)
+                node = self.add_field(mesh_group._v_pathname, 
+                                      fieldname='field_'+name,
+                                      array=data, replace=replace,
+                                      location=Ntags_group._v_pathname)
+                # remove from index : Elsets may be too numerous and
+                # overload content index --> actual choice is to remove
+                # them from index
+                self._remove_from_index(node._v_pathname)
         self.add_attributes({'Node_tags_list': Node_tags_list},
                             mesh_group._v_pathname)
 
@@ -2799,9 +2890,12 @@ class SampleData:
                 Elem_tags_list.append(name)
                 Elem_tag_type_list.append(elem_type)
                 elem_list = mesh_object.GetElementsInTag(tagname)
-                self.add_data_array(location=Etags_group._v_pathname,
-                                    name='ET_'+name, array=elem_list,
-                                    replace=replace)
+                node = self.add_data_array(location=Etags_group._v_pathname,
+                                           name='ET_'+name, array=elem_list,
+                                           replace=replace)
+                # remove from index : Elsets may be too numerous and overload
+                # content index --> actual choice is to remove them from index
+                self._remove_from_index(node._v_pathname)
                 # ???: Xdmf Sets --> utility not clear for now, code kept as
                 # comments as a precaution
                 # elem_list_path = os.path.join(Etags_group._v_pathname,
@@ -2816,9 +2910,14 @@ class SampleData:
                     data = np.zeros((mesh_object.GetNumberOfElements(),1),
                                     dtype=np.int8)
                     data[elem_list_field] = 1;
-                    self.add_field(mesh_group._v_pathname, fieldname='field_'+name,
-                                    array=data, replace=replace,
-                                    location=Etags_group._v_pathname)
+                    node = self.add_field(mesh_group._v_pathname,
+                                          fieldname='field_'+name,
+                                          array=data, replace=replace,
+                                          location=Etags_group._v_pathname)
+                    # remove from index : Elsets may be too numerous and
+                    # overload content index --> actual choice is to remove
+                    # them from index
+                    self._remove_from_index(node._v_pathname)
         self.add_attributes({'Elem_tags_list': Elem_tags_list,
                              'Elem_tag_type_list': Elem_tag_type_list},
                             mesh_group._v_pathname)

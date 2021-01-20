@@ -2266,7 +2266,7 @@ class Microstructure(SampleData):
         # get rid of overlap regions flaged by -1
         grain_map[grain_map == -1] = 0
 
-        if self.__contains__('mask'):
+        if not self._is_empty('mask'):
             grain_map = Microstructure.dilate_labels(grain_map,
                                                      dilation_steps=dilation_steps,
                                                      mask=self.get_node('mask', as_numpy=True),

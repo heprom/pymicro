@@ -1831,18 +1831,18 @@ class Microstructure(SampleData):
         Nelements = int(self.get_attribute('Number_of_elements',meshname))
         mesh = self.get_node(meshname)
         El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
-        orientation_field = np.zeros((Nelements,1),dtype=float)
+        ID_field = np.zeros((Nelements,1),dtype=float)
         grainIds = self.get_grain_ids()
         # if mesh is provided
         for i in range(len(grainIds)):
             set_name = 'ET_grain_'+str(grainIds[i]).strip()
             elset_path = os.path.join(El_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
-            orientation_field[element_ids] = grainIds[i]
+            ID_field[element_ids] = grainIds[i]
         if store:
             self.add_field(gridname=meshname, fieldname='grain_ids',
-                           array=orientation_field)
-        return orientation_field
+                           array=ID_field)
+        return ID_field
 
     def create_orientation_field(self, meshname=None, store=True):
         """Create a vector field of grain orientations on the inputed mesh.

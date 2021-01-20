@@ -97,6 +97,24 @@ class MicrostructureTests(unittest.TestCase):
         self.assertTrue(not os.path.exists(xdmf_file))
         del m
 
+    def test_grain_geometry(self):
+        m = Microstructure(name='test', autodelete=True)
+        grain_map = np.ones((8, 8, 8), dtype=np.uint8)
+        m.set_grain_map(grain_map, voxel_size=1.0)
+        grain = m.grains.row
+        grain['idnumber'] = 1
+        grain['orientation'] = Orientation.from_euler([10, 20, 30]).rod
+        grain.append()
+        m.grains.flush()
+        m.recompute_grain_bounding_boxes()
+        m.recompute_grain_centers()
+        m.recompute_grain_volumes()
+        bb1 = m.compute_grain_bounding_box(gid=1)
+        self.assertEqual(bb1, ((0, 8), (0, 8), (0, 8)))
+        c1 = m.compute_grain_center(gid=1).tolist()
+        self.assertEqual(c1, [0., 0., 0.])
+        self.assertEqual(m.compute_grain_volume(gid=1), 512)
+
     def test_renumber_grains(self):
         # read and copy a microstructure
         m1_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5')

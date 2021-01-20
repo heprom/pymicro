@@ -2349,7 +2349,8 @@ class Microstructure(SampleData):
         voxel_size = self.get_attribute('spacing', 'CellData')
         offset = bb[:, 0]
         grain_data_bin = (grain_map == gid).astype(np.uint8)
-        local_com = ndimage.measurements.center_of_mass(grain_data_bin)
+        local_com = ndimage.measurements.center_of_mass(grain_data_bin) \
+                    + np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
         com = voxel_size * (offset + local_com
                             - 0.5 * np.array(self.get_grain_map().shape))
         return com

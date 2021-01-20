@@ -172,7 +172,7 @@ class PoleFigure:
         if display:
             plt.show()
         else:
-            plt.savefig('%s_pole_figure.%s' % (self.microstructure.name, save_as), format=save_as)
+            plt.savefig('%s_pole_figure.%s' % (self.microstructure.get_sample_name(), save_as), format=save_as)
 
     def plot_crystal_dir(self, c_dir, **kwargs):
         """Function to plot a crystal direction on a pole figure.

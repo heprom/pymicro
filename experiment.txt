@@ -33,7 +33,7 @@
             "Symmetry": "cubic"
         },
         "Microstructure": {
-            "Name": "tmp_micro",
+            "Name": "tmp_micro_3962",
             "Lattice": {
                 "Angles": [
                     90.0,

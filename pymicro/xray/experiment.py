@@ -257,11 +257,12 @@ class Sample:
 
     def set_microstructure(self, microstructure):
         if microstructure is None:
-            microstructure = Microstructure(name='tmp_micro',
-                                            file_path=os.getcwd(),
-                                            autodelete=True)
+            # Create random name to avoid opening another microstructure with
+            # same file name when initializing another sample
+            randint = str(np.random.randint(1,10000+1))
+            microstructure = Microstructure(name='tmp_micro_'+randint,
+                                            autodelete=True, verbose=True)
         self.microstructure = microstructure
-
     def has_grains(self):
         """Method to see if a sample has at least one grain in the microstructure.
 
@@ -364,8 +365,8 @@ class Experiment:
     def load(file_path='experiment.txt'):
         with open(file_path, 'r') as f:
             dict_exp = json.load(f)
-        sample = Sample()
-        sample.set_name(dict_exp['Sample']['Name'])
+        name = dict_exp['Sample']['Name']
+        sample = Sample(name=name)
         sample.data_dir = dict_exp['Sample']['Data Dir']
         sample.set_position(dict_exp['Sample']['Position'])
         if 'Geometry' in dict_exp['Sample']:

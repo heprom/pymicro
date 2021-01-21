@@ -247,7 +247,7 @@ class SampleData:
                   ''.format(self.__class__.__name__, self.h5_file,
                             self.xdmf_file))
             os.remove(self.h5_path)
-            os.remove(self.xdmf_file)
+            os.remove(self.xdmf_path)
             if os.path.exists(self.h5_path) or os.path.exists(self.xdmf_path):
                 raise RuntimeError('HDF5 and XDMF not removed')
         return
@@ -356,18 +356,18 @@ class SampleData:
         self._verbose_print('.... writing xdmf file : {}'
                             ''.format(self.xdmf_file),
                             line_break=False)
-        self.xdmf_tree.write(self.xdmf_file,
+        self.xdmf_tree.write(self.xdmf_path,
                              xml_declaration=True,
                              pretty_print=True,
                              doctype='<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>')
 
         # correct xml declaration to allow Paraview reader compatibility
-        with open(self.xdmf_file, 'r') as f:
+        with open(self.xdmf_path, 'r') as f:
             lines = f.readlines()
 
         lines[0] = lines[0].replace("encoding='ASCII'", "")
 
-        with open(self.xdmf_file, 'w') as f:
+        with open(self.xdmf_path, 'w') as f:
             f.writelines(lines)
 
         return
@@ -1972,17 +1972,17 @@ class SampleData:
             indexname = newname
         # change nodename in XDMF file
         xdmf_lines = []
-        with open(self.xdmf_file, 'r') as f:
+        with open(self.xdmf_path, 'r') as f:
             old_xdmf_lines = f.readlines()
         for line in old_xdmf_lines:
             xdmf_lines.append(line.replace(node._v_name, newname))
-        with open(self.xdmf_file, 'w') as f:
+        with open(self.xdmf_path, 'w') as f:
             f.writelines(xdmf_lines)
         # change HDF5 node name
         self.h5_dataset.rename_node(node, newname, overwrite=replace)
         # change index
         self.content_index[indexname] = node._v_pathname
-        self.xdmf_tree = etree.parse(self.xdmf_file)
+        self.xdmf_tree = etree.parse(self.xdmf_path)
         self.sync()
         return
 
@@ -2109,7 +2109,7 @@ class SampleData:
         sample.h5_dataset.copy_file(dst_sample_file_h5, overwrite=overwrite)
         # copy XDMF file
         dst_xdmf_lines = []
-        with open(sample.xdmf_file, 'r') as f:
+        with open(sample.xdmf_path, 'r') as f:
             src_xdmf_lines = f.readlines()
         for line in src_xdmf_lines:
             dst_xdmf_lines.append(line.replace(sample.h5_path,
@@ -2194,7 +2194,7 @@ class SampleData:
             out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor.geof')
             self.add_mesh(file=out_file, meshname=meshname+'_surface',
                           indexname=indexname, location=location,
-                          replace=replace, 
+                          replace=replace,
                           bin_fields_from_sets=bin_fields_from_sets)
         # Add cleaned multiphase image to dataset if required
         if load_clean_image:
@@ -2209,13 +2209,13 @@ class SampleData:
                 self.add_field(gridname=clean_image_location,
                                 fieldname=clean_imagename,
                                 array=image)
-            # self.add_image_from_field(image, 'grain_map_clean', 
+            # self.add_image_from_field(image, 'grain_map_clean',
             #                           imagename='CleanImage')
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
-        return    
-    
-    def create_elset_ids_field(self, meshname=None, store=True, 
+        return
+
+    def create_elset_ids_field(self, meshname=None, store=True,
                                get_sets_IDs=False, tags_prefix='elset'):
         """Create an element tag Id field on the inputed mesh.
 
@@ -2345,7 +2345,7 @@ class SampleData:
     def _init_xml_tree(self):
         """Read xml tree structured in .xdmf file or initiate one."""
         try:
-            self.xdmf_tree = etree.parse(self.xdmf_file)
+            self.xdmf_tree = etree.parse(self.xdmf_path)
         except OSError:
             # Non existent xdmf file.
             # A new .xdmf is created with the base node Xdmf and one Domain
@@ -2862,7 +2862,7 @@ class SampleData:
                 data = np.zeros((mesh_object.GetNumberOfNodes(),1),
                                 dtype=np.int8)
                 data[node_list] = 1;
-                node = self.add_field(mesh_group._v_pathname, 
+                node = self.add_field(mesh_group._v_pathname,
                                       fieldname='field_'+name,
                                       array=data, replace=replace,
                                       location=Ntags_group._v_pathname)

@@ -84,7 +84,7 @@ class SampleDataTests(unittest.TestCase):
         """Test creation of a SampleData instance/file and  data storage."""
         sample = SampleData(filename=self.filename,
                             sample_name='validation_test_sample',
-                            overwrite_hdf5=True)
+                            overwrite_hdf5=True, verbose=False)
         self.assertTrue(os.path.exists(self.filename+'.h5'))
         self.assertTrue(os.path.exists(self.filename+'.xdmf'))
         # Add mesh data into SampleData dataset

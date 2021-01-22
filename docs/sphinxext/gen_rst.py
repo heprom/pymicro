@@ -79,22 +79,39 @@ def extract_docstring(filename):
     docstring = ''
     first_par = ''
     tokens = tokenize.generate_tokens(lines.__iter__)
-    for tok in tokens:
-        print(tok)
-    for tok_type, tok_content, _, (erow, _), _ in tokens:
-        tok_type = token.tok_name[tok_type]
-        if tok_type in ('NEWLINE', 'COMMENT', 'NL', 'INDENT', 'DEDENT'):
-            continue
-        elif tok_type == 'STRING':
-            docstring = eval(tok_content)
-            # If the docstring is formatted with several paragraphs, extract
-            # the first one:
-            paragraphs = '\n'.join(line.rstrip()
-                                   for line in docstring.split('\n')).split('\n\n')
-            if len(paragraphs) > 0:
-                first_par = paragraphs[0]
-        break
-    return docstring, first_par, erow + 1 + start_row
+    #~ for tok in tokens:
+        #~ print(tok)
+    with tokenize.open(filename) as f:
+        tokens = tokenize.generate_tokens(f.readline)
+        for tok_type, tok_content, _, (erow, _), _ in tokens:
+            tok_type = token.tok_name[tok_type]
+            if tok_type in ('NEWLINE', 'COMMENT', 'NL', 'INDENT', 'DEDENT'):
+                continue
+            elif tok_type == 'STRING':
+                docstring = eval(tok_content)
+                # If the docstring is formatted with several paragraphs, extract
+                # the first one:
+                paragraphs = '\n'.join(line.rstrip()
+                                       for line in docstring.split('\n')).split('\n\n')
+                if len(paragraphs) > 0:
+                    first_par = paragraphs[0]
+            break
+        return docstring, first_par, erow + 1 + start_row
+            
+    #~ for tok_type, tok_content, _, (erow, _), _ in tokens:
+        #~ tok_type = token.tok_name[tok_type]
+        #~ if tok_type in ('NEWLINE', 'COMMENT', 'NL', 'INDENT', 'DEDENT'):
+            #~ continue
+        #~ elif tok_type == 'STRING':
+            #~ docstring = eval(tok_content)
+            #~ # If the docstring is formatted with several paragraphs, extract
+            #~ # the first one:
+            #~ paragraphs = '\n'.join(line.rstrip()
+                                   #~ for line in docstring.split('\n')).split('\n\n')
+            #~ if len(paragraphs) > 0:
+                #~ first_par = paragraphs[0]
+        #~ break
+    #~ return docstring, first_par, erow + 1 + start_row
 
 
 def generate_all_example_rst(app):
@@ -102,20 +119,10 @@ def generate_all_example_rst(app):
         examples.
     """
     input_dir = os.path.abspath(app.builder.srcdir)
-    input_dir = os.path.join(input_dir, 'auto_examples')
-    if not os.path.exists(input_dir):
-        os.makedirs(input_dir)
-    print('*** input_dir = ', input_dir)
-    # Walk all our source tree to find examples and generate them
-    for file_name in os.listdir(input_dir):
-        if not os.path.isdir(file_name):
-          continue
-        dir_path = os.path.join(input_dir, file_name)
-        print ('*** found examples in %s' % file_name)
-        generate_example_rst(
-            os.path.join(dir_path, 'examples'),
-            os.path.join(dir_path, 'auto_examples'))
-
+    example_dir = os.path.join(input_dir, 'examples')
+    print ('*** Looking for examples in %s' % example_dir)
+    generate_example_rst(example_dir,
+                         os.path.join(input_dir, 'auto_examples'))
 
 def generate_example_rst(example_dir, out_dir):
     if not os.path.exists(out_dir):
@@ -150,7 +157,7 @@ Examples
 
 .. _examples-index:
 """)
-    print('***will generate_dir_rst', fhindex, example_dir, out_dir)
+    print('***** will generate_dir_rst', fhindex.name, example_dir, out_dir)
     generate_dir_rst('.', fhindex, example_dir, out_dir, False)
     fhindex.flush()
 
@@ -170,11 +177,13 @@ def generate_dir_rst(dir, fhindex, example_dir, out_dir, plot_anim):
         os.makedirs(target_dir)
 
     for fname in sorted(os.listdir(src_dir)):
-        print('***found file', fname)
+        print('***** found file', fname)
         if fname.endswith('data'):
             continue
+        if fname.endswith('Notebooks'):
+            continue
         if os.path.isdir(os.path.join(src_dir, fname)):
-            print('*** this is a directory, going in...')
+            print('***** this is a directory, going in...')
             # recursively treat this folder
             fhindex.write('\n' + fname + '\n')
             fhindex.write(len(fname) * '-' + '\n\n')
@@ -251,7 +260,6 @@ def generate_file_rst(fname, target_dir, src_dir, plot_anim):
 
     docstring, short_desc, end_row = extract_docstring(example_file)
     #docstring, short_desc, end_row = '', '', 0
-
     if plot_anim:
         image_fname = image_fname[:-4] + '.gif'
         gif_path = os.path.join(image_dir, image_fname)

@@ -27,13 +27,14 @@ class PoleFigure:
            crystal lattice) but it has only really be tested for cubic.
 
         :param microstructure: the :py:class:`~pymicro.crystal.microstructure.Microstructure`
-        containing the collection of orientations to plot (None by default).
+            containing the collection of orientations to plot (None by default).
         :param lattice: the crystal :py:class:`~pymicro.crystal.lattice.Lattice`.
         :param str axis: the pole figure axis ('Z' by default), vertical axis in
-        the direct pole figure and direction plotted on the inverse pole figure.
+            the direct pole figure and direction plotted on the inverse pole figure.
         :param str hkl: slip plane family ('111' by default)
         :param str proj: projection type, can be either 'stereo' (default) or 'flat'
         :param bool verbose: verbose mode (False by default)
+        
         """
         self.proj = proj
         self.axis = axis
@@ -102,13 +103,14 @@ class PoleFigure:
         as the min() and max() of the field.
 
         :param str field_name: The field name, could be 'grain_id', 'ipf',
-        'grain_size' or any other name describing the field.
+            'grain_size' or any other name describing the field.
         :param list field: A list containing a record for each grain.
         :param float field_min_level: The minimum value to use for this field.
         :param float field_max_level: The maximum value to use for this field.
         :param str lut: A string describing the colormap to use (among
-        matplotlib ones available).
+            matplotlib ones available).
         :raise ValueError: If the given field does not contain enough values.
+        
         """
         self.map_field = field_name
         self.lut = lut
@@ -134,11 +136,11 @@ class PoleFigure:
         """Plot and save a picture with both direct and inverse pole figures.
 
         :param bool plot_sst: controls wether to plot the full inverse pole
-        figure or only the standard stereographic triangle (True by default).
+            figure or only the standard stereographic triangle (True by default).
         :param bool display: display the plot if True, else save a picture of
-        the pole figures (True by default)
+            the pole figures (True by default)
         :param str save_as: File format used to save the image such as pdf
-        or png ('pdf' by default)
+            or png ('pdf' by default)
 
         ::
 
@@ -158,6 +160,7 @@ class PoleFigure:
             :align: center
 
             A 111 pole figure plotted for a single crystal orientation.
+            
         """
         fig = plt.figure(figsize=(10, 5))
         # direct PF
@@ -226,8 +229,9 @@ class PoleFigure:
         :param c2: vector describing crystal direction 2
         :param ax: a reference to a pyplot ax to draw the line
         :param int steps: number of straight lines composing the curve
-        (11 by default)
+            (11 by default)
         :param col: line color (black by default)
+        
         """
         path = np.zeros((steps, 2), dtype=float)
         for j, i in enumerate(np.linspace(0., 1., steps)):
@@ -289,7 +293,8 @@ class PoleFigure:
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (disc by default).
         :param bool ann: Annotate the pole with the coordinates of the vector
-        if True (False by default).
+            if True (False by default).
+            
         """
         self.plot_pf_background(ax)
         kwargs = {'ax': ax, 'mk': mk, 'ann': ann}
@@ -340,7 +345,8 @@ class PoleFigure:
 
         :param ax: a reference to a pyplot ax to draw the contours.
         :param int ang_step: angular step in degrees to use for constructing
-        the orientation distribution data (10 degrees by default)
+            the orientation distribution data (10 degrees by default)
+        
         """
         # discretise the angular space (azimuth and altitude)
         ang_step *= np.pi / 180  # change to radians
@@ -461,14 +467,15 @@ class PoleFigure:
 
          * the grain id, according to the `Microstructure.rand_cmap` function
          * ipf the colour will reflect the orientation according to the IPF
-         coloring scheme
+            coloring scheme
          * the field value mapped on a pyplot color map if the lut field of
-         the PoleFigure instance is a string.
+            the PoleFigure instance is a string.
          * a color directly read from the lut field; in this case the field
-         value must reflect the category of the given grain.
+            value must reflect the category of the given grain.
 
         :param grain: the `Grain` instance.
         :return: the color as a 3 element numpy array representing the rgb values.
+        
         """
         if self.map_field:
             if self.map_field == 'grain_id':
@@ -504,7 +511,8 @@ class PoleFigure:
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
         :param bool ann: Annotate the pole with the coordinates of the vector
-        if True (False by default).
+            if True (False by default).
+        
         """
         # first draw the boundary of the symmetry domain limited by 3 hkl plane
         # normals, called here A, B and C
@@ -571,7 +579,8 @@ class PoleFigure:
         :param ax: a reference to a pyplot ax to draw the poles.
         :param mk: marker used to plot the poles (square by default).
         :param bool ann: Annotate the pole with the coordinates of the vector
-        if True (False by default).
+            if True (False by default).
+        
         """
         ax = kwargs.get('ax')
         self.plot_pf_background(ax, labels=False)
@@ -599,7 +608,9 @@ class PoleFigure:
         orientations.
 
         :param orientations: the list of crystalline
-        :py:class:`~pymicro.crystal.microstructure.Orientation` to plot.
+            :py:class:`~pymicro.crystal.microstructure.Orientation` to
+            plot.
+        
         """
         micro = Microstructure(autodelete=True)
         if isinstance(orientations, list):

@@ -1,72 +1,15 @@
 {
     "Source": {
+        "Max Energy (keV)": 120.0,
         "Position": [
             0.0,
             0.0,
             0.0
-        ],
-        "Max Energy (keV)": 120.0
-    },
-    "Sample": {
-        "Name": "test sample",
-        "Data Dir": ".",
-        "Position": [
-            0.0,
-            0.0,
-            0.0
-        ],
-        "Geometry": {
-            "Type": "point"
-        },
-        "Material": {
-            "Angles": [
-                90.0,
-                90.0,
-                90.0
-            ],
-            "Lengths": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "Centering": "P",
-            "Symmetry": "cubic"
-        },
-        "Microstructure": {
-            "Name": "tmp_micro",
-            "Lattice": {
-                "Angles": [
-                    90.0,
-                    90.0,
-                    90.0
-                ],
-                "Lengths": [
-                    1.0,
-                    1.0,
-                    1.0
-                ],
-                "Centering": "P",
-                "Symmetry": "cubic"
-            },
-            "Grains": []
-        },
-        "Grain Ids Path": null
+        ]
     },
     "Detectors": [
         {
-            "Class": "RegArrayDetector2d",
-            "Size (pixels)": [
-                512,
-                512
-            ],
             "Pixel Size (mm)": 0.1,
-            "Data Type": "<class 'numpy.uint16'>",
-            "Reference Position (mm)": [
-                100.0,
-                0.0,
-                0.0
-            ],
-            "Binning": 1,
             "u_dir": [
                 0.0,
                 -1.0,
@@ -77,26 +20,26 @@
                 0.0,
                 -1.0
             ],
+            "Data Type": "<class 'numpy.uint16'>",
+            "Class": "RegArrayDetector2d",
+            "Binning": 1,
             "w_dir": [
                 1.0,
+                0.0,
+                0.0
+            ],
+            "Size (pixels)": [
+                512,
+                512
+            ],
+            "Reference Position (mm)": [
+                100.0,
                 0.0,
                 0.0
             ]
         },
         {
-            "Class": "RegArrayDetector2d",
-            "Size (pixels)": [
-                512,
-                512
-            ],
             "Pixel Size (mm)": 0.1,
-            "Data Type": "<class 'numpy.uint16'>",
-            "Reference Position (mm)": [
-                0.0,
-                0.0,
-                100.0
-            ],
-            "Binning": 1,
             "u_dir": [
                 0.0,
                 -1.0,
@@ -107,12 +50,69 @@
                 0.0,
                 -6.123233995736766e-17
             ],
+            "Data Type": "<class 'numpy.uint16'>",
+            "Class": "RegArrayDetector2d",
+            "Binning": 1,
             "w_dir": [
                 6.123233995736766e-17,
                 0.0,
                 1.0
+            ],
+            "Size (pixels)": [
+                512,
+                512
+            ],
+            "Reference Position (mm)": [
+                0.0,
+                0.0,
+                100.0
             ]
         }
     ],
+    "Sample": {
+        "Microstructure": {
+            "Lattice": {
+                "Centering": "P",
+                "Lengths": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "Symmetry": "cubic",
+                "Angles": [
+                    90.0,
+                    90.0,
+                    90.0
+                ]
+            },
+            "Grains": [],
+            "Name": "tmp_micro"
+        },
+        "Grain Ids Path": null,
+        "Geometry": {
+            "Type": "point"
+        },
+        "Position": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "Data Dir": ".",
+        "Material": {
+            "Centering": "P",
+            "Lengths": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "Symmetry": "cubic",
+            "Angles": [
+                90.0,
+                90.0,
+                90.0
+            ]
+        },
+        "Name": "test sample"
+    },
     "Active Detector Id": 0
 }

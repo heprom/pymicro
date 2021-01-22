@@ -8,7 +8,7 @@ addons:
     - liblzo2-dev
 
 python:
-  - "3.7"
+  - "3.5"
 
 virtualenv:
   system_site_packages: true

@@ -140,7 +140,7 @@ class SampleDataTests(unittest.TestCase):
                                         overwrite=True,get_object=True,
                                         autodelete=True)
         # Verify data content
-        data_array = sample.get_node('test_array')
+        data_array = sample.get_node('test_array', as_numpy=True)
         self.assertTrue(np.all(self.data_array==data_array))
         # compress image data
         original_filesize, _ = sample.get_file_disk_size(print_flag=False,

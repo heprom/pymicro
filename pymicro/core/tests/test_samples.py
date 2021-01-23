@@ -134,15 +134,16 @@ class SampleDataTests(unittest.TestCase):
                                         dst_sample_file=self.filename,
                                         overwrite=True,get_object=True,
                                         autodelete=True)
-        # Verify data content
-        data_array = sample.get_node('test_array')
-        self.assertTrue(np.all(self.data_array==data_array))
-        # compress image data
+        # get filesizes
         original_filesize, _ = sample.get_file_disk_size(print_flag=False,
                                                       convert=False)
         original_size, _ = sample.get_node_disk_size('test_image_field',
                                                   print_flag=False,
                                                   convert=False)
+        # Verify data content
+        data_array = sample.get_node('test_array')
+        self.assertTrue(np.all(self.data_array==data_array))
+        # compress image data
         sample.set_chunkshape_and_compression(node='test_image_field',
                                               complib='zlib',complevel=1)
         # assert that node size is smaller after compression
@@ -151,8 +152,6 @@ class SampleDataTests(unittest.TestCase):
                                                   convert=False)
         new_filesize, _ = sample.get_file_disk_size(print_flag=False,
                                                       convert=False)
-        # assert that file size is unchanged before repacking file
-        self.assertEqual(original_filesize,new_filesize)
         # repack file and assert file size is lower than original filesize
         sample.repack_h5file()
         new_filesize, _ = sample.get_file_disk_size(print_flag=False,

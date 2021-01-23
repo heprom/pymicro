@@ -5,18 +5,18 @@ When dealing with 3d images, pymicro uses the following convention:
  * the array in memory represents (x,y,z) data.
  * the data is written to the disk as a succession of (x,y) slices, x being the fastest moving index.
 
-This matches ImageJ convention when looking at the data. For instance 
+This matches ImageJ convention when looking at the data. For instance
 looking at the 100th slice of the foam data set:
 
 .. image:: mousse_250x250x250_uint8_slice100_ij.png
    :align: center
 
-When writting 2d images such as tif, jpg or png, out of a numpy array 
+When writting 2d images such as tif, jpg or png, out of a numpy array
 one may use existing function from matplotlib.pyplot, scipy.misc, etc...
-but careful checking needs to be done to remain consistent since pyplot 
-assume a (y,x) array when plotting, writting, reading images.. 
-This recipe demonstrate how to use the pyplot module to write / read 2d 
-images. For other format than PNG, pyplot uses PIL under the hood so 
+but careful checking needs to be done to remain consistent since pyplot
+assume a (y,x) array when plotting, writting, reading images..
+This recipe demonstrate how to use the pyplot module to write / read 2d
+images. For other format than PNG, pyplot uses PIL under the hood so
 this should work with PIL as well.
 
 **Get the complete Python source code:** :download:`convention_read_write_2d_images.py <convention_read_write_2d_images.py>`
@@ -68,11 +68,11 @@ numpy array read from the 2d image and plotting a profile along x:
 .. image:: mousse_250x250x250_uint8_2d_slices.png
    :align: center
 
-Everythings lloks in order, the changes in terms of values along x are 
-normal since pyplot renormalize the data between 0 and 1 to write the 
+Everythings lloks in order, the changes in terms of values along x are
+normal since pyplot renormalize the data between 0 and 1 to write the
 png image (to minimize the loss of information).
 
-In summary, 3d volumes are handled via (x,y,z) 3d numpy arrays in 
-pymicro, pyplot assume a (y,x) array when plotting, writting, reading 
-images. So if you care about having everything consistent you must 
+In summary, 3d volumes are handled via (x,y,z) 3d numpy arrays in
+pymicro, pyplot assume a (y,x) array when plotting, writting, reading
+images. So if you care about having everything consistent you must
 transpose the arrays passed to pyplot.

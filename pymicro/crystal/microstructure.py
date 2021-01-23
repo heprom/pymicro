@@ -2687,11 +2687,22 @@ class Microstructure(SampleData):
             from vtk.util import numpy_support
             #TODO build a continuous grain map for amitex
             grain_ids = self.get_grain_map(as_numpy=True)
-            material_ids = np.ones_like(grain_ids)
-            nmat = 2
+            material_ids = np.zeros_like(grain_ids)
+            new_id = 1
+            if add_grips:
+                # add a layer of new_id (the value must actually be the first
+                # grain id) above and below the sample.
+                grain_ids = np.pad(grain_ids, ((0, 0),
+                                               (0, 0),
+                                               (grip_size, grip_size)),
+                                   mode='constant', constant_values=1)
+                material_ids = np.pad(material_ids, ((0, 0),
+                                                     (0, 0),
+                                                     (grip_size, grip_size)),
+                                      mode='constant', constant_values=new_id)
+                new_id += 1
             if add_exterior:
-                # add a layer of ones (the value must actually be the first
-                # grain id) around the first two dimensions
+                # add a layer of new_id around the first two dimensions
                 grain_ids = np.pad(grain_ids, ((exterior_size, exterior_size),
                                                (exterior_size, exterior_size),
                                                (0, 0)),
@@ -2700,23 +2711,7 @@ class Microstructure(SampleData):
                                       ((exterior_size, exterior_size),
                                        (exterior_size, exterior_size),
                                        (0, 0)),
-                                      mode='constant', constant_values=nmat)
-                nmat = nmat+1
-            if add_grips:
-                grain_ids = np.pad(grain_ids, ((0, 0),
-                                               (0, 0),
-                                               (grip_size, grip_size)),
-                                   mode='constant', constant_values=1)
-                material_ids = np.pad(material_ids, ((0, 0),
-                                                     (0, 0),
-                                                     (grip_size, grip_size)),
-                                      mode='constant', constant_values=nmat)
-            # renumber grain_map
-            Ids = self.get_grain_ids()
-            k = 1
-            for Id in Ids:
-                grain_ids[np.where(grain_ids == Id)] = k
-                k += 1
+                                      mode='constant', constant_values=new_id)
             # write both arrays as VTK files for amitex
             voxel_size = self.get_voxel_size()
             for array, array_name in zip([grain_ids, material_ids],

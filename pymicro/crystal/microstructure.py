@@ -1020,6 +1020,8 @@ class Orientation:
         """
         Read a set of euler angles from an ascii file.
 
+        This method is deprecated, please use `read_orientations`.
+
         :param str txt_path: path to the text file containing the euler angles.
         :returns dict: a dictionary with the line number and the corresponding
         orientation.
@@ -1833,10 +1835,10 @@ class Microstructure(SampleData):
             else:
                 min_id = 0
             grain_ids = range(min_id, min_id + len(euler_list))
+        print('adding %d grains to the microstructure' % len(grain_ids))
         for gid, euler in zip(grain_ids, euler_list):
             grain['idnumber'] = gid
-            o = Orientation.from_euler(euler)
-            grain['orientation'] = o.rod
+            grain['orientation'] = Orientation.Euler2Rodrigues(euler)
             grain.append()
         self.grains.flush()
 

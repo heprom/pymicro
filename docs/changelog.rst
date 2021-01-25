@@ -4,6 +4,28 @@ Change log history
 pymicro version 0.5.0
 ---------------------
 
+* updated version number to 0.5.1 (Henry Proudhon)
+* use Euler2Rodrigues directly in add_grains method (Henry Proudhon)
+* corrected examples according to recent changes in the Microstructure class (Henry Proudhon)
+* Add bibliography file to sphinxcontrib bibtex configuration (AldoMarano)
+* Debug documentation to remove warnings and allow Read the Docs automatic   doc building (AldoMarano)
+* Add bibliography file to sphinxcontrib bibtex configuration (AldoMarano)
+* Attempt to solve Travis building problems n2 (AldoMarano)
+* Debug for travis build (AldoMarano)
+* change the id used to pad arrays when preparing for amitex (Henry Proudhon)
+* updated test files after changes in the microstructure geometry calculations (Henry Proudhon)
+* updated the calculation of grain center to place the first voxel at (0.5, 0.5, 0.5) (Henry Proudhon)
+* Merge pull request #7 from basileMarchand/master (Henry Proudhon)
+* new method stiffness_matrix for the Symmetry class and new CrystallinePhase class (Henry Proudhon)
+* Update .travis.yml (Basile Marchand)
+* Update .travis.yml (Basile Marchand)
+* Update .travis.yml (Basile Marchand)
+* Update travis config for hdf5 (Basile MARCHAND)
+* updated change log for version 0.5.0 (Henry Proudhon)
+
+pymicro version 0.5.0
+---------------------
+
 * updated version number to 0.5.0 (Henry Proudhon)
 * add element type c3d8r (Henry Proudhon)
 * new methods to transform vector/matrix to and from crystal/sample frames (Henry Proudhon)

@@ -16,12 +16,15 @@ Let's consider 5 points given by their coordinates :math:`(x, y)` in the referen
 .. literalinclude:: pointset_registration.py
    :lines: 9-14
 
-    For the sake of the
-    example, let's transform the 5 points by an isotropic scaling of :math:`s=1.4`, a rotation of :math:`\theta=22` degrees
-and a translation of :math:`(t_x, t_y)=(5, 3)`. The transformation is can be achieved by multiplying the augmented
-coordinates vector :math:`(x, y, 1)^T` by the affine transform matrix :math:`\mathbf{A}=\mathbf{T}.\mathbf{S}.\mathbf{R}`
-obtained by the composition of the rotation, scaling and translation (the order of the translation is important, here
-it is applied after the rotation and scaling).
+For the sake of the example, let's transform the 5 points by an isotropic
+scaling of :math:`s=1.4`, a rotation of :math:`\theta=22` degrees and a
+translation of :math:`(t_x, t_y)=(5, 3)`. The transformation is can be
+achieved by multiplying the augmented coordinates vector
+:math:`(x, y, 1)^T` by the affine transform matrix
+:math:`\mathbf{A}=\mathbf{T}.\mathbf{S}.\mathbf{R}` obtained by the
+composition of the rotation, scaling and translation (the order of the
+translation is important, here it is applied after the rotation and
+scaling).
 
 For this example we have chosen the following transformation:
 
@@ -57,7 +60,7 @@ For this example we have chosen the following transformation:
 .. literalinclude:: pointset_registration.py
    :lines: 25-39
 
-    Which is also equivalent to:
+Which is also equivalent to:
 
 .. math::
 
@@ -101,4 +104,4 @@ And register the points using the inverse affine transform and the offset comput
    :align: center
    :width: 50%
 
-       The 5 transformed points registered by applying the inverse affine transform.
+   The 5 transformed points registered by applying the inverse affine transform.

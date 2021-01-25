@@ -1741,40 +1741,50 @@ class SampleData:
         content_paths, content_type = self.minimal_data_model()
         self._init_content_index(content_paths)
         self._verbose_print('Minimal data model initialization....')
+        # Determine maximum path level in data model elements
+        max_path_level = 0
         for key, value in content_paths.items():
-            head, tail = os.path.split(value)
-            if self.h5_dataset.__contains__(content_paths[key]):
-                if self._is_table(content_paths[key]):
-                    msg = ('Updating table {}'.format(content_paths[key]))
-                    self._verbose_print(msg)
-                    self._update_table_columns(tablename=content_paths[key],
-                                               Description=content_type[key])
-                if self._is_empty(content_paths[key]):
-                    self._verbose_print('Warning: node {} specified in the'
-                                        'minimal data model for this class'
-                                        'is empty'.format(content_paths[key]))
-                continue
-            elif content_type[key] == 'Group':
-                msg = ('Adding empty Group {}'.format(content_paths[key]))
-                self.add_group(groupname=tail, location=head, indexname=key,
-                               replace=False)
-            elif content_type[key] == '3DImage':
-                msg = ('Adding empty 3DImage  {}'.format(content_paths[key]))
-                self.add_image(imagename=tail, indexname=key, location=head)
-            elif content_type[key] == 'Mesh':
-                msg = ('Adding empty Mesh  {}'.format(content_paths[key]))
-                self.add_mesh(meshname=tail, indexname=key, location=head)
-            elif content_type[key] == 'Array':
-                msg = ('Adding empty Array  {}'.format(content_paths[key]))
-                empty_array = np.array([0])
-                self.add_data_array(location=head, name=tail,
-                                    array=empty_array, empty=True,
-                                    indexname=key)
-            elif (isinstance(content_type[key], tables.IsDescription)
-                  or issubclass(content_type[key], tables.IsDescription)):
-                msg = ('Adding empty Table  {}'.format(content_paths[key]))
-                self.add_table(location=head, name=tail, indexname=key,
-                               description=content_type[key])
+            max_path_level = max(value.count('/'), max_path_level)
+        for level in range(max_path_level+1):
+            for key, value in content_paths.items():
+                if value.count('/') != level:
+                    continue
+                head, tail = os.path.split(value)
+                if self.h5_dataset.__contains__(content_paths[key]):
+                    if self._is_table(content_paths[key]):
+                        msg = ('Updating table {}'.format(content_paths[key]))
+                        self._verbose_print(msg)
+                        self._update_table_columns(
+                            tablename=content_paths[key],
+                            Description=content_type[key])
+                    if self._is_empty(content_paths[key]):
+                        self._verbose_print('Warning: node {} specified in the'
+                                            'minimal data model for this class'
+                                            'is empty'
+                                            ''.format(content_paths[key]))
+                    continue
+                elif content_type[key] == 'Group':
+                    msg = ('Adding empty Group {}'.format(content_paths[key]))
+                    self.add_group(groupname=tail, location=head,
+                                   indexname=key, replace=False)
+                elif content_type[key] == '3DImage':
+                    msg = ('Adding empty 3DImage {}'
+                           ''.format(content_paths[key]))
+                    self.add_image(imagename=tail, indexname=key, location=head)
+                elif content_type[key] == 'Mesh':
+                    msg = ('Adding empty Mesh  {}'.format(content_paths[key]))
+                    self.add_mesh(meshname=tail, indexname=key, location=head)
+                elif content_type[key] == 'Array':
+                    msg = ('Adding empty Array  {}'.format(content_paths[key]))
+                    empty_array = np.array([0])
+                    self.add_data_array(location=head, name=tail,
+                                        array=empty_array, empty=True,
+                                        indexname=key)
+                elif (isinstance(content_type[key], tables.IsDescription)
+                      or issubclass(content_type[key], tables.IsDescription)):
+                    msg = ('Adding empty Table  {}'.format(content_paths[key]))
+                    self.add_table(location=head, name=tail, indexname=key,
+                                   description=content_type[key])
         self._verbose_print('Minimal data model initialization done\n')
         return
 

@@ -13,5 +13,4 @@ pymicro tries to hide some of the complexity of vtk, manipulating 3d arrays and 
    cookbook/convention_read_write_2d_images.rst
    cookbook/euler_angles.rst
    cookbook/pointset_registration.rst
-..
    cookbook/Atomic_scattering_factor.rst

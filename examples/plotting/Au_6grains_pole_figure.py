@@ -30,9 +30,11 @@ if __name__ == '__main__':
     pf.set_map_field('grain_id')
     pf.pflegend = True  # this works well for a few grains
     pf.plot_pole_figures(plot_sst=True, display=False, save_as='png')
+    del pf
+    del micro
 
     image_name = os.path.splitext(__file__)[0] + '.png'
-    print('writting %s' % image_name)
+    print('writing %s' % image_name)
 
     from matplotlib import image
 

@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt, cm
 import os
 import numpy as np
 
-print 'plotting cubic elasticity...'
+print('plotting cubic elasticity...')
 fig = plt.figure(figsize=(10, 8))
 plt.subplots_adjust(top=1, bottom=0, left=0, right=1)
 ax = fig.gca(projection='3d')
@@ -25,9 +25,7 @@ s11 =  2.87e-05
 s12 = -1.29e-05
 s44 =  1.82e-05
 '''
-print 'elsatic stiffness s11 =', s11
-print 'elsatic stiffness s12 =', s12
-print 'elsatic stiffness s44 =', s44
+print('elastic compliance s11 =%.6f, s12 =%.6f, s44 =%.6f' % (s11, s12, s44))
 
 beta = 2. * s11 - 2. * s12 - s44
 alpha = s11
@@ -42,17 +40,22 @@ n2 = np.sin(theta) * np.sin(phi)
 n3 = np.cos(phi)
 
 # rho = alpha - (beta*(np.cos(theta)**2*np.sin(theta)**2*np.sin(phi)**4 + np.cos(phi)**2*np.sin(phi)**2));
-rho = alpha - beta * (n1 ** 2 * n2 ** 2 + n3 ** 2 * (n1 ** 2 + n2 ** 2));
-rho = 1. / rho;
+rho = alpha - beta * (n1 ** 2 * n2 ** 2 + n3 ** 2 * (n1 ** 2 + n2 ** 2))
+rho = 1. / rho
 
-x = rho * np.sin(phi) * np.cos(theta);
-y = rho * np.sin(phi) * np.sin(theta);
-z = rho * np.cos(phi);
-ax.plot_surface(x, y, z, rstride=2, cstride=2, cmap=cm.jet, \
-                linewidth=0.5, antialiased=True)
+x = rho * np.sin(phi) * np.cos(theta)
+y = rho * np.sin(phi) * np.sin(theta)
+z = rho * np.cos(phi)
+ax.plot_surface(x, y, z, rstride=2, cstride=2, cmap=cm.jet, edgecolor='k',
+                linewidth=1.0, antialiased=True)
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_zlabel('Z')
 image_name = os.path.splitext(__file__)[0] + '.png'
 plt.savefig(image_name, format='png')
-print 'done'
+
+from matplotlib import image
+
+image.thumbnail(image_name, 'thumb_' + image_name, 0.2)
+
+print('done')

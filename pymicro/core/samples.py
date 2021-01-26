@@ -1253,7 +1253,7 @@ class SampleData:
         else:
             msg = 'No node with path {} referenced in content index'.format(
                 node_path)
-            raise tables.NodeError(msg)
+            self._verbose_print(msg)
 
     def get_mesh(self, meshname, with_fields=True):
         """Return data of a mesh group as BasicTools UnstructuredMesh object.
@@ -2111,9 +2111,9 @@ class SampleData:
         dst_xdmf_lines = []
         with open(sample.xdmf_path, 'r') as f:
             src_xdmf_lines = f.readlines()
+        _, new_file = os.path.split(dst_sample_file_h5)
         for line in src_xdmf_lines:
-            dst_xdmf_lines.append(line.replace(sample.h5_path,
-                                               dst_sample_file_h5))
+            dst_xdmf_lines.append(line.replace(sample.h5_file, new_file))
         with open(dst_sample_file_xdmf, 'w') as f:
             f.writelines(dst_xdmf_lines)
         del sample
@@ -2126,11 +2126,58 @@ class SampleData:
             del new_sample
             return
 
+    def morphological_image_cleaner(self, target_image_field='',
+                                    clean_fieldname='', indexname='',
+                                    replace=False, **keywords):
+        """Apply a morphological cleaning treatment to a multiphase image.
+
+        A Matlab morphological cleaner is called to smooth the morphology of
+        the different phases of a multiphase image: a voxelized/pixelized 
+        field of integers identifying the different phases of a microstructure.
+        This cleaning treatment is typically used to improve the quality of a
+        mesh produced from the multiphase image, or improved image based
+        mechanical modelisation techniques results, such as FFT-based
+        computational homogenization solvers.
+
+        The cleaner path must be correctly set in the `global_variables.py`
+        file, as well as the definition and path of the Matlab command. The
+        multiphase cleaner is a Matlab program that has been developed by
+        Franck Nguyen (Centre des Matériaux).
+
+        :param str multiphase_image_name: Path, Name, Index Name or Alias of
+            the multiphase image field to mesh.
+        :param str meshname: name used to create the Mesh group in dataset
+        :param indexname: Index name used to reference the Mesh group
+        :location str: Path, Name, Index Name or Alias of the parent group
+            where the Mesh group is to be created
+
+        """
+        imagename = self._get_parent_name(target_image_field)
+        if not self._is_image(imagename):
+            raise tables.NodeError('{}, parent of {}, is not an Image group,'
+                                   'cannot apply image morphological cleaner.'
+                                   ''.format(imagename, target_image_field))
+        self.sync()
+        # Set data and file pathes
+        DATA_DIR, _ = os.path.split(self.h5_path)
+        DATA_PATH = self._name_or_node_to_path(target_image_field)
+        OUT_FILE = os.path.join(DATA_DIR, 'Clean_image.mat')
+        # launch mesher
+        self._launch_morphocleaner(DATA_PATH, self.h5_path, OUT_FILE)
+        # Add image to SD instance
+        from scipy.io import loadmat
+        mat_dic = loadmat(OUT_FILE)
+        image = mat_dic['mat3D_clean']
+        self.add_field(gridname=imagename, fieldname=clean_fieldname,
+                       array=image, replace=replace, **keywords)
+        # Remove tmp mesh files
+        os.remove(OUT_FILE)
+        return
+
     def multi_phase_mesher(self, multiphase_image_name='', meshname='',
                            indexname='', location='', load_surface_mesh=False,
-                           load_clean_image=False, clean_imagename='',
-                           clean_image_location='', replace=False,
-                           bin_fields_from_sets=True):
+                           replace=False, bin_fields_from_sets=True,
+                           **keywords):
         """Create a conformal mesh from a multiphase image.
 
         A Matlab multiphase mesher is called to create a conformal mesh of a
@@ -2153,39 +2200,19 @@ class SampleData:
 
         """
         self.sync()
-        # global variables import
-        from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
-        from pymicro.core.global_variables import MESHER_TEMPLATE, MESHER_TMP
-        from scipy.io import loadmat
-
         # Set data and file pathes
-        DATA_DIR, DATA_H5FILE = os.path.split(self.h5_path)
-        print(DATA_DIR)
-        if DATA_DIR == '':
-            DATA_DIR = os.getcwd()
-        print(DATA_DIR)
-        DATA_H5FILE = os.path.join(DATA_DIR,DATA_H5FILE)
+        DATA_DIR, _ = os.path.split(self.h5_path)
         DATA_PATH = self._name_or_node_to_path(multiphase_image_name)
         OUT_DIR = os.path.join(DATA_DIR, 'Tmp/')
         # create temp directory for mesh files
-        os.mkdir(OUT_DIR)
-        # Create specific mesher script
-        shutil.copyfile(MESHER_TEMPLATE, MESHER_TMP)
-        with open(MESHER_TMP,'r') as file:
-            lines = file.read()
-        lines = lines.replace('DATA_PATH', DATA_PATH)
-        lines = lines.replace('DATA_H5FILE', DATA_H5FILE)
-        lines = lines.replace('OUT_DIR', OUT_DIR)
-        with open(MESHER_TMP,'w') as file:
-            file.write(lines)
-        # Launch mesher
-        CWD = os.getcwd()
-        matlab_command = '"'+"run('" + MESHER_TMP + "');exit;"+'"'
-        subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
-        os.chdir(CWD)
-        os.remove(MESHER_TMP)
+        if not os.path.exists(OUT_DIR):
+           os.mkdir(OUT_DIR)
+        # Get meshing parameters eventually passed as keyword arguments
+        mesh_params = self._get_mesher_parameters(**keywords)
+        # launch mesher
+        self._launch_mesher(DATA_PATH, self.h5_path, OUT_DIR, mesh_params)
         # Add mesh to SD instance
-        out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra.geof')
+        out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra_p.geof')
         self.add_mesh(file=out_file, meshname=meshname, indexname=indexname,
                       location=location, replace=replace,
                       bin_fields_from_sets=bin_fields_from_sets)
@@ -2193,30 +2220,15 @@ class SampleData:
         if load_surface_mesh:
             out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor.geof')
             self.add_mesh(file=out_file, meshname=meshname+'_surface',
-                          indexname=indexname, location=location,
-                          replace=replace,
+                          location=location, replace=replace,
                           bin_fields_from_sets=bin_fields_from_sets)
-        # Add cleaned multiphase image to dataset if required
-        if load_clean_image:
-            out_file = os.path.join(OUT_DIR,'Tmp_mesh_clean.mat')
-            mat_dic = loadmat(out_file)
-            # original_image = self.get_node(multiphase_image_name, as_numpy=True)
-            image_tmp = mat_dic['mat3D_clean']
-            # image_tmp = image_tmp[2:-3,2:-3,2:-3]
-            image = image_tmp.transpose(1,0,2)
-            # check if location is an image group
-            if self._is_image(clean_image_location):
-                self.add_field(gridname=clean_image_location,
-                                fieldname=clean_imagename,
-                                array=image)
-            # self.add_image_from_field(image, 'grain_map_clean',
-            #                           imagename='CleanImage')
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
         return
 
     def create_elset_ids_field(self, meshname=None, store=True,
-                               get_sets_IDs=False, tags_prefix='elset'):
+                               get_sets_IDs=False, tags_prefix='elset',
+                               remove_elset_fields=False):
         """Create an element tag Id field on the inputed mesh.
 
         Creates a element wise field from the provided mesh,
@@ -2237,6 +2249,9 @@ class SampleData:
         :param str tags_prefix: Remove from element sets/tags names
             prefix to determine the set/tag ID. This supposes that sets
             names have the form prefix+ID
+        :param bool remove_elset_fields: If `True`, removes the elsets
+            indicator fields after construction of the elset id field.
+            (default is `False`)
         """
         if meshname is None:
                 raise ValueError('meshname do not refer to an existing mesh')
@@ -2253,6 +2268,7 @@ class SampleData:
         # if mesh is provided
         for i in range(len(elem_tags)):
             set_name = elem_tags[i]
+            print('Removing set : ', set_name)
             elset_path = os.path.join(El_tag_path, 'ET_'+set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
             if get_sets_IDs:
@@ -2260,6 +2276,9 @@ class SampleData:
             else:
                 set_ID = i
             ID_field[element_ids] = set_ID
+            if remove_elset_fields:
+                field_path = os.path.join(El_tag_path, 'field_'+set_name)
+                self.remove_node(field_path)
         if store:
             self.add_field(gridname=meshname, fieldname=meshname+'_elset_ids',
                            array=ID_field, replace=True)
@@ -2529,7 +2548,7 @@ class SampleData:
                 self.aliases.pop(key)
             self._verbose_print('item {} : {} removed from context index'
                                 ' dictionary'.format(key, removed_path))
-        except ValueError:
+        except:
             self._verbose_print('node {} not found in content index values for'
                                 'removal'.format(node_path))
         return
@@ -3436,3 +3455,73 @@ class SampleData:
         Retstr =  str(Retstr).strip('[').strip(']')
         Retstr =  str(Retstr).replace(',', ' ')
         return Retstr
+    
+    #=========================================================================
+    #   External codes calling methods
+    #   TODO: Externalize ?
+    #   TODO: Create specific method for external scripts templates
+    #=========================================================================
+    
+    def _launch_morphocleaner(self, path, filename, out_file):
+        from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
+        from pymicro.core.global_variables import CLEANER_TEMPLATE, CLEANER_TMP
+        # Create specific mesher script
+        shutil.copyfile(CLEANER_TEMPLATE, CLEANER_TMP)
+        with open(CLEANER_TMP,'r') as file:
+            lines = file.read()
+        lines = lines.replace('DATA_PATH', path)
+        lines = lines.replace('DATA_H5FILE', filename)
+        lines = lines.replace('OUT_FILE', out_file)
+        with open(CLEANER_TMP,'w') as file:
+            file.write(lines)
+        # Launch mesher
+        CWD = os.getcwd()
+        matlab_command = '"'+"run('" + CLEANER_TMP + "');exit;"+'"'
+        subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
+        os.remove(CLEANER_TMP)
+        os.chdir(CWD)
+        return
+    
+    def _get_mesher_parameters(self, **keywords):
+        MEM = 50
+        HGRAD = 1.5
+        HMIN = 5
+        HMAX = 50
+        HAUSD = 3
+        ANG = 50
+        if 'MEM' in keywords: MEM = keywords['MEM']
+        if 'HGRAD' in keywords: HGRAD = keywords['HGRAD']
+        if 'HMIN' in keywords: HMIN = keywords['HMIN']
+        if 'HMAX' in keywords: HMAX = keywords['HMAX']
+        if 'HAUSD' in keywords: HAUSD = keywords['HAUSD']
+        if 'ANG' in keywords: ANG = keywords['ANG']
+        return {'MEM':MEM, 'HGRAD':HGRAD, 'HMIN':HMIN, 'HMAX':HMAX,
+                'HAUSD':HAUSD, 'ANG':ANG}
+    
+    def _launch_mesher(self, path, filename, out_dir, params):
+        from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
+        from pymicro.core.global_variables import MESHER_TEMPLATE, MESHER_TMP
+        print(filename)
+        # Create specific mesher script
+        shutil.copyfile(MESHER_TEMPLATE, MESHER_TMP)
+        with open(MESHER_TMP,'r') as file:
+            lines = file.read()
+        lines = lines.replace('DATA_PATH', path)
+        lines = lines.replace('DATA_H5FILE', filename)
+        lines = lines.replace('OUT_DIR', out_dir)
+        lines = lines.replace('MEM', str(params['MEM']))
+        lines = lines.replace('HGRAD', str(params['HGRAD']))
+        lines = lines.replace('HMIN', str(params['HMIN']))
+        lines = lines.replace('HMAX', str(params['HMAX']))
+        lines = lines.replace('HAUSD', str(params['HAUSD']))
+        lines = lines.replace('ANG', str(params['ANG']))
+        with open(MESHER_TMP,'w') as file:
+            file.write(lines)
+        # Launch mesher
+        CWD = os.getcwd()
+        matlab_command = '"'+"run('" + MESHER_TMP + "');exit;"+'"'
+        subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
+        os.remove(MESHER_TMP)
+        os.chdir(CWD)
+        return
+        

@@ -2263,7 +2263,8 @@ class Microstructure(SampleData):
             struct = ndimage.morphology.generate_binary_structure(array.ndim, 1)
         assert struct.ndim == array.ndim
         # carry out dilation in iterative steps
-        for step in range(dilation_steps):
+        step = 0
+        while True:
             if dilation_ids:
                 grains = np.isin(array, dilation_ids)
             else:
@@ -2314,6 +2315,12 @@ class Microstructure(SampleData):
             else:
                 array[X, Y, Z] = dilation
             print('dilation step %d done' % (step + 1))
+            step = step + 1
+            if step == dilation_steps:
+                break
+            if dilation_steps == -1:
+                if not np.any(array == 0):
+                    break
         return array
 
     def dilate_grains(self, dilation_steps=1, dilation_ids=None):

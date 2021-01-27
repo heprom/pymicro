@@ -2007,15 +2007,7 @@ class SampleData:
             return
         # remove node in xdmf tree
         self._remove_from_xdmf(Node)
-        if self.get_attribute('xdmf_path', Node) is not None:
-            xdmf_path = self.get_attribute('xdmf_path', Node)
-            group_xdmf = self.xdmf_tree.find(xdmf_path)
-            self._verbose_print('Removing  node {} in xdmf'
-                                ' tree....'.format(xdmf_path))
-            parent = group_xdmf.getparent()
-            parent.remove(group_xdmf)
-        self._verbose_print('Removing  node {} in h5 structure'
-                            ' ....'.format(node_path))
+
         if (isGroup):
             for child in Node._v_children:
                 remove_path = Node._v_children[child]._v_pathname

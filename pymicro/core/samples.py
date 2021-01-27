@@ -2097,7 +2097,9 @@ class SampleData:
 
         A Matlab morphological cleaner is called to smooth the morphology of
         the different phases of a multiphase image: a voxelized/pixelized
-        field of integers identifying the different phases of a microstructure.
+        field of integers identifying the different phases of a
+        microstructure.
+
         This cleaning treatment is typically used to improve the quality of a
         mesh produced from the multiphase image, or improved image based
         mechanical modelisation techniques results, such as FFT-based
@@ -2108,13 +2110,14 @@ class SampleData:
         multiphase cleaner is a Matlab program that has been developed by
         Franck Nguyen (Centre des Matériaux).
 
-        :param str multiphase_image_name: Path, Name, Index Name or Alias of
-            the multiphase image field to mesh.
-        :param str meshname: name used to create the Mesh group in dataset
+        :param str target_image_field: Path, Name, Index Name or Alias of
+            the multiphase image field to clean.
+        :param str clean_fieldname: name used to add the morphologically
+            cleaned field to the image group
         :param indexname: Index name used to reference the Mesh group
-        :location str: Path, Name, Index Name or Alias of the parent group
-            where the Mesh group is to be created
-
+        :param bool replace: If `True`, overwrite any preexisting field node
+            with the name `clean_fieldname` in the image group with the
+            morphologically cleaned field.
         """
         imagename = self._get_parent_name(target_image_field)
         if not self._is_image(imagename):
@@ -2140,7 +2143,7 @@ class SampleData:
 
     def multi_phase_mesher(self, multiphase_image_name='', meshname='',
                            indexname='', location='', load_surface_mesh=False,
-                           replace=False, bin_fields_from_sets=True,
+                           bin_fields_from_sets=True, replace=False,
                            **keywords):
         """Create a conformal mesh from a multiphase image.
 
@@ -2149,6 +2152,12 @@ class SampleData:
         the different phases of a microstructure. Then, the mesh is stored in
         the calling SampleData instance at the desired location with the
         desired name and Indexname.
+
+        The meshing procedure involves the construction of a surface mesh that
+        is conformant with the phase boundaries in the image. The space
+        between boundary elements is then filled with tetrahedra to construct
+        a volumic mesh. This intermediate surface mesh can be store into the
+        SampleData instance if required.
 
         The mesher path must be correctly set in the `global_variables.py`
         file, as well as the definition and path of the Matlab command. The
@@ -2159,9 +2168,14 @@ class SampleData:
             the multiphase image field to mesh.
         :param str meshname: name used to create the Mesh group in dataset
         :param indexname: Index name used to reference the Mesh group
-        :location str: Path, Name, Index Name or Alias of the parent group
-            where the Mesh group is to be created
-
+        :param str location: Path, Name, Index Name or Alias of the parent
+            group where the Mesh group is to be created
+        :param bool load_surface_mesh: If `True`, load the intermediate
+            surface mesh in the dataset.
+        :param bool bin_fields_from_sets: If `True`, stores all Node and
+            Element Sets in mesh_object as binary fields (1 on Set, 0 else)
+        :param bool replace: if `True`, overwrites pre-existing Mesh group
+            with the same `meshname` to add the new mesh.
         """
         self.sync()
         # Set data and file pathes
@@ -2213,7 +2227,7 @@ class SampleData:
         :param str tags_prefix: Remove from element sets/tags names
             prefix to determine the set/tag ID. This supposes that sets
             names have the form prefix+ID
-        :param bool remove_elset_fields: If `True`, removes the elsets
+        :param bool remove_elset_fields: If `True`, removes the elset
             indicator fields after construction of the elset id field.
             (default is `False`)
         """

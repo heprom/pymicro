@@ -1409,7 +1409,7 @@ class GrainData(tables.IsDescription):
        Microstructure Class, in HDF5 node /GrainData/GrainDataTable
     """
     # grain identity number
-    idnumber = tables.Int32Col()  # Signed 64-bit integer
+    idnumber = tables.Int32Col()  # Signed 32-bit integer
     # grain volume
     volume = tables.Float32Col()  # float
     # grain center of mass coordinates
@@ -1528,12 +1528,15 @@ class Microstructure(SampleData):
         """
         return 1
 
-    def get_number_of_grains(self):
+    def get_number_of_grains(self, from_grain_map=False):
         """Return the number of grains in this microstructure.
 
         :return: the number of grains in the microstructure.
         """
-        return self.grains.nrows
+        if from_grain_map:
+            return len(np.unique(self.get_grain_map()))
+        else:
+            return self.grains.nrows
 
     def get_lattice(self):
         """Get the crystallographic lattice associated with this microstructure.
@@ -1796,6 +1799,23 @@ class Microstructure(SampleData):
         self.grains.flush()
         return
 
+    def remove_grains_not_in_map(self):
+        """Remove from GrainDataTable grains that are not in the grain map."""
+        _,not_in_map,_ = self.compute_grains_map_table_intersection()
+        self.remove_grains_from_table(not_in_map)
+        return
+
+    def remove_grains_from_table(self, ids):
+        """Remove from GrainDataTable the grains with given ids.
+
+        :param ids: Array of grain ids to remove from GrainDataTable
+        :type ids: list
+        """
+        for Id in ids:
+            where = self.grains.get_where_list('idnumber == Id')[:]
+            self.grains.remove_row(int(where))
+        return
+
     def add_grains(self, euler_list, grain_ids=None):
         """A a list of grains to this microstructure.
 
@@ -1808,7 +1828,7 @@ class Microstructure(SampleData):
         """
         grain = self.grains.row
         # build a list of grain ids if it is not given
-        if not grain_ids:
+        if grain_ids is None:
             if self.get_number_of_grains() > 0:
                 min_id = max(self.get_grain_ids())
             else:
@@ -1820,6 +1840,16 @@ class Microstructure(SampleData):
             grain['orientation'] = o.rod
             grain.append()
         self.grains.flush()
+
+    def add_grains_in_map(self):
+        """Add to GrainDataTable the grains in grain map missing in table.
+
+        The grains are added with a (0,0,0) orientation by convention.
+        """
+        _, _, not_in_table = self.compute_grains_map_table_intersection()
+        euler_list = np.zeros((len(not_in_table),3))
+        self.add_grains(euler_list, grain_ids=not_in_table)
+        return
 
     @staticmethod
     def random_texture(n=100):
@@ -2379,12 +2409,21 @@ class Microstructure(SampleData):
         micro_crop.recompute_grain_volumes()
         return micro_crop
 
+    def sync_grain_table_with_grain_map(self):
+        """Update GrainDataTable with only grain IDs from active grain map."""
+        # Remove grains that are not in grain map from GrainDataTable
+        self.remove_grains_not_in_map()
+        # Add grains that are in grain map but not in GrainDataTable
+        self.add_grains_in_map()
+        return
+
     def renumber_grains(self, sort_by_size=False):
         """Renumber the grains in the microstructure.
 
         Renumber the grains from 1 to n, with n the total number of grains
-        so that the numbering is consecutive. Only positive grain ids are taken
-        into account (the id 0 is reserved for the background).
+        that are found in the active grain map array, so that the numbering is
+        consecutive. Only positive grain ids are taken into account (the id 0
+        is reserved for the background).
 
         :param bool sort_by_size: use the grain volume to sort the grain ids
         (the larger grain will become grain 1, etc).
@@ -2392,14 +2431,16 @@ class Microstructure(SampleData):
         if self._is_empty('grain_map'):
             print('warning: a grain map is needed to renumber the grains')
             return
+        self.sync_grain_table_with_grain_map()
+        # At this point, the table and the map have the same grain Ids
+        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map_renum = grain_map.copy()
         if sort_by_size:
             print('sorting ids by grain size')
             sizes = self.get_grain_volumes()
             new_ids = self.get_grain_ids()[np.argsort(sizes)][::-1]
         else:
-            new_ids = range(1, self.get_number_of_grains() + 1)
-        grain_map = self.get_grain_map(as_numpy=True)
-        grain_map_renum = grain_map.copy()
+            new_ids = range(1, len(np.unique(grain_map)) + 1)
         for i, g in enumerate(self.grains):
             gid = g['idnumber']
             if not gid > 0:
@@ -2604,6 +2645,53 @@ class Microstructure(SampleData):
                 self.grains.append(gr)
         self.grains.flush()
         return
+
+    def compute_grains_map_table_intersection(self, verbose=False):
+        """Return grains that are both in grain map and grain table.
+
+        The method also returns the grains that are in the grain map but not
+        in the grain table, and the grains that are in the grain table, but
+        not in the grain map.
+
+        :return array intersection: array of grain ids that are in both
+            grain map and grain data table.
+        :return array not_in_map: array of grain ids that are in grain data
+            table but not in grain map.
+        :return array not_in_table: array of grain ids that are in grain map
+            but not in grain data table.
+        """
+        if self._is_empty('grain_map'):
+            print('warning: a grain map is needed to compute grains map'
+                  '/table intersection.')
+            return
+        grain_map = self.get_grain_map(as_numpy=True)
+        map_ids = np.unique(grain_map)
+        table_ids = self.get_grain_ids()
+        intersection = np.intersect1d(map_ids, table_ids)
+        not_in_map = table_ids[np.isin(table_ids, map_ids, invert=True,
+                             assume_unique=True)]
+        not_in_table = map_ids[np.isin(map_ids, table_ids, invert=True,
+                             assume_unique=True)]
+        if verbose:
+            print('Grains IDs both in grain map and GrainDataTable:')
+            print(str(intersection).strip('[]'))
+            print('Grains IDs in GrainDataTable but not in grain map:')
+            print(str(not_in_map).strip('[]'))
+            print('Grains IDs in grain map but not in GrainDataTable :')
+            print(str(not_in_table).strip('[]'))
+        return intersection, not_in_map, not_in_table
+
+    def build_grain_table_from_grain_map(self):
+        """Synchronizes and recomputes GrainDataTable from active grain map."""
+        # First step: synchronize table with grain map
+        self.sync_grain_table_with_grain_map()
+        # Second step, recompute grain geometry
+        # TODO: use recompute_grain_geometry when method is corrected
+        self.recompute_grain_bounding_boxes()
+        self.recompute_grain_centers()
+        self.recompute_grain_volumes()
+        return
+
 
     def to_amitex_fftp(self, binary=True,
                        add_grips=False, grip_size=10,

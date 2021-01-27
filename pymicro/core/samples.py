@@ -637,18 +637,12 @@ class SampleData:
         self._add_mesh_geometry(mesh_object,mesh_group, replace,
                                 bin_fields_from_sets)
         ### Add mesh Grid to xdmf file
-        Xdmf_pathes = self._add_mesh_to_xdmf(mesh_group._v_pathname)
+        self._add_mesh_to_xdmf(mesh_group)
         # store mesh metadata as HDF5 attributes
         Attribute_dic = {'description': description,
                          'empty': False,
-                         'xdmf_path': Xdmf_pathes['mesh_path'],
-                         'xdmf_topology_path': Xdmf_pathes['topology_path'],
-                         'xdmf_geometry_path': Xdmf_pathes['geometry_path']}
+                         'xdmf_gridname': mesh_group._v_name}
         self.add_attributes(Attribute_dic, mesh_group._v_pathname)
-        self.add_attributes({'xdmf_path': Xdmf_pathes['topology_path']},
-                            mesh_group._v_name+'_Elements')
-        self.add_attributes({'xdmf_path': Xdmf_pathes['geometry_path']},
-                            mesh_group._v_name+'_Nodes')
         ### Add node and element tags, eventually as fields if extended=True
         self._add_nodes_elements_tags(mesh_object, mesh_group, replace,
                                       bin_fields_from_sets)
@@ -761,7 +755,7 @@ class SampleData:
         else:
             self._check_image_object_support(image_object)
         ### Add image Grid to xdmf file
-        Xdmf_pathes = self._add_image_to_xdmf(imagename, image_object)
+        self._add_image_to_xdmf(imagename, image_object)
         ### store image metadata as HDF5 attributes
         image_type = self._get_image_type(image_object)
         image_nodes_dim = np.array(image_object.GetDimensions())
@@ -779,9 +773,7 @@ class SampleData:
                          'description': description,
                          'group_type': image_type,
                          'empty': False,
-                         'xdmf_path': Xdmf_pathes['image_path'],
-                         'xdmf_topology_path': Xdmf_pathes['topology_path'],
-                         'xdmf_geometry_path': Xdmf_pathes['geometry_path']}
+                         'xdmf_gridname': imagename}
         self.add_attributes(Attribute_dic, image_group._v_pathname)
         ### Add fields if some are stored in the image object
         for field_name, field in image_object.nodeFields.items():
@@ -949,7 +941,9 @@ class SampleData:
         Attribute_dic = {'field_type': field_type,
                          'field_dimensionality': dimensionality,
                          'parent_grid_path': self._name_or_node_to_path(
-                             gridname)
+                             gridname),
+                         'xdmf_gridname': self.get_attribute('xdmf_gridname',
+                                                             gridname)
                          }
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
@@ -1708,7 +1702,7 @@ class SampleData:
         self.add_attributes({'description': description}, node)
         return
 
-    def set_voxel_size(self, image_data_group, voxel_size):
+    def set_voxel_size(self, image_group, voxel_size):
         """Set voxel size for an HDF5/XDMF image data group.
 
         The values are registered in the `spacing` Attribute of the 3DImage
@@ -1720,17 +1714,15 @@ class SampleData:
             each dimension of the 3Dimage
         """
         self.add_attributes({'spacing': np.array(voxel_size)},
-                            image_data_group)
-        xdmf_geometry_path = self.get_attribute('xdmf_geometry_path',
-                                                image_data_group)
-        xdmf_geometry = self.xdmf_tree.find(xdmf_geometry_path)
+                            image_group)
+        xdmf_geometry = self._find_xdmf_geometry(image_group)
         spacing_node = xdmf_geometry.getchildren()[1]
         spacing_text = str(voxel_size).strip('[').strip(']').replace(',', ' ')
         spacing_node.text = spacing_text
         self.sync()
         return
 
-    def set_origin(self, image_data_group, origin):
+    def set_origin(self, image_group, origin):
         """Set origin coordinates for an HDF5/XDMF image data group.
 
         The origin corresponds to the first vertex of the first voxel, that is
@@ -1742,10 +1734,8 @@ class SampleData:
         :param np.array voxel_size: (Ox, Oy, Oz) array of the coordinates in
             each dimension of the origin of the 3Dimage
         """
-        self.add_attributes({'origin': origin}, image_data_group)
-        xdmf_geometry_path = self.get_attribute('xdmf_geometry_path',
-                                                image_data_group)
-        xdmf_geometry = self.xdmf_tree.find(xdmf_geometry_path)
+        self.add_attributes({'origin': origin}, image_group)
+        xdmf_geometry = self._find_xdmf_geometry(image_group)
         origin_node = xdmf_geometry.getchildren()[0]
         origin_text = str(origin).strip('[').strip(']').replace(',', ' ')
         origin_node.text = origin_text
@@ -2007,65 +1997,39 @@ class SampleData:
                    ' nor index name. Node removal aborted.')
             self._verbose_print(msg)
             return
-
         Node = self.get_node(node_path)
-        isGroup = False
-        remove_flag = False
-
-        # determine if node is an HDF5 Group
-        if (Node._v_attrs.CLASS == 'GROUP'):
-            isGroup = True
+        isGroup = (Node._v_attrs.CLASS == 'GROUP')
+        if (isGroup) and not recursive:
+            msg = ('Node {} is a hdf5 group. Use `recursive=True` keyword'
+                  ' argument to remove it and its childrens.'
+                  ''.format(node_path))
+            self._verbose_print(msg)
+            return
+        # remove node in xdmf tree
+        self._remove_from_xdmf(Node)
+        if self.get_attribute('xdmf_path', Node) is not None:
+            xdmf_path = self.get_attribute('xdmf_path', Node)
+            group_xdmf = self.xdmf_tree.find(xdmf_path)
+            self._verbose_print('Removing  node {} in xdmf'
+                                ' tree....'.format(xdmf_path))
+            parent = group_xdmf.getparent()
+            parent.remove(group_xdmf)
+        self._verbose_print('Removing  node {} in h5 structure'
+                            ' ....'.format(node_path))
         if (isGroup):
-            print('WARGNING : node {} is a hdf5 group with  {} children(s)'
-                  ' :'.format(node_path, Node._v_nchildren))
-            count = 1
             for child in Node._v_children:
-                print('\t child {}:'.format(count), Node[child])
-                count = count + 1
-            if not recursive:
-                print('Deleting the group will delete children data.',
-                      'Are you sure you want to remove it ? ', end='')
-                text_input = input('(y/n) ')
-
-                if (text_input == 'y'):
-                    remove_flag = True
-                elif (text_input == 'n'):
-                    remove_flag = False
-                else:
-                    print('\t Unknown response, y or n expected. Group has not'
-                          'been removed.')
-                    return
-            else:
-                remove_flag = True
-        # remove node
-        if (remove_flag or not (isGroup)):
-
-            # remove node in xdmf tree
-            if self.get_attribute('xdmf_path', Node) is not None:
-                xdmf_path = self.get_attribute('xdmf_path', Node)
-                group_xdmf = self.xdmf_tree.find(xdmf_path)
-                self._verbose_print('Removing  node {} in xdmf'
-                                    ' tree....'.format(xdmf_path))
-                parent = group_xdmf.getparent()
-                parent.remove(group_xdmf)
-
-            self._verbose_print('Removing  node {} in h5 structure'
-                                ' ....'.format(node_path))
-            if (isGroup):
-                for child in Node._v_children:
-                    remove_path = Node._v_children[child]._v_pathname
-                    self._remove_from_index(node_path=remove_path)
-                self._verbose_print('Removing  node {} in content'
-                                    ' index....'.format(
-                                        Node._v_pathname))
-                self._remove_from_index(node_path=Node._v_pathname)
-                Node._f_remove(recursive=True)
-
-            else:
-                self._remove_from_index(node_path=Node._v_pathname)
-                Node.remove()
-            self.sync()
-            self._verbose_print('Node {} sucessfully removed'.format(name))
+                remove_path = Node._v_children[child]._v_pathname
+                self._remove_from_index(node_path=remove_path)
+            self._verbose_print('Removing  node {} in content'
+                                ' index....'.format(
+                                    Node._v_pathname))
+            self._remove_from_index(node_path=Node._v_pathname)
+            Node._f_remove(recursive=True)
+        else:
+            self._remove_from_index(node_path=Node._v_pathname)
+            Node.remove()
+        self.sync()
+        self._verbose_print('Node {} sucessfully removed'.format(name))
         return
 
     def repack_h5file(self):
@@ -2132,7 +2096,7 @@ class SampleData:
         """Apply a morphological cleaning treatment to a multiphase image.
 
         A Matlab morphological cleaner is called to smooth the morphology of
-        the different phases of a multiphase image: a voxelized/pixelized 
+        the different phases of a multiphase image: a voxelized/pixelized
         field of integers identifying the different phases of a microstructure.
         This cleaning treatment is typically used to improve the quality of a
         mesh produced from the multiphase image, or improved image based
@@ -2374,14 +2338,15 @@ class SampleData:
     def _init_xml_tree(self):
         """Read xml tree structured in .xdmf file or initiate one."""
         try:
-            self.xdmf_tree = etree.parse(self.xdmf_path)
+            file_parser = etree.XMLParser(remove_blank_text=True)
+            with open(self.xdmf_path, 'rb') as source:
+                self.xdmf_tree = etree.parse(source, parser=file_parser)
         except OSError:
             # Non existent xdmf file.
             # A new .xdmf is created with the base node Xdmf and one Domain
             self._verbose_print('-- File "{}" not found : file'
                                 ' created'.format(self.xdmf_file),
                                 line_break=False)
-
             # create root element of xdmf tree structure
             E = lxml.builder.ElementMaker(
                     namespace="http://www.w3.org/2003/XInclude",
@@ -2552,6 +2517,47 @@ class SampleData:
             self._verbose_print('node {} not found in content index values for'
                                 'removal'.format(node_path))
         return
+
+    def _remove_from_xdmf(self, nodename):
+        """Remove a Grid or Attribute Node from the xdmf tree."""
+        if self._is_grid(nodename):
+            xdmf_grid = self._find_xdmf_grid(nodename)
+            p = xdmf_grid.getparent()
+            p.remove(xdmf_grid)
+        elif self._is_field(nodename):
+            xdmf_field, xdmf_grid = self._find_xdmf_field(nodename)
+            xdmf_grid.remove(xdmf_field)
+        return
+
+    def _find_xdmf_grid(self, gridname):
+        name = self.get_attribute('xdmf_gridname', gridname)
+        for el in self.xdmf_tree.iterfind('.//Grid'):
+            if el.get('Name') == name:
+                return el
+        return None
+
+    def _find_xdmf_geometry(self, gridname):
+        xdmf_grid = self._find_xdmf_grid(gridname)
+        for el in xdmf_grid:
+            if el.tag == 'Geometry':
+                return el
+        return None
+
+    def _find_xdmf_topologyy(self, gridname):
+        xdmf_grid = self._find_xdmf_grid(gridname)
+        for el in xdmf_grid:
+            if el.tag == 'Topology':
+                return el
+        return None
+
+    def _find_xdmf_field(self, fieldnodename):
+        gridname = self.get_attribute('xdmf_gridname', fieldnodename)
+        fieldname = self.get_attribute('xdmf_fieldname', fieldnodename)
+        xdmf_grid = self._find_xdmf_grid(gridname)
+        for el in xdmf_grid:
+            if el.get('Name') == fieldname:
+                return el, xdmf_grid
+        return None
 
     def _name_or_node_to_path(self, name_or_node):
         """Return path of `name` in content_index dic or HDF5 tree."""
@@ -2960,8 +2966,7 @@ class SampleData:
         are handled.
         """
         subset_list = self.get_node(subset_list_path)
-        xdmf_grid_path = self.get_attribute('xdmf_path', grid_name)
-        Xdmf_grid_node = self.xdmf_tree.find(xdmf_grid_path)
+        Xdmf_grid_node = self._find_xdmf_grid(grid_name)
         # Create xdmf Set node
         Set_xdmf = etree.Element(_tag='Set', Name=setname,
                                        SetType=set_type)
@@ -3136,18 +3141,12 @@ class SampleData:
         image_xdmf.append(geometry_xdmf)
         # Add Grid to node Domain and get XDMF pathes
         self.xdmf_tree.getroot()[0].append(image_xdmf)
-        # Return XDMF pathes
-        im_path = self.xdmf_tree.getelementpath(image_xdmf)
-        topo_path = self.xdmf_tree.getelementpath(topology_xdmf)
-        geo_path = self.xdmf_tree.getelementpath(geometry_xdmf)
-        Path_dic = {'image_path': im_path, 'topology_path': topo_path,
-                    'geometry_path': geo_path}
-        return Path_dic
+        return
 
-    def _add_mesh_to_xdmf(self, mesh_path):
+    def _add_mesh_to_xdmf(self, mesh_group):
         """Write mesh grid element geometry and topoly in xdmf tree/file."""
         # get mesh group
-        mesh_group = self.get_node(mesh_path)
+        mesh_path = mesh_group._v_pathname
         # Creatge Grid element
         mesh_xdmf = etree.Element(_tag='Grid', Name=mesh_group._v_name,
                                   GridType='Uniform')
@@ -3190,13 +3189,7 @@ class SampleData:
         mesh_xdmf.append(topology_xdmf)
         # Add Grid to node Domain
         self.xdmf_tree.getroot()[0].append(mesh_xdmf)
-        # Return XDMF pathes
-        mesh_xdmf_path = self.xdmf_tree.getelementpath(mesh_xdmf)
-        topo_path = self.xdmf_tree.getelementpath(topology_xdmf)
-        geo_path = self.xdmf_tree.getelementpath(geometry_xdmf)
-        Path_dic = {'mesh_path': mesh_xdmf_path, 'topology_path': topo_path,
-                    'geometry_path': geo_path}
-        return Path_dic
+        return
 
     def _append_field_index(self, gridname, field_path):
         """Append field_path to the field index of a grid group."""
@@ -3234,8 +3227,9 @@ class SampleData:
         """Write field data as Grid Attribute in xdmf tree/file."""
         Node = self.get_node(fieldname)
         Grid_name = self.get_attribute('parent_grid_path', fieldname)
-        xdmf_path = self.get_attribute('xdmf_path', Grid_name)
+        Xdmf_grid_node = self._find_xdmf_grid(Grid_name)
         field_type = self.get_attribute('field_type', fieldname)
+        # TODO: implement here xdmf format for IP fields
         if field_type == 'Nodal_field':
             Center_type = 'Node'
         elif field_type == 'Element_field':
@@ -3245,7 +3239,6 @@ class SampleData:
                              ' or `Element_field`.')
         field_dimensionality = self.get_attribute('field_dimensionality',
                                                   fieldname)
-        Xdmf_grid_node = self.xdmf_tree.find(xdmf_path)
         # create Attribute element
         Attribute_xdmf = etree.Element(_tag='Attribute', Name=Node._v_name,
                                        AttributeType=field_dimensionality,
@@ -3271,8 +3264,8 @@ class SampleData:
         Attribute_xdmf.append(Attribute_data)
         # add attribute to Grid
         Xdmf_grid_node.append(Attribute_xdmf)
-        el_path = self.xdmf_tree.getelementpath(Attribute_xdmf)
-        self.add_attributes({'xdmf_path': el_path}, fieldname)
+        self.add_attributes({'xdmf_fieldname': Attribute_xdmf.get('Name')},
+                            fieldname)
         return
 
     def _get_node_class(self, name):
@@ -3455,13 +3448,13 @@ class SampleData:
         Retstr =  str(Retstr).strip('[').strip(']')
         Retstr =  str(Retstr).replace(',', ' ')
         return Retstr
-    
+
     #=========================================================================
     #   External codes calling methods
     #   TODO: Externalize ?
     #   TODO: Create specific method for external scripts templates
     #=========================================================================
-    
+
     def _launch_morphocleaner(self, path, filename, out_file):
         from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
         from pymicro.core.global_variables import CLEANER_TEMPLATE, CLEANER_TMP
@@ -3481,7 +3474,7 @@ class SampleData:
         os.remove(CLEANER_TMP)
         os.chdir(CWD)
         return
-    
+
     def _get_mesher_parameters(self, **keywords):
         MEM = 50
         HGRAD = 1.5
@@ -3497,7 +3490,7 @@ class SampleData:
         if 'ANG' in keywords: ANG = keywords['ANG']
         return {'MEM':MEM, 'HGRAD':HGRAD, 'HMIN':HMIN, 'HMAX':HMAX,
                 'HAUSD':HAUSD, 'ANG':ANG}
-    
+
     def _launch_mesher(self, path, filename, out_dir, params):
         from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
         from pymicro.core.global_variables import MESHER_TEMPLATE, MESHER_TMP
@@ -3524,4 +3517,3 @@ class SampleData:
         os.remove(MESHER_TMP)
         os.chdir(CWD)
         return
-        

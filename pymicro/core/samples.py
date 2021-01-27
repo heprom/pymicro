@@ -239,7 +239,7 @@ class SampleData:
         """
         self._verbose_print('Deleting DataSample object ')
         self.sync()
-        # self.repack_h5file()
+        self.repack_h5file()
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
         if self.autodelete:
@@ -2234,11 +2234,9 @@ class SampleData:
         El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
         ID_field = np.zeros((Nelements,1),dtype=float)
         elem_tags,_ = self.get_mesh_elem_tags_names(meshname)
-        print(elem_tags)
         # if mesh is provided
         for i in range(len(elem_tags)):
             set_name = elem_tags[i]
-            print('Removing set : ', set_name)
             elset_path = os.path.join(El_tag_path, 'ET_'+set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
             if get_sets_IDs:
@@ -2251,7 +2249,8 @@ class SampleData:
                 self.remove_node(field_path)
         if store:
             self.add_field(gridname=meshname, fieldname=meshname+'_elset_ids',
-                           array=ID_field, replace=True)
+                           array=ID_field, replace=True,
+                           complib='zlib', complevel=1, shuffle=True)
         return ID_field
 
     # =========================================================================
@@ -2906,7 +2905,9 @@ class SampleData:
                 node = self.add_field(mesh_group._v_pathname,
                                       fieldname='field_'+name,
                                       array=data, replace=replace,
-                                      location=Ntags_group._v_pathname)
+                                      location=Ntags_group._v_pathname,
+                                      complib='zlib', complevel=1,
+                                      shuffle=True)
                 # remove from index : Elsets may be too numerous and
                 # overload content index --> actual choice is to remove
                 # them from index
@@ -2954,7 +2955,9 @@ class SampleData:
                     node = self.add_field(mesh_group._v_pathname,
                                           fieldname='field_'+name,
                                           array=data, replace=replace,
-                                          location=Etags_group._v_pathname)
+                                          location=Etags_group._v_pathname,
+                                          complib='zlib', complevel=1,
+                                          shuffle=True)
                     # remove from index : Elsets may be too numerous and
                     # overload content index --> actual choice is to remove
                     # them from index

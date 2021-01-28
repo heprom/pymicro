@@ -239,7 +239,7 @@ class SampleData:
         """
         self._verbose_print('Deleting DataSample object ')
         self.sync()
-        self.repack_h5file()
+        # self.repack_h5file()
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
         if self.autodelete:
@@ -1249,7 +1249,7 @@ class SampleData:
                 node_path)
             self._verbose_print(msg)
 
-    def get_mesh(self, meshname, with_fields=True):
+    def get_mesh(self, meshname, with_fields=True, as_numpy=True):
         """Return data of a mesh group as BasicTools UnstructuredMesh object.
 
         This methods gathers the data of a 2DMesh or 3DMesh group, including
@@ -1268,14 +1268,14 @@ class SampleData:
         # Create mesh object
         mesh_object = UnstructuredMesh()
         # Get mesh nodes
-        mesh_object.nodes = self.get_mesh_nodes(meshname, as_numpy=True)
+        mesh_object.nodes = self.get_mesh_nodes(meshname, as_numpy)
         # No mesh ID for now --> create mesh Ids
-        mesh_object.originalIDNodes = self.get_mesh_nodesID(meshname,
-                                                            as_numpy=True)
+        mesh_object.originalIDNodes = self.get_mesh_nodesID(meshname, as_numpy)
         # Get node tags
-        self._load_nodes_tags(meshname, mesh_object)
+        self._load_nodes_tags(meshname, mesh_object, as_numpy=as_numpy)
         # Get mesh elements and element tags
-        mesh_object.elements = self.get_mesh_elements(meshname)
+        mesh_object.elements = self.get_mesh_elements(meshname,
+                                                      as_numpy=as_numpy)
         # Get mesh fields
         Field_list =  self.get_attribute('Field_index', meshname)
         if with_fields:
@@ -1352,7 +1352,7 @@ class SampleData:
         elems_path = self.get_attribute('elements_path', meshname)
         return self.get_node(elems_path, as_numpy)
 
-    def get_mesh_elements(self, meshname):
+    def get_mesh_elements(self, meshname, as_numpy=True):
         """Return the mesh elements connectivity as HDF5 node or Numpy array.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
@@ -1362,8 +1362,7 @@ class SampleData:
         """
         # Create AllElementsContainer
         AElements = AllElements()
-        connectivity = self.get_mesh_xdmf_connectivity(meshname,
-                                                       as_numpy=False)
+        connectivity = self.get_mesh_xdmf_connectivity(meshname, as_numpy)
         # Get Elements Metadata
         Mesh_attrs = self.get_dic_from_attributes(meshname)
         Topology = Mesh_attrs['Topology']
@@ -1402,9 +1401,10 @@ class SampleData:
                 Elements.cpt = Nelems[i]
                 offset = Nvalues
             elif Topology == 'Uniform':
-                Elements.connectivity = connectivity
+                Elements.connectivity = connectivity.reshape((Nelems[i],
+                                                              Nnode_per_el))
                 Elements.cpt = connectivity.shape[0]
-        self._load_elements_tags(meshname, AElements)
+        self._load_elements_tags(meshname, AElements, as_numpy)
         return AElements
 
     def get_mesh_elem_tags_names(self, meshname):
@@ -3015,7 +3015,7 @@ class SampleData:
         Xdmf_grid_node.append(Set_xdmf)
         return
 
-    def _load_nodes_tags(self, meshname, mesh_object):
+    def _load_nodes_tags(self, meshname, mesh_object, as_numpy=True):
         """Add Node and ElemTags in mesh geometry group from mesh object."""
         mesh_group = self.get_node(meshname)
         Ntags_group = self.get_node(mesh_group._v_name+'_NodeTags')
@@ -3024,10 +3024,10 @@ class SampleData:
             for tag_name in Ntag_list:
                 tag = mesh_object.GetNodalTag(tag_name)
                 tag_path = os.path.join(Ntags_group._v_pathname,'NT_'+tag_name)
-                tag.SetIds(self.get_node(tag_path,as_numpy=True))
+                tag.SetIds(self.get_node(tag_path, as_numpy))
         return mesh_object
 
-    def _load_elements_tags(self, meshname, AllElements):
+    def _load_elements_tags(self, meshname, AllElements, as_numpy=True):
         """Add Node and ElemTags in mesh geometry group from mesh object."""
         mesh_group = self.get_node(meshname)
         Etags_group = self.get_node(mesh_group._v_name+'_ElemTags')
@@ -3041,7 +3041,7 @@ class SampleData:
                 elem_container = AllElements.GetElementsOfType(el_type)
                 tag = elem_container.tags.CreateTag(tag_name,False)
                 tag_path = os.path.join(Etags_group._v_pathname,'ET_'+tag_name)
-                tag.SetIds(self.get_node(tag_path,as_numpy=True))
+                tag.SetIds(self.get_node(tag_path, as_numpy))
         return AllElements
 
     def _from_BT_mixed_topology(self, mesh_object):

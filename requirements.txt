@@ -6,3 +6,4 @@ vtk
 h5py
 lxml
 tables
+basictools 

@@ -20,7 +20,8 @@ MOCK_MODULES = ['numpy', 'scipy', 'scipy.special', 'matplotlib',
                 'matplotlib.backend_bases',
                 'matplotlib.backends.backend_qt4agg', 'scipy.ndimage', 'wx',
                 'wx.Panel', 'vtk', 'vtk.util', 'vtk.util.colors', 'skimage',
-                'skimage.transform', '_tifffile', 'h5py', 'tables']
+                'skimage.transform', '_tifffile', 'h5py', 'tables',
+                'lxml', 'basictools']
 # , 'ImPanel', 'PlotPanel']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()

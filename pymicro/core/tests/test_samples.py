@@ -4,8 +4,8 @@ import numpy as np
 import math
 from tables import IsDescription, Int32Col, Float32Col
 from pymicro.core.samples import SampleData
-from pymicro.core.meshes import MeshObject
-from pymicro.core.images import ImageObject
+from BasicTools.Containers.ConstantRectilinearMesh import ConstantRectilinearMesh
+import BasicTools.Containers.UnstructuredMeshCreationTools as UMCT
 from config import PYMICRO_EXAMPLES_DATA_DIR
 
 
@@ -81,27 +81,24 @@ class SampleDataTests(unittest.TestCase):
                                      'test_sampledata_ref')
 
     def test_create_sample(self):
-        """ test creation of a SampleData instance/file and  data storage """
+        """Test creation of a SampleData instance/file and  data storage."""
         sample = SampleData(filename=self.filename,
                             sample_name='validation_test_sample',
-                            overwrite_hdf5=True)
+                            overwrite_hdf5=True, verbose=False)
         self.assertTrue(os.path.exists(self.filename+'.h5'))
         self.assertTrue(os.path.exists(self.filename+'.xdmf'))
         # Add mesh data into SampleData dataset
-        mesh = MeshObject()
-        mesh.add_nodes(self.mesh_nodes)
-        mesh.add_elements(Elements_topology=['Triangle', 1],
-                          Elements_Id=np.arange(self.mesh_nodes.shape[0])+1,
-                          Elements_connectivity=self.mesh_elements)
-        mesh.add_field(self.mesh_shape_f1,'Test_field1')
-        mesh.add_field(self.mesh_shape_f2,'Test_field2')
+        mesh = UMCT.CreateMeshOfTriangles(self.mesh_nodes, self.mesh_elements)
+        mesh.nodeFields['Test_field1'] = self.mesh_shape_f1
+        mesh.nodeFields['Test_field2'] = self.mesh_shape_f2
         sample.add_mesh(mesh, meshname='test_mesh',indexname='mesh',
-                        location='/')
+                        location='/', extended_data=False)
         # Add image data into SampleData dataset
-        image = ImageObject(dimension=self.image.shape,
-                            origin= self.image_origin,
-                            spacing=self.image_voxel_size)
-        image.add_field(self.image,'test_image_field')
+        image = ConstantRectilinearMesh(dim=len(self.image.shape))
+        image.SetDimensions(self.image.shape)
+        image.SetOrigin(self.image_origin)
+        image.SetSpacing(self.image_voxel_size)
+        image.elemFields['test_image_field'] = self.image
         sample.add_image(image,imagename='test_image',indexname='image',
                          location='/')
         # Add new group and array to SampleData dataset
@@ -115,17 +112,15 @@ class SampleDataTests(unittest.TestCase):
         # test mesh geometry data recovery
         mesh_nodes = sample.get_mesh_nodes(meshname='mesh',as_numpy=True)
         self.assertTrue(np.all(mesh_nodes==self.mesh_nodes))
-        mesh_elements = sample.get_mesh_elements(meshname='mesh',
-                                                  as_numpy=True)
+        mesh_elements = sample.get_mesh_xdmf_connectivity(meshname='mesh',
+                                                          as_numpy=True)
+        mesh_elements = mesh_elements.reshape(self.mesh_elements.shape)
         self.assertTrue(np.all(mesh_elements==self.mesh_elements))
         # test mesh field recovery
-        shape_f1 = sample.get_field(gridname='mesh',fieldname='Test_field1',
-                                    as_numpy=True)
+        shape_f1 = sample.get_node('Test_field1', as_numpy=True)
         self.assertTrue(np.all(shape_f1==self.mesh_shape_f1))
         # test image field recovery
-        image_field = sample.get_field(gridname='image',
-                                       fieldname='test_image_field',
-                                       as_numpy=True)
+        image_field = sample.get_node('test_image_field', as_numpy=True)
         self.assertTrue(np.all(image_field==self.image))
         # test sampledata instance and file autodelete function
         sample.autodelete = True
@@ -169,11 +164,12 @@ class SampleDataTests(unittest.TestCase):
 
     def test_derived_class(self):
         """ Test application specific data model specification through
-            derived classes
+            derived classes.
+            Also test table functionalities.
         """
         derived_sample = Test_DerivedClass(filename=self.derived_filename,
-                                           autodelete=True, overwrite_hdf5=True,
-                                           verbose=False)
+                                           autodelete=False,
+                                           overwrite_hdf5=True, verbose=False)
         # assert data model Nodes are contained in dataset
         self.assertTrue(derived_sample.__contains__('Image_data'))
         self.assertTrue(derived_sample.__contains__('grain_map'))
@@ -190,10 +186,74 @@ class SampleDataTests(unittest.TestCase):
         tab = derived_sample.get_node('GrainDataTable')
         self.assertEqual(Test_GrainData.columns,
                          tab.description._v_colobjects)
+        # add columns to the table
+        dtype = np.dtype([('name', np.str_, 16),('floats', np.float64, (2,))])
+        derived_sample.add_tablecols('GrainDataTable', description=dtype)
+        tab = derived_sample.get_node('GrainDataTable')
+        self.assertTrue('name' in tab.colnames)
+        self.assertTrue('floats' in tab.colnames)
+        del derived_sample
+        # reopen file and check that neqw columns have been added
+        derived_sample = Test_DerivedClass(filename=self.derived_filename,
+                                           autodelete=True,
+                                           overwrite_hdf5=False, verbose=True)
+        derived_sample.get_node_info('GrainDataTable')
+        tab = derived_sample.get_node('GrainDataTable')
+        self.assertTrue('name' in tab.colnames)
+        self.assertTrue('floats' in tab.colnames)
         del derived_sample
         self.assertTrue(not os.path.exists(self.derived_filename+'.h5'))
         self.assertTrue(not os.path.exists(self.derived_filename+'.xdmf'))
 
+    def test_BasicTools_binding(self):
+        """Test BasicTools to SampleData to BasicTools."""
+        # create mesh of triangles
+        myMesh = UMCT.CreateSquare(dimensions=[3,3], ofTris=True)
+        # get into a SampleData instance
+        sample = SampleData(filename='square', verbose=False, autodelete=True)
+        sample.add_mesh(mesh_object=myMesh, meshname='BT_mesh',indexname='BTM',
+                          replace=True, extended_data=True)
+        # get mesh object from SampleData file/instance
+        myMesh2 = sample.get_mesh('BTM')
+        # delete SampleData object and test values
+        self.assertTrue(np.all(myMesh.nodes == myMesh2.nodes))
+        connectivity = myMesh.elements['tri3'].connectivity
+        connectivity2 = myMesh2.elements['tri3'].connectivity
+        self.assertTrue(np.all(connectivity == connectivity2))
+        elements_in_tag = myMesh.GetElementsInTag('ExteriorSurf')
+        elements_in_tag2 = myMesh2.GetElementsInTag('ExteriorSurf')
+        self.assertTrue(np.all(elements_in_tag == elements_in_tag2))
+        del sample
 
-
+    def test_mesh_from_image(self):
+        """Test BasicTools to SDimage to SDmesh."""
+        # 3D image parameters
+        dimensions = [11,11,11]
+        origin = [0.,0.,0.]
+        spacing = [1.,1.,1.]
+        # create BasicTools image object
+        myMesh = ConstantRectilinearMesh(dim=3)
+        myMesh.SetDimensions(dimensions)
+        myMesh.SetOrigin(origin)
+        myMesh.SetSpacing(spacing)
+        # create data field
+        data = np.zeros(shape=dimensions)
+        data[:,3:8,3:8] = 1
+        myMesh.nodeFields['test_field'] = data
+        # create SD instance and image group
+        sample = SampleData(filename='cube', verbose=False, autodelete=True)
+        sample.add_image(image_object=myMesh, imagename='Image_3D',
+                          indexname='Im3D', replace=True)
+        # create mesh group of tetra from image group
+        sample.add_mesh_from_image('Im3D', with_fields=True, ofTetras=True,
+                                    meshname='Tetra_mesh',
+                                    indexname='Tmsh', replace=True)
+        self.assertTrue(sample.__contains__('Im3D'))
+        self.assertTrue(sample.__contains__('Tmsh'))
+        field1 = sample.get_node('test_field', as_numpy=True)
+        self.assertEqual(field1.shape,(11,11,11))
+        field2 = sample.get_node('test_field_Tetra_mesh', as_numpy=True)
+        self.assertEqual(field2.shape,(11*11*11,1))
+        self.assertEqual(field1.ravel()[37], field2.ravel()[37])
+        del sample
 

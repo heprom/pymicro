@@ -36,6 +36,6 @@ class ExperimentTests(unittest.TestCase):
         self.experiment.active_detector_id = 0
         self.experiment.save()
         self.assertTrue(os.path.exists('experiment.txt'))
+        del self.experiment
         exp = Experiment.load('experiment.txt')
         self.assertTrue(exp.get_source().max_energy == 120.)
-        del self.experiment

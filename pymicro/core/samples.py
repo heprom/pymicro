@@ -655,7 +655,7 @@ class SampleData:
             self.add_field(gridname=mesh_group._v_pathname,
                            fieldname=field_name, array=field,
                            replace=replace, **keywords)
-        return
+        return mesh_object
 
     def add_mesh_from_image(self, imagename, with_fields=True, ofTetras=False,
                             meshname='', indexname='', location='/',
@@ -784,7 +784,7 @@ class SampleData:
             self.add_field(gridname=image_group._v_pathname,
                            fieldname=field_name, array=field,
                            replace=replace, **keywords)
-        return
+        return image_object
 
     def add_image_from_field(self, field_array, fieldname, imagename='',
                              indexname='', location='/', description=' ',
@@ -1403,7 +1403,7 @@ class SampleData:
             elif Topology == 'Uniform':
                 Elements.connectivity = connectivity.reshape((Nelems[i],
                                                               Nnode_per_el))
-                Elements.cpt = connectivity.shape[0]
+                Elements.cpt = Nelems[i]
         self._load_elements_tags(meshname, AElements, as_numpy)
         return AElements
 
@@ -2884,6 +2884,8 @@ class SampleData:
             name = tag.name
             Node_tags_list.append(name)
             node_list = mesh_object.nodesTags[tag.name].GetIds()
+            if len(node_list) == 0:
+                continue
             node = self.add_data_array(location=Ntags_group._v_pathname,
                                        name='NT_'+name, array=node_list,
                                        replace=replace)
@@ -2932,6 +2934,8 @@ class SampleData:
                 Elem_tags_list.append(name)
                 Elem_tag_type_list.append(elem_type)
                 elem_list = mesh_object.GetElementsInTag(tagname)
+                if len(elem_list) == 0:
+                    continue
                 node = self.add_data_array(location=Etags_group._v_pathname,
                                            name='ET_'+name, array=elem_list,
                                            replace=replace)

@@ -208,7 +208,7 @@ class Symmetry(enum.Enum):
         """
         Compute the rotation matrix in the Fundamental Zone of a given `Symmetry` instance.
 
-        :param g: a 3x3 matrix representing the rotation 
+        :param g: a 3x3 matrix representing the rotation
         :param verbose: flag for verbose mode
         :return: a new 3x3 matrix for the rotation in the fundamental zone.
         """
@@ -240,9 +240,9 @@ class Symmetry(enum.Enum):
         """Build the stiffness matrix for this symmetry.
 
         :param list elastic_constants: the elastic constants (the number must
-        correspond to the type of symmetry, eg 3 for cubic).
+            correspond to the type of symmetry, eg 3 for cubic).
         :return ndarray: a numpy array of shape (6, 6) representing
-        the stiffness matrix.
+            the stiffness matrix.
         """
         if self is Symmetry.cubic:
             if len(elastic_constants) is not 3:
@@ -1011,7 +1011,7 @@ class HklObject:
         """Create a copy of a list of some hkl object retaining only the first order.
 
         :param list hkl_list: The list of `HklObject`.
-        :param bool keep_friedel_pair: flag to keep order -1 in the list. 
+        :param bool keep_friedel_pair: flag to keep order -1 in the list.
         :param bool verbose: activate verbose mode.
         :returns list: A new list of :py:class:`~pymicro.crystal.lattice.HklObject` without any multiple reflection.
         """
@@ -1305,10 +1305,11 @@ class HklPlane(HklObject):
 
     @staticmethod
     def is_same_family(hkl1, hkl2, crystal_structure=Symmetry.cubic):
-        """Static method to test if both lattice planes belongs to the same family.
-        
-        A family {hkl} is composed by all planes that are equivalent to (hkl) using the symmetry of the lattice. 
-        The lattice assoiated with `hkl2`is not taken into account here.
+        """Static mtd to test if both lattice planes belongs to same family.
+
+        A family {hkl} is composed by all planes that are equivalent to (hkl)
+        using the symmetry of the lattice. The lattice assoiated with `hkl2`
+        is not taken into account here.
         """
         return hkl1.is_in_list(HklPlane.get_family(hkl2.miller_indices(), lattice=hkl1._lattice,
                                                    crystal_structure=crystal_structure))
@@ -1321,15 +1322,15 @@ class HklPlane(HklObject):
         :param str hkl: a sequence of 3 (4 for hexagonal) numbers corresponding to the miller indices.
         :param Lattice lattice: The reference crystal lattice (default None).
         :param bool include_friedel_pairs: Flag to include the Friedel pairs in the list (False by default).
-        :param str crystal_structure: A string descibing the crystal structure (cubic by default). 
+        :param str crystal_structure: A string descibing the crystal structure (cubic by default).
         :raise ValueError: if the given string does not correspond to a supported family.
         :returns list: a list of the :py:class:`~pymicro.crystal.lattice.HklPlane` in the given hkl family.
 
         .. note::
 
-          The method account for the lattice symmetry to create a list of equivalent lattice plane from the point 
-          of view of the point group symmetry. A flag can be used to include or not the Friedel pairs. If not, the 
-          family is contstructed using the miller indices limited the number of minus signs. For instance  (1,0,0) 
+          The method account for the lattice symmetry to create a list of equivalent lattice plane from the point
+          of view of the point group symmetry. A flag can be used to include or not the Friedel pairs. If not, the
+          family is contstructed using the miller indices limited the number of minus signs. For instance  (1,0,0)
           will be in the list and not (-1,0,0).
         """
         if not (len(hkl) == 3 or (len(hkl) == 4 and crystal_structure == Symmetry.hexagonal)):
@@ -1662,9 +1663,10 @@ class HklPlane(HklObject):
     @staticmethod
     def indices_from_two_directions(uvw1, uvw2):
         """
-        Two crystallographic directions :math:`uvw_1` and :math:`uvw_2`define a unique set of hkl planes. 
+        Two crystallographic directions :math:`uvw_1` and :math:`uvw_2` define
+        a unique set of hkl planes.
         This does not depends on the crystal symmetry.
-        
+
         .. math::
 
            h = v_1 . w_2 - w_1 . v_2 \\\\
@@ -1673,7 +1675,8 @@ class HklPlane(HklObject):
 
         :param uvw1: The first instance of the `HklDirection` class.
         :param uvw2: The second instance of the `HklDirection` class.
-        :return h, k, l: the miller indices of the `HklPlane` defined by the two directions.
+        :return h, k, l: the miller indices of the `HklPlane` defined by the
+             two directions.
         """
         (u1, v1, w1) = uvw1.miller_indices()
         (u2, v2, w2) = uvw2.miller_indices()

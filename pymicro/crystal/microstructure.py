@@ -73,7 +73,7 @@ class Orientation:
         frame.
 
         :param ndarray v: a 3 component vector or a 3x3 array expressed in
-        the sample frame.
+            the sample frame.
         :return: the vector or matrix expressed in the crystal frame.
         """
         if v.size not in [3, 9]:
@@ -92,7 +92,7 @@ class Orientation:
         frame.
 
         :param ndarray v: a 3 component vector or a 3x3 array expressed in
-        the crystal frame.
+            the crystal frame.
         :return: the vector or matrix expressed in the sample frame.
         """
         if v.size not in [3, 9]:
@@ -329,12 +329,16 @@ class Orientation:
          Both orientations are supposed to have the same symmetry. This is not
          necessarily the case in multi-phase materials.
 
-        :param orientation: an instance of :py:class:`~pymicro.crystal.microstructure.Orientation` class describing
+        :param orientation: an instance of
+            :py:class:`~pymicro.crystal.microstructure.Orientation` class
+            describing
         the other crystal orientation from which to compute the angle.
-        :param crystal_structure: an instance of the `Symmetry` class describing
-        the crystal symmetry, triclinic (no symmetry) by default.
-        :returns tuple: the misorientation angle in radians, the axis as a numpy
-        vector (crystal coordinates), the axis as a numpy vector (sample coordinates).
+        :param crystal_structure: an instance of the `Symmetry` class
+            describing the crystal symmetry, triclinic (no symmetry) by
+            default.
+        :returns tuple: the misorientation angle in radians, the axis as a
+            numpy vector (crystal coordinates), the axis as a numpy vector
+            (sample coordinates).
         """
         the_angle = np.pi
         symmetries = crystal_structure.symmetry_operators()
@@ -578,14 +582,15 @@ class Orientation:
 
     @staticmethod
     def compute_instrument_transformation_matrix(rx_offset, ry_offset, rz_offset):
-        """Compute the instrument transformation matrix for given rotation offset.
+        """Compute instrument transformation matrix for given rotation offset.
 
         This function compute a 3x3 rotation matrix (passive convention) that
         transforms the sample coordinate system by rotating around the 3
         cartesian axes in this order: rotation around X is applied first,
         then around Y and finally around Z.
 
-        A sample vector :math:`V_s` is consequently transformed into :math:`V'_s` as:
+        A sample vector :math:`V_s` is consequently transformed into
+        :math:`V'_s` as:
 
         .. math::
 
@@ -595,7 +600,7 @@ class Orientation:
         :param double ry_offset: value to apply for the rotation around Y.
         :param double rz_offset: value to apply for the rotation around Z.
         :return: a 3x3 rotation matrix describing the transformation applied
-        by the diffractometer.
+            by the diffractometer.
         """
         angle_zr = np.radians(rz_offset)
         angle_yr = np.radians(ry_offset)
@@ -615,9 +620,10 @@ class Orientation:
     def topotomo_tilts(self, hkl, T=None, verbose=False):
         """Compute the tilts for topotomography alignment.
 
-        :param hkl: the hkl plane, an instance of :py:class:`~pymicro.crystal.lattice.HklPlane`
+        :param hkl: the hkl plane, an instance of
+            :py:class:`~pymicro.crystal.lattice.HklPlane`
         :param ndarray T: transformation matrix representing the diffractometer
-        direction at omega=0.
+            direction at omega=0.
         :param bool verbose: activate verbose mode (False by default).
         :returns tuple: (ut, lt) the two values of tilts to apply (in radians).
         """
@@ -1023,7 +1029,7 @@ class Orientation:
 
         :param str txt_path: path to the text file containing the euler angles.
         :returns dict: a dictionary with the line number and the corresponding
-        orientation.
+           orientation.
         """
         return Orientation.read_orientations(txt_path)
 
@@ -1081,7 +1087,7 @@ class Orientation:
 
         :param str inp_path: the path to the ascii file to read.
         :returns dict: a dictionary of the orientations associated with the
-        elset names.
+            elset names.
         """
         inp = open(inp_path)
         lines = inp.readlines()
@@ -1158,7 +1164,7 @@ class Orientation:
 
     def slip_system_orientation_rotation_tensor(self, s):
         """Compute the orientation rotation tensor q^s for this
-        :py:class:`~pymicro.crystal.microstructure.Orientation and the given
+        :py:class:`~pymicro.crystal.microstructure.Orientation` and the given
         slip system.
 
         :param s: an instance of :py:class:`~pymicro.crystal.lattice.SlipSystem`
@@ -1181,7 +1187,7 @@ class Orientation:
 
         :param slip_system: a `SlipSystem` instance.
         :param load_direction: a unit vector describing the loading direction
-        (default: vertical axis [0, 0, 1]).
+            (default: vertical axis [0, 0, 1]).
         :return float: a number between 0 ad 0.5.
         """
         plane = slip_system.get_slip_plane()
@@ -1199,9 +1205,9 @@ class Orientation:
         given list of slip systems.
 
         :param slip_systems: a list of the slip systems from which to compute
-        the Schmid factor values.
+            the Schmid factor values.
         :param load_direction: a unit vector describing the loading direction
-        (default: vertical axis [0, 0, 1]).
+            (default: vertical axis [0, 0, 1]).
         :param bool verbose: activate verbose mode.
         :return list: a list of the schmid factors.
         """
@@ -1259,7 +1265,7 @@ class Grain:
 
         :param slip_system: a `SlipSystem` instance.
         :param load_direction: a unit vector describing the loading direction
-        (default: vertical axis [0, 0, 1]).
+            (default: vertical axis [0, 0, 1]).
         :return float: a number between 0 ad 0.5.
         """
         return self.orientation.schmid_factor(slip_system, load_direction)
@@ -2076,8 +2082,8 @@ class Microstructure(SampleData):
         """Create a `Microstructure` reading grain infos from a file.
 
         This file is typically created using EBSD. the usual pattern is:
-            grain_id, phi1, phi, phi2, x, y, volume.
-        The column number are tunable using the function arguments.
+        grain_id, phi1, phi, phi2, x, y, volume. The column number are tunable
+        using the function arguments.
         """
         # get the file name without extension
         name = os.path.splitext(os.path.basename(grain_file_path))[0]
@@ -2135,15 +2141,15 @@ class Microstructure(SampleData):
           This function works only for microstructures with the same symmetry.
 
         :param micro2: the second instance of `Microstructure` from which
-        to match the grains.
+            to match the grains.
         :param float mis_tol: the tolerance is misorientation to use
-        to detect matches (in degrees).
+            to detect matches (in degrees).
         :param list use_grain_ids: a list of ids to restrict the grains
-        in which to search for matches.
+            in which to search for matches.
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
         :return tuple: a tuple of three lists holding respectively the matches,
-        the candidates for each match and the grains that were unmatched.
+           the candidates for each match and the grains that were unmatched.
         """
         # TODO : Test
         if not (self.get_lattice().get_symmetry()
@@ -2206,9 +2212,9 @@ class Microstructure(SampleData):
         unique function.
 
         :param int grain_id: the grain id from which the neighbors need
-        to be determined.
+            to be determined.
         :param int distance: the distance to use for the dilation (default
-        is 1 voxel).
+            is 1 voxel).
         :return: a list (possibly empty) of the neighboring grain ids.
         """
         grain_map = self.get_grain_map(as_numpy=True)
@@ -2227,7 +2233,7 @@ class Microstructure(SampleData):
         :param int grain_id: the grain id to dilate.
         :param int dilation_steps: the number of dilation steps to apply.
         :param bool use_mask: if True and that this microstructure has a mask,
-               the dilation will be limite by it.
+            the dilation will be limite by it.
         """
         # TODO : test
         grain_map = self.get_grain_map(as_numpy=True)
@@ -2255,9 +2261,10 @@ class Microstructure(SampleData):
         :param ndarray array: the numpy array to dilate.
         :param int dilation_steps: the number of dilation steps to apply.
         :param ndarray mask: a msk to constrain the dilation (None by default).
-        :param list dilation_ids: a list to restrict the dilation to the given ids.
+        :param list dilation_ids: a list to restrict the dilation to the given
+            ids.
         :param ndarray struct: the structuring element to use (strong
-        connectivity by default).
+            connectivity by default).
         :return: the dilated array.
         """
         from scipy import ndimage
@@ -2366,9 +2373,9 @@ class Microstructure(SampleData):
         :param int z_start: start value for slicing the third axis.
         :param int z_end: end value for slicing the third axis.
         :param str crop name: the name for the cropped microstructure
-        (the default is to append '_crop' to the initial name).
+            (the default is to append '_crop' to the initial name).
         :param bool autodelete: a flag to delete the microstructure files
-        on the disk when it is not needed anymore.
+            on the disk when it is not needed anymore.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
         if self._is_empty('grain_map'):
@@ -2435,7 +2442,7 @@ class Microstructure(SampleData):
         is reserved for the background).
 
         :param bool sort_by_size: use the grain volume to sort the grain ids
-        (the larger grain will become grain 1, etc).
+            (the larger grain will become grain 1, etc).
         """
         if self._is_empty('grain_map'):
             print('warning: a grain map is needed to renumber the grains')
@@ -2722,10 +2729,10 @@ class Microstructure(SampleData):
 
         :param bool binary: flag to write the files in binary or ascii format.
         :param bool add_grips: add a constant region at the beginning and the
-        end of the third axis.
+            end of the third axis.
         :param int grip_size: thickness of the region.
         :param bool add_exterior: add a constant region around the sample at
-        the beginning and the end of the first two axes.
+            the beginning and the end of the first two axes.
         :param int exterior_size: thickness of the exterior region.
         """
         ext = 'bin' if binary else 'txt'
@@ -2838,9 +2845,9 @@ class Microstructure(SampleData):
         a finite element calculation with z-set.
 
         :param str mat_file: The name of the file where the material behaviour
-        is located
+            is located
         :param str grain_prefix: The grain prefix used to name the elsets
-        corresponding to the different grains
+            corresponding to the different grains
         """
         f = open('elset_list.txt', 'w')
         # TODO : test
@@ -2921,15 +2928,15 @@ class Microstructure(SampleData):
         :param str file_path: the path to the hdf5 file to read.
         :param str main_key: the string describing the root key.
         :param str data_container: the string describing the data container
-        group in the hdf5 file.
+            group in the hdf5 file.
         :param str grain_data: the string describing the grain data group in the
-        hdf5 file.
+            hdf5 file.
         :param str grain_orientations: the string describing the average grain
-        orientations in the hdf5 file.
+            orientations in the hdf5 file.
         :param str orientation_type: the string describing the descriptor used
-        for orientation data.
+            for orientation data.
         :param str grain_centroid: the string describing the grain centroid in
-        the hdf5 file.
+            the hdf5 file.
         :return: a `Microstructure` instance created from the hdf5 file.
         """
         # TODO: test
@@ -2983,7 +2990,7 @@ class Microstructure(SampleData):
         https://neper.info
 
         :param str neper_file_path: the path to the tesselation file generated
-        by Neper.
+            by Neper.
         :return: a pymicro `Microstructure` instance.
         """
         neper_file = neper_file_path.split(os.sep)[-1]
@@ -3072,8 +3079,8 @@ class Microstructure(SampleData):
         :param str vol_file: the name of the volume file.
         :param str mask_file: the name of the mask file.
         :param bool use_dct_path: if True, the grain_file should be located in
-                                  4_grains/phase_01 folder and the
-        vol_file and mask_file in the 5_reconstruction folder.
+            4_grains/phase_01 folder and the vol_file and mask_file in the
+            5_reconstruction folder.
         :param bool verbose: activate verbose mode.
         :return: a `Microstructure` instance created from the DCT reconstruction.
         """
@@ -3273,8 +3280,8 @@ class Microstructure(SampleData):
 
         The function works for two microstructures with grain maps and an
         overlap between them. Temporarily `Microstructures` restricted to the
-        overlap regions are created and grains are matched between the two based
-        on a disorientation tolerance.
+        overlap regions are created and grains are matched between the two
+        based on a disorientation tolerance.
 
         .. note::
 
@@ -3284,7 +3291,7 @@ class Microstructure(SampleData):
         :param list micros: a list containing the two microstructures to merge.
         :param int overlap: the overlap to use.
         :param list translation_offset: a manual translation (in voxels) offset
-        to add to the result.
+            to add to the result.
         :param bool plot: a flag to plot some results.
         :return: a new `Microstructure`instance containing the merged
                  microstructure.

@@ -27,7 +27,8 @@ MOCK_MODULES = ['numpy', 'scipy', 'scipy.special', 'matplotlib',
                 'BasicTools.Containers.UnstructuredMesh',
                 'BasicTools.Containers.UnstructuredMeshCreationTools',
                 'BasicTools.Containers.MeshBase','BasicTools.IO',
-                'BasicTools.IO.XdmfTools']
+                'BasicTools.IO.XdmfTools', 'PyQt5', 'PyQt5.QtWidgets',
+                'PyQt5.QtCore']
 # , 'ImPanel', 'PlotPanel']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()

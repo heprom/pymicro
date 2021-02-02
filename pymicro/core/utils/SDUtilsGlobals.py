@@ -7,7 +7,7 @@
 # Matlab software : alias or path to the Matlab software executable file
 MATLAB = 'matlab'
 MATLAB_OPTS = '-nodisplay -nosplash -nodesktop -r '
-# F. Nugyen multiphase mesher
+# F. Nugyen multiphase mesher and image cleaner
 #  --> make sure that the mesher_file_dir contains all the matlab code required
 #      to run the mesher, and that the mesher template contains a addpath
 #      matlab command poiting towards the directory

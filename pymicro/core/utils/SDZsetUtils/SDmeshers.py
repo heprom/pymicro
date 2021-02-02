@@ -8,9 +8,8 @@
 ## Imports
 import os
 import shutil
-import pathlib
 import subprocess
-import numpy as np
+from pymicro.core.utils.templateUtils import ScriptTemplate
 from pymicro.core.samples import SampleData
 
 
@@ -57,8 +56,8 @@ class SDZsetMesher():
         A Matlab multiphase mesher is called to create a conformal mesh of a
         multiphase image: a voxelized/pixelized field of integers identifying
         the different phases of a microstructure. Then, the mesh is stored in
-        the calling SampleData instance at the desired location with the
-        desired name and Indexname.
+        the Mesher SampleData instance at the desired location with the
+        desired meshname and Indexname.
 
         The meshing procedure involves the construction of a surface mesh that
         is conformant with the phase boundaries in the image. The space
@@ -69,7 +68,11 @@ class SDZsetMesher():
         The mesher path must be correctly set in the `global_variables.py`
         file, as well as the definition and path of the Matlab command. The
         multiphase mesher is a Matlab program that has been developed by
-        Franck Nguyen (Centre des Matériaux).
+        Franck Nguyen (Centre des Matériaux). It also relies on the Zset
+        and the MeshGems-Tetra softwares.
+
+        Mesh parameters can be passed as optional keyword arguments (see
+        MeshGems - Tetra software User Manual for more details.)
 
         :param str multiphase_image_name: Path, Name, Index Name or Alias of
             the multiphase image field to mesh in the SampleData instance.
@@ -83,24 +86,50 @@ class SDZsetMesher():
             Element Sets in mesh_object as binary fields (1 on Set, 0 else)
         :param bool replace: if `True`, overwrites pre-existing Mesh group
             with the same `meshname` to add the new mesh.
+        :param float MEM: (optional) memory (in Mb) to reserve for the mesh
+            construction
+        :param float HGRAD: Controls the ratio between the size of elements
+            close to surfaces and elements in the bulk of the mesh.
+        :param float HMIN: Minimal size for the mesh edges
+        :param float HMAX: Maximal size for the mesh edges
+        :param float HAUSD: Hausdorff distance between the initially produced
+            surface mesh and the volume mesh created by MeshGems from the
+            surface mesh.
         """
-        self.data.sync()
-        # Set data and file pathes
-        DATA_DIR, _ = os.path.split(self.data.h5_path)
+        # Defaults mesh parameters
+        default_params = {'MEM':50,'HGRAD':1.5,'HMIN':5,'HMAX':50, 'HAUSD':3,
+                          'ANG':50}
+        # Local Imports
+        from pymicro.core.utils.SDUtilsGlobals import MATLAB, MATLAB_OPTS
+        from pymicro.core.utils.SDUtilsGlobals import (MESHER_TEMPLATE,
+                                                       MESHER_TMP)
+        # get data and output pathes
         DATA_PATH = self.data._name_or_node_to_path(multiphase_image_name)
+        DATA_DIR, _ = os.path.split(self.data.h5_path)
         OUT_DIR = os.path.join(DATA_DIR, 'Tmp/')
         # create temp directory for mesh files
-        if not os.path.exists(OUT_DIR):
-           os.mkdir(OUT_DIR)
-        # Get meshing parameters eventually passed as keyword arguments
-        mesh_params = self._get_mesher_parameters(**keywords)
+        if not os.path.exists(OUT_DIR): os.mkdir(OUT_DIR)
+        # perpare mesher script
+        mesher = ScriptTemplate(template_file=MESHER_TEMPLATE,
+                                script_file = MESHER_TMP, autodelete=True,
+                                script_command=MATLAB)
+        # set command line options
+        matlab_command = '"'+"run('" + MESHER_TMP + "');exit;"+'"'
+        mesher.set_script_command_options([*MATLAB_OPTS, matlab_command])
+        # set mesher script parameters
+        mesher_arguments = {'DATA_PATH':DATA_PATH,'OUT_DIR':OUT_DIR,
+                            'DATA_H5FILE': self.data.h5_path}
+        mesher_arguments.update(default_params)
+        mesher.set_arguments(mesher_arguments, **keywords)
         # launch mesher
-        self._launch_mesher(DATA_PATH, self.data.h5_path, OUT_DIR, mesh_params)
+        CWD = os.getcwd()
+        self.data.sync() # flushes H5 dataset
+        mesher.launchScript(workdir=OUT_DIR)
+        os.chdir(CWD)
         # Add mesh to SD instance
         out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra_p.geof')
-        self.data.add_mesh(file=out_file, meshname=meshname,
+        self.data.add_mesh(file=out_file, meshname=meshname, replace=replace,
                            indexname=indexname, location=location,
-                           replace=replace,
                            bin_fields_from_sets=bin_fields_from_sets)
         # Add surface mesh if required
         if load_surface_mesh:
@@ -141,14 +170,32 @@ class SDZsetMesher():
             with the name `clean_fieldname` in the image group with the
             morphologically cleaned field.
         """
-        imagename = self.data._get_parent_name(target_image_field)
+        # Local Imports
+        from pymicro.core.utils.SDUtilsGlobals import MATLAB, MATLAB_OPTS
+        from pymicro.core.utils.SDUtilsGlobals import (CLEANER_TEMPLATE,
+                                                       CLEANER_TMP)
         self.data.sync()
-        # Set data and file pathes
+        # get data and output pathes
+        imagename = self.data._get_parent_name(target_image_field)
         DATA_DIR, _ = os.path.split(self.data.h5_path)
         DATA_PATH = self.data._name_or_node_to_path(target_image_field)
         OUT_FILE = os.path.join(DATA_DIR, 'Clean_image.mat')
-        # launch mesher
-        self._launch_morphocleaner(DATA_PATH, self.data.h5_path, OUT_FILE)
+        # perpare cleaner script
+        cleaner = ScriptTemplate(template_file=CLEANER_TEMPLATE,
+                                 script_file = CLEANER_TMP, autodelete=True,
+                                 script_command=MATLAB)
+        # set command line options
+        matlab_command = '"'+"run('" + CLEANER_TMP + "');exit;"+'"'
+        cleaner.set_script_command_options([*MATLAB_OPTS, matlab_command])
+        # set mesher script parameters
+        cleaner_arguments = {'DATA_PATH':DATA_PATH,'OUT_FILE':OUT_FILE,
+                            'DATA_H5FILE': self.data.h5_path}
+        cleaner.set_arguments(cleaner_arguments)
+        # launch cleaner
+        CWD = os.getcwd()
+        self.data.sync() # flushes H5 dataset
+        cleaner.launchScript()
+        os.chdir(CWD)
         # Add image to SD instance
         from scipy.io import loadmat
         mat_dic = loadmat(OUT_FILE)
@@ -158,67 +205,3 @@ class SDZsetMesher():
         # Remove tmp mesh files
         os.remove(OUT_FILE)
         return
-
-    def _launch_morphocleaner(self, path, filename, out_file):
-        from SDUtilsGlobals import MATLAB, MATLAB_OPTS
-        from SDUtilsGlobals import CLEANER_TEMPLATE, CLEANER_TMP
-        # Create specific mesher script
-        shutil.copyfile(CLEANER_TEMPLATE, CLEANER_TMP)
-        with open(CLEANER_TMP,'r') as file:
-            lines = file.read()
-        lines = lines.replace('DATA_PATH', path)
-        lines = lines.replace('DATA_H5FILE', filename)
-        lines = lines.replace('OUT_FILE', out_file)
-        with open(CLEANER_TMP,'w') as file:
-            file.write(lines)
-        # Launch mesher
-        CWD = os.getcwd()
-        matlab_command = '"'+"run('" + CLEANER_TMP + "');exit;"+'"'
-        subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
-        os.remove(CLEANER_TMP)
-        os.chdir(CWD)
-        return
-
-    def _get_mesher_parameters(self, **keywords):
-        MEM = 50
-        HGRAD = 1.5
-        HMIN = 5
-        HMAX = 50
-        HAUSD = 3
-        ANG = 50
-        if 'MEM' in keywords: MEM = keywords['MEM']
-        if 'HGRAD' in keywords: HGRAD = keywords['HGRAD']
-        if 'HMIN' in keywords: HMIN = keywords['HMIN']
-        if 'HMAX' in keywords: HMAX = keywords['HMAX']
-        if 'HAUSD' in keywords: HAUSD = keywords['HAUSD']
-        if 'ANG' in keywords: ANG = keywords['ANG']
-        return {'MEM':MEM, 'HGRAD':HGRAD, 'HMIN':HMIN, 'HMAX':HMAX,
-                'HAUSD':HAUSD, 'ANG':ANG}
-
-    def _launch_mesher(self, path, filename, out_dir, params):
-        from SDUtilsGlobals import MATLAB, MATLAB_OPTS
-        from SDUtilsGlobals import MESHER_TEMPLATE, MESHER_TMP
-        print(filename)
-        # Create specific mesher script
-        shutil.copyfile(MESHER_TEMPLATE, MESHER_TMP)
-        with open(MESHER_TMP,'r') as file:
-            lines = file.read()
-        lines = lines.replace('DATA_PATH', path)
-        lines = lines.replace('DATA_H5FILE', filename)
-        lines = lines.replace('OUT_DIR', out_dir)
-        lines = lines.replace('MEM', str(params['MEM']))
-        lines = lines.replace('HGRAD', str(params['HGRAD']))
-        lines = lines.replace('HMIN', str(params['HMIN']))
-        lines = lines.replace('HMAX', str(params['HMAX']))
-        lines = lines.replace('HAUSD', str(params['HAUSD']))
-        lines = lines.replace('ANG', str(params['ANG']))
-        with open(MESHER_TMP,'w') as file:
-            file.write(lines)
-        # Launch mesher
-        CWD = os.getcwd()
-        matlab_command = '"'+"run('" + MESHER_TMP + "');exit;"+'"'
-        subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
-        os.remove(MESHER_TMP)
-        os.chdir(CWD)
-        return
-

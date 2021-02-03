@@ -115,19 +115,20 @@ class SDZsetMesher():
                                 script_command=MATLAB)
         # set command line options
         matlab_command = '"'+"run('" + MESHER_TMP + "');exit;"+'"'
-        mesher.set_script_command_options([*MATLAB_OPTS, matlab_command])
+        mesher.set_script_command_options([MATLAB_OPTS, matlab_command])
         # set mesher script parameters
         mesher_arguments = {'DATA_PATH':DATA_PATH,'OUT_DIR':OUT_DIR,
                             'DATA_H5FILE': self.data.h5_path}
         mesher_arguments.update(default_params)
         mesher.set_arguments(mesher_arguments, **keywords)
+        mesher.createScript(filename=MESHER_TMP)
         # launch mesher
         CWD = os.getcwd()
         self.data.sync() # flushes H5 dataset
-        mesher.launchScript(workdir=OUT_DIR)
+        mesher.launchScript(workdir=OUT_DIR, append_filename=False)
         os.chdir(CWD)
         # Add mesh to SD instance
-        out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra_p.geof')
+        out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra.geof')
         self.data.add_mesh(file=out_file, meshname=meshname, replace=replace,
                            indexname=indexname, location=location,
                            bin_fields_from_sets=bin_fields_from_sets)
@@ -186,15 +187,16 @@ class SDZsetMesher():
                                  script_command=MATLAB)
         # set command line options
         matlab_command = '"'+"run('" + CLEANER_TMP + "');exit;"+'"'
-        cleaner.set_script_command_options([*MATLAB_OPTS, matlab_command])
-        # set mesher script parameters
+        cleaner.set_script_command_options([MATLAB_OPTS, matlab_command])
+        # set mesher script parameters and create script file
         cleaner_arguments = {'DATA_PATH':DATA_PATH,'OUT_FILE':OUT_FILE,
                             'DATA_H5FILE': self.data.h5_path}
         cleaner.set_arguments(cleaner_arguments)
+        cleaner.createScript(filename=CLEANER_TMP)
         # launch cleaner
         CWD = os.getcwd()
         self.data.sync() # flushes H5 dataset
-        cleaner.launchScript()
+        cleaner.launchScript(append_filename=False)
         os.chdir(CWD)
         # Add image to SD instance
         from scipy.io import loadmat

@@ -19,7 +19,7 @@ class ScriptTemplate():
 
     def __init__(self, template_file, script_file=None, args=None,
                  script_command=None, script_opts=None, workdir=None,
-                 autodelete=False):
+                 autodelete=False, verbose=False):
         """ScriptTemplate constructor.
 
         :param str template_file: Path to the script template file to handle
@@ -36,12 +36,13 @@ class ScriptTemplate():
         if args is not None:
             self.args = args
         else:
-            args = {}
+            self.args = {}
         self.set_script_filename(script_file)
         self.set_script_command(script_command)
         self.set_script_command_options(script_opts)
         self.set_work_directory(workdir)
         self.autodelete = False
+        self._verbose = verbose
         return
 
     def set_arguments(self, args=None, **kwargs):
@@ -67,7 +68,7 @@ class ScriptTemplate():
         """Set the filename to use to write script file"""
         if (filename is None) and not hasattr(self, 'script_file)'):
             self.script_file = ( self.file.parent / f"{self.file.stem}_tmp"
-                            / self.file.suffix)
+                                f"{self.file.suffix}")
         else:
             self.script_file = Path(filename).absolute()
         return
@@ -129,22 +130,42 @@ class ScriptTemplate():
             f.write(temp.substitute(self.args))
         return
 
-    def launchScript(self, workdir=None):
+    def launchScript(self, workdir=None, append_filename=True):
         """Run script file with provided shell command line and options.
 
         :param str workdir: directory in which to run the script. If None is
             passed, the used directory is the current work directory.
+        :param bool print_output: if `True` print information about the
+            script run.
+        :param bool append_filename: If `True` (default), add the script
+            filename at the end of the command line used to run the script
         :return output: output of the subprocess.run method used to launch the
             script.
         """
         if (self.command is None) or (self.opts is None):
             raise ValueError('None shell command or command options provided,'
                              ' cannot run the script.')
-        if workdir is not None:self.set_work_directory(workdir)
-        output = run(args=[self.command, *self.opts], shell=True,
-                   capture_output=True, cwd=workdir)
+        if workdir is not None: self.set_work_directory(workdir)
+        # create script file
+        self.createScript()
+        # create shell command line to run script
+        command_line = [self.command, *self.opts]
+        if append_filename:
+            command_line.append(self.script_file)
+        if self._verbose:
+            print(' ---- Launching Script ----')
+            print(f'Work directory : {self.workdir}')
+            print(f'Script file: {self.script_file}')
+            print(f'Executable : {self.command}')
+            print(f'Options : {self.opts}')
+            print(f'Shell Command line: {command_line}')
+        run(args=command_line, cwd=self.workdir)
         if self.autodelete:
             os.remove(self.script_file)
-        return output
+        # if print_output:
+        #     print(f"SCRIPT RETURN CODE IS {output.returncode}.\n")
+        #     print(f"SCRIPT STDOUT is: \n\n{output.stdout.decode()}")
+        #     print(f"SCRIPT STDERR is: \n\n{output.stderr.decode()}")
+        # return  output
 
 

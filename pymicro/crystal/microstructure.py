@@ -2500,8 +2500,8 @@ class Microstructure(SampleData):
         self.grains.flush()
         return
 
-    def to_amitex_fftp(self, binary=True,
-                       add_grips=False, grip_size=10,
+    def to_amitex_fftp(self, binary=True, mat_file=True, add_grips=False,
+                       grip_size=10, grip_constants=(104100., 49440.),
                        add_exterior=False, exterior_size=10):
         """Write orientation data to ascii files to prepare for FFT computation.
 
@@ -2519,14 +2519,18 @@ class Microstructure(SampleData):
         The second region is around the sample (first and second axes).
 
         :param bool binary: flag to write the files in binary or ascii format.
+        :param bool mat_file: flag to write the materila file for Amitex.
         :param bool add_grips: add a constant region at the beginning and the
         end of the third axis.
         :param int grip_size: thickness of the region.
+        :param tuple grip_constants: elasticity values for the grip (lambda, mu).
         :param bool add_exterior: add a constant region around the sample at
         the beginning and the end of the first two axes.
         :param int exterior_size: thickness of the exterior region.
         """
         ext = 'bin' if binary else 'txt'
+        grip_id = 1  # material id for the grips
+        ext_id = 2 if add_grips else 1  # material id for the exterior
         n1x = open('N1X.%s' % ext, 'w')
         n1y = open('N1Y.%s' % ext, 'w')
         n1z = open('N1Z.%s' % ext, 'w')
@@ -2576,6 +2580,62 @@ class Microstructure(SampleData):
         n2z.close()
         print('orientation data written for AMITEX_FFTP')
 
+        # if required, write the material file for Amitex
+        if mat_file:
+            from lxml import etree, builder
+            root = etree.Element('Materials')
+            root.append(etree.Element('Reference_Material',
+                                      Lambda0='90000.0',
+                                      Mu0='31000.0'))
+            # add each phase as a material
+            for i in range(self.get_number_of_phases()):
+                mat = etree.Element('Material', numM=str(i + 1),
+                                    Lib='libUmatAmitex.so',
+                                    Law='elasaniso')
+                # get the C_IJ values
+                '''TODO
+                phase = self.get_phase(phase_id)
+                C = symmetry.stiffness_matrix(phase.elastic_constants)
+                '''
+                C11, C12, C13, C22, C23, C33, C44, C55, C66 = 162000., 92000., 69000., 162000., 69000., 180000., \
+                                                              46700., 46700., 35000.
+                '''
+                Note that Amitex uses a different reduced number:
+                (1, 2, 3, 4, 5, 6) = (11, 22, 33, 12, 13, 23)
+                Because of this indices 4 and 6 are inversed with respect to the Voigt convention. 
+                '''
+                mat.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(C11)))
+                mat.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(C12)))
+                mat.append(etree.Element(_tag='Coeff', Index='3', Type='Constant', Value=str(C13)))
+                mat.append(etree.Element(_tag='Coeff', Index='4', Type='Constant', Value=str(C22)))
+                mat.append(etree.Element(_tag='Coeff', Index='5', Type='Constant', Value=str(C23)))
+                mat.append(etree.Element(_tag='Coeff', Index='6', Type='Constant', Value=str(C33)))
+                mat.append(etree.Element(_tag='Coeff', Index='7', Type='Constant', Value=str(C66)))
+                mat.append(etree.Element(_tag='Coeff', Index='8', Type='Constant', Value=str(C55)))
+                mat.append(etree.Element(_tag='Coeff', Index='9', Type='Constant', Value=str(C44)))
+                root.append(mat)
+            # add a material for top and bottom layers
+            if add_grips:
+                grips = etree.Element('Material', numM=str(grip_id + self.get_number_of_phases()),
+                                      Lib='libUmatAmitex.so',
+                                      Law='elasiso')
+                grips.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(grip_constants[0])))
+                grips.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(grip_constants[1])))
+                root.append(grips)
+            # add a material for external buffer
+            if add_exterior:
+                exterior = etree.Element('Material', numM=str(ext_id + self.get_number_of_phases()),
+                                         Lib='libUmatAmitex.so',
+                                         Law='elasiso')
+                exterior.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value='0.'))
+                exterior.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value='0.'))
+                root.append(exterior)
+
+            tree = etree.ElementTree(root)
+            tree.write('mat.xml', xml_declaration=True, pretty_print=True,
+                       encoding='UTF-8')
+            print('material file written in mat.xml')
+
         # if possible, write the vtk file to run the computation
         if self.__contains__('grain_map'):
             # convert the grain map to vtk file
@@ -2583,7 +2643,6 @@ class Microstructure(SampleData):
             #TODO build a continuous grain map for amitex
             grain_ids = self.get_grain_map(as_numpy=True)
             material_ids = np.zeros_like(grain_ids)
-            new_id = 1
             if add_grips:
                 # add a layer of new_id (the value must actually be the first
                 # grain id) above and below the sample.
@@ -2594,8 +2653,7 @@ class Microstructure(SampleData):
                 material_ids = np.pad(material_ids, ((0, 0),
                                                      (0, 0),
                                                      (grip_size, grip_size)),
-                                      mode='constant', constant_values=new_id)
-                new_id += 1
+                                      mode='constant', constant_values=grip_id)
             if add_exterior:
                 # add a layer of new_id around the first two dimensions
                 grain_ids = np.pad(grain_ids, ((exterior_size, exterior_size),
@@ -2606,7 +2664,7 @@ class Microstructure(SampleData):
                                       ((exterior_size, exterior_size),
                                        (exterior_size, exterior_size),
                                        (0, 0)),
-                                      mode='constant', constant_values=new_id)
+                                      mode='constant', constant_values=ext_id)
             # write both arrays as VTK files for amitex
             voxel_size = self.get_voxel_size()
             for array, array_name in zip([grain_ids, material_ids],

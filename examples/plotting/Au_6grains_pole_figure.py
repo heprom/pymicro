@@ -12,7 +12,7 @@ if __name__ == '__main__':
     A PoleFigure object is then created using this microstructure and the pole figures
     (both direct and inverse) are drawn by calling the plot_pole_figures() method.
     '''
-    micro = Microstructure(name='Au_6grains')
+    micro = Microstructure(name='Au_6grains', overwrite_hdf5=True)
     micro.autodelete = True
     gid_list = [1158, 1349, 1585, 1805, 1833, 2268]
     euler_list = [(344.776, 52.2589, 53.9933), 

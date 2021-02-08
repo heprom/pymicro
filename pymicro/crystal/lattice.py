@@ -49,7 +49,7 @@ class Crystal:
 
 class CrystallinePhase:
 
-    def __init__(self, phase_id=1):
+    def __init__(self, phase_id=1, name='unknown', lattice=None):
         """Create a new crystalline phase.
 
         The `phase_id` attribute is used to identify the phase in data sets
@@ -237,7 +237,7 @@ class Symmetry(enum.Enum):
         return np.dot(syms[index], g)
 
     def stiffness_matrix(self, elastic_constants):
-        """Build the stiffness matrix for this symmetry.
+        """Build the stiffness matrix for this symmetry using Voigt convention.
 
         :param list elastic_constants: the elastic constants (the number must
         correspond to the type of symmetry, eg 3 for cubic).

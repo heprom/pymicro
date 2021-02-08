@@ -20,7 +20,15 @@ MOCK_MODULES = ['numpy', 'scipy', 'scipy.special', 'matplotlib',
                 'matplotlib.backend_bases',
                 'matplotlib.backends.backend_qt4agg', 'scipy.ndimage', 'wx',
                 'wx.Panel', 'vtk', 'vtk.util', 'vtk.util.colors', 'skimage',
-                'skimage.transform', '_tifffile', 'h5py', 'tables']
+                'skimage.transform', '_tifffile', 'h5py', 'tables',
+                'lxml', 'lxml.builder', 'BasicTools', 
+                'BasicTools.Containers',
+                'BasicTools.Containers.ConstantRectilinearMesh',
+                'BasicTools.Containers.UnstructuredMesh',
+                'BasicTools.Containers.UnstructuredMeshCreationTools',
+                'BasicTools.Containers.MeshBase','BasicTools.IO',
+                'BasicTools.IO.XdmfTools', 'PyQt5', 'PyQt5.QtWidgets',
+                'PyQt5.QtCore']
 # , 'ImPanel', 'PlotPanel']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()

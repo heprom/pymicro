@@ -59,15 +59,17 @@ class MicrostructureTests(unittest.TestCase):
         new_file = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'tmp_slice_dct')
         m = Microstructure.copy_sample(filename, new_file, autodelete=True,
                                        get_object=True)
-        h5_file = m.h5_file
-        xdmf_file = m.xdmf_file
+        h5_file = m.h5_path
+        xdmf_file = m.xdmf_path
         self.assertTrue(os.path.exists(h5_file))
         self.assertTrue(os.path.exists(xdmf_file))
         m.recompute_grain_bounding_boxes()
         m.recompute_grain_centers()
-        m.recompute_grain_volumes()
+        # m.recompute_grain_volumes()
         m_ref = Microstructure(filename=filename)
         for i in range(m_ref.grains.nrows):
+            print(' n°1 :',m.grains[i])
+            print(' n°2 :',m_ref.grains[i])
             self.assertEqual(m.grains[i], m_ref.grains[i])
         volume = np.sum(m.get_mask(as_numpy=True))
         self.assertEqual(volume, 194025)
@@ -161,7 +163,7 @@ class MicrostructureTests(unittest.TestCase):
         self.assertAlmostEqual(m.get_voxel_size(), 0.018, 2)
         dims = (54, 65, 75)
         for i in range(3):
-            self.assertEqual(m.get_grain_map().shape[i], dims[i])
+            self.assertEqual(m.get_grain_map(as_numpy=True).shape[i], dims[i])
         del m
 
     def test_find_neighbors(self):

@@ -1249,7 +1249,8 @@ class SampleData:
                 node_path)
             self._verbose_print(msg)
 
-    def get_mesh(self, meshname, with_fields=True, as_numpy=True):
+    def get_mesh(self, meshname, with_tags=True, with_fields=True,
+                 as_numpy=True):
         """Return data of a mesh group as BasicTools UnstructuredMesh object.
 
         This methods gathers the data of a 2DMesh or 3DMesh group, including
@@ -1257,7 +1258,9 @@ class SampleData:
         BasicTools :class:`ConstantRectilinearMesh` object.
 
         :param str meshname: Name, Path or Indexname of the mesh group to get
-        :param with_fields: If `True`, store mesh group fields into the
+        :param bool with_tags: If `True`, store the nodes and element tags
+            (sets) into the mesh object
+        :param bool with_fields: If `True`, store mesh group fields into the
             mesh_object, defaults to True
         :type with_fields: bool, optional
         :return: Mesh_object containing all data (nodes, elements, nodes and
@@ -1272,9 +1275,11 @@ class SampleData:
         # No mesh ID for now --> create mesh Ids
         mesh_object.originalIDNodes = self.get_mesh_nodesID(meshname, as_numpy)
         # Get node tags
-        self._load_nodes_tags(meshname, mesh_object, as_numpy=as_numpy)
+        if with_tags:
+            self._load_nodes_tags(meshname, mesh_object, as_numpy=as_numpy)
         # Get mesh elements and element tags
         mesh_object.elements = self.get_mesh_elements(meshname,
+                                                      with_tags=with_tags,
                                                       as_numpy=as_numpy)
         # Get mesh fields
         Field_list =  self.get_attribute('Field_index', meshname)
@@ -1352,7 +1357,7 @@ class SampleData:
         elems_path = self.get_attribute('elements_path', meshname)
         return self.get_node(elems_path, as_numpy)
 
-    def get_mesh_elements(self, meshname, as_numpy=True):
+    def get_mesh_elements(self, meshname, with_tags=True, as_numpy=True):
         """Return the mesh elements connectivity as HDF5 node or Numpy array.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
@@ -1404,7 +1409,8 @@ class SampleData:
                 Elements.connectivity = connectivity.reshape((Nelems[i],
                                                               Nnode_per_el))
                 Elements.cpt = Nelems[i]
-        self._load_elements_tags(meshname, AElements, as_numpy)
+        if with_tags:
+            self._load_elements_tags(meshname, AElements, as_numpy)
         return AElements
 
     def get_mesh_elem_tags_names(self, meshname):

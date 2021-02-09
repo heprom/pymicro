@@ -58,10 +58,7 @@ class SDZsetMesher():
     #   launch parametric studies
     #
     # TODO Meshers
-    #   mesher find external surfaces
-    # TODO safety
-    #   keep a mesher arguments list. Check if args contains all elements in
-    #   mesher argument list.
+    #   mesher 
 
     def __init__(self, data=None, sd_datafile=None, inp_filename=None,
                  inputmesh=None, input_meshfile=None, outputmesh=None,
@@ -433,6 +430,7 @@ class SDZsetMesher():
         self.write_mesher_template(mesher_filename)
         if hasattr(self, 'data_inputmesh'):
             self.write_input_mesh_to_geof()
+        self._check_arguments_list()
         mesher_output = self.Script.runScript(workdir, append_filename=True,
                                               print_output=print_output)
         if hasattr(self, 'data_outputmesh'):
@@ -468,8 +466,6 @@ class SDZsetMesher():
             margin = relative_margin*np.min(Nodes.max(0) - Nodes.min(0))
         Bmin = Nodes.min(0) + margin*np.ones(shape=(3,))
         Bmax = Nodes.max(0) - margin*np.ones(shape=(3,))
-        print('margin is:', margin)
-        print('Bmin is:', Bmin, 'Bmax is:', Bmax)
         # Add to mesh template the bounding planes nset template
         self._add_bounding_planes_nset_template()
         self.set_mesher_args(Xbmin=Bmin[0], Xbmax=Bmax[0], Ybmin=Bmin[1],
@@ -494,10 +490,12 @@ class SDZsetMesher():
         """
         if nset_template is not None:
             nset_name = nset_template
-            self.mesher_args_list.append(nset_template)
+            temp = self._find_template_string(nset_template)
+            self.mesher_args_list.append(temp)
         if func_template:
             function = func_template
-            self.mesher_args_list.append(func_template)
+            temp = self._find_template_string(func_template)
+            self.mesher_args_list.append(temp)
         lines = [f'  **nset {nset_name}',
                  f'   *function {function};'] 
         self._current_position = self._add_mesher_lines(lines,
@@ -535,6 +533,19 @@ class SDZsetMesher():
             self.mesher_lines.insert(pos,line.replace('\n','')+'\n')
             pos = pos+1
         return pos
+    
+    def _check_arguments_list(self):
+        """Verify that each template argument has been provided a value."""
+        for arg in self.mesher_args_list:
+            if arg not in self.Script.args.keys():
+                raise ValueError('Mesher command argument `{}` value missing.'
+                                 ' Use `set_mesher_args` method to assign a '
+                                 'value'.format(arg))
+        return
+    
+    @staticmethod
+    def _find_template_string(string):
+        return string[string.find('${')+2:string.find('}')]
 
 # SD Image mesher class
 class SDImageMesher():

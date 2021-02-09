@@ -2011,21 +2011,23 @@ class SampleData:
                   ''.format(node_path))
             self._verbose_print(msg)
             return
-        # remove node in xdmf tree
-        self._remove_from_xdmf(Node)
 
-        if (isGroup):
-            for child in Node._v_children:
-                remove_path = Node._v_children[child]._v_pathname
-                self._remove_from_index(node_path=remove_path)
-            self._verbose_print('Removing  node {} in content'
-                                ' index....'.format(
-                                    Node._v_pathname))
+        # Remove HDF5 node and its childrens
+        self._verbose_print('Removing  node {} in content index....'
+                            ''.format(Node._v_pathname))
+        if isGroup and recursive:
+            for child, child_node in Node._v_children.items():
+                self.remove_node(child_node, recursive=True)
             self._remove_from_index(node_path=Node._v_pathname)
+            # remove node in xdmf tree
+            self._remove_from_xdmf(Node)
             Node._f_remove(recursive=True)
         else:
             self._remove_from_index(node_path=Node._v_pathname)
+            # remove node in xdmf tree
+            self._remove_from_xdmf(Node)
             Node.remove()
+        # synchronize HDF5 and XDMF file with node removal
         self.sync()
         self._verbose_print('Node {} sucessfully removed'.format(name))
         return

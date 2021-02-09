@@ -8,6 +8,8 @@
 ## Imports
 import os
 import shutil
+import numpy as np
+from subprocess import run
 from pathlib import Path
 from string import Template
 from pymicro.core.utils.templateUtils import ScriptTemplate
@@ -57,24 +59,16 @@ class SDZsetMesher():
     #
     # TODO Meshers
     #   mesher find external surfaces
-    # TODO DataLoaders
-    #   write geof from data, load geof in data
     # TODO safety
     #   keep a mesher arguments list. Check if args contains all elements in
     #   mesher argument list.
 
     def __init__(self, data=None, sd_datafile=None, inp_filename=None,
                  inputmesh=None, input_meshfile=None, outputmesh=None,
-                 output_meshfile=None, verbose=False):
+                 output_meshfile=None, verbose=False, autodelete=False):
         """SDZsetMesher class constructor."""
         # Initialize SampleData instance
-        if data is None:
-            if sd_datafile is None:
-                self.data =None
-            else:
-                self.data = SampleData(filename=sd_datafile, verbose=verbose)
-        elif (data is not None):
-            self.data = data
+        self.set_data(data=data, datafile=sd_datafile)
         # Set default values for mesher input output data
         self.input_meshfile = ( Path('.').absolute() / 'input.geof')
         self.output_meshfile = ( Path('.').absolute() / 'output.geof')
@@ -87,19 +81,70 @@ class SDZsetMesher():
         self.mesher_lines = []
         self.Script = ScriptTemplate(template_file=self.inp_mesher,
                                      script_command='Zrun', 
-                                     autodelete=True)
+                                     autodelete=autodelete)
+        self.mesher_args_list = ['input_meshfile','output_meshfile']
         self.set_mesher_args(input_meshfile=str(self.input_meshfile))
         self.set_mesher_args(output_meshfile=str(self.output_meshfile))
         self._current_position = 0
         self._init_mesher_content()
         # Other flags
         self._verbose = verbose
+        self.autodelete = autodelete
         return
 
     def __del__(self):
         """SDZsetMesher destructor."""
-        if hasattr(self, 'data'):
+        if self.data is not None:
             del self.data
+        if self.autodelete:
+            self.clean_output_files()
+            self.clean_mesher_files()
+            if hasattr(self, 'data_inputmesh'):
+                self.clean_input_mesh_file()
+        return
+    
+    def __repr__(self):
+        """String representation of the class."""
+        s  = '\nSampleData--Zset Mesher Class instance: \n\n'
+        if self.data is not None:
+            s += ('---- Associated SampleData dataset:\n\t\t{}\n'
+                  ''.format(self.data.h5_file))
+            s += ('\t\tdataset name:\t{}\n'
+                  ''.format(self.data.get_sample_name()))
+            s += ('\t\tdataset description:\t{}\n'
+                  ''.format(self.data.get_description()))
+            if hasattr(self, 'data_inputmesh'):
+                s += ('---- Input Mesh data path:\n\t\t{}\n'
+                      ''.format(self.data_inputmesh))
+            if hasattr(self, 'data_outputmesh'):
+                s += ('---- Output Mesh data path:\n\t\t{}\n'
+                      ''.format(self.data_outputmesh))
+        else:
+            s += '---- Associated SampleData dataset:\n\t\tNone\n'
+        s += '---- Mesh input file:\n\t\t{}\n'.format(str(self.input_meshfile))
+        s += '---- Mesh output file:\n\t\t{}\n'.format(str(self.output_meshfile))
+        s += '---- Mesher template filename:\n\t\t{}\n'.format(str(self.inp_mesher))
+        s += '---- Mesher commands argument values:\n'
+        for key,value in self.Script.args.items():
+            s += '\t\t{:30} --> {} \n'.format(key,value)
+        s += '---- Mesher autodelete flag:\n\t\t{}\n'.format(self.autodelete)
+        return s
+    
+    def set_data(self, data=None, datafile=None):
+        """Set the SampleData instance to use to manipulate mesh data.
+        
+        :param SampleData data: SampleData instance to use 
+        :param str datafile: SampleData file to open as a the SampleData
+            instance to use, if `data` argument is `None`. If datafile does not
+            exist, the SampleData instance is created.            
+        """
+        if data is None:
+            if datafile is None:
+                self.data = None
+            else:
+                self.data = SampleData(filename=datafile)
+        elif (data is not None):
+            self.data = data
         return
 
     def set_inputmesh(self, meshname=None, meshfilename=None):
@@ -167,6 +212,37 @@ class SDZsetMesher():
             'argument_value_template_name':argument_value.
         """
         self.Script.set_arguments(args_dict, **keywords)
+    
+    def clean_mesher_files(self, remove_template=True):
+        """Remove the template and .inp script files created by the class.
+        
+        :param bool remove_template: If `True` (default), removes the mesher
+            template file. If `False`, removes only the script file built from
+            the template file.
+        """
+        # Remove last script file
+        self.Script.clean_script_file()
+        # Remove template file
+        if remove_template and self.inp_mesher.exists():
+            print('Removing {} ...'.format(str(self.inp_mesher)))
+            os.remove(self.inp_mesher)
+        return
+    
+    def clean_output_files(self, clean_output_mesh=True):
+        """Remove all Zset output files and output .geof file if possible."""
+        if clean_output_mesh:
+            run(args=['Zclean',f'{self.inp_mesher.stem}_tmp'])
+        if self.output_meshfile.exists():
+            print('Removing {} ...'.format(str(self.output_meshfile)))
+            os.remove(self.output_meshfile)
+        return
+    
+    def clean_input_mesh_file(self):
+        """Remove all Zset output files and output .geof file if possible."""
+        if self.input_meshfile.exists():
+            print('Removing {} ...'.format(str(self.input_meshfile)))
+            os.remove(self.input_meshfile)
+        return
 
     def print_mesher_template_content(self):
         """Print the current Zset mesher template content to write as .inp.
@@ -175,7 +251,7 @@ class SDZsetMesher():
         instance, without the value of the command arguments specified, as if
         it was a .inp template file.
         """
-        print('Content of the mesher:\n-----------------------\n\n')
+        print('Content of the mesher template:\n-----------------------\n')
         for line in self.mesher_lines:
             print(line, end='')
         return
@@ -192,6 +268,123 @@ class SDZsetMesher():
             line_tmp = Template(line)
             print(line_tmp.substitute(self.Script.args), end='')
         return
+    
+    def print_mesher_msg(self):
+        """Print the content of the Zset .msg output log file."""
+        # The .inp file template is transformed into a _tmp.inp script file
+        # and hence, the .msg file has the same basename {inp}_tmp.msg
+        msg_file = self.inp_mesher.parent / f'{self.inp_mesher.stem}_tmp.msg'
+        print('\n============================================')
+        print('Content of the {} file'.format(str(msg_file)))
+        with open(msg_file,'r') as f:
+            print(f.read())
+        return
+    
+    def load_input_mesh(self, meshname=None, mesh_location='/',replace=False,
+                        mesh_indexname='', bin_fields_from_sets=True):
+        """Load into SampleData instance the inputmesh .geof file data.
+        
+        :param str meshname: Name of mesh data group to create to load file
+            content into SampleData instance
+        :param str mesh_location: Path of the meshgroup to create into the
+            SampleData instance.
+        :param str mesh_indexname: Indexname for the mesh group to create.
+        :param bool replace: If `True` overwrites the meshgroup if needed.
+        :param bool bin_fields_from_sets: If `True`, creates a binary field for
+            each node/element set defined in the .geof file.
+        :return mesh: BasicTools Unstructured Mesh object containing mesh data
+            from the .geof file 
+        """
+        self.load_geof_mesh(self.input_meshfile, meshname=meshname,
+                            mesh_location=mesh_location, 
+                            mesh_indexname=mesh_indexname, replace=replace,
+                            bin_fields_from_sets=bin_fields_from_sets)
+        return
+        
+    def load_geof_mesh(self, filename=None, meshname=None, mesh_location='/',
+                       mesh_indexname='', replace=False, 
+                       bin_fields_from_sets=True):
+        """Read and load into SampleData instance mesh data from a .geof file. 
+        
+        :param str filename: Relative or absolute path of .geof file to load.
+        :param str meshname: Name of mesh data group to create to load file
+            content into SampleData instance
+        :param str mesh_location: Path of the meshgroup to create into the
+            SampleData instance.
+        :param str mesh_indexname: Indexname for the mesh group to create.
+        :param bool replace: If `True` overwrites the meshgroup if needed.
+        :param bool bin_fields_from_sets: If `True`, creates a binary field for
+            each node/element set defined in the .geof file.
+        :return mesh: BasicTools Unstructured Mesh object containing mesh data
+            from the .geof file            
+        """
+        import BasicTools.IO.GeofReader as GR
+        p = Path(filename).absolute()
+        mesh = GR.ReadGeof(str(p))
+        if (self.data is not None) and (meshname is not None):
+            self.data.add_mesh(mesh_object=mesh, meshname=meshname,
+                               indexname=mesh_indexname, replace=replace,
+                               location=mesh_location, 
+                               bin_fields_from_sets=bin_fields_from_sets)
+        return mesh
+    
+    def write_input_mesh_to_geof(self, with_tags=True):
+        """Write the input data from SampleData instance to .geof file.
+        
+        :param bool with_tags: If `True`, writes the element/node sets stored
+            in SampleData instance into .geof file.
+        """
+        if self.input_meshfile is None:
+            raise Warning('Cannot write input mesh to geof as `input_meshfile`'
+                          ' Mesher attribute is `None`.')
+        if self.data_inputmesh is None:
+            raise Warning('Cannot write input mesh to geof as `data_inputmesh`'
+                          ' Mesher attribute is `None`.')
+        self.write_mesh_to_geof(filename=self.input_meshfile, 
+                                meshname=self.data_inputmesh,
+                                with_tags=with_tags)
+        return
+    
+    def write_output_mesh_to_geof(self, with_tags=True):
+        """Write the input data from SampleData instance to .geof file.
+        
+        :param bool with_tags: If `True`, writes the element/node sets stored
+            in SampleData instance into .geof file.
+        """
+        if self.output_meshfile is None:
+            raise Warning('Cannot write input mesh to geof as `output_meshfile`'
+                          ' Mesher attribute is `None`.')
+        if self.data_outputmesh is None:
+            raise Warning('Cannot write input mesh to geof as `data_outputmesh`'
+                          ' Mesher attribute is `None`.')
+        self.write_mesh_to_geof(filename=self.output_meshfile, 
+                                meshname=self.data_outputmesh,
+                                with_tags=with_tags)
+        return
+    
+    def write_mesh_to_geof(self, filename=None, meshname=None, with_tags=True):
+        """Write data from a SampleData isntance mesh group as a .geof file. 
+        
+        :param str filename: Relative or absolute path of .geof file to write.
+        :param str meshname: Name, Path, Indexname or Alias of mesh data group
+            to write as a .geof file
+        :param bool with_tags: If `True`, writes the element/node sets stored
+            in SampleData instance into .geof file.
+        """
+        if self.data is None:
+            raise Warning('Mesher has None SampleData instance.'
+                          'Cannot write any mesh data to .geof file.')
+            return
+        import BasicTools.IO.GeofWriter as GW
+        p = Path(filename).absolute()
+        mesh = self.data.get_mesh(meshname=meshname, with_tags=with_tags, 
+                                  with_fields=False, as_numpy=True)
+        OW = GW.GeofWriter()
+        OW.Open(str(p))
+        OW.Write(mesh)
+        OW.Close()
+        return 
+                               
     
     def write_mesher_template(self, mesher_filename=None):
         """Write a .inp Zset mesher with current mesher commands template.
@@ -227,16 +420,89 @@ class SDZsetMesher():
         return 
 
     def run_mesher(self, mesher_filename=None, workdir=None,
-                   print_output=False):
+                   print_output=False, mesh_location='/', load_sets=True):
         """Run the .inp Zset mesher with current commands and arguments.
         
         This methods writes and runs a Zset mesher that will execute all
-        mesh commands prescribed by the class instance.
+        mesh commands prescribed by the class instance. First the method 
+        writes the mesher script template and the input .geof file from the
+        SampleData instance mesh data if the `data_inputmesh` attribute the
+        `data` attributes are set to a valid value. The results are loaded in
+        the SampleData instance if the `data_outputmesh` attribute is set.
         """
         self.write_mesher_template(mesher_filename)
+        if hasattr(self, 'data_inputmesh'):
+            self.write_input_mesh_to_geof()
         mesher_output = self.Script.runScript(workdir, append_filename=True,
                                               print_output=print_output)
+        if hasattr(self, 'data_outputmesh'):
+            self.load_geof_mesh(filename=self.output_meshfile,
+                                meshname=self.data_outputmesh,
+                                replace=True, bin_fields_from_sets=load_sets)
         return mesher_output
+    
+    def create_XYZ_min_max_nodesets(self, margin=None, relative_margin=0.01):
+        """Create nodesets with extremal values of each XYZ coordinate.
+        
+        :param float margin: Define the maximal distance to the max/min value
+            of nodes coordinate in each direction that is used to defined the
+            nsets. For instance, The Xmin and Xmax elsets will be defined by
+            x < min(Xnodes) + margin and x > max(Xnodes) - margin. If `None` is
+            passed (default), the relative margin is used.
+        :param float relative_margin: Same as `margin`, but defines the margin
+            as a fraction of the smallest extent of the mesh in the 3
+            dimensions. For isntance, if the smallest extent of the mesh is in
+            the X direction, margin = relative_margin*(Xmax - Xmin)
+        """
+        # Get the input mesh
+        if hasattr(self, 'data_inputmesh'):
+            input_mesh = self.data_inputmesh
+        else:
+            input_mesh = 'input_mesh'
+        if not self.data.__contains__(input_mesh):
+            self.load_input_mesh(meshname=input_mesh, 
+                                 bin_fields_from_sets=False)
+        # Get nodes and find nsets bounds
+        Nodes = self.data.get_mesh_nodes(meshname=input_mesh, as_numpy=True)
+        if margin is None:
+            margin = relative_margin*np.min(Nodes.max(0) - Nodes.min(0))
+        Bmin = Nodes.min(0) + margin*np.ones(shape=(3,))
+        Bmax = Nodes.max(0) - margin*np.ones(shape=(3,))
+        print('margin is:', margin)
+        print('Bmin is:', Bmin, 'Bmax is:', Bmax)
+        # Add to mesh template the bounding planes nset template
+        self._add_bounding_planes_nset_template()
+        self.set_mesher_args(Xbmin=Bmin[0], Xbmax=Bmax[0], Ybmin=Bmin[1],
+                             Ybmax=Bmax[1], Zbmin=Bmin[2], Zbmax=Bmax[2])
+        return
+    
+    def create_nodeset_with_function(self, nset_name='my_nset', function='1;',
+                                     nset_template= None, func_template=False):
+        """Add a command to create a nodeset with a function to the mesher.
+        
+        :param str nset_name: Name of the nodeset to create 
+        :param str function: Function used to construct the node set, for
+            instance `(x > 0.5)` (see Zset user manual for more details)
+        :param str nset_template: If not `None`, this string is used as a
+            nset name template in the mesher. Its value has to be set with the
+            `set_mesher_args` method. The string must contain a template 
+            motif of the form ${template_str} 
+        :param str func_template: If not `None`, this string is used as a
+            function template in the mesher. Its value has to be set with the
+            `set_mesher_args` method. The string must contain a template 
+            motif of the form ${template_str} 
+        """
+        if nset_template is not None:
+            nset_name = nset_template
+            self.mesher_args_list.append(nset_template)
+        if func_template:
+            function = func_template
+            self.mesher_args_list.append(func_template)
+        lines = [f'  **nset {nset_name}',
+                 f'   *function {function};'] 
+        self._current_position = self._add_mesher_lines(lines,
+                                                        self._current_position)
+        return
 
     def _init_mesher_content(self):
         """Create mesher minimal text content."""
@@ -244,8 +510,22 @@ class SDZsetMesher():
                ' ***mesh ${output_meshfile}',
                '  **open ${input_meshfile}',
                '****return']
-        self._add_mesher_lines(lines,0)
-        self._current_position = 4
+        self._current_position = self._add_mesher_lines(lines,0) - 1
+        return
+    
+    def _add_bounding_planes_nset_template(self):
+        self.create_nodeset_with_function('Xmin', 
+                                          func_template='(x < ${Xbmin})')
+        self.create_nodeset_with_function('Xmax', 
+                                          func_template='(x > ${Xbmax})')
+        self.create_nodeset_with_function('Ymin', 
+                                          func_template='(y < ${Ybmin})')
+        self.create_nodeset_with_function('Ymax', 
+                                          func_template='(y > ${Ybmax})')
+        self.create_nodeset_with_function('Zmin', 
+                                          func_template='(z < ${Zbmin})')
+        self.create_nodeset_with_function('Zmax', 
+                                          func_template='(z > ${Zbmax})')
         return
     
     def _add_mesher_lines(self, lines, position):

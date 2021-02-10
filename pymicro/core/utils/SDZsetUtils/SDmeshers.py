@@ -30,6 +30,25 @@ class SDZsetMesher():
     That means that the Zset software must be available in your PATH
     environnement variable at least.
 
+    .. rubric:: PASSING MESHER COMMANDS OPTIONS AND ARGUMENTS
+            
+    Some class methods are directly bound to some Zset mesher commands. In
+    practice, they write the commands into the class instance mesher, and
+    handle its argument values through string templates. They can accept
+    Zset command options as method keyword arguments. Each command will be
+    added to the mesher as a line of the form:
+        *command keyword['command']
+            
+    The value of the keyword argument (keyword['command']) must be a string
+    that may contain a string template (an expression between ${..}). In
+    this case, the template is automatically detected and handled by the
+    ScriptTemplate attribute of the Mesher. The value of the template
+    expression can be prescribed with the `set_mesher_args` method.
+    
+    No additional documentation on the command options is provided here.
+    Details are available in the Zset user manual (accessible through
+    the shell command line `Zman user`).   
+
     .. rubric:: CONSTRUCTOR PARAMETERS
 
     :data: SampleData object
@@ -57,8 +76,8 @@ class SDZsetMesher():
     #   as a class attribute (self.mesher_args ?). Think of a mechanisms to
     #   launch parametric studies
     #
-    # TODO Meshers
-    #   mesher 
+    # TODO : save mesh fields before applying mesh operations, and adding
+    #        fields to output_mesh when input and output mesh are equal
 
     def __init__(self, data=None, sd_datafile=None, inp_filename=None,
                  inputmesh=None, input_meshfile=None, outputmesh=None,
@@ -91,7 +110,7 @@ class SDZsetMesher():
 
     def __del__(self):
         """SDZsetMesher destructor."""
-        if self.data is not None:
+        if self.data is not None and self._del_data:
             del self.data
         if self.autodelete:
             self.clean_output_files()
@@ -135,16 +154,21 @@ class SDZsetMesher():
             instance to use, if `data` argument is `None`. If datafile does not
             exist, the SampleData instance is created.            
         """
+        self._del_data = False
         if data is None:
             if datafile is None:
                 self.data = None
             else:
                 self.data = SampleData(filename=datafile)
+                if self.autodelete:
+                    self.data.autodelete = True
+                    self.del_data = True
         elif (data is not None):
             self.data = data
         return
 
-    def set_inputmesh(self, meshname=None, meshfilename=None):
+    def set_inputmesh(self, meshname=None, meshfilename=None,
+                      fields_to_transfer=None):
         """Set the inputmesh file or path into the SampleData instance.
 
         :param str meshname: Name, Path, Indexname or Alias of the mesh group
@@ -155,12 +179,15 @@ class SDZsetMesher():
             the mesh data refered by `meshname` in the SampleData instance will
             be written as a .geof mesh file `meshfilename.geof`
         """
+        self.fields_to_transfer = []
         if meshname is not None:
             self.data_inputmesh = meshname
         if meshfilename is not None:
             p = Path(meshfilename).absolute()
             self.input_meshfile = p.parent / f'{p.stem}.geof'
             self.set_mesher_args(input_meshfile=str(self.input_meshfile))
+        if fields_to_transfer is not None:
+            self.fields_to_transfer = fields_to_transfer
         return
     
     def set_outputmesh(self, meshname=None, meshfilename=None):
@@ -434,12 +461,15 @@ class SDZsetMesher():
         mesher_output = self.Script.runScript(workdir, append_filename=True,
                                               print_output=print_output)
         if hasattr(self, 'data_outputmesh'):
+            self._get_fields_to_transfer()
             self.load_geof_mesh(filename=self.output_meshfile,
                                 meshname=self.data_outputmesh,
                                 replace=True, bin_fields_from_sets=load_sets)
+            self._load_fields_to_transfer()
         return mesher_output
     
-    def create_XYZ_min_max_nodesets(self, margin=None, relative_margin=0.01):
+    def create_XYZ_min_max_nodesets(self, margin=None, relative_margin=0.01,
+                                    Exterior_surf_set=None):
         """Create nodesets with extremal values of each XYZ coordinate.
         
         :param float margin: Define the maximal distance to the max/min value
@@ -470,37 +500,258 @@ class SDZsetMesher():
         self._add_bounding_planes_nset_template()
         self.set_mesher_args(Xbmin=Bmin[0], Xbmax=Bmax[0], Ybmin=Bmin[1],
                              Ybmax=Bmax[1], Zbmin=Bmin[2], Zbmax=Bmax[2])
+        if Exterior_surf_set is not None:
+            boundary_nsets= 'Xmin Xmax Ymin Ymax Zmin Zmax'
+            self.create_point_set(set_name=Exterior_surf_set,
+                                  use_nset=boundary_nsets)
         return
     
-    def create_nodeset_with_function(self, nset_name='my_nset', function='1;',
-                                     nset_template= None, func_template=False):
-        """Add a command to create a nodeset with a function to the mesher.
+    def create_element_set(self, set_name='my_set', **keywords):
+        """Write a Zset mesher node set or boundary creation command.
         
-        :param str nset_name: Name of the nodeset to create 
-        :param str function: Function used to construct the node set, for
-            instance `(x > 0.5)` (see Zset user manual for more details)
-        :param str nset_template: If not `None`, this string is used as a
-            nset name template in the mesher. Its value has to be set with the
-            `set_mesher_args` method. The string must contain a template 
-            motif of the form ${template_str} 
-        :param str func_template: If not `None`, this string is used as a
-            function template in the mesher. Its value has to be set with the
-            `set_mesher_args` method. The string must contain a template 
-            motif of the form ${template_str} 
+        This method write a **elset command block in the mesher. It
+        can accept as additional keyword arguments the command options for the
+        **elset command (see Zset user manual and class docstring).
+        
+        :param str set_name: Name of the eset to create (can contain a
+              string template)
         """
-        if nset_template is not None:
-            nset_name = nset_template
-            temp = self._find_template_string(nset_template)
+        # find out if the set_name is a script template element
+        temp = self._find_template_string(set_name)
+        if temp:
             self.mesher_args_list.append(temp)
-        if func_template:
-            function = func_template
-            temp = self._find_template_string(func_template)
+        # creates line for mesher point set definition command base line
+        lines = [f'  **elset {set_name}']   
+        # Add command options
+        self._add_command_options(lines, **keywords)  
+        # write command in mesher
+        self._current_position = self._add_mesher_lines(lines,
+                                                        self._current_position)     
+        return
+    
+    def create_boundary_node_set(self, setname='my_set',
+                                 used_elsets=None,
+                                 create_nodeset=False, remove_bset=False):
+        """Write a **unshared_faces command to create bset from elset.
+        
+        If used without `used_elsets`, create a boundary set of the mesh
+        exterior surface or a nodeset of the mesh exterior nodes. If some
+        mesh elsets are passed into the 
+        
+        :param str node_setname:  Name of the nset/bset to create (can contain
+              a string template)
+        :param str used_elsets: List of elsets to use to construct the
+            boundary.
+        :param bool create_nodeset: If `True`, create a nset with the same
+            name. If `False`, only a bset is created.
+        """
+        temp = self._find_template_string(setname)
+        if temp:
             self.mesher_args_list.append(temp)
-        lines = [f'  **nset {nset_name}',
-                 f'   *function {function};'] 
+        # creates line for mesher point set definition command base line
+        lines = [f'  **unshared_faces {setname}']
+        if used_elsets is not None:
+            temp = self._find_template_string(used_elsets)
+            if temp:
+                self.mesher_args_list.append(temp)
+            lines.append(f'   *elsets {used_elsets}')
+        # write command in mesher 
+        self._current_position = self._add_mesher_lines(lines,
+                                                        self._current_position)
+        # add nset creation if required
+        if create_nodeset:
+            self.create_point_set(set_name=setname, use_bset=setname)
+            if remove_bset:
+                self.remove_set(bsets=setname)
+        return
+    
+    def create_boundary_set(self, set_name='my_set', **keywords):
+        """Write a Zset mesher node set or boundary creation command.
+        
+        This method write a **nset or **bset command block in the mesher. It
+        can accept as additional keyword arguments the command options for the
+        **nset and **bset commands (see Zset user manual and class docstring).
+        
+        :param str set_name: Name of the nset/bset to create (can contain a
+              string template)
+        :param bool is_bset: If `True`, create a bset definition command. If
+            `False`, create a nset definition command.
+        """
+        # find out if the set_name is a script template element
+        temp = self._find_template_string(set_name)
+        if temp:
+            self.mesher_args_list.append(temp)
+        # creates line for mesher boundary set definition command base line
+        lines = [f'  **bset {set_name}']
+        # Add command options
+        self._add_command_options(lines, **keywords)   
+        # write command in mesher 
         self._current_position = self._add_mesher_lines(lines,
                                                         self._current_position)
         return
+    
+    def create_point_set(self, set_name='my_set', **keywords):
+        """Write a Zset mesher node set or boundary creation command.
+        
+        This method write a **nset or **bset command block in the mesher. It
+        can accept as additional keyword arguments the command options for the
+        **nset and **bset commands (see Zset user manual and class docstring).
+        
+        :param str set_name: Name of the nset/bset to create (can contain a
+              string template)
+        :param bool is_bset: If `True`, create a bset definition command. If
+            `False`, create a nset definition command.
+        """
+        # find out if the set_name is a script template element
+        temp = self._find_template_string(set_name)
+        if temp:
+            self.mesher_args_list.append(temp)
+        # creates line for mesher point set definition command base line
+        lines = [f'  **nset {set_name}']
+        # Add command options
+        self._add_command_options(lines, **keywords)   
+        # write command in mesher 
+        self._current_position = self._add_mesher_lines(lines,
+                                                        self._current_position)
+        return
+    
+    def create_nset_intersection(self, set_name, nsets):
+        """Write a Zset mesher nset intersection command.
+        
+        :param str set_name: Name of the intersection nset to create
+        :param str nsets: String containing all the names of the nsets to
+            intersect.
+        """
+        # find out if the set_name is a script template element
+        temp = self._find_template_string(set_name)
+        if temp:
+            self.mesher_args_list.append(temp)
+        # creates line for mesher nset intersection command base line
+        lines = [ '  **nset_intersection',
+                 f'   *nsets {nsets}',
+                 f'   *intersection_name {set_name}']
+        # write command in mesher 
+        self._current_position = self._add_mesher_lines(lines,
+                                                        self._current_position)
+        return
+    
+    def create_nset_difference(self, set_name, nset1, nset2):
+        """Write commands to compute the difference of two nsets.
+        
+        The difference nset contains the nodes in nset1 that are not in nset2.
+        
+        :param str set_name: Name of the intersection nset to create
+        :param str nset1: First nset to use.
+        :param str nset2: Second nset to use, to substract from nset1
+        """
+        # find out if the set_names are a script template element
+        temp = self._find_template_string(set_name)
+        if temp:
+            self.mesher_args_list.append(temp)
+        temp = self._find_template_string(nset1)
+        if temp:
+            self.mesher_args_list.append(temp)
+        temp = self._find_template_string(nset2)
+        if temp:
+            self.mesher_args_list.append(temp)
+        # First create intersection of the nsets
+        randint = np.random.randint(0,1000)
+        tmp_intersection_name = 'tmp_intersection_'+str(randint)
+        nset_names = nset1+' '+nset2
+        self.create_nset_intersection(tmp_intersection_name, nset_names)
+        # Create the new elset from nset1
+        self.create_point_set(set_name, function='1', use_nset=nset1)
+        # Now substract intersection from nset1
+        self.remove_nodes_from_sets(set_name, tmp_intersection_name)
+        # Finally, remove tmp intersection nset
+        self.remove_set(nsets=tmp_intersection_name)
+        return
+    
+    def create_all_nodes_nset(self, set_name='All_nodes'):
+        """Create a nset containing all mesh nodes."""
+        self.create_point_set(set_name=set_name, function='1')
+        return  
+    
+    def create_interior_nodes_nset(self, set_name='interior_nodes'):
+        """Create a nset will all nodes except those on the mesh ext. surf."""
+        self.create_all_nodes_nset(set_name)
+        self.create_boundary_node_set(setname='tmp_exterior', 
+                                      create_nodeset=True, remove_bset=True)
+        self.remove_nodes_from_sets(set_name, 'tmp_exterior')
+        self.remove_set(nsets='tmp_exterior')
+        return
+    
+    def create_mesh_from_elsets(self, elsets):
+        """Create output mesh with only input mesh elements in elsets.
+        
+        :param str elsets: list of elset to use a new mesh
+        """
+        # find out if the set_names are a script template element
+        temp = self._find_template_string(elsets)
+        if temp:
+            self.mesher_args_list.append(temp)
+        # create the reunion of elsets 
+        self.create_element_set(set_name='new_mesh_all_elements',
+                                add_elset=elsets)
+        # create the elset to remove
+        self.create_element_set(set_name='cut_from_mesh',
+                                not_in_elset='new_mesh_all_elements')
+        # remove elements in elset
+        self.delete_element_sets(elsets='cut_from_mesh')
+        # remove created tmp elset
+        self.remove_set(elsets='new_mesh_all_elements')
+        return
+    
+    def delete_element_sets(self, elsets):
+        """Zset command to remove input list of element sets from mesh."""
+        # find out if the sets_names are a script template element
+        temp = self._find_template_string(elsets)
+        if temp:
+            self.mesher_args_list.append(temp)
+        lines = [ f'  **delete_elset {elsets}']
+        # write command in mesher 
+        self._current_position = self._add_mesher_lines(lines,
+                                                        self._current_position)
+        return
+    
+    def remove_nodes_from_sets(self, target_nset, nsets_to_remove):
+        """Write a Zset mesher command to remove nodes from nset.
+        
+        :param str target_nset: Name of the nset from which the nodes must be
+            removed.
+        :param str nset_to_remove: Name of the nset whose content must be
+            removed from `target_nset`
+        """
+        # find out if the sets_names are a script template element
+        temp = self._find_template_string(target_nset)
+        if temp:
+            self.mesher_args_list.append(temp)
+        temp = self._find_template_string(nsets_to_remove)
+        if temp:
+            self.mesher_args_list.append(temp)
+        lines = [ '  **remove_nodes_from_nset',
+                 f'   *nset_name {target_nset}',
+                 f'   *nsets_to_remove {nsets_to_remove}']
+        # write command in mesher 
+        self._current_position = self._add_mesher_lines(lines,
+                                                        self._current_position)
+        return
+        
+    
+    def remove_set(self, **keywords):
+        """Write a Zset mesher nset/elset/bset removal command.
+        
+        This method write a **remove_set command block in the mesher. It
+        can accept keyword arguments the command options for the
+        **remove_set  commands (see Zset user manual and class docstring). 
+        """
+        lines = ['  **remove_set']
+        # Add command options
+        self._add_command_options(lines, **keywords)   
+        # write command in mesher 
+        self._current_position = self._add_mesher_lines(lines,
+                                                        self._current_position)
+        return 
 
     def _init_mesher_content(self):
         """Create mesher minimal text content."""
@@ -512,18 +763,12 @@ class SDZsetMesher():
         return
     
     def _add_bounding_planes_nset_template(self):
-        self.create_nodeset_with_function('Xmin', 
-                                          func_template='(x < ${Xbmin})')
-        self.create_nodeset_with_function('Xmax', 
-                                          func_template='(x > ${Xbmax})')
-        self.create_nodeset_with_function('Ymin', 
-                                          func_template='(y < ${Ybmin})')
-        self.create_nodeset_with_function('Ymax', 
-                                          func_template='(y > ${Ybmax})')
-        self.create_nodeset_with_function('Zmin', 
-                                          func_template='(z < ${Zbmin})')
-        self.create_nodeset_with_function('Zmax', 
-                                          func_template='(z > ${Zbmax})')
+        self.create_point_set(set_name='Xmin', function='(x < ${Xbmin})')
+        self.create_point_set(set_name='Xmax', function='(x > ${Xbmax})')
+        self.create_point_set(set_name='Ymin', function='(y < ${Ybmin})')
+        self.create_point_set(set_name='Ymax', function='(y > ${Ybmax})')
+        self.create_point_set(set_name='Zmin', function='(z < ${Zbmin})')
+        self.create_point_set(set_name='Zmax', function='(z > ${Zbmax})')
         return
     
     def _add_mesher_lines(self, lines, position):
@@ -533,6 +778,19 @@ class SDZsetMesher():
             self.mesher_lines.insert(pos,line.replace('\n','')+'\n')
             pos = pos+1
         return pos
+    
+    def _add_command_options(self, lines, **keywords):
+        """Add to lines options passed as kwargs and track args list.""" 
+        for key,value in keywords.items():
+            temp = self._find_template_string(value)
+            if temp:
+                self.mesher_args_list.append(temp)
+            line = f'   *{key} {value}'
+            if key[0:4] == 'func':
+                line = line+';'
+            lines.append(line)   
+        return lines
+    
     
     def _check_arguments_list(self):
         """Verify that each template argument has been provided a value."""
@@ -545,7 +803,24 @@ class SDZsetMesher():
     
     @staticmethod
     def _find_template_string(string):
-        return string[string.find('${')+2:string.find('}')]
+        if (string.find('${') > -1):
+            return string[string.find('${')+2:string.find('}')]
+        else:
+            return 0
+        
+    def _get_fields_to_transfer(self):
+        self.fields_storage = {}
+        for fieldname in self.fields_to_transfer:
+            self.fields_storage[fieldname] = self.data.get_node(fieldname, 
+                                                                as_numpy=True)
+        return     
+    
+    def _load_fields_to_transfer(self):
+        for fieldname, field in self.fields_storage.items():
+            self.data.add_field(gridname=self.data_outputmesh,
+                                fieldname=fieldname, array=field)
+        return
+            
 
 # SD Image mesher class
 class SDImageMesher():

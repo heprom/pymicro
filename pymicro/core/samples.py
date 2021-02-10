@@ -914,10 +914,13 @@ class SampleData:
         if not(self._is_grid(gridname)):
             raise tables.NodeError('{} is not a grid, cannot add a field data'
                                    ' array in this group.'.format(gridname))
+        # If needed, pad the field with 0s to comply with number of bulk and
+        # boundary elements
+        array = self._mesh_field_padding(array, gridname)
         # Check if the array shape is consistent with the grid geometry
-        # and returns field dimension and xdmf Center attribute
+        # and returns field dimension, xdmf Center attribute
         field_type, dimensionality = self._check_field_compatibility(
-            gridname,array.shape)
+                                                        gridname,array.shape)
         if location is None:
             # FIELD STORAGE DEFAULT CONVENTION :
             # fields are stored directly into the HDF5 grid group
@@ -2204,7 +2207,7 @@ class SampleData:
         shutil.rmtree(OUT_DIR)
         return
 
-    def create_elset_ids_field(self, meshname=None, store=True,
+    def create_elset_ids_field(self, meshname=None, store=True, fieldname=None,
                                get_sets_IDs=False, tags_prefix='elset',
                                remove_elset_fields=False):
         """Create an element tag Id field on the inputed mesh.
@@ -2256,7 +2259,9 @@ class SampleData:
                 field_path = os.path.join(El_tag_path, 'field_'+set_name)
                 self.remove_node(field_path)
         if store:
-            self.add_field(gridname=meshname, fieldname=meshname+'_elset_ids',
+            if fieldname is None:
+                fieldname = meshname+'_elset_ids'
+            self.add_field(gridname=meshname, fieldname=fieldname,
                            array=ID_field, replace=True,
                            complib='zlib', complevel=1, shuffle=True)
         return ID_field
@@ -2739,8 +2744,8 @@ class SampleData:
             raise ValueError('Forbidden field shape. The field array must be'
                              ' of shape (Nvalues) or (Nvalues,Ndim). Received'
                              ' {}'.format(field_shape))
-        node_field = True
-        elem_field = True
+        node_field = False
+        elem_field = False
         Nnodes = self.get_attribute('number_of_nodes', meshname)
         Nelem = np.sum(self.get_attribute('Number_of_elements', meshname))
         Nfield_values = field_shape[0]
@@ -2758,7 +2763,7 @@ class SampleData:
         if not(compatibility):
             raise ValueError('Field number of values ({}) is not conformant'
                              ' with mesh number of nodes ({}) or number of'
-                             ' elements ({}). IP fields not implemented yet.'
+                             ' elements ({}).'
                              ''.format(field_shape, Nnodes, Nelem))
         if Field_dim not in XDMF_FIELD_TYPE:
             raise ValueError('Field dimensionnality `{}` is not know. '
@@ -2810,6 +2815,32 @@ class SampleData:
                              'Maybe are you trying to add a 3D field into a'
                              '3D grid.')
         return field_type, XDMF_FIELD_TYPE[dimension]
+    
+    def _mesh_field_padding(self, field, meshname):
+        """Pad with zeros the mesh elem field to comply with size."""
+        Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements',
+                                               meshname))
+        Nelem_boundary = np.sum(self.get_attribute(
+                                'Number_of_boundary_elements', meshname))
+        padding = 'None'
+        if field.shape[0] == Nelem_bulk:
+            padding = 'bulk'
+        elif field.shape[0] == Nelem_boundary:
+            padding = 'boundary'
+        if padding == 'None':
+            return field
+        elif padding == 'bulk':
+            Nelem_boundary = np.sum(self.get_attribute(
+                                'Number_of_boundary_elements',meshname))
+            pad_array = np.zeros(shape=(Nelem_boundary, field.shape[1]))
+            field = np.concatenate((field, pad_array), axis=0)
+            return field
+        elif padding == 'boundary':
+            Nelem_bulk = np.sum(self.get_attribute(
+                                    'Number_of_bulk_elements',meshname))
+            pad_array = np.zeros(shape=(Nelem_bulk, field.shape[1]))
+            field = np.concatenate((pad_array, field), axis=0)
+        return field
 
     def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
                            bin_fields_from_sets):
@@ -3058,21 +3089,43 @@ class SampleData:
 
     def _from_BT_mixed_topology(self, mesh_object):
         """Read mesh elements information/metadata from mesh_object."""
+        import BasicTools.Containers.ElementNames as EN
         topology_attributes = {}
         topology_attributes['Topology'] = 'Mixed'
         element_type = []
         Number_of_elements = []
+        Number_of_bulk_elements = []
+        Number_of_boundary_elements = []
         Xdmf_elements_code = []
+        Bulk_elements_over = False
         # for each element type in the mesh_object, read type, number and
         # xdmf code for the elements
         for ntype, data in mesh_object.elements.items():
             element_type.append(ntype)
             Number_of_elements.append(data.GetNumberOfElements())
             Xdmf_elements_code.append(XdmfNumber[ntype])
+            if EN.dimension[ntype] == mesh_object.GetDimensionality():
+                if Bulk_elements_over:
+                    raise ValueError('Boundary elements are stored before '
+                                     'bulk elements in the mesh_object. Bulk '
+                                     'elements should be stored before '
+                                     'boundary elements to comply with Sample'
+                                     'Data mesh conventions.')
+                Number_of_bulk_elements.append(data.GetNumberOfElements())
+            elif EN.dimension[ntype] < mesh_object.GetDimensionality():
+                Bulk_elements_over = True
+                Number_of_boundary_elements.append(data.GetNumberOfElements())
+            elif EN.dimension[ntype] > mesh_object.GetDimensionality():
+                raise ValueError('Elements dimensionality is higher than mesh'
+                                 ' dimensionality.')
         # Return them in topology_attributes dic
         topology_attributes['element_type'] = element_type
         topology_attributes['Number_of_elements'] = np.array(
             Number_of_elements)
+        topology_attributes['Number_of_bulk_elements'] = np.array(
+            Number_of_bulk_elements)
+        topology_attributes['Number_of_boundary_elements'] = np.array(
+            Number_of_boundary_elements)
         topology_attributes['Xdmf_elements_code'] = Xdmf_elements_code
         return topology_attributes
 

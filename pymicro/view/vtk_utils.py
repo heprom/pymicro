@@ -2051,32 +2051,36 @@ def select(grid, id_list, verbose=False):
 
 
 def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
-    '''Create a 3d actor representing a numpy array.
+    """Create a 3d actor representing a numpy array.
 
     Given a 3d array, this function compute the skin of the volume.
     The scalars can be mapped to the created surface and the colormap
     adjusted. If the data is in numpy format it is converted to VTK first.
 
     :param data: the dataset, in numpy or VTK format.
-    :param bool map_scalars: map the scalar in the data array to the created surface (False by default).
+    :param bool map_scalars: map the scalar in the data array to the created
+    surface (False by default).
     :param lut: a vtk lookup table (colormap) used to map the scalars.
+    :param bool hide_zero_values: blank cells with a value of zero (True
+    by default)
     :return: a vtk actor that can be added to a rendered to show the 3d array.
-    '''
+    """
     if type(data) == np.ndarray:
         grid = numpy_array_to_vtk_grid(data, cell_data=True)
         if hide_zero_values:
-            #workaround as SetCellVisibilityArray is not available anymore after vtk 6.3
-            if (vtk.vtkVersion().GetVTKMajorVersion() > 6) | (vtk.vtkVersion().GetVTKMajorVersion() == 6 and vtk.vtkVersion().GetVTKMinorVersion() > 2):
-                ids_to_blank = np.argwhere(data.transpose(2, 1, 0).flatten() == 0)
+            # workaround as SetCellVisibilityArray is not available anymore after vtk 6.3
+            if (vtk.vtkVersion().GetVTKMajorVersion() > 6) | \
+                    (vtk.vtkVersion().GetVTKMajorVersion() == 6 and
+                     vtk.vtkVersion().GetVTKMinorVersion() > 2):
+                ids_to_blank = np.squeeze(np.argwhere(
+                    data.transpose(2, 1, 0).flatten() == 0))
                 [grid.BlankCell(i) for i in ids_to_blank]
             else:
-                visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
+                visible = numpy_support.numpy_to_vtk(np.ravel(
+                    data > 0, order='F').astype(np.uint8), deep=1)
                 grid.SetCellVisibilityArray(visible)
-                #grid.SetPointVisibilityArray(visible)
-        size = data.shape
     else:
         grid = data
-        bounds = grid.GetBounds()
     extract = extract_poly_data(grid)
     return show_mesh(extract.GetOutput(), map_scalars, lut)
 

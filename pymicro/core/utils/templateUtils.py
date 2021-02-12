@@ -16,6 +16,9 @@ from string import Template
 class ScriptTemplate():
     """Generic class to handle, fill and run script templates.
     """
+    
+    # TODO: __repr__ method for string representation
+    # TODO: clean files method --> deletes temp file
 
     def __init__(self, template_file, script_file=None, args=None,
                  script_command=None, script_opts=[], workdir=None,
@@ -41,8 +44,14 @@ class ScriptTemplate():
         self.set_script_command(script_command)
         self.set_script_command_options(script_opts)
         self.set_work_directory(workdir)
-        self.autodelete = False
+        self.autodelete = autodelete
         self._verbose = verbose
+        return
+    
+    def __del__(self):
+        """ScriptTemplate class destructor."""
+        if self.autodelete:
+            self.clean_script_file()
         return
 
     def set_arguments(self, args=None, **kwargs):
@@ -119,6 +128,13 @@ class ScriptTemplate():
         else:
             self.opts = command_opts
         return
+    
+    def clean_script_file(self):
+        """Remove the last written script file."""
+        if self.script_file.exists():
+            print('Removing {}'.format(self.script_file))
+            os.remove(self.script_file)
+        return
 
     def createScript(self, filename=None):
         """Create a script file from the template and the stored arguments.
@@ -172,7 +188,7 @@ class ScriptTemplate():
         output = run(args=command_line, cwd=self.workdir,
                      capture_output=True)
         if self.autodelete:
-            os.remove(self.script_file)
+            self.clean_script_file()
         if print_output:
             print(f"SCRIPT RETURN CODE IS {output.returncode}.\n")
             print(f"SCRIPT STDOUT is: \n\n{output.stdout.decode()}")

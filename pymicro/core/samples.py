@@ -914,10 +914,13 @@ class SampleData:
         if not(self._is_grid(gridname)):
             raise tables.NodeError('{} is not a grid, cannot add a field data'
                                    ' array in this group.'.format(gridname))
+        # If needed, pad the field with 0s to comply with number of bulk and
+        # boundary elements
+        array, padding = self._mesh_field_padding(array, gridname)
         # Check if the array shape is consistent with the grid geometry
-        # and returns field dimension and xdmf Center attribute
+        # and returns field dimension, xdmf Center attribute
         field_type, dimensionality = self._check_field_compatibility(
-            gridname,array.shape)
+                                                        gridname,array.shape)
         if location is None:
             # FIELD STORAGE DEFAULT CONVENTION :
             # fields are stored directly into the HDF5 grid group
@@ -943,7 +946,8 @@ class SampleData:
                          'parent_grid_path': self._name_or_node_to_path(
                              gridname),
                          'xdmf_gridname': self.get_attribute('xdmf_gridname',
-                                                             gridname)
+                                                             gridname),
+                         'padding': padding
                          }
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
@@ -1249,7 +1253,8 @@ class SampleData:
                 node_path)
             self._verbose_print(msg)
 
-    def get_mesh(self, meshname, with_fields=True, as_numpy=True):
+    def get_mesh(self, meshname, with_tags=True, with_fields=True,
+                 as_numpy=True):
         """Return data of a mesh group as BasicTools UnstructuredMesh object.
 
         This methods gathers the data of a 2DMesh or 3DMesh group, including
@@ -1257,7 +1262,9 @@ class SampleData:
         BasicTools :class:`ConstantRectilinearMesh` object.
 
         :param str meshname: Name, Path or Indexname of the mesh group to get
-        :param with_fields: If `True`, store mesh group fields into the
+        :param bool with_tags: If `True`, store the nodes and element tags
+            (sets) into the mesh object
+        :param bool with_fields: If `True`, store mesh group fields into the
             mesh_object, defaults to True
         :type with_fields: bool, optional
         :return: Mesh_object containing all data (nodes, elements, nodes and
@@ -1272,9 +1279,11 @@ class SampleData:
         # No mesh ID for now --> create mesh Ids
         mesh_object.originalIDNodes = self.get_mesh_nodesID(meshname, as_numpy)
         # Get node tags
-        self._load_nodes_tags(meshname, mesh_object, as_numpy=as_numpy)
+        if with_tags:
+            self._load_nodes_tags(meshname, mesh_object, as_numpy=as_numpy)
         # Get mesh elements and element tags
         mesh_object.elements = self.get_mesh_elements(meshname,
+                                                      with_tags=with_tags,
                                                       as_numpy=as_numpy)
         # Get mesh fields
         Field_list =  self.get_attribute('Field_index', meshname)
@@ -1282,10 +1291,10 @@ class SampleData:
             for fieldname in Field_list:
                 field_type = self.get_attribute('field_type', fieldname)
                 if field_type == 'Nodal_field':
-                    data = self.get_node(fieldname,as_numpy=True)
+                    data = self.get_field(fieldname, unpad_field=True)
                     mesh_object.nodeFields[meshname] = data
                 elif field_type == 'Element_field':
-                    data = self.get_node(fieldname,as_numpy=True)
+                    data = self.get_field(fieldname, unpad_field=True)
                     mesh_object.elemFields[meshname] = data
         mesh_object.PrepareForOutput()
         return mesh_object
@@ -1352,7 +1361,7 @@ class SampleData:
         elems_path = self.get_attribute('elements_path', meshname)
         return self.get_node(elems_path, as_numpy)
 
-    def get_mesh_elements(self, meshname, as_numpy=True):
+    def get_mesh_elements(self, meshname, with_tags=True, as_numpy=True):
         """Return the mesh elements connectivity as HDF5 node or Numpy array.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
@@ -1370,6 +1379,7 @@ class SampleData:
         Nelems = Mesh_attrs['Number_of_elements']
         Xdmf_code = Mesh_attrs['Xdmf_elements_code']
         offset = 0
+        elements_offset = 0
         # For each element type, create an Element container and fill
         # connectivity
         for i in range(len(element_type)):
@@ -1399,12 +1409,16 @@ class SampleData:
                                      ''.format(element_type[i]))
                 Elements.connectivity = local_connect[:,id_offset:]
                 Elements.cpt = Nelems[i]
+                Elements._sd_element_offset = elements_offset
                 offset = Nvalues
+                elements_offset = Nelems[i]
             elif Topology == 'Uniform':
                 Elements.connectivity = connectivity.reshape((Nelems[i],
                                                               Nnode_per_el))
                 Elements.cpt = Nelems[i]
-        self._load_elements_tags(meshname, AElements, as_numpy)
+                Elements._sd_element_offset = offset
+        if with_tags:
+            self._load_elements_tags(meshname, AElements, as_numpy)
         return AElements
 
     def get_mesh_elem_tags_names(self, meshname):
@@ -1494,6 +1508,34 @@ class SampleData:
                 msg = ('(get_tablecol) Data is not an table node.')
                 self._verbose_print(msg)
         return data
+    
+    def get_field(self, fieldname, unpad_field=True):
+        """Return a padded or unpadded field from a grid data group as array.
+        
+        Use this method to get a mesh element wise field in its original form,
+        i.e. bulk element fields (defined on elements of the same dimensonality
+        than the mesh) or a boundary field (defined on elements of a lower
+        dimensionality than the mesh).
+        
+        :param str fieldname: Name, Path, Index, Alias or Node of the field in
+            dataset
+        :param bool unpad_field: if `True` (default), remove the zeros added to
+            to the field to comply with the mesh topology and return it with
+            its original size (bulk or boundary field).
+        """
+        field = self.get_node(fieldname, as_numpy=True)
+        padding = self.get_attribute('padding', fieldname)
+        parent_mesh =  self.get_attribute('parent_grid_path', fieldname)
+        if not self._is_mesh(parent_mesh):
+            raise Warning('Could not unpad field `{}`, which is an image '
+                          'field. Only mesh fields can be unpadded.'
+                          ''.format(fieldname)) 
+            return field
+        if padding is not None:
+            return self._mesh_field_unpadding(field, parent_mesh, padding)
+        else:
+            return field
+        
 
     def get_node(self, name, as_numpy=False):
         """Return a HDF5 node in the dataset.
@@ -2005,21 +2047,23 @@ class SampleData:
                   ''.format(node_path))
             self._verbose_print(msg)
             return
-        # remove node in xdmf tree
-        self._remove_from_xdmf(Node)
 
-        if (isGroup):
-            for child in Node._v_children:
-                remove_path = Node._v_children[child]._v_pathname
-                self._remove_from_index(node_path=remove_path)
-            self._verbose_print('Removing  node {} in content'
-                                ' index....'.format(
-                                    Node._v_pathname))
+        # Remove HDF5 node and its childrens
+        self._verbose_print('Removing  node {} in content index....'
+                            ''.format(Node._v_pathname))
+        if isGroup and recursive:
+            for child, child_node in Node._v_children.items():
+                self.remove_node(child_node, recursive=True)
             self._remove_from_index(node_path=Node._v_pathname)
+            # remove node in xdmf tree
+            self._remove_from_xdmf(Node)
             Node._f_remove(recursive=True)
         else:
             self._remove_from_index(node_path=Node._v_pathname)
+            # remove node in xdmf tree
+            self._remove_from_xdmf(Node)
             Node.remove()
+        # synchronize HDF5 and XDMF file with node removal
         self.sync()
         self._verbose_print('Node {} sucessfully removed'.format(name))
         return
@@ -2196,7 +2240,7 @@ class SampleData:
         shutil.rmtree(OUT_DIR)
         return
 
-    def create_elset_ids_field(self, meshname=None, store=True,
+    def create_elset_ids_field(self, meshname=None, store=True, fieldname=None,
                                get_sets_IDs=False, tags_prefix='elset',
                                remove_elset_fields=False):
         """Create an element tag Id field on the inputed mesh.
@@ -2248,7 +2292,9 @@ class SampleData:
                 field_path = os.path.join(El_tag_path, 'field_'+set_name)
                 self.remove_node(field_path)
         if store:
-            self.add_field(gridname=meshname, fieldname=meshname+'_elset_ids',
+            if fieldname is None:
+                fieldname = meshname+'_elset_ids'
+            self.add_field(gridname=meshname, fieldname=fieldname,
                            array=ID_field, replace=True,
                            complib='zlib', complevel=1, shuffle=True)
         return ID_field
@@ -2731,8 +2777,8 @@ class SampleData:
             raise ValueError('Forbidden field shape. The field array must be'
                              ' of shape (Nvalues) or (Nvalues,Ndim). Received'
                              ' {}'.format(field_shape))
-        node_field = True
-        elem_field = True
+        node_field = False
+        elem_field = False
         Nnodes = self.get_attribute('number_of_nodes', meshname)
         Nelem = np.sum(self.get_attribute('Number_of_elements', meshname))
         Nfield_values = field_shape[0]
@@ -2750,7 +2796,7 @@ class SampleData:
         if not(compatibility):
             raise ValueError('Field number of values ({}) is not conformant'
                              ' with mesh number of nodes ({}) or number of'
-                             ' elements ({}). IP fields not implemented yet.'
+                             ' elements ({}).'
                              ''.format(field_shape, Nnodes, Nelem))
         if Field_dim not in XDMF_FIELD_TYPE:
             raise ValueError('Field dimensionnality `{}` is not know. '
@@ -2802,6 +2848,48 @@ class SampleData:
                              'Maybe are you trying to add a 3D field into a'
                              '3D grid.')
         return field_type, XDMF_FIELD_TYPE[dimension]
+    
+    def _mesh_field_padding(self, field, meshname):
+        """Pad with zeros the mesh elem field to comply with size."""
+        Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements',
+                                               meshname))
+        Nelem_boundary = np.sum(self.get_attribute(
+                                'Number_of_boundary_elements', meshname))
+        padding = 'None'
+        if field.shape[0] == Nelem_bulk:
+            padding = 'bulk'
+        elif field.shape[0] == Nelem_boundary:
+            padding = 'boundary'
+        if padding == 'None':
+            pass
+        elif padding == 'bulk':
+            Nelem_boundary = np.sum(self.get_attribute(
+                                'Number_of_boundary_elements',meshname))
+            pad_array = np.zeros(shape=(Nelem_boundary, field.shape[1]))
+            field = np.concatenate((field, pad_array), axis=0)
+        elif padding == 'boundary':
+            Nelem_bulk = np.sum(self.get_attribute(
+                                    'Number_of_bulk_elements',meshname))
+            pad_array = np.zeros(shape=(Nelem_bulk, field.shape[1]))
+            field = np.concatenate((pad_array, field), axis=0)
+        return field, padding 
+    
+    def _mesh_field_unpadding(self, field, parent_mesh, padding):
+        """Remove zeros to return field to original shape, before padding."""
+        Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements',
+                                               parent_mesh))
+        Nelem_boundary = np.sum(self.get_attribute(
+                                'Number_of_boundary_elements', parent_mesh))
+        if padding == 'bulk':
+            field = field[:Nelem_bulk,:]
+        elif padding == 'boundary':
+            field = field[Nelem_boundary,:]
+        elif padding == 'None':
+            pass
+        else:
+            raise Warning('Cannot unpad the field, unknown padding type `{}`'
+                          ''.format(padding))
+        return field
 
     def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
                            bin_fields_from_sets):
@@ -3045,26 +3133,51 @@ class SampleData:
                 elem_container = AllElements.GetElementsOfType(el_type)
                 tag = elem_container.tags.CreateTag(tag_name,False)
                 tag_path = os.path.join(Etags_group._v_pathname,'ET_'+tag_name)
-                tag.SetIds(self.get_node(tag_path, as_numpy))
+                nodes_Ids = self.get_node(tag_path, as_numpy)
+                ## Need to add local ids !! Substract the offset stored by 
+                ## get_mesh_elements
+                tag.SetIds(nodes_Ids- elem_container._sd_element_offset)
         return AllElements
 
     def _from_BT_mixed_topology(self, mesh_object):
         """Read mesh elements information/metadata from mesh_object."""
+        import BasicTools.Containers.ElementNames as EN
         topology_attributes = {}
         topology_attributes['Topology'] = 'Mixed'
         element_type = []
         Number_of_elements = []
+        Number_of_bulk_elements = []
+        Number_of_boundary_elements = []
         Xdmf_elements_code = []
+        Bulk_elements_over = False
         # for each element type in the mesh_object, read type, number and
         # xdmf code for the elements
         for ntype, data in mesh_object.elements.items():
             element_type.append(ntype)
             Number_of_elements.append(data.GetNumberOfElements())
             Xdmf_elements_code.append(XdmfNumber[ntype])
+            if EN.dimension[ntype] == mesh_object.GetDimensionality():
+                if Bulk_elements_over:
+                    raise ValueError('Boundary elements are stored before '
+                                     'bulk elements in the mesh_object. Bulk '
+                                     'elements should be stored before '
+                                     'boundary elements to comply with Sample'
+                                     'Data mesh conventions.')
+                Number_of_bulk_elements.append(data.GetNumberOfElements())
+            elif EN.dimension[ntype] < mesh_object.GetDimensionality():
+                Bulk_elements_over = True
+                Number_of_boundary_elements.append(data.GetNumberOfElements())
+            elif EN.dimension[ntype] > mesh_object.GetDimensionality():
+                raise ValueError('Elements dimensionality is higher than mesh'
+                                 ' dimensionality.')
         # Return them in topology_attributes dic
         topology_attributes['element_type'] = element_type
         topology_attributes['Number_of_elements'] = np.array(
             Number_of_elements)
+        topology_attributes['Number_of_bulk_elements'] = np.array(
+            Number_of_bulk_elements)
+        topology_attributes['Number_of_boundary_elements'] = np.array(
+            Number_of_boundary_elements)
         topology_attributes['Xdmf_elements_code'] = Xdmf_elements_code
         return topology_attributes
 
@@ -3204,12 +3317,12 @@ class SampleData:
         self.xdmf_tree.getroot()[0].append(mesh_xdmf)
         return
 
-    def _append_field_index(self, gridname, field_path):
-        """Append field_path to the field index of a grid group."""
+    def _append_field_index(self, gridname, fieldname):
+        """Append field name to the field index of a grid group."""
         Field_index = self.get_attribute('Field_index', gridname)
         if Field_index is None:
             Field_index = []
-        Field_index.append(field_path)
+        Field_index.append(fieldname)
         self.add_attributes({'Field_index': Field_index}, gridname)
         return
 

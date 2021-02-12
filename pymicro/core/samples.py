@@ -916,7 +916,7 @@ class SampleData:
                                    ' array in this group.'.format(gridname))
         # If needed, pad the field with 0s to comply with number of bulk and
         # boundary elements
-        array = self._mesh_field_padding(array, gridname)
+        array, padding = self._mesh_field_padding(array, gridname)
         # Check if the array shape is consistent with the grid geometry
         # and returns field dimension, xdmf Center attribute
         field_type, dimensionality = self._check_field_compatibility(
@@ -946,7 +946,8 @@ class SampleData:
                          'parent_grid_path': self._name_or_node_to_path(
                              gridname),
                          'xdmf_gridname': self.get_attribute('xdmf_gridname',
-                                                             gridname)
+                                                             gridname),
+                         'padding': padding
                          }
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
@@ -1290,10 +1291,10 @@ class SampleData:
             for fieldname in Field_list:
                 field_type = self.get_attribute('field_type', fieldname)
                 if field_type == 'Nodal_field':
-                    data = self.get_node(fieldname,as_numpy=True)
+                    data = self.get_field(fieldname, unpad_field=True)
                     mesh_object.nodeFields[meshname] = data
                 elif field_type == 'Element_field':
-                    data = self.get_node(fieldname,as_numpy=True)
+                    data = self.get_field(fieldname, unpad_field=True)
                     mesh_object.elemFields[meshname] = data
         mesh_object.PrepareForOutput()
         return mesh_object
@@ -1378,6 +1379,7 @@ class SampleData:
         Nelems = Mesh_attrs['Number_of_elements']
         Xdmf_code = Mesh_attrs['Xdmf_elements_code']
         offset = 0
+        elements_offset = 0
         # For each element type, create an Element container and fill
         # connectivity
         for i in range(len(element_type)):
@@ -1407,11 +1409,14 @@ class SampleData:
                                      ''.format(element_type[i]))
                 Elements.connectivity = local_connect[:,id_offset:]
                 Elements.cpt = Nelems[i]
+                Elements._sd_element_offset = elements_offset
                 offset = Nvalues
+                elements_offset = Nelems[i]
             elif Topology == 'Uniform':
                 Elements.connectivity = connectivity.reshape((Nelems[i],
                                                               Nnode_per_el))
                 Elements.cpt = Nelems[i]
+                Elements._sd_element_offset = offset
         if with_tags:
             self._load_elements_tags(meshname, AElements, as_numpy)
         return AElements
@@ -1503,6 +1508,34 @@ class SampleData:
                 msg = ('(get_tablecol) Data is not an table node.')
                 self._verbose_print(msg)
         return data
+    
+    def get_field(self, fieldname, unpad_field=True):
+        """Return a padded or unpadded field from a grid data group as array.
+        
+        Use this method to get a mesh element wise field in its original form,
+        i.e. bulk element fields (defined on elements of the same dimensonality
+        than the mesh) or a boundary field (defined on elements of a lower
+        dimensionality than the mesh).
+        
+        :param str fieldname: Name, Path, Index, Alias or Node of the field in
+            dataset
+        :param bool unpad_field: if `True` (default), remove the zeros added to
+            to the field to comply with the mesh topology and return it with
+            its original size (bulk or boundary field).
+        """
+        field = self.get_node(fieldname, as_numpy=True)
+        padding = self.get_attribute('padding', fieldname)
+        parent_mesh =  self.get_attribute('parent_grid_path', fieldname)
+        if not self._is_mesh(parent_mesh):
+            raise Warning('Could not unpad field `{}`, which is an image '
+                          'field. Only mesh fields can be unpadded.'
+                          ''.format(fieldname)) 
+            return field
+        if padding is not None:
+            return self._mesh_field_unpadding(field, parent_mesh, padding)
+        else:
+            return field
+        
 
     def get_node(self, name, as_numpy=False):
         """Return a HDF5 node in the dataset.
@@ -2828,18 +2861,34 @@ class SampleData:
         elif field.shape[0] == Nelem_boundary:
             padding = 'boundary'
         if padding == 'None':
-            return field
+            pass
         elif padding == 'bulk':
             Nelem_boundary = np.sum(self.get_attribute(
                                 'Number_of_boundary_elements',meshname))
             pad_array = np.zeros(shape=(Nelem_boundary, field.shape[1]))
             field = np.concatenate((field, pad_array), axis=0)
-            return field
         elif padding == 'boundary':
             Nelem_bulk = np.sum(self.get_attribute(
                                     'Number_of_bulk_elements',meshname))
             pad_array = np.zeros(shape=(Nelem_bulk, field.shape[1]))
             field = np.concatenate((pad_array, field), axis=0)
+        return field, padding 
+    
+    def _mesh_field_unpadding(self, field, parent_mesh, padding):
+        """Remove zeros to return field to original shape, before padding."""
+        Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements',
+                                               parent_mesh))
+        Nelem_boundary = np.sum(self.get_attribute(
+                                'Number_of_boundary_elements', parent_mesh))
+        if padding == 'bulk':
+            field = field[:Nelem_bulk,:]
+        elif padding == 'boundary':
+            field = field[Nelem_boundary,:]
+        elif padding == 'None':
+            pass
+        else:
+            raise Warning('Cannot unpad the field, unknown padding type `{}`'
+                          ''.format(padding))
         return field
 
     def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
@@ -3084,7 +3133,10 @@ class SampleData:
                 elem_container = AllElements.GetElementsOfType(el_type)
                 tag = elem_container.tags.CreateTag(tag_name,False)
                 tag_path = os.path.join(Etags_group._v_pathname,'ET_'+tag_name)
-                tag.SetIds(self.get_node(tag_path, as_numpy))
+                nodes_Ids = self.get_node(tag_path, as_numpy)
+                ## Need to add local ids !! Substract the offset stored by 
+                ## get_mesh_elements
+                tag.SetIds(nodes_Ids- elem_container._sd_element_offset)
         return AllElements
 
     def _from_BT_mixed_topology(self, mesh_object):
@@ -3265,12 +3317,12 @@ class SampleData:
         self.xdmf_tree.getroot()[0].append(mesh_xdmf)
         return
 
-    def _append_field_index(self, gridname, field_path):
-        """Append field_path to the field index of a grid group."""
+    def _append_field_index(self, gridname, fieldname):
+        """Append field name to the field index of a grid group."""
         Field_index = self.get_attribute('Field_index', gridname)
         if Field_index is None:
             Field_index = []
-        Field_index.append(field_path)
+        Field_index.append(fieldname)
         self.add_attributes({'Field_index': Field_index}, gridname)
         return
 

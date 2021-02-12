@@ -403,6 +403,7 @@ class SDZsetMesher():
         p = Path(filename).absolute()
         mesh = self.data.get_mesh(meshname=meshname, with_tags=with_tags, 
                                   with_fields=False, as_numpy=True)
+        mesh.PrepareForOutput()
         OW = GW.GeofWriter()
         OW.Open(str(p))
         OW.Write(mesh)
@@ -737,6 +738,15 @@ class SDZsetMesher():
                                                         self._current_position)
         return
         
+    def reinitialize_mesher_commands(self):
+        """Removes all added mesher commands to produce virgin mesher file."""
+        self.mesher_lines = []
+        self.Script.args = {}
+        self.mesher_args_list = ['input_meshfile','output_meshfile']
+        self.set_mesher_args(input_meshfile=str(self.input_meshfile))
+        self.set_mesher_args(output_meshfile=str(self.output_meshfile))
+        self._current_position = 0
+        self._init_mesher_content()
     
     def remove_set(self, **keywords):
         """Write a Zset mesher nset/elset/bset removal command.
@@ -811,8 +821,8 @@ class SDZsetMesher():
     def _get_fields_to_transfer(self):
         self.fields_storage = {}
         for fieldname in self.fields_to_transfer:
-            self.fields_storage[fieldname] = self.data.get_node(fieldname, 
-                                                                as_numpy=True)
+            field  = self.data.get_field(fieldname, unpad_field=True)
+            self.fields_storage[fieldname] = field
         return     
     
     def _load_fields_to_transfer(self):

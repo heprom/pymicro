@@ -1555,7 +1555,7 @@ class Microstructure(SampleData):
                                            grain_map.shape[1], 1))
         return grain_map
 
-    def get_mask(self, as_numpy=False):
+    def get_mask(self, as_numpy=True):
         mask = self.get_node(name='mask', as_numpy=as_numpy)
         if self._is_empty('mask'):
             mask = None
@@ -1847,7 +1847,7 @@ class Microstructure(SampleData):
         The grains are added with a (0,0,0) orientation by convention.
         """
         _, _, not_in_table = self.compute_grains_map_table_intersection()
-        euler_list = np.zeros((len(not_in_table),3))
+        euler_list = np.zeros((len(not_in_table), 3))
         self.add_grains(euler_list, grain_ids=not_in_table)
         return
 
@@ -2212,6 +2212,7 @@ class Microstructure(SampleData):
         grain_map = self.get_grain_map(as_numpy=True)
         if grain_map is None:
             return []
+        # TODO: use the grain bounding box to speed this up
         grain_data = (grain_map == grain_id)
         grain_data_dil = ndimage.binary_dilation(grain_data,
                                                  iterations=distance).astype(
@@ -2227,14 +2228,14 @@ class Microstructure(SampleData):
         :param bool use_mask: if True and that this microstructure has a mask,
                the dilation will be limite by it.
         """
-        # TODO : test
+        # TODO: test
         grain_map = self.get_grain_map(as_numpy=True)
         grain_volume_init = (grain_map == grain_id).sum()
         grain_data = grain_map == grain_id
         grain_data = ndimage.binary_dilation(grain_data,
                                              iterations=dilation_steps).astype(np.uint8)
-        if use_mask and self.__contains__('mask'):
-            grain_data *= self.get_node('mask')
+        if use_mask and not self._is_empty('mask'):
+            grain_data *= self.get_mask(as_numpy=True)
         grain_map[grain_data == 1] = grain_id
         grain_volume_final = (grain_map == grain_id).sum()
         print('grain %s was dilated by %d voxels' % (grain_id,
@@ -2397,7 +2398,7 @@ class Microstructure(SampleData):
         print(micro_crop.h5_dataset)
         micro_crop.set_grain_map(grain_map_crop,
                                  voxel_size=self.get_voxel_size())
-        if self.get_mask():
+        if not self._is_empty('mask'):
             mask_crop = self.get_mask()[x_start:x_end, y_start:y_end,
                                 z_start:z_end]
             micro_crop.set_mask(mask_crop)
@@ -3368,12 +3369,13 @@ class Microstructure(SampleData):
               % micros[1].get_sample_name())
         for match in matched:
             ref_id, other_id = match
+            #TODO get this done faster (could be factorized in the method renumber_grains
             print('replacing %d by %d' % (other_id, ref_id))
             grain_map_translated[grain_map == other_id] = ref_id
             try:
                 ids_mrg_list.remove(other_id)
             except ValueError:
-                # this can happend if a reference grain was matched to more than 1 grain
+                # this can happen if a reference grain was matched to more than 1 grain
                 print('%d was not in list anymore' % other_id)
         # also renumber the rest using the offset
         renumbered_grains = []

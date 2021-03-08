@@ -4,7 +4,7 @@ from pymicro.crystal.microstructure import Microstructure, Grain, Orientation
 from matplotlib import pyplot as plt, colors, colorbar, cm
 
 '''
-An inverse pole figure with symboled colored by the grain size.
+An inverse pole figure with symbols colored by the grain size.
 '''
 euler_list = np.genfromtxt('../data/EBSD_20grains.txt', usecols=[1, 2, 3]).tolist()
 grain_sizes = np.genfromtxt('../data/EBSD_20grains.txt', usecols=[9])
@@ -29,8 +29,9 @@ cb = colorbar.ColorbarBase(ax2, cmap=cm.jet, norm=norm, orientation='vertical')
 cb.set_label('Grain size (pixels)')
 
 image_name = os.path.splitext(__file__)[0] + '.png'
-print('writting %s' % image_name)
+print('writing %s' % image_name)
 plt.savefig(image_name, format='png')
+del pf
 del micro
 
 from matplotlib import image

@@ -1,29 +1,28 @@
 #!/usr/bin/env python
 import os, numpy as np
-from pymicro.crystal.microstructure import Microstructure, Grain, Orientation
+from pymicro.crystal.microstructure import Microstructure
 from pymicro.crystal.texture import PoleFigure
-from matplotlib import pyplot as plt, colors, cm
 
 if __name__ == '__main__':
     '''
     200 Pole figure of a copper sample containing 10000 grains with a fibre
     texture.
     '''
-    eulers = Orientation.read_euler_txt('../data/Cu_200.dat')
-    micro = Microstructure(name='Cu_200')
-    for index in eulers:
-        # if index > 1000: continue
-        micro.grains.append(Grain(index, eulers[index]))
+    euler_list = np.genfromtxt('../data/Cu_200.dat', usecols=(0, 1, 2), max_rows=1000)
+    micro = Microstructure(name='Cu_200', autodelete=True)
+    micro.add_grains(euler_list)
 
     # create pole figure (both direct and inverse)
-    pf = PoleFigure(hkl='200', proj='stereo', microstructure=micro, verbose=False)
+    pf = PoleFigure(hkl='200', proj='stereo', microstructure=micro)
     pf.color_by_grain_id = False
     pf.mksize = 5
     pf.pflegend = False
     pf.plot_pole_figures(plot_sst=True, display=False, save_as='png')
+    del pf
+    del micro
 
     image_name = os.path.splitext(__file__)[0] + '.png'
-    print('writting %s' % image_name)
+    print('writing %s' % image_name)
 
     from matplotlib import image
 

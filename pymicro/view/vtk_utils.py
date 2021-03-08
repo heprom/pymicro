@@ -72,6 +72,23 @@ def pv_rand_cmap(N=256, first_is_black=False):
     print('</ColorMap>')
 
 
+def pyplot_cmap(name='viridis', table_range=(0, 255)):
+    """Create a VTK colormap from pyplot.
+
+    :param str name: the color map name to import from pyplot.
+    :return:
+    """
+    from matplotlib import cm
+    cmap = cm.get_cmap(name)
+    lut = vtk.vtkLookupTable()
+    lut.SetNumberOfTableValues(256)
+    lut.Build()
+    for i in range(256):
+        lut.SetTableValue(i, *cmap([i]))
+    lut.SetRange(table_range)
+    return lut
+
+
 def gray_cmap(table_range=(0, 255)):
     '''create a black and white colormap.
 

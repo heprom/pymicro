@@ -3,8 +3,8 @@ from pymicro.crystal.texture import *
 from matplotlib import pyplot as plt, colors, colorbar, cm
 
 if __name__ == '__main__':
-    '''This example demonstrate how a field can be used to color each
-    symbol on the pole figure with the :py:meth:~`pymicro.crystal.texture.set_map_field`
+    '''This example demonstrate how a field can be used to color each symbol on
+    the pole figure with the :py:meth:~`pymicro.crystal.texture.set_map_field`
     method.
     '''
     #orientations = Orientation.read_euler_txt('../data/orientation_set.inp')
@@ -34,8 +34,9 @@ if __name__ == '__main__':
     cb.set_label('Average strain (mm/mm)')
 
     image_name = os.path.splitext(__file__)[0] + '.png'
-    print('writting %s' % image_name)
+    print('writing %s' % image_name)
     plt.savefig('%s' % image_name, format='png')
+    del pf
     del micro
 
     from matplotlib import image

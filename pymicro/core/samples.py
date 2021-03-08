@@ -929,6 +929,8 @@ class SampleData:
             # check if the given location is a subgroup of the grid group
             if self._is_children_of(location, gridname):
                 array_location = location
+            elif self.get_node(location) == self.get_node(gridname):
+                array_location = location
             else:
                 raise tables.NodeError('Cannot add field at location `{}`.'
                                        ' Field location must be a grid group'
@@ -1526,11 +1528,6 @@ class SampleData:
         field = self.get_node(fieldname, as_numpy=True)
         padding = self.get_attribute('padding', fieldname)
         parent_mesh =  self.get_attribute('parent_grid_path', fieldname)
-        if not self._is_mesh(parent_mesh):
-            raise Warning('Could not unpad field `{}`, which is an image '
-                          'field. Only mesh fields can be unpadded.'
-                          ''.format(fieldname)) 
-            return field
         if padding is not None:
             return self._mesh_field_unpadding(field, parent_mesh, padding)
         else:

@@ -7,9 +7,13 @@
 import os
 import shutil
 import numpy as np
+
 from subprocess import run
 from pathlib import Path
 from string import Template
+
+import BasicTools.IO.UtReader as UR
+
 from pymicro.core.utils.templateUtils import ScriptTemplate
 from pymicro.core.samples import SampleData
 
@@ -104,7 +108,7 @@ class SDZset():
             del self.data
         if self.autodelete:
             self.clean_output_files()
-            self.clean_mesher_files()
+            self.clean_script_files()
             if hasattr(self, 'data_inputmesh'):
                 self.clean_input_mesh_file()
         return
@@ -201,6 +205,7 @@ class SDZset():
         if filename is not None:
             p = Path(filename).absolute()
             self.inp_script = p.parent / f'{p.stem}.inp'
+            self.inp_template = p.parent / f'{p.stem}_tmp.inp'
             self.Script.set_template_filename(self.inp_script)
         return
     
@@ -244,9 +249,10 @@ class SDZset():
         """Remove all Zset output files and output .geof file if possible."""
         if clean_output_mesh:
             run(args=['Zclean',f'{self.inp_script.stem}_tmp'])
-        if self.output_meshfile.exists():
-            print('Removing {} ...'.format(str(self.output_meshfile)))
-            os.remove(self.output_meshfile)
+        if hasattr(self, 'output_meshfile'):
+            if self.output_meshfile.exists():
+                print('Removing {} ...'.format(str(self.output_meshfile)))
+                os.remove(self.output_meshfile)
         return
     
     def clean_input_mesh_file(self):
@@ -276,6 +282,7 @@ class SDZset():
         a .inp file.
         """
         print('\nContent of the .inp script:\n-----------------------\n')
+        self._check_arguments_list()
         for line in self.inp_lines:
             line_tmp = Template(line)
             print(line_tmp.substitute(self.Script.args), end='')
@@ -339,6 +346,139 @@ class SDZset():
                                location=mesh_location, 
                                bin_fields_from_sets=bin_fields_from_sets)
         return mesh
+    
+    def load_FEA_metadata(self, load_in_data=False):
+        """If Zset script output exists, read fem analysis metadata."""
+        self._clean_ut_file_comments()
+        ut_file = str(self.inp_template.with_suffix('.ut'))
+        self.metadata = UR.ReadUTMetaData(ut_file)
+        self.metadata['Sequence'] = self.metadata["time"][:, 4]
+        if load_in_data:
+            self.data.add_attributes(self.metadata, self.data_inputmesh)
+        return
+    
+    def load_field_sequence(self, field_sequence, sequence_name, suffix=None):
+        """Load a field sequence into the SampleData instance.
+        
+        :param field_sequence: dict of the form {fielname: field array} of
+            FEM fields from one sequence of a Zset FEA calculation. See
+            `read_output_fields` for more details.
+        :type field_sequence: TYPE
+        :param sequence_name: Name of the HDF5 group used to store the sequence
+            fields. If the group does not exist, it is created.
+        :type sequence_name: str
+        :param suffix: suffix to add to the fields names. If `None` (default),
+            suffix is '_sequence_name'. 
+        :type suffix: TYPE, optional
+        """
+        # create a Group to store the sequence in the Mesh group
+        if not self.data.__contains__(sequence_name):
+            self.data.add_group(groupname=sequence_name,
+                                location=self.data_inputmesh, replace=False)
+        # store fields in the group for the mesh group
+        for key, value in field_sequence.items():
+            if suffix is None:
+                name = key + '_' + sequence_name
+            else:
+                name = key + suffix
+            self.data.add_field(gridname=self.data_inputmesh, fieldname=name,
+                                array=value, location=sequence_name)
+        return
+    
+    def load_output_fields(self, field_list=None, sequence_list=None,
+                           sequence_basename='', is_time_sequence=True,
+                           fields_basename=''):
+        """Load fields from Zset FEA output into the SampleData instance.
+        
+        :param field_list: List of variables names corresponding to the fields
+            to read from the FEA output. Defaults to None: read all fields.
+        :type field_list: list[str], optional
+        :param sequence_list: List of output sequences to read. Defaults to None:
+            read all sequences.
+        :type sequence_list: list[str], optional
+        :raises RuntimeError: raised if the FEA has not been runed. 
+        :raises ValueError: raised if fields not in FEA output are required
+        :return Nodal_field_sequence: List of dict{fieldname: field array}, one
+            element for each sequence, for the node fields.
+        :rtype: list
+        :return Integ_field_sequence: List of dict{fieldname: field array}, one
+            element for each sequence, for the integration points fields.
+        :rtype: list
+        """
+        # read the output fields
+        Nodal_fields, Integ_fields = self.read_output_fields(
+                                                    field_list, sequence_list)
+        # load the outputs into the SampleData instance
+        for i in range(len(Nodal_fields)):
+            suffix = f'{fields_basename}_{i}'
+            if is_time_sequence:
+                sequence_group = sequence_basename+f'time_{i}'
+            else:
+                sequence_group = sequence_basename
+            self.load_field_sequence(Nodal_fields[i], sequence_group, suffix)
+            self.load_field_sequence(Integ_fields[i], sequence_group, suffix)
+        return
+        
+    def read_output_fields(self, field_list=None, sequence_list=None):
+        """Read node or integration point fields from Zset FEA output.
+        
+        :param field_list: List of variables names corresponding to the fields
+            to read from the FEA output. Defaults to None: read all fields.
+        :type field_list: list[str], optional
+        :param sequence_list: List of output sequences to read. Defaults to None:
+            read all sequences.
+        :type sequence_list: list[str], optional
+        :raises RuntimeError: raised if the FEA has not been runed. 
+        :raises ValueError: raised if fields not in FEA output are required
+        :return Nodal_field_sequence: List of dict{fieldname: field array}, one
+            element for each sequence, for the node fields.
+        :rtype: list
+        :return Integ_field_sequence: List of dict{fieldname: field array}, one
+            element for each sequence, for the integration points fields.
+        :rtype: list
+        """
+        # verify FEA output presence
+        if not self._check_fea_output_presence():
+            raise RuntimeError('No finite element analysis output found for'
+                               f' the class inp script {self.inp_template}.'
+                               ' Cannot load results.')
+        # get output file 
+        self._clean_ut_file_comments()
+        ut_file = str(self.inp_template.with_suffix('.ut'))
+        # load FEA calc metadata
+        self.load_FEA_metadata()
+        metadata_field_list = self.metadata['node']
+        metadata_field_list.extend(self.metadata['integ'])
+        if field_list is None:
+            field_list = metadata_field_list
+        else:
+            # check if required fields are in fea metadata
+            if not set(field_list) <= set(metadata_field_list):
+                raise ValueError(f'Inputed field list ({field_list}) is'
+                                 f' not contained into FEA output field'
+                                 f' list ({metadata_field_list})')
+        # load nodal fields for each sequence and for each variable
+        Nodal_field_sequence = []
+        Integ_field_sequence = []
+        for t in self.metadata['Sequence']:
+            print(t)
+            if sequence_list is not None:
+                if t not in sequence_list:
+                    continue
+            nodal_fields_dic = {}
+            integ_fields_dic = {}
+            for fieldname in field_list:
+                if fieldname in self.metadata['node']:
+                    nodal_fields_dic[fieldname] = UR.ReadFieldFromUt(
+                        fileName=ut_file, fieldname=fieldname, time=t,
+                        atIntegrationPoints=False)
+                elif fieldname in self.metadata['integ']:
+                    integ_fields_dic[fieldname] = UR.ReadFieldFromUt(
+                        fileName=ut_file, fieldname=fieldname, time=t,
+                        atIntegrationPoints=True)
+            Nodal_field_sequence.append(nodal_fields_dic)
+            Integ_field_sequence.append(integ_fields_dic)
+        return Nodal_field_sequence, Integ_field_sequence
     
     def write_input_mesh_to_geof(self, with_tags=True):
         """Write the input data from SampleData instance to .geof file.
@@ -473,6 +613,16 @@ class SDZset():
         self._current_position = self._add_inp_lines(lines,0) - 1
         return
     
+    def _set_position_at_command(self, command='', after=True):
+        """Set file position after/before passed Zset stared command."""
+        count = 0
+        for line in self.inp_lines:
+            if line.strip().startswith(command.strip()):
+                self._current_position = count + after*1
+                return
+            count += 1
+        return
+    
     def _add_inp_lines(self, lines, position):
         """Add a line to the .inp file content."""
         pos = position
@@ -493,13 +643,46 @@ class SDZset():
             lines.append(line)   
         return lines
     
+    def _check_fea_output_presence(self):
+        """Verify that Zset has produced a finite element analysis output."""
+        output_file = self.inp_template.with_suffix('.ut')
+        if output_file.exists():
+            return True
+        else:
+            return False
+    
     def _check_arguments_list(self):
         """Verify that each template argument has been provided a value."""
+        args_not_set = []
+        args_none = []
         for arg in self.script_args_list:
             if arg not in self.Script.args.keys():
-                raise ValueError('Script command argument `{}` value missing.'
-                                 ' Use `set_script_args` method to assign a '
-                                 'value'.format(arg))
+                args_not_set.append(arg)
+            elif self.Script.args[arg] is None:
+                args_none.append(arg)
+        if len(args_none) > 0:
+            raise Warning('Script command arguments `{}` value(s) are `None`.'
+                          ' Use `set_script_args` method to assign a '
+                          'value if needed.'.format(args_none))
+        if len(args_not_set) > 0:
+            raise ValueError('Script command arguments `{}` value(s) missing.'
+                             ' Use `set_script_args` method to assign a '
+                             'value'.format(args_not_set))
+        return
+    
+    def _clean_ut_file_comments(self):
+        SDZset._clean_comments(str(self.inp_template.with_suffix('.ut')))
+        return
+        
+    @staticmethod
+    def _clean_comments(filename):
+        new_lines = []
+        with open(filename,'r') as f:
+            for line in f.readlines():
+                if not line.startswith('%'):
+                    new_lines.append(line)
+        with open(filename, 'w') as f:
+            f.writelines(new_lines)
         return
         
     def _get_fields_to_transfer(self):
@@ -514,6 +697,15 @@ class SDZset():
             self.data.add_field(gridname=self.data_outputmesh,
                                 fieldname=fieldname, array=field)
         return
+    
+    def _add_templates_to_args(self, input_list):
+        """Search input_list values for templates and add them to script args.
+        """
+        for item in input_list:
+            temp = self._find_template_string(str(item))
+            if temp:
+                self.script_args_list.append(temp)
+        return            
     
     @staticmethod
     def _find_template_string(string):

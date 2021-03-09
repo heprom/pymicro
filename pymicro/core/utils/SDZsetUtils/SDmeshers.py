@@ -57,7 +57,48 @@ class SDZsetMesher(SDZset):
                  input_meshfile=Path('.').absolute() / 'input.geof', 
                  output_meshfile=Path('.').absolute() / 'output.geof', 
                  verbose=False, autodelete=False, data_autodelete=False):
-        """SDZsetMesher class constructor."""
+        """SDZsetMesher class constructor.
+        
+        :param data: SampleData object to store input and output data for/from
+            Zset. If `None`, the class will open a SampleData instance from a
+            datafile path. Defaults to None
+        :type data: :py:class:`pymicro.core.samples.SampleData` object, optional
+        :param sd_datafile:  Path of the hdf5/xdmf data file to open as the
+            SampleData instance containing mesh tools input data. Defaults to
+            None
+        :type sd_datafile: str, optional
+        :param inp_filename: Name of the .inp script file associated to the
+            class instance. Zset commands passed to the class instance are
+            written in this file. Defaults to `./script.inp`
+        :type inp_filename: str, optional
+        :param inputmesh: Name, Path, Indexname or Alias of the mesh group
+            in the SampleData instance to use as Zset inputmesh. Defaults to
+            None
+        :type inputmesh: str, optional
+        :param outputmesh:  Name, Path, Indexname or Alias of the mesh group
+            in the SampleData instance to store Zset output mesh (for Zset
+            meshers). Defaults to None
+        :type outputmesh: str, optional
+        :param input_meshfile: Name of .geof mesh file to use as Zset input.
+            If `inputmesh` is `None`, the file must exist and be a valid .geof
+            meshfile for Zset. If `inputmesh` is not `None`, then the mesh data
+            refered by `meshname` in the SampleData instance will be written
+            as a .geof mesh file `meshfilename.geof`.
+            Defaults to `./input.geof`
+        :type input_meshfile: str, optional
+        :param output_meshfile: Name of the mesh .geof file to use as output
+            when using Zset meshers. Defaults to `./output.geof`
+        :type output_meshfile: str, optional
+        :param verbose: verbosity flag, defaults to False
+        :type verbose: bool, optional
+        :param autodelete: If `True`, removes all temporary files, script files
+            and Zset output files (~ Zclean) when deleting the class isntance.
+            Defaults to False
+        :type autodelete: bool, optional
+        :param data_autodelete: If `True`, set `autodelete` flag to `True` on
+            SampleData instance. Defaults to False
+        :type data_autodelete: bool, optional
+        """
         super(SDZsetMesher, self).__init__(data, sd_datafile, inp_filename,
                                            inputmesh, outputmesh,
                                            input_meshfile, output_meshfile,
@@ -134,9 +175,7 @@ class SDZsetMesher(SDZset):
               string template)
         """
         # find out if the set_name is a script template element
-        temp = self._find_template_string(set_name)
-        if temp:
-            self.script_args_list.append(temp)
+        self._add_templates_to_args([set_name])
         # creates line for mesher point set definition command base line
         lines = [f'  **elset {set_name}']   
         # Add command options
@@ -168,9 +207,7 @@ class SDZsetMesher(SDZset):
         # creates line for mesher point set definition command base line
         lines = [f'  **unshared_faces {setname}']
         if used_elsets is not None:
-            temp = self._find_template_string(used_elsets)
-            if temp:
-                self.script_args_list.append(temp)
+            self._add_templates_to_args(used_elsets)
             lines.append(f'   *elsets {used_elsets}')
         # write command in mesher 
         self._current_position = self._add_inp_lines(lines,
@@ -195,9 +232,7 @@ class SDZsetMesher(SDZset):
             `False`, create a nset definition command.
         """
         # find out if the set_name is a script template element
-        temp = self._find_template_string(set_name)
-        if temp:
-            self.script_args_list.append(temp)
+        self._add_templates_to_args([set_name])
         # creates line for mesher boundary set definition command base line
         lines = [f'  **bset {set_name}']
         # Add command options
@@ -220,9 +255,7 @@ class SDZsetMesher(SDZset):
             `False`, create a nset definition command.
         """
         # find out if the set_name is a script template element
-        temp = self._find_template_string(set_name)
-        if temp:
-            self.script_args_list.append(temp)
+        self._add_templates_to_args([set_name])
         # creates line for mesher point set definition command base line
         lines = [f'  **nset {set_name}']
         # Add command options
@@ -240,9 +273,7 @@ class SDZsetMesher(SDZset):
             intersect.
         """
         # find out if the set_name is a script template element
-        temp = self._find_template_string(set_name)
-        if temp:
-            self.script_args_list.append(temp)
+        self._add_templates_to_args([set_name])
         # creates line for mesher nset intersection command base line
         lines = [ '  **nset_intersection',
                  f'   *nsets {nsets}',
@@ -262,15 +293,7 @@ class SDZsetMesher(SDZset):
         :param str nset2: Second nset to use, to substract from nset1
         """
         # find out if the set_names are a script template element
-        temp = self._find_template_string(set_name)
-        if temp:
-            self.script_args_list.append(temp)
-        temp = self._find_template_string(nset1)
-        if temp:
-            self.script_args_list.append(temp)
-        temp = self._find_template_string(nset2)
-        if temp:
-            self.script_args_list.append(temp)
+        self._add_templates_to_args([set_name, nset1, nset2])
         # First create intersection of the nsets
         randint = np.random.randint(0,1000)
         tmp_intersection_name = 'tmp_intersection_'+str(randint)
@@ -304,9 +327,7 @@ class SDZsetMesher(SDZset):
         :param str elsets: list of elset to use a new mesh
         """
         # find out if the set_names are a script template element
-        temp = self._find_template_string(elsets)
-        if temp:
-            self.script_args_list.append(temp)
+        self._add_templates_to_args(elsets)
         # create the reunion of elsets 
         self.create_element_set(set_name='new_mesh_all_elements',
                                 add_elset=elsets)
@@ -322,9 +343,7 @@ class SDZsetMesher(SDZset):
     def delete_element_sets(self, elsets):
         """Zset command to remove input list of element sets from mesh."""
         # find out if the sets_names are a script template element
-        temp = self._find_template_string(elsets)
-        if temp:
-            self.script_args_list.append(temp)
+        self._add_templates_to_args(elsets)
         lines = [ f'  **delete_elset {elsets}']
         # write command in mesher 
         self._current_position = self._add_inp_lines(lines,
@@ -340,12 +359,7 @@ class SDZsetMesher(SDZset):
             removed from `target_nset`
         """
         # find out if the sets_names are a script template element
-        temp = self._find_template_string(target_nset)
-        if temp:
-            self.script_args_list.append(temp)
-        temp = self._find_template_string(nsets_to_remove)
-        if temp:
-            self.script_args_list.append(temp)
+        self._add_templates_to_args([target_nset, nsets_to_remove])
         lines = [ '  **remove_nodes_from_nset',
                  f'   *nset_name {target_nset}',
                  f'   *nsets_to_remove {nsets_to_remove}']

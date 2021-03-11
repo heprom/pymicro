@@ -23,26 +23,7 @@ class SDZsetFEA(SDZset):
 
     The use of this class methods requires a Zset compatible environnement.
     That means that the Zset software must be available in your PATH
-    environnement variable at least.
-
-    .. rubric:: PASSING ZSET COMMANDS OPTIONS AND ARGUMENTS
-            
-    Some class methods are directly bound to some Zset finite element analysis
-    commands. They write the command into the class mesher file, and handle its
-    argument values through string templates. They can accept Zset command
-    options as method keyword arguments. Each command will be added to the
-    mesher as a line of the form:
-        *command keyword['command']
-            
-    The value of the keyword argument (keyword['command']) must be a string
-    that may contain a string template (an expression between ${..}). In
-    this case, the template is automatically detected and handled by the
-    ScriptTemplate attribute of the Mesher. The value of the template
-    expression can be prescribed with the `set_mesher_args` method.
-    
-    No additional documentation on the command options is provided here.
-    Details are available in the Zset user manual (accessible through
-    the shell command line `Zman user`).   
+    environnement variable at least. 
     """
     
     def __init__(self, data=None, sd_datafile=None,
@@ -298,8 +279,16 @@ class SDZsetFEA(SDZset):
         else:
             mat_file = Path(material_file).name
             self.set_script_args(material_file=mat_file)
+        return
             
     def load_eigenmodes(self, store_group='eigenmodes'):
+        """Load eigenmodes into the SampleData outputmesh group.
+        
+        :param store_group: Name of the HDF5 group in which to store the
+            eigenmode fields in the SampleData instance.
+            Defaults to 'eigenmodes'.
+        :type store_group: str, optional
+        """
         # read the U1, U2, U3 fields
         fields_list = ['U1','U2','U3']
         Node_fields, _ = self.read_output_fields(fields_list)
@@ -336,5 +325,215 @@ class SDZsetFEA(SDZset):
         self.script_args_list.append('material_file')
         self._current_position = self._add_inp_lines(lines,0) - 1
         return
+ 
+
+# SD Zset mesher class
+class SDZsetFieldsTransfer(SDZset):
+    """Class Zset field transfer operators interface with Sampledata fields.
+
+    This class is an inteface between the SampleData data platform class and
+    the Zset software (developed at Centre des Matériaux, Mines Paris)
+    finite element tools. It is designed to use Zset to run finite element
+    analysis and/or process FEM fields from data in SampleData Mesh groups, and
+    store the results in the same SampleData instance/file, in the same or
+    another Mesh group. 
+
+    The use of this class methods requires a Zset compatible environnement.
+    That means that the Zset software must be available in your PATH
+    environnement variable at least. 
     
+    Convention: 
+    """
     
+    def __init__(self, problem_name, transfer_type='nodal',
+                 data=None, sd_datafile=None,
+                 inp_filename=Path('.').absolute() / 'transfer.inp',
+                 inputmesh=None, outputmesh=None, 
+                 input_meshfile=Path('.').absolute() / 'input.geof', 
+                 output_meshfile=Path('.').absolute() / 'output.geof', 
+                 verbose=False, autodelete=False, data_autodelete=False):
+        """SDZsetFEA class constructor.
+        
+        :param problem_name: Base name of the Zset files where the fields to
+            transfer are stored (basename.ut or basename.integ ....).
+        :type problem name: str
+        :param transfer_type: Type of field transfer to apply. 'nodal': node
+            field transfer, 'integ': integration points field transfer.
+            Defaults to 'nodal'
+        :type transfer_type name: str, optional
+        :param data: SampleData object to store input and output data for/from
+            Zset. If `None`, the class will open a SampleData instance from a
+            datafile path. Defaults to None
+        :type data: :py:class:`pymicro.core.samples.SampleData` object, optional
+        :param sd_datafile:  Path of the hdf5/xdmf data file to open as the
+            SampleData instance containing mesh tools input data. Defaults to
+            None
+        :type sd_datafile: str, optional
+        :param inp_filename: Name of the .inp script file associated to the
+            class instance. Zset commands passed to the class instance are
+            written in this file. Defaults to `./script.inp`
+        :type inp_filename: str, optional
+        :param inputmesh: Name, Path, Indexname or Alias of the mesh group
+            in the SampleData instance to use as Zset inputmesh. Defaults to
+            None
+        :type inputmesh: str, optional
+        :param outputmesh:  Name, Path, Indexname or Alias of the mesh group
+            in the SampleData instance to store Zset output mesh (for Zset
+            meshers). Defaults to None
+        :type outputmesh: str, optional
+        :param input_meshfile: Name of .geof mesh on which the fields must
+            be transfered. If `inputmesh` is `None`, the file must exist and
+            be a valid .geof meshfile for Zset. If `inputmesh` is not `None`,
+            then the mesh data refered by `meshname` in the SampleData instance
+            will be written as a .geof mesh file `meshfilename.geof`.
+            Defaults to `./input.geof`
+            Defaults to `./input.geof`
+        :type input_meshfile: str, optional
+        :param output_meshfile: Name of the mesh .geof file to use as output
+            when using Zset meshers. Defaults to `./output.geof`
+        :type output_meshfile: str, optional
+        :param verbose: verbosity flag, defaults to False
+        :type verbose: bool, optional
+        :param autodelete: If `True`, removes all temporary files, script files
+            and Zset output files (~ Zclean) when deleting the class isntance.
+            Defaults to False
+        :type autodelete: bool, optional
+        :param data_autodelete: If `True`, set `autodelete` flag to `True` on
+            SampleData instance. Defaults to False
+        :type data_autodelete: bool, optional
+        """
+        super(SDZsetFieldsTransfer, self).__init__(data, sd_datafile, inp_filename,
+                                        inputmesh, outputmesh,
+                                        input_meshfile, output_meshfile,
+                                        verbose, autodelete, data_autodelete)
+        self.set_problem_name(problem_name)
+        self.set_transfer_type(transfer_type)
+        return   
+
+    def set_problem_name(self, problem_name):
+        """Set the finite element calculation type.
+        
+        :param problem_name: Name of basename of the Zset .ut file where the
+            fields to transfer metadata are stored.
+        :type problem name: str
+        """
+        p = Path(problem_name).absolute()
+        self.problem_name = p.parent / f'{p.stem}.ut'
+        self.set_script_args(problem_name=str(self.problem_name))
+        return
+
+    def set_transfer_type(self, transfer_type='nodal'):
+        """Set the finite element calculation type.
+        
+        :param transfer_type: Type of field transfer to apply. 'nodal': node
+            field transfer, 'integ': integration points field transfer.
+            Defaults to 'nodal'
+        :type transfer_type name: str, optional
+        """
+        if transfer_type not in ['nodal', 'integ']:
+            raise ValueError('The only field transfer types accepted are'
+                             f'"node" or "integ", got {transfer_type}')
+        self.transfer_type = transfer_type
+        self.set_script_args(transfer_type=transfer_type)
+        return
+    
+    def run_inp(self, inp_filename=None, workdir=None, print_output=False):
+        """Run the .inp Zset script with current commands and arguments.
+                
+        This methods writes and runs a Zset script that will execute all
+        commands prescribed by the class instance. First the method 
+        writes the inp script template and the input .geof file from the
+        SampleData instance mesh data if the `data_inputmesh` and the `data`
+        attributes are set to a valid value. The results are loaded in
+        the SampleData instance if the `data` attribute exists. In addition,
+        this method writes if needed the problem and output mesh files, and
+        verifies that the problem files containing the fields to transfer
+        exists.
+        """
+        # check problem existence
+        presence = self._check_problem()
+        if not presence:
+            # TODO: implement construction of .ut problem from Sampledata
+            #       mesh groups
+            raise RuntimeError('Cannot transfer fields from problem '
+                               f'{self.problem_name}: files not found')
+        # write .inp script template
+        self.write_inp_template(inp_filename)
+        # if needed, write the input and output meshes
+        if hasattr(self, 'data_outputmesh'):
+            self.write_output_mesh_to_geof()
+        self._check_arguments_list()
+        script_output = self.Script.runScript(workdir, append_filename=True,
+                                              print_output=print_output)
+        return script_output
+    
+    def load_transfered_displacement(self, sequence_list=None,
+                                     storage_group=None, field_basename='U'):
+        """Load projected displacement as vector field on target mesh group.
+        
+        :param ut_file: Name of the Zset output from which the fields must be
+            loaded. Defaults to None: read all fields.
+        :type ut_file: str, optional
+        :param sequence_list: Load selected only displacement field in output
+            sequence (see .ut file, output metadata). Defaults to None (all 
+            output sequence elements are loaded)
+        :type sequence_list: list[int], optional
+        :param storage_group: HDF5 group to store the displacement field
+            arrays in SampleData group. Defaults to None: in this case they
+            are stored in the data_inputmesh group.
+        :type storage_group: str, optional
+        :param field_basename: Basename to store the displacement fields in the
+            SampleData instance. Defaults to 'U' (for a sequence: U_1, U_2....)
+        :type field_basename: TYPE, optional
+        """
+        output_file = str(self.output_meshfile.with_suffix('.ut'))
+        if storage_group is None:
+            storage_group = self.data_outputmesh
+        self.load_displacement_field_sequence(
+            ut_file=output_file, sequence_list=sequence_list,
+            storage_group=storage_group, field_basename=field_basename, 
+            storage_mesh=self.data_outputmesh)
+        return
+    
+    def _correct_output_meshfile_name(self):
+        with open(self.output_meshfile.with_suffix('.ut'),'r') as f:
+            lines = f.readlines()
+        new_lines = []
+        for line in lines:
+            if line.strip().startswith('**meshfile'):
+                new_lines.append(f'**meshfile {self.output_meshfile}')
+            else:
+                new_lines.append(line)
+        with open(self.output_meshfile.with_suffix('.ut'),'w') as f:
+            f.writelines(new_lines)
+        return
+        
+    
+    def _check_problem(self):
+        """Verify that Zset has produced a finite element analysis output."""
+        presence = self._check_fea_output_presence(self.problem_name)
+        if presence:
+            self.load_FEA_metadata(ut_file=str(self.problem_name))
+            meshfile = Path(self.metadata['meshFile'])
+            if meshfile.exists():
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def _init_script_content(self):
+        """Create mesher minimal text content."""
+        lines=['****transfer_fields',
+               ' ***new_mesh',
+               '  **name ${output_meshfile}',
+               ' ***old_mesh',
+               '  **name ${problem_name}',
+               ' ***${transfer_type}_values',
+               '****return']
+        self.script_args_list.append('output_meshfile')
+        self.script_args_list.append('problem_name')
+        self.script_args_list.append('transfer_type')
+        self._current_position = self._add_inp_lines(lines,0) - 1
+        return
+

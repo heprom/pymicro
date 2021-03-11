@@ -115,7 +115,8 @@ class SDZset():
     
     def __repr__(self):
         """String representation of the class."""
-        s  = '\n {} Class instance: \n\n'.format(self.__name__)
+        classname = str(self.__class__).split('.')[-1][:-2]
+        s  = '\n {} Class instance: \n\n'.format(classname)
         if self.data is not None:
             s += ('---- Associated SampleData dataset:\n\t\t{}\n'
                   ''.format(self.data.h5_file))
@@ -124,20 +125,21 @@ class SDZset():
             s += ('\t\tdataset description:\t{}\n'
                   ''.format(self.data.get_description()))
             if hasattr(self, 'data_inputmesh'):
-                s += ('---- Input Mesh data path:\n\t\t{}\n'
-                      ''.format(self.data_inputmesh))
+                path = self.data._name_or_node_to_path(self.data_inputmesh)
+                s += (f'\n---- Input Mesh data path: {path}\n')
             if hasattr(self, 'data_outputmesh'):
-                s += ('---- Output Mesh data path:\n\t\t{}\n'
-                      ''.format(self.data_outputmesh))
+                path = self.data._name_or_node_to_path(self.data_outputmesh)
+                s += (f'\n---- Output Mesh data path: {path}\n')
         else:
             s += '---- Associated SampleData dataset:\n\t\tNone\n'
-        s += '---- Mesh input file:\n\t\t{}\n'.format(str(self.input_meshfile))
-        s += '---- Mesh output file:\n\t\t{}\n'.format(str(self.output_meshfile))
-        s += '---- Inp script template filename:\n\t\t{}\n'.format(str(self.inp_mesher))
-        s += '---- Inp commands argument values:\n'
+        s += '\n---- Mesh input file: {}\n'.format(str(self.input_meshfile))
+        s += '\n---- Mesh output file: {}\n'.format(str(self.output_meshfile))
+        s += '\n---- Inp script template filename: {}\n'.format(
+                                                        str(self.inp_script))
+        s += '\n---- Inp commands argument values:\n'
         for key,value in self.Script.args.items():
             s += '\t\t{:30} --> {} \n'.format(key,value)
-        s += '---- Autodelete flag:\n\t\t{}\n'.format(self.autodelete)
+        s += '\n---- Autodelete flag:\n\t\t{}\n'.format(self.autodelete)
         return s
     
     def set_data(self, data=None, datafile=None, data_autodelete=False):
@@ -347,10 +349,19 @@ class SDZset():
                                bin_fields_from_sets=bin_fields_from_sets)
         return mesh
     
-    def load_FEA_metadata(self, load_in_data=False):
-        """If Zset script output exists, read fem analysis metadata."""
-        self._clean_ut_file_comments()
-        ut_file = str(self.inp_template.with_suffix('.ut'))
+    def load_FEA_metadata(self, ut_file=None, load_in_data=False):
+        """If Zset script output exists, read fem analysis metadata.
+        
+        :param ut_file: .ut file from which the metadata must be loaded.
+            Defaults to None
+        :type ut_file: str, optional
+        :param load_in_data: If `True`, load the metadata as output Mesh Group
+            HDF5 attributes in the SampleData instance. Defaults to False
+        :type load_in_data: bool, optional
+        """
+        if ut_file is None:
+            ut_file = str(self.inp_template.with_suffix('.ut'))
+        SDZset._clean_comments(ut_file)
         self.metadata = UR.ReadUTMetaData(ut_file)
         self.metadata['Sequence'] = self.metadata["time"][:, 4]
         if load_in_data:
@@ -385,6 +396,54 @@ class SDZset():
                                 array=value, location=sequence_name)
         return
     
+    def load_displacement_field_sequence(self, ut_file=None,
+                                        sequence_list=None, storage_group=None,
+                                        field_basename='U', storage_mesh=None):
+        """Load displacement as vector field in SampleData instance.
+        
+        :param sequence_list: Load selected only displacement field in output
+            sequence (see .ut file, output metadata). Defaults to None (all 
+            output sequence elements are loaded)
+        :type sequence_list: list[int], optional
+        :param storage_group: HDF5 group to store the displacement field
+            arrays in SampleData group. Defaults to None: in this case they
+            are stored in the data_inputmesh group.
+        :type storage_group: str, optional
+        :param field_basename: Basename to store the displacement fields in the
+            SampleData instance. Defaults to 'U' (for a sequence: U_1, U_2....)
+        :type field_basename: TYPE, optional
+        :param storage_mesh: SampleData Mesh group in which the fields will be
+            loaded (Name, path, indexname or alias of the group).
+            Defaults to None.
+        :type storage_mesh: str, optional
+        """
+        # read the U1, U2, U3 fields
+        fields_list = ['U1','U2','U3']
+        Nodal_fields, _ = self.read_output_fields(ut_file, fields_list,
+                                                  sequence_list)
+        # define SampleData mesh group to store displacement fields
+        if storage_mesh is None:
+            storage_mesh = self.data_inputmesh
+        # define HDF5 storage group
+        if (storage_group is None) and (hasattr(self, 'data_inputmesh')):
+            storage_group = self.data._name_or_node_to_path(
+                                                           self.data_inputmesh)
+        # load the outputs into the SampleData instance
+        for i in range(len(Nodal_fields)):
+            fieldname = f'{field_basename}_{i+1}'
+            field_dic = Nodal_fields[i]
+            if not self.data.__contains__(storage_group):
+                self.data.add_group(storage_group, self.data_inputmesh,
+                                    replace=False)
+            U = np.zeros((len(field_dic['U1']),3), 
+                            dtype=field_dic['U1'].dtype)
+            U[:,0] = field_dic['U1']
+            U[:,1] = field_dic['U2']
+            U[:,2] = field_dic['U3']
+            self.data.add_field(gridname=storage_mesh, location=storage_group,
+                                fieldname=fieldname, array=U, replace=False)
+        return
+    
     def load_output_fields(self, field_list=None, sequence_list=None,
                            sequence_basename='', is_time_sequence=True,
                            fields_basename=''):
@@ -395,7 +454,7 @@ class SDZset():
         :type field_list: list[str], optional
         :param sequence_list: List of output sequences to read. Defaults to None:
             read all sequences.
-        :type sequence_list: list[str], optional
+        :type sequence_list: list[int], optional
         :raises RuntimeError: raised if the FEA has not been runed. 
         :raises ValueError: raised if fields not in FEA output are required
         :return Nodal_field_sequence: List of dict{fieldname: field array}, one
@@ -419,15 +478,19 @@ class SDZset():
             self.load_field_sequence(Integ_fields[i], sequence_group, suffix)
         return
         
-    def read_output_fields(self, field_list=None, sequence_list=None):
+    def read_output_fields(self, ut_file=None, field_list=None,
+                           sequence_list=None):
         """Read node or integration point fields from Zset FEA output.
         
+        :param ut_file: Name of the Zset output from which the fields must be
+            loaded. Defaults to None: read all fields.
+        :type ut_file: str, optional
         :param field_list: List of variables names corresponding to the fields
             to read from the FEA output. Defaults to None: read all fields.
         :type field_list: list[str], optional
         :param sequence_list: List of output sequences to read. Defaults to None:
             read all sequences.
-        :type sequence_list: list[str], optional
+        :type sequence_list: list[int], optional
         :raises RuntimeError: raised if the FEA has not been runed. 
         :raises ValueError: raised if fields not in FEA output are required
         :return Nodal_field_sequence: List of dict{fieldname: field array}, one
@@ -437,16 +500,17 @@ class SDZset():
             element for each sequence, for the integration points fields.
         :rtype: list
         """
+        if ut_file is None:
+            ut_file = str(self.inp_template.with_suffix('.ut'))
         # verify FEA output presence
-        if not self._check_fea_output_presence():
+        if not self._check_fea_output_presence(Path(ut_file)):
             raise RuntimeError('No finite element analysis output found for'
                                f' the class inp script {self.inp_template}.'
                                ' Cannot load results.')
         # get output file 
-        self._clean_ut_file_comments()
-        ut_file = str(self.inp_template.with_suffix('.ut'))
+        SDZset._clean_comments(ut_file)
         # load FEA calc metadata
-        self.load_FEA_metadata()
+        self.load_FEA_metadata(ut_file)
         metadata_field_list = self.metadata['node']
         metadata_field_list.extend(self.metadata['integ'])
         if field_list is None:
@@ -643,9 +707,10 @@ class SDZset():
             lines.append(line)   
         return lines
     
-    def _check_fea_output_presence(self):
+    def _check_fea_output_presence(self, output_file=None):
         """Verify that Zset has produced a finite element analysis output."""
-        output_file = self.inp_template.with_suffix('.ut')
+        if output_file is None:
+            output_file = self.inp_template.with_suffix('.ut')
         if output_file.exists():
             return True
         else:

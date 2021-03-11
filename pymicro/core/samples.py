@@ -399,10 +399,11 @@ class SampleData:
                 continue
             if not(node._v_name == 'Index'):
                 s += self.get_node_info(node._v_pathname, as_string)
-                s += self.print_group_content(node._v_pathname,
-                                              recursive=True,
-                                              as_string=as_string,
-                                              max_depth=max_depth)
+                if self._is_group(node._v_pathname):
+                    s += self.print_group_content(node._v_pathname,
+                                                  recursive=True,
+                                                  as_string=as_string,
+                                                  max_depth=max_depth)
                 s += '\n************************************************'
                 if not(as_string):
                     print('\n************************************************')
@@ -420,6 +421,7 @@ class SampleData:
         """
         s = '\n\n****** Group {} CONTENT ******'.format(groupname)
         group = self.get_node(groupname)
+        print(group)
         if group._v_depth > max_depth:
             return ''
         if group._v_nchildren == 0:
@@ -940,6 +942,10 @@ class SampleData:
         if self._is_image(gridname):
             array, transpose_indices = self._transpose_image_array(
                 dimensionality, array)
+        if indexname is None:
+            grid_path = self._name_or_node_to_path(gridname)
+            grid_indexname = self.get_indexname_from_path(grid_path)
+            indexname = grid_indexname+'_'+fieldname
         node = self.add_data_array(array_location, fieldname, array, indexname,
                                    chunkshape, replace, filters, empty,
                                    **keywords)
@@ -1740,6 +1746,25 @@ class SampleData:
         """
         self.add_attributes({'description': description}, node)
         return
+    
+    def set_new_indexname(self, nodename, new_indexname):
+        """Change the indexname of a node in the dataset. 
+        
+        Usefull to solve indexname duplicates issues that can arises when
+        automatically adding elements to the dataset, that have the same name.
+        
+        :param nodename: Name, Path, Indexname or Alias of the node whose
+            indexname is to be changed
+        :type nodename: str
+        :param new_indexname: New indexname for the node
+        :type new_indexname: str
+        """
+        path = self._name_or_node_to_path(nodename)
+        old_indexname = self.get_indexname_from_path(path)
+        index_content = self.content_index.pop(old_indexname)
+        self.content_index[new_indexname] = index_content
+        return
+        
 
     def set_voxel_size(self, image_group, voxel_size):
         """Set voxel size for an HDF5/XDMF image data group.

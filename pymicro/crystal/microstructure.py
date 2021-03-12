@@ -2318,8 +2318,11 @@ class Microstructure(SampleData):
                                        ystart[i]:yend[i] + 1,
                                        zstart[i]:zend[i] + 1]
                 if np.any(neighbours):
-                    # at least one neighboring voxel in non zero
-                    dilation[i] = min(neighbours[neighbours > 0])
+                    # at least one neighboring voxel is non zero
+                    counts = np.bincount(neighbours.flatten())[1:]  # do not consider zero
+                    # find the most frequent value
+                    dilation[i] = np.argmax(counts) + 1
+                    #dilation[i] = min(neighbours[neighbours > 0])
             if array.ndim == 2:
                 array[X, Y] = dilation
             else:

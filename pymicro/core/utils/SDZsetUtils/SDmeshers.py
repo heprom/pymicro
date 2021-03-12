@@ -361,6 +361,39 @@ class SDZsetMesher(SDZset):
         self.remove_set(options={'elsets':'new_mesh_all_elements'})
         return
     
+    def deform_mesh(self, deform_map, input_problem, magnitude=1.,
+                    mesh_format='Z7'):
+        """Add a **deform_mesh command to the mesher.
+        
+        **deform_mesh applies to a mesh a displacement field obtained from
+        another Zset calculation to produced a new mesh, whose nodes have been
+        displaced with this field multiplied by a scale factor.
+        
+        :param deform_map: sequence number of the displacement field to use in
+            Zset output to deform the mesh
+        :type deform_map: int
+        :param input_problem: name of the .ut file of the Zset output
+            containing the displacement field to deform the mesh
+        :type input_problem: str
+        :param magnitude: scale factor applied to the displacement field used
+            to deform the mesh, defaults to 1.
+        :type magnitude: float, optional
+        :param mesh_format: Format of the deformed mesh output.
+            Defaults to 'Z7'
+        :type mesh_format: str, optional
+        """
+        ut_file = Path(input_problem).absolute().with_suffix('.ut')
+        # find out if the sets_names are a script template element
+        lines = [ '  **deform_mesh',
+                 f'   *map {deform_map}',
+                 f'   *input_problem {ut_file}',
+                 f'   *magnitude {magnitude}',
+                 f'   *format {mesh_format}']
+        # write command in mesher 
+        self._current_position = self._add_inp_lines(lines,
+                                                        self._current_position)
+        return
+    
     def delete_element_sets(self, elsets):
         """Zset command to remove input list of element sets from mesh."""
         # find out if the sets_names are a script template element

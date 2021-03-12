@@ -589,10 +589,9 @@ class SDZsetFieldsTransfer(SDZset):
             SampleData instance. Defaults to False
         :type data_autodelete: bool, optional
         """
-        super(SDZsetFieldsTransfer, self).__init__(data, sd_datafile, inp_filename,
-                                        inputmesh, outputmesh,
-                                        input_meshfile, output_meshfile,
-                                        verbose, autodelete, data_autodelete)
+        super(SDZsetFieldsTransfer, self).__init__(data, 
+            sd_datafile, inp_filename, inputmesh, outputmesh, input_meshfile,
+            output_meshfile, verbose, autodelete, data_autodelete)
         self.set_problem_name(problem_name)
         self.set_transfer_type(transfer_type)
         return   

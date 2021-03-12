@@ -107,6 +107,155 @@ class SDZsetFEA(SDZset):
         self._add_inp_lines(lines, self._current_position)
         return
     
+    def add_resolution(self, resolution_type='newton', use_lumped_mass=False):
+        """Add a ***resolution procedure to the inp script.
+        """
+        # add resolution procedure
+        self._set_position_at_command(command='****return', after=False)
+        lines=[' ***resolution ${resolution_type}']
+        self.script_args_list.append('resolution_type')
+        self.set_script_args(resolution_type=resolution_type)
+        if use_lumped_mass:
+            lines.append('  **use_lumped_mass')
+        self._current_position = self._add_inp_lines(lines,
+                                                     self._current_position)
+        return
+    
+    def add_sequence_or_cycle(self, N_sequences=1, sequence_options=dict(),
+                              is_cycle=False):
+        """Add a sequence command to ***resolution procedure.
+        
+        :param N_sequences: Number of sequences, defaults to 1
+        :type N_sequences: int, optional
+        :param sequence_options: Dictionary of '*' options to add to the
+            **sequence command block in .inp script --> `*dict_key dict_entry` 
+            Default is an empty dict.
+        :type sequence_options: TYPE, optional
+        :param is_cycle: if `True`, add a **cycle command. If `False`, add a
+            **sequence command.
+        """
+        # add the **sequence command after the ***resolution procedure
+        self._set_position_at_command(command='***resolution')
+        # create lines
+        if is_cycle:
+            lines=['  **cycle ${N_sequences}']
+        else:
+            lines=['  **sequence ${N_sequences}']
+        # add script arguments
+        self.script_args_list.append('N_sequences')
+        self.set_script_args(N_sequences=N_sequences)
+        # add command options
+        self._add_command_options(lines, sequence_options)
+        self._current_position = self._add_inp_lines(lines, 
+                                                     self._current_position)
+        return
+    
+    def set_skip_cycle(self, skip_type='', skip_options=dict()):
+        """Add skip_cycle command to ***resolution procedure.
+        
+        :param skip_type: type of extrapolation to speed up cyclic calculations
+            Defaults to ''
+        :type skip_type: str, optional
+        :param sequence_options: Dictionary of '*' options to add to the
+            **skip_cycle command block in .inp script --> `*dict_key dict_entry` 
+            Default is an empty dict.
+        :type sequence_options: dict, optional
+        """
+        # add resolution procedure
+        self._set_position_at_command(command='****return')
+        lines=[' ***skip_cycle {skip_type}']
+        self.script_args_list.append('skip_type')
+        # add command options
+        self._add_command_options(lines, skip_options)
+        self._current_position = self._add_inp_lines(lines, 
+                                                     self._current_position)
+        return
+    
+    def add_init_d_dof(self, ratio=None, sequence=None):
+        """Add proportional initialization of dofs command to ***resolution.
+        
+        :param ratio:  scaling factor for proportional initialization. 
+            Defaults to None (Zset default is 1)
+        :type ratio: float, optional
+        :param sequence: If `True`, activate procedure only within each
+            sequence. Defaults to None
+        :type sequence: bool, optional
+        """
+        # add the **sequence command after the ***resolution procedure
+        self._set_position_at_command(command='***resolution')
+        # create command line
+        c_line = '  **init_d_dof '
+        if ratio is not None:
+            c_line = c_line + f' ratio {ratio}'
+            self._add_templates_to_args([str(ratio)])
+        if sequence:
+            c_line = c_line + ' sequence'
+        self._current_position = self._add_inp_lines([c_line], 
+                                                     self._current_position)
+        return
+    
+    def add_max_divergence(self, value):
+        """Add max_divergence procedure to ***resolution.
+        
+        :param value: maximum allowable ratio of two successive convergence
+            ratios
+        :type value: float 
+        """
+        # add the **sequence command after the ***resolution procedure
+        self._set_position_at_command(command='***resolution')
+        # create command line
+        c_line = '  **max_divergence {value} '
+        self._current_position = self._add_inp_lines([c_line], 
+                                                     self._current_position)
+        return
+    
+    def add_automatic_time(self, autotime_type='standard', vars_inc=dict(),
+                           global_iterations=None,  mandatory=False, 
+                           autotime_options=dict()):
+        """Add automatic substepping command block to ***resolution procedure.
+        
+        :param Autotime_type: Type of autotime, defaults to ''
+        :type Autotime_type: TYPE, optional
+        :param vars_inc: Dictionary whose key are variables names and
+            values are the max. increments allowed for this variables for one
+            increment. If the increment surpasses this value, time substepping
+            is applied. Defaults to empty dict()
+        :type vars_inc: dict, optional
+        :param global_iterations: If provided, set a max. iterations number for
+            each time increment. If more iterations are required, substepping
+            is enforced. Defaults to None
+        :type global_iterations: int, optional
+        :param mandatory: If `True` set the mandatory option for the variables
+            increment values. In this case, time substepping is applied until
+            the specified variable increments are under the specified values
+            Defaults to False
+        :type mandatory: bool, optional
+        :param autotime_options: Dictionary of '*' options to add to the
+            **autotime_options command block in .inp script 
+            --> `*dict_key dict_entry`. Default is an empty dict.
+        :type autotime_options: dict, optional
+        """
+        # add the **sequence command after the ***resolution procedure
+        self._set_position_at_command(command='***resolution')
+        # create command line
+        c_line = f'  **automatic_time {autotime_type}'
+        self._add_templates_to_args([autotime_type])
+        for key, value in vars_inc:
+            c_line = c_line + f' {key} {value}'
+            self._add_templates_to_args([str(key),str(value)])
+        if global_iterations is not None:
+            c_line = c_line + f' global {global_iterations}'
+            self._add_templates_to_args([str(global_iterations)])
+        if mandatory:
+            c_line = c_line + ' mandatory'
+        # create lines
+        lines=[c_line]
+        # add command options
+        self._add_command_options(lines, autotime_options)
+        self._current_position = self._add_inp_lines(lines, 
+                                                     self._current_position)
+        return
+    
     def add_boundary_condition(self, bc_type, set_names, dof_names, values,
                                tables=None):
         """Add a boundary condition block to the Zset FEA script.
@@ -174,6 +323,44 @@ class SDZsetFEA(SDZset):
             lines.append(line)
         # add boundary condition block to ***bc block
         self._add_inp_lines(lines, self._current_position)
+        return       
+    
+    def add_submodel(self, global_problem, dofs, driven_nsets,
+                     sub_format=None):
+        """Add a submodel boundary condition for the FEM calculation.
+        
+        This boundary condition imposes degrees of freedom located at boundary
+        nodes in a submodel to values computed from a larger problem, already
+        solved (master problem).
+        
+        :param global_problem: .ut file of the Zset master problem 
+        :type global_problem: str
+        :param dofs: List of the names of the degree of fredom to drive on the
+            submodel with their values computed on the master problem.
+        :type dofs: list[str]
+        :param driven_nsets: name of a nodeset of the submodel whose nodes are
+            all driven by the master problem values, for the specified degrees
+            of freedom
+        :type driven_nsets: TYPE
+        :param sub_format: DESCRIPTION, defaults to None
+        :type sub_format: TYPE, optional
+        """
+        # add the **sequence command after the ***resolution procedure
+        self._set_position_at_command(command='***bc')
+        # create command line
+        lines = ['  **submodel']
+        if sub_format is not None:
+            lines.append(f'   *format {sub_format}')
+            self._add_templates_to_args([str(sub_format)])
+        lines.append(f'   *global_problem {global_problem}')
+        line = '   *dofs '
+        for item in dofs:
+            line = line + ' ' + item + ' '
+        lines.append(line)
+        lines.append(f'   *driven_nsets {driven_nsets}')
+        # add command options
+        self._current_position = self._add_inp_lines(lines, 
+                                                     self._current_position)
         return
     
     def set_fixed_set_bc(self, nset_list=None, bset_list=None):
@@ -291,7 +478,7 @@ class SDZsetFEA(SDZset):
         """
         # read the U1, U2, U3 fields
         fields_list = ['U1','U2','U3']
-        Node_fields, _ = self.read_output_fields(fields_list)
+        Node_fields, _ = self.read_output_fields(field_list=fields_list)
         # create a group to store the eigen modes
         if not self.data.__contains__(store_group):
             self.data.add_group(store_group, self.data_inputmesh,
@@ -465,6 +652,7 @@ class SDZsetFieldsTransfer(SDZset):
         self._check_arguments_list()
         script_output = self.Script.runScript(workdir, append_filename=True,
                                               print_output=print_output)
+        self._correct_output_meshfile_name()
         return script_output
     
     def load_transfered_displacement(self, sequence_list=None,
@@ -501,7 +689,7 @@ class SDZsetFieldsTransfer(SDZset):
         new_lines = []
         for line in lines:
             if line.strip().startswith('**meshfile'):
-                new_lines.append(f'**meshfile {self.output_meshfile}')
+                new_lines.append(f'**meshfile {self.output_meshfile}\n')
             else:
                 new_lines.append(line)
         with open(self.output_meshfile.with_suffix('.ut'),'w') as f:

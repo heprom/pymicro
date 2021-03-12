@@ -161,25 +161,32 @@ class SDZsetMesher(SDZset):
         if Exterior_surf_set is not None:
             boundary_nsets= 'Xmin Xmax Ymin Ymax Zmin Zmax'
             self.create_point_set(set_name=Exterior_surf_set,
-                                  use_nset=boundary_nsets)
+                                  options={'use_nset':boundary_nsets})
         return
     
-    def create_element_set(self, set_name='my_set', **keywords):
+    def create_element_set(self, set_name='my_set', options=dict()):
         """Write a Zset mesher node set or boundary creation command.
         
-        This method write a **elset command block in the mesher. It
-        can accept as additional keyword arguments the command options for the
-        **elset command (see Zset user manual and class docstring).
+        This method write a **elset command block in the mesher. Each item
+        of the option dict argument will be added as a [*key value] line to the
+        inp **elset block. The command block will look like::
+            
+            **elset {set_name}
+             *options_key1 options_value1
+             *options_key2 options_value2
+             *...          ...
         
         :param str set_name: Name of the eset to create (can contain a
               string template)
+        :param dict options: Dictionary of **elset command options. Each item
+            will be added as a [*key value] line to the inp **elset block.
         """
         # find out if the set_name is a script template element
         self._add_templates_to_args([set_name])
         # creates line for mesher point set definition command base line
         lines = [f'  **elset {set_name}']   
         # Add command options
-        self._add_command_options(lines, **keywords)  
+        self._add_command_options(lines, options)  
         # write command in mesher
         self._current_position = self._add_inp_lines(lines,
                                                         self._current_position)     
@@ -214,52 +221,65 @@ class SDZsetMesher(SDZset):
                                                         self._current_position)
         # add nset creation if required
         if create_nodeset:
-            self.create_point_set(set_name=setname, use_bset=setname)
+            self.create_point_set(set_name=setname,
+                                  options={'use_bset':setname})
             if remove_bset:
-                self.remove_set(bsets=setname)
+                self.remove_set(options={'bsets':setname})
         return
     
-    def create_boundary_set(self, set_name='my_set', **keywords):
-        """Write a Zset mesher node set or boundary creation command.
+    def create_boundary_set(self, set_name='my_set', options=dict()):
+        """Write a Zset mesher boundary set creation command.
         
-        This method write a **nset or **bset command block in the mesher. It
-        can accept as additional keyword arguments the command options for the
-        **nset and **bset commands (see Zset user manual and class docstring).
+        This method write a  **bset command block in the mesher. Each
+        item of the option dict argument will be added as a [*key value] line
+        to the inp **. The command block will look like::
+            
+            **bset {set_name}
+             *options_key1 options_value1
+             *options_key2 options_value2
+             *...          ...
         
-        :param str set_name: Name of the nset/bset to create (can contain a
+        :param str set_name: Name of the bset to create (can contain a
               string template)
         :param bool is_bset: If `True`, create a bset definition command. If
             `False`, create a nset definition command.
+        :param dict options: Dictionary of **elset command options. Each item
+            will be added as a [*key value] line to the inp **elset block.
         """
         # find out if the set_name is a script template element
         self._add_templates_to_args([set_name])
         # creates line for mesher boundary set definition command base line
         lines = [f'  **bset {set_name}']
         # Add command options
-        self._add_command_options(lines, **keywords)   
+        self._add_command_options(lines, options)   
         # write command in mesher 
         self._current_position = self._add_inp_lines(lines,
                                                         self._current_position)
         return
     
-    def create_point_set(self, set_name='my_set', **keywords):
-        """Write a Zset mesher node set or boundary creation command.
+    def create_point_set(self, set_name='my_set', options=dict()):
+        """Write a Zset mesher node set creation command.
         
-        This method write a **nset or **bset command block in the mesher. It
-        can accept as additional keyword arguments the command options for the
-        **nset and **bset commands (see Zset user manual and class docstring).
+        This method write a **nset command block in the mesher. Each
+        item of the option dict argument will be added as a [*key value] line
+        to the inp **. The command block will look like::
+            
+            **nset {set_name}
+             *options_key1 options_value1
+             *options_key2 options_value2
+             *...          ...
         
         :param str set_name: Name of the nset/bset to create (can contain a
               string template)
-        :param bool is_bset: If `True`, create a bset definition command. If
-            `False`, create a nset definition command.
+        :param dict options: Dictionary of **elset command options. Each item
+            will be added as a [*key value] line to the inp **elset block.
         """
         # find out if the set_name is a script template element
         self._add_templates_to_args([set_name])
         # creates line for mesher point set definition command base line
         lines = [f'  **nset {set_name}']
         # Add command options
-        self._add_command_options(lines, **keywords)   
+        self._add_command_options(lines, options)   
         # write command in mesher 
         self._current_position = self._add_inp_lines(lines,
                                                         self._current_position)
@@ -300,16 +320,17 @@ class SDZsetMesher(SDZset):
         nset_names = nset1+' '+nset2
         self.create_nset_intersection(tmp_intersection_name, nset_names)
         # Create the new elset from nset1
-        self.create_point_set(set_name, function='1', use_nset=nset1)
+        self.create_point_set(set_name, options={'function':'1',
+                                                 'use_nset':nset1})
         # Now substract intersection from nset1
         self.remove_nodes_from_sets(set_name, tmp_intersection_name)
         # Finally, remove tmp intersection nset
-        self.remove_set(nsets=tmp_intersection_name)
+        self.remove_set(options={'nsets':tmp_intersection_name})
         return
     
     def create_all_nodes_nset(self, set_name='All_nodes'):
         """Create a nset containing all mesh nodes."""
-        self.create_point_set(set_name=set_name, function='1')
+        self.create_point_set(set_name=set_name, options={'function':'1'})
         return  
     
     def create_interior_nodes_nset(self, set_name='interior_nodes'):
@@ -318,7 +339,7 @@ class SDZsetMesher(SDZset):
         self.create_boundary_node_set(setname='tmp_exterior', 
                                       create_nodeset=True, remove_bset=True)
         self.remove_nodes_from_sets(set_name, 'tmp_exterior')
-        self.remove_set(nsets='tmp_exterior')
+        self.remove_set(options={'nsets':'tmp_exterior'})
         return
     
     def create_mesh_from_elsets(self, elsets):
@@ -330,14 +351,14 @@ class SDZsetMesher(SDZset):
         self._add_templates_to_args(elsets)
         # create the reunion of elsets 
         self.create_element_set(set_name='new_mesh_all_elements',
-                                add_elset=elsets)
+                                options={'add_elset':elsets})
         # create the elset to remove
         self.create_element_set(set_name='cut_from_mesh',
-                                not_in_elset='new_mesh_all_elements')
+                                options={'not_in_elset':'new_mesh_all_elements'})
         # remove elements in elset
         self.delete_element_sets(elsets='cut_from_mesh')
         # remove created tmp elset
-        self.remove_set(elsets='new_mesh_all_elements')
+        self.remove_set(options={'elsets':'new_mesh_all_elements'})
         return
     
     def delete_element_sets(self, elsets):
@@ -368,16 +389,24 @@ class SDZsetMesher(SDZset):
                                                         self._current_position)
         return
     
-    def remove_set(self, **keywords):
+    def remove_set(self, options=dict()):
         """Write a Zset mesher nset/elset/bset removal command.
         
-        This method write a **remove_set command block in the mesher. It
-        can accept keyword arguments the command options for the
-        **remove_set  commands (see Zset user manual and class docstring). 
+        This method write a **remove_set command block in the mesher. Each
+        item of the option dict argument will be added as a [*key value] line
+        to the inp **. The command block will look like::
+            
+            **remove_set 
+             *options_key1 options_value1
+             *options_key2 options_value2
+             *...          ...
+             
+        :param dict options: Dictionary of **elset command options. Each item
+            will be added as a [*key value] line to the inp **elset block.
         """
         lines = ['  **remove_set']
         # Add command options
-        self._add_command_options(lines, **keywords)   
+        self._add_command_options(lines, options)   
         # write command in mesher 
         self._current_position = self._add_inp_lines(lines,
                                                         self._current_position)
@@ -395,12 +424,18 @@ class SDZsetMesher(SDZset):
         return
     
     def _add_bounding_planes_nset_template(self):
-        self.create_point_set(set_name='Xmin', function='(x < ${Xbmin})')
-        self.create_point_set(set_name='Xmax', function='(x > ${Xbmax})')
-        self.create_point_set(set_name='Ymin', function='(y < ${Ybmin})')
-        self.create_point_set(set_name='Ymax', function='(y > ${Ybmax})')
-        self.create_point_set(set_name='Zmin', function='(z < ${Zbmin})')
-        self.create_point_set(set_name='Zmax', function='(z > ${Zbmax})')
+        self.create_point_set(set_name='Xmin',
+                              options={'function':'(x < ${Xbmin})'})
+        self.create_point_set(set_name='Xmax',
+                              options={'function':'(x > ${Xbmax})'})
+        self.create_point_set(set_name='Ymin',
+                              options={'function':'(y < ${Ybmin})'})
+        self.create_point_set(set_name='Ymax',
+                              options={'function':'(y > ${Ybmax})'})
+        self.create_point_set(set_name='Zmin',
+                              options={'function':'(z < ${Zbmin})'})
+        self.create_point_set(set_name='Zmax',
+                              options={'function':'(z > ${Zbmax})'})
         return
             
 

@@ -525,7 +525,6 @@ class SDZset():
         Nodal_field_sequence = []
         Integ_field_sequence = []
         for t in self.metadata['Sequence']:
-            print(t)
             if sequence_list is not None:
                 if t not in sequence_list:
                     continue
@@ -695,10 +694,10 @@ class SDZset():
             pos = pos+1
         return pos
     
-    def _add_command_options(self, lines, **keywords):
+    def _add_command_options(self, lines, options_dict=dict()):
         """Add to lines options passed as kwargs and track args list.""" 
-        for key,value in keywords.items():
-            temp = self._find_template_string(value)
+        for key,value in options_dict.items():
+            temp = self._find_template_string(str(value))
             if temp:
                 self.script_args_list.append(temp)
             line = f'   *{key} {value}'

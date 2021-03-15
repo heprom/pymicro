@@ -6,4 +6,4 @@ vtk
 h5py
 lxml
 tables
-basictools 
+-e git+https://gitlab.com/drti/basic-tools.git#egg=basictools

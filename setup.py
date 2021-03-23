@@ -11,6 +11,28 @@ try:
 except ImportError:
     from distutils.command.build_py import build_py
 
+## Load requirements.txt and format for setuptools.setup
+requirements = []
+dependency_links = []
+here = os.path.abspath( os.path.dirname(__file__))
+with open( os.path.join(here, "requirements.txt")) as fid:
+    content = fid.read().split("\n")
+    for line in content:
+        if line.startswith( "#" ) or line.startswith( " " ) or line=="":
+            continue
+        elif line.startswith( "-e" ):
+            pname = line.split("#egg=")[1]
+            req_line = "{} @ {}".format( pname, line[3:] )
+            requirements.append( req_line )
+            dep_line = line.replace("-e", "").strip()
+            dependency_links.append( dep_line )
+        else:
+            requirements.append( line )
+
+## DISABLE C++ part compilation for basic-tools
+os.environ["BASICTOOLS_DISABLE_MKL"] = "1"
+os.environ["BASICTOOLS_DISABLE_OPENMP"] = "1"
+
 setuptools.setup(
     name="pymicro",
     version=pymicro.__version__,
@@ -29,6 +51,8 @@ setuptools.setup(
         "Development Status :: 4 - Beta",
     ],
     python_requires='>=3.5',
+    install_requires=requirements,
+    dependency_links=dependency_links,
     license="MIT license",
     cmdclass={'build_py':build_py}
 )

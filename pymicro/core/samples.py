@@ -1387,7 +1387,6 @@ class SampleData:
         Nelems = Mesh_attrs['Number_of_elements']
         Xdmf_code = Mesh_attrs['Xdmf_elements_code']
         offset = 0
-        elements_offset = 0
         # For each element type, create an Element container and fill
         # connectivity
         for i in range(len(element_type)):
@@ -1417,14 +1416,11 @@ class SampleData:
                                      ''.format(element_type[i]))
                 Elements.connectivity = local_connect[:,id_offset:]
                 Elements.cpt = Nelems[i]
-                Elements._sd_element_offset = elements_offset
                 offset = Nvalues
-                elements_offset = Nelems[i]
             elif Topology == 'Uniform':
                 Elements.connectivity = connectivity.reshape((Nelems[i],
                                                               Nnode_per_el))
                 Elements.cpt = Nelems[i]
-                Elements._sd_element_offset = offset
         if with_tags:
             self._load_elements_tags(meshname, AElements, as_numpy)
         return AElements
@@ -3030,6 +3026,11 @@ class SampleData:
     def _add_mesh_elems_tags(self, mesh_object, mesh_group, geo_group,
                              replace, bin_fields_from_sets):
         """Add ElementsTags arrays in mesh geometry group from mesh object."""
+        # create an dictionnary for the offset to apply to elem local Ids
+        # for each element type
+        element_type = self.get_attribute('element_type', mesh_group._v_name)
+        offsets = self.get_attribute('Elements_offset', mesh_group._v_name)
+        offset_dic = {element_type[i]:offsets[i] for i in range(len(offsets))}
         # create Noe tags group
         Etags_group = self.add_group(groupname='ElementsTags',
                                      location=geo_group._v_pathname,
@@ -3043,7 +3044,8 @@ class SampleData:
                 name = tagname
                 Elem_tags_list.append(name)
                 Elem_tag_type_list.append(elem_type)
-                elem_list = mesh_object.GetElementsInTag(tagname)
+                elem_list = element_container.tags[tagname].GetIds()
+                elem_list = elem_list + offset_dic[elem_type]
                 if len(elem_list) == 0:
                     continue
                 node = self.add_data_array(location=Etags_group._v_pathname,
@@ -3130,7 +3132,7 @@ class SampleData:
         return
 
     def _load_nodes_tags(self, meshname, mesh_object, as_numpy=True):
-        """Add Node and ElemTags in mesh geometry group from mesh object."""
+        """Add Node and ElemTags in mesh object from mesh geometry."""
         mesh_group = self.get_node(meshname)
         Ntags_group = self.get_node(mesh_group._v_name+'_NodeTags')
         if Ntags_group is not None:
@@ -3142,9 +3144,16 @@ class SampleData:
         return mesh_object
 
     def _load_elements_tags(self, meshname, AllElements, as_numpy=True):
-        """Add Node and ElemTags in mesh geometry group from mesh object."""
+        """Add Node and ElemTags in mesh object from mesh group."""
+        # get SD groups
         mesh_group = self.get_node(meshname)
         Etags_group = self.get_node(mesh_group._v_name+'_ElemTags')
+        # create an dictionnary for the offset to apply to elem local Ids
+        # for each element type
+        element_type = self.get_attribute('element_type', mesh_group._v_name)
+        offsets = self.get_attribute('Elements_offset', mesh_group._v_name)
+        offset_dic = {element_type[i]:offsets[i] for i in range(len(offsets))}
+        # load element tags
         if Etags_group is not None:
             Etag_list = self.get_attribute('Elem_tags_list', meshname)
             Etag_Etype_list = self.get_attribute('Elem_tag_type_list',
@@ -3158,7 +3167,7 @@ class SampleData:
                 nodes_Ids = self.get_node(tag_path, as_numpy)
                 ## Need to add local ids !! Substract the offset stored by 
                 ## get_mesh_elements
-                tag.SetIds(nodes_Ids- elem_container._sd_element_offset)
+                tag.SetIds(nodes_Ids- offset_dic[el_type])
         return AllElements
 
     def _from_BT_mixed_topology(self, mesh_object):
@@ -3167,27 +3176,36 @@ class SampleData:
         topology_attributes = {}
         topology_attributes['Topology'] = 'Mixed'
         element_type = []
+        elements_offset = []
         Number_of_elements = []
         Number_of_bulk_elements = []
         Number_of_boundary_elements = []
         Xdmf_elements_code = []
-        Bulk_elements_over = False
+        offset = 0
         # for each element type in the mesh_object, read type, number and
         # xdmf code for the elements
+        # The process has 2 steps: 1 for bulk elements, then 1 for boundary
+        # elements
+        # First step for bulk elements
         for ntype, data in mesh_object.elements.items():
-            element_type.append(ntype)
-            Number_of_elements.append(data.GetNumberOfElements())
-            Xdmf_elements_code.append(XdmfNumber[ntype])
             if EN.dimension[ntype] == mesh_object.GetDimensionality():
-                if Bulk_elements_over:
-                    raise ValueError('Boundary elements are stored before '
-                                     'bulk elements in the mesh_object. Bulk '
-                                     'elements should be stored before '
-                                     'boundary elements to comply with Sample'
-                                     'Data mesh conventions.')
+                element_type.append(ntype)
+                elements_offset.append(offset)
+                offset += data.GetNumberOfElements()
+                Number_of_elements.append(data.GetNumberOfElements())
+                Xdmf_elements_code.append(XdmfNumber[ntype])
                 Number_of_bulk_elements.append(data.GetNumberOfElements())
-            elif EN.dimension[ntype] < mesh_object.GetDimensionality():
-                Bulk_elements_over = True
+            elif EN.dimension[ntype] > mesh_object.GetDimensionality():
+                raise ValueError('Elements dimensionality is higher than mesh'
+                                 ' dimensionality.')
+        # Second step for boundary elements
+        for ntype, data in mesh_object.elements.items():
+            if EN.dimension[ntype] < mesh_object.GetDimensionality():
+                element_type.append(ntype)
+                elements_offset.append(offset)
+                offset += data.GetNumberOfElements()
+                Number_of_elements.append(data.GetNumberOfElements())
+                Xdmf_elements_code.append(XdmfNumber[ntype])
                 Number_of_boundary_elements.append(data.GetNumberOfElements())
             elif EN.dimension[ntype] > mesh_object.GetDimensionality():
                 raise ValueError('Elements dimensionality is higher than mesh'
@@ -3196,6 +3214,8 @@ class SampleData:
         topology_attributes['element_type'] = element_type
         topology_attributes['Number_of_elements'] = np.array(
             Number_of_elements)
+        topology_attributes['Elements_offset'] = np.array(
+            elements_offset)
         topology_attributes['Number_of_bulk_elements'] = np.array(
             Number_of_bulk_elements)
         topology_attributes['Number_of_boundary_elements'] = np.array(
@@ -3211,6 +3231,7 @@ class SampleData:
         topology_attributes['element_type'] = [element_type]
         n_elements = mesh_object.GetNumberOfElements()
         topology_attributes['Number_of_elements'] = np.array([n_elements])
+        topology_attributes['Elements_offset'] = [0]
         topology_attributes['Xdmf_elements_code'] = [XdmfName[element_type]]
         return topology_attributes
 

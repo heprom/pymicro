@@ -212,16 +212,26 @@ class SampleDataTests(unittest.TestCase):
         # get into a SampleData instance
         sample = SampleData(filename='square', verbose=False, autodelete=True)
         sample.add_mesh(mesh_object=myMesh, meshname='BT_mesh',indexname='BTM',
-                          replace=True, extended_data=True)
+                        replace=True, extended_data=True)
         # get mesh object from SampleData file/instance
         myMesh2 = sample.get_mesh('BTM')
         # delete SampleData object and test values
         self.assertTrue(np.all(myMesh.nodes == myMesh2.nodes))
+        # assert bulk element  connectivity
         connectivity = myMesh.elements['tri3'].connectivity
         connectivity2 = myMesh2.elements['tri3'].connectivity
         self.assertTrue(np.all(connectivity == connectivity2))
+        # assert boundary element  connectivity
+        connectivity = myMesh.elements['bar2'].connectivity
+        connectivity2 = myMesh2.elements['bar2'].connectivity
+        self.assertTrue(np.all(connectivity == connectivity2))
+        # assert boundary element tags values
         elements_in_tag = myMesh.GetElementsInTag('ExteriorSurf')
         elements_in_tag2 = myMesh2.GetElementsInTag('ExteriorSurf')
+        self.assertTrue(np.all(elements_in_tag == elements_in_tag2))
+        # assert bulk element tags values
+        elements_in_tag = myMesh.GetElementsInTag('2D')
+        elements_in_tag2 = myMesh2.GetElementsInTag('2D')
         self.assertTrue(np.all(elements_in_tag == elements_in_tag2))
         del sample
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from pymicro.core.utils.SDZsetUtils.SDZset import SDZset
 
 
-# SD Zset mesher class
+# SD Zset Finite element analysis class
 class SDZsetFEA(SDZset):
     """A Class to use Zset meshers to process SampleData meshes.
 
@@ -363,6 +363,26 @@ class SDZsetFEA(SDZset):
                                                      self._current_position)
         return
     
+    def add_post_processing(self, PostProcessing):
+        """Add a post processing block to the inp script.
+        
+        :param SDZsetPostProcessing: Class instance handling the post
+            processing block to add to the inp file.
+        :type SDZsetPostProcessing: SDZsetPostProcessing
+        """
+        if not isinstance(PostProcessing, SDZsetPostProcessing):
+            raise Warning('Input is not a SDZsetPostProcessing class instance.'
+                          ' Cannot add the post processing block.')
+            return
+        # add post processing block at the end of inp script
+        pos = len(self.inp_lines)
+        self._add_inp_lines(PostProcessing.inp_lines, pos)
+        # update script arguments 
+        self.Script.args.update(PostProcessing.Script.args)
+        # update script arguments lists
+        self.script_args_list.extend(PostProcessing.script_args_list)
+        return
+    
     def set_fixed_set_bc(self, nset_list=None, bset_list=None):
         """Add a U=0 boundary condition for the inputed nsets or bsets.
         
@@ -514,9 +534,9 @@ class SDZsetFEA(SDZset):
         return
  
 
-# SD Zset mesher class
+# SD Zset Field transfer class
 class SDZsetFieldsTransfer(SDZset):
-    """Class Zset field transfer operators interface with Sampledata fields.
+    """Class to use Zset field transfer operators with Sampledata fields.
 
     This class is an inteface between the SampleData data platform class and
     the Zset software (developed at Centre des Matériaux, Mines Paris)
@@ -529,7 +549,6 @@ class SDZsetFieldsTransfer(SDZset):
     That means that the Zset software must be available in your PATH
     environnement variable at least. 
     
-    Convention: 
     """
     
     def __init__(self, problem_name, transfer_type='nodal',
@@ -594,7 +613,16 @@ class SDZsetFieldsTransfer(SDZset):
             output_meshfile, verbose, autodelete, data_autodelete)
         self.set_problem_name(problem_name)
         self.set_transfer_type(transfer_type)
-        return   
+        return  
+    
+    def clean_output_files(self, clean_Zset_output=True):
+        """Remove all Zset output files and output .geof file if possible."""
+        super(SDZsetFieldsTransfer, self).clean_output_files(clean_Zset_output)      
+        from subprocess import run
+        if clean_Zset_output:
+            run(args=['Zclean','output'])
+        return
+     
 
     def set_problem_name(self, problem_name):
         """Set the finite element calculation type.
@@ -722,5 +750,314 @@ class SDZsetFieldsTransfer(SDZset):
         self.script_args_list.append('problem_name')
         self.script_args_list.append('transfer_type')
         self._current_position = self._add_inp_lines(lines,0) - 1
+        return
+ 
+
+# SD Zset Postprocessing class
+class SDZsetPostProcessing(SDZset):
+    """Class to use Zset postprocessing operators on Sampledata fields.
+
+    This class is an inteface between the SampleData data platform class and
+    the Zset software (developed at Centre des Matériaux, Mines Paris)
+    finite element tools. It is designed to use Zset to run finite element
+    analysis and/or process FEM fields from data in SampleData Mesh groups, and
+    store the results in the same SampleData instance/file, in the same or
+    another Mesh group. 
+
+    The use of this class methods requires a Zset compatible environnement.
+    That means that the Zset software must be available in your PATH
+    environnement variable at least. 
+    
+    Convention::
+        
+        The Zset ouput data used as input for the post processing must exist,
+        and the associated .geof file must as well.
+                
+    """
+    
+    def __init__(self, data=None, sd_datafile=None,
+                 inp_filename=Path('.').absolute() / 'post_processing.inp',
+                 inputmesh=None, outputmesh=None, 
+                 input_meshfile=None, output_meshfile=None,
+                 verbose=False, autodelete=False, data_autodelete=False):
+        """SDZsetFEA class constructor.
+        
+        :type transfer_type name: str, optional
+        :param data: SampleData object to store input and output data for/from
+            Zset. If `None`, the class will open a SampleData instance from a
+            datafile path. Defaults to None
+        :type data: :py:class:`pymicro.core.samples.SampleData` object, optional
+        :param sd_datafile:  Path of the hdf5/xdmf data file to open as the
+            SampleData instance containing mesh tools input data. Defaults to
+            None
+        :type sd_datafile: str, optional
+        :param inp_filename: Name of the .inp script file associated to the
+            class instance. Zset commands passed to the class instance are
+            written in this file. Defaults to `./script.inp`
+        :type inp_filename: str, optional
+        :param inputmesh: Name, Path, Indexname or Alias of the mesh group
+            in the SampleData instance to use as Zset inputmesh. Defaults to
+            None
+        :type inputmesh: str, optional
+        :param outputmesh:  Name, Path, Indexname or Alias of the mesh group
+            in the SampleData instance to store Zset output mesh (for Zset
+            meshers). Defaults to None
+        :type outputmesh: str, optional
+        :param input_meshfile: Name of .geof mesh on which the fields must
+            be transfered. If `inputmesh` is `None`, the file must exist and
+            be a valid .geof meshfile for Zset. If `inputmesh` is not `None`,
+            then the mesh data refered by `meshname` in the SampleData instance
+            will be written as a .geof mesh file `meshfilename.geof`.
+            Defaults to `./input.geof`
+            Defaults to `./input.geof`
+        :type input_meshfile: str, optional
+        :param output_meshfile: Name of the mesh .geof file to use as output
+            when using Zset meshers. Defaults to `./output.geof`
+        :type output_meshfile: str, optional
+        :param verbose: verbosity flag, defaults to False
+        :type verbose: bool, optional
+        :param autodelete: If `True`, removes all temporary files, script files
+            and Zset output files (~ Zclean) when deleting the class isntance.
+            Defaults to False
+        :type autodelete: bool, optional
+        :param data_autodelete: If `True`, set `autodelete` flag to `True` on
+            SampleData instance. Defaults to False
+        :type data_autodelete: bool, optional
+        """
+        # init post proc block count
+        self._pp_count = 0
+        # parent class init
+        super(SDZsetPostProcessing, self).__init__(data, 
+            sd_datafile, inp_filename, inputmesh, outputmesh, input_meshfile,
+            output_meshfile, verbose, autodelete, data_autodelete)
+        return   
+
+    def add_post_proc_bloc(self, precision=None, prefix=None,
+                           suppress_p=False):
+        """Add a post processing block to theend of the inp script file."""
+        lines=['****post_processing',
+               '****return']
+        pos = len(self.inp_lines)
+        # add lines and set position inside post processing block
+        self._current_position = self._add_inp_lines(lines,pos) - 1
+        self._pp_count += 1
+        if precision is not None:
+            self.set_precision(precision)
+        if prefix is not None:
+            self.set_post_file_prefix(prefix)
+        if suppress_p:
+            lines = [' ***suppress_p_on_post_files']
+            self._current_position = self._add_inp_lines(lines, 
+                                                        self._current_position)
+        return
+    
+    def add_data_source_type(self, source_type='Z7', filename=''):
+        """Add a ***data_source command to the current post_processing.
+        
+        :param source_type: type of external source of data to post process,
+            defaults to 'Z7'
+        :type source_type: str, optional
+        :param filename: name of the file containing the external source,
+            defaults to ''
+        :type filename: str, optional
+        """
+        lines = [f' ***data_source {source_type}',
+                 f'  **open {filename}']
+        self._current_position = self._add_inp_lines(lines, 
+                                                      self._current_position)
+        return
+    
+    def add_data_output(self, output_type='Z7', pb_name='', elset_name=None):
+        """Add a ***data_output command to the current post_processing.
+        
+        :param source_type: type of external source of data to post process,
+            defaults to 'Z7'
+        :type source_type: str, optional
+        :param pb_name:  output file will be this name appended with a dot
+            suffix of the file type. Defaults to ''
+        :type pb_name: str, optional
+        :param elset_name: elset to use as submesh for the output of post
+            processing. Default to None
+        :type elset_name: str, optional
+        """
+        lines = [f' ***data_output {output_type}',
+                 f'  **problem_name {pb_name}',
+                 f'   *elset {elset_name}']
+        self._current_position = self._add_inp_lines(lines, 
+                                                      self._current_position)
+        return
+    
+    def add_local_post_processing(self, post_proc_opts=dict(),
+                                  process_list=None):
+        # create block
+        lines = [' ***local_post_processing']
+        # add options 
+        lines = self._add_command_options(lines, post_proc_opts, level='  **')
+        # add process blocks
+        if process_list is not None:
+            for process in process_list:
+                lines.append(self.add_process(process_opts=process))
+        # add lines
+        self._current_position = self._add_inp_lines(lines, 
+                                                      self._current_position)
+        return
+    
+    def add_global_post_processing(self, post_proc_opts=dict(),
+                                  process_list=None):
+        # create block
+        lines = [' ***global_post_processing']
+        # add options 
+        lines = self._add_command_options(lines, post_proc_opts, level='  **')
+        # add process blocks
+        if process_list is not None:
+            for process in process_list:
+                lines.extend(self.add_process(process_opts=process))
+        # add lines
+        self._current_position = self._add_inp_lines(lines, 
+                                                      self._current_position)
+        return
+    
+    def add_process(self, process_opts):
+        """Add a process block to the current post processing block.
+        
+        :param process_opts: Dictionnary of options describing the process
+            block. Must contain 'process_type'. Can containe a 'material_file'
+            key to specify the material file to set for this process block.
+            All other entries are treated as '*' options for the process block
+            and written in it as '   *{key} value' lines.
+        :type process_opts: dict
+        """
+        if 'process_type' in process_opts:
+            p_type = process_opts.pop('process_type')
+        else:
+            raise ValueError('No "process_type" key in the process_opts dict.')
+        if 'material_file' in process_opts:
+            matfile = process_opts.pop('material_file')
+            lines = [f'  **material_file {matfile}',
+                     f'  **process {p_type}']
+        else:
+            lines = [f'  **process {p_type}']
+        lines = self._add_command_options(lines, process_opts)
+        return lines
+    
+    def add_results_management(self, add_list=None):
+        """Add a ****result_management block on top of current script.
+        
+        :param add_opts: Dictionnary of options describing the process
+            block. Must contain 'process_type'. Can containe a 'material_file'
+            key to specify the material file to set for this process block.
+            All other entries are treated as '*' options for the process block
+            and written in it as '   *{key} value' lines.
+        :type process_opts: dict
+        """
+        # create block
+        lines = ['****result_management']
+        # add process blocks
+        if add_list is not None:
+            for add in add_list:
+                lines.append(self.add_to_result_management(add_opts=add))
+        lines.append('****return')
+        # add lines
+        self._current_position = self._add_inp_lines(lines, 
+                                                      self._current_position)
+        return
+    
+    def add_to_result_management(self, add_opts):
+        """Add a ***add block to the current ****result_management.
+        
+        :param add_opts: Dictionnary of options describing the add
+            block. Must contain 'filename'. All other entries are treated as
+            '*' options for the process block and written in it as '   *{key}
+            value' lines.
+        :type process_opts: dict
+        """
+        if 'filename' in add_opts:
+            fname = add_opts.pop('filename')
+        else:
+            raise ValueError('No "filename" key in the add_opts dict.')
+        lines = [f' ***add {fname}']
+        lines = self._add_command_options(lines, add_opts)
+        return
+    
+    def read_output_fields(self, ut_file=None, field_list=None,
+                           sequence_list=None):
+        """Read node or integration point fields from Zset FEA output.
+        
+        :param ut_file: Name of the Zset output from which the fields must be
+            loaded. Defaults to None: read all fields.
+        :type ut_file: str, optional
+        :param field_list: List of variables names corresponding to the fields
+            to read from the FEA output. Defaults to None: read all fields.
+        :type field_list: list[str], optional
+        :param sequence_list: List of output sequences to read. Defaults to None:
+            read all sequences.
+        :type sequence_list: list[int], optional
+        :raises RuntimeError: raised if the FEA has not been runed. 
+        :raises ValueError: raised if fields not in FEA output are required
+        :return Nodal_field_sequence: List of dict{fieldname: field array}, one
+            element for each sequence, for the node fields.
+        :rtype: list
+        :return Integ_field_sequence: List of dict{fieldname: field array}, one
+            element for each sequence, for the integration points fields.
+        :rtype: list
+        """
+        if ut_file is None:
+            ut_file = str(self.inp_template.with_suffix('.utp'))
+            
+        Nodal_field_sequence, Integ_field_sequence = (
+            super(SDZsetPostProcessing, self).read_output_fields(ut_file,
+                    field_list, sequence_list)
+            )
+        return Nodal_field_sequence, Integ_field_sequence
+    
+    def run_inp(self, inp_filename=None, workdir=None, print_output=False):
+        """Run the .inp Zset script with current commands and arguments.
+                
+        This methods writes and runs a Zset script that will execute all
+        commands prescribed by the class instance. First the method 
+        writes the inp script template and the input .geof file from the
+        SampleData instance mesh data if the `data_inputmesh` and the `data`
+        attributes are set to a valid value. The results are loaded in
+        the SampleData instance if the `data` attribute exists. In addition,
+        this method writes if needed the problem and output mesh files, and
+        verifies that the problem files containing the fields to transfer
+        exists.
+        """
+        # Add post processing command option 
+        if self._pp_count == 1:
+            self.Script.set_script_command_options(['-pp'])
+        elif self._pp_count > 1:
+            command_opts = [f'-N {self._pp_count}',' -pp']
+            self.Script.set_script_command_options(command_opts)
+        # Write inp script template
+        self.write_inp_template(inp_filename)
+        # Check that script template arguments are well defined
+        self._check_arguments_list()
+        # Run Script
+        script_output = self.Script.runScript(workdir, append_filename=True,
+                                              print_output=print_output)
+        return script_output
+
+    def set_precision(self, precision):
+        """Set the float precision of the post processing output.
+        
+        :param precision: precision for formatted output of real values
+        :type precision: float
+        """
+        lines = [f' ***precision {precision}']
+        self._current_position = self._add_inp_lines(lines, 
+                                                      self._current_position)
+        return
+    
+    def set_post_file_prefix(self, prefix='post'):
+        """Set output files probel name."""
+        lines = [f' ***post_file_prefix {prefix}']
+        self._current_position = self._add_inp_lines(lines, 
+                                                      self._current_position)
+        return
+
+    def _init_script_content(self):
+        """Create inp minimal text content."""
+        self.add_post_proc_bloc()
         return
 

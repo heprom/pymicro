@@ -959,9 +959,9 @@ class SampleData:
                          }
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
-        self.add_attributes(Attribute_dic, nodename=fieldname)
+        self.add_attributes(Attribute_dic, nodename=indexname)
         # Add field description to XDMF file
-        self._add_field_to_xdmf(fieldname, array)
+        self._add_field_to_xdmf(indexname, array)
         # Add field path to grid node Field_list attribute
         self._append_field_index(gridname, fieldname)
         return node
@@ -3014,6 +3014,9 @@ class SampleData:
                 data = np.zeros((mesh_object.GetNumberOfNodes(),1),
                                 dtype=np.int8)
                 data[node_list] = 1;
+                print(f' adding field to mesh : {mesh_group._v_pathname}')
+                print(f' adding field: field_{name}')
+                print(f' adding field at : {Ntags_group._v_pathname}')
                 node = self.add_field(mesh_group._v_pathname,
                                       fieldname='field_'+name,
                                       array=data, replace=replace,

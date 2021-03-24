@@ -247,9 +247,9 @@ class SDZset():
             os.remove(self.inp_script)
         return
     
-    def clean_output_files(self, clean_output_mesh=True):
+    def clean_output_files(self, clean_Zset_output=True):
         """Remove all Zset output files and output .geof file if possible."""
-        if clean_output_mesh:
+        if clean_Zset_output:
             run(args=['Zclean',f'{self.inp_script.stem}_tmp'])
         if hasattr(self, 'output_meshfile'):
             if self.output_meshfile.exists():
@@ -445,8 +445,8 @@ class SDZset():
         return
     
     def load_output_fields(self, field_list=None, sequence_list=None,
-                           sequence_basename='', is_time_sequence=True,
-                           fields_basename=''):
+                           sequence_basename='output_fields',
+                           is_time_sequence=True, fields_basename=''):
         """Load fields from Zset FEA output into the SampleData instance.
         
         :param field_list: List of variables names corresponding to the fields
@@ -469,7 +469,10 @@ class SDZset():
                                                     field_list, sequence_list)
         # load the outputs into the SampleData instance
         for i in range(len(Nodal_fields)):
-            suffix = f'{fields_basename}_{i}'
+            if len(Nodal_fields) == 1:
+                suffix = f'{fields_basename}'
+            else:
+                suffix = f'{fields_basename}_{i}'
             if is_time_sequence:
                 sequence_group = sequence_basename+f'time_{i}'
             else:
@@ -694,13 +697,13 @@ class SDZset():
             pos = pos+1
         return pos
     
-    def _add_command_options(self, lines, options_dict=dict()):
+    def _add_command_options(self, lines, options_dict=dict(), level='   *'):
         """Add to lines options passed as kwargs and track args list.""" 
         for key,value in options_dict.items():
             temp = self._find_template_string(str(value))
             if temp:
                 self.script_args_list.append(temp)
-            line = f'   *{key} {value}'
+            line = level+f'{key} {value}'
             if key[0:4] == 'func':
                 line = line+';'
             lines.append(line)   

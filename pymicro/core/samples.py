@@ -1242,6 +1242,81 @@ class SampleData:
             else:
                 self.content_index[indexname] = [path, colname]
         return
+    
+    def compute_mesh_elements_normals(self, meshname, element_tag,
+                                      Normal_fieldname=None,
+                                      align_vector=[0,0,1]):
+        """Compute the normals of a set of boundary elements of a mesh group.
+        
+        The normals are stored as en element wise constant field in the mesh
+        group. 
+        
+        :param meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :type meshname: str
+        :param element_tag: name of the element tag or element type whose
+            normals must be computed
+        :type element_tag: str
+        :param Normal_fieldname: Name of the normals field to store on the
+            mesh group. Defaults to 'Normals_element_tag_name'
+        :type Normal_fieldname: TYPE, optional
+        :param align_vector: All normals are oriented to have positive dot
+            product with `align_vector`, defaults to [0,0,1]
+        :type align_vector: np.array(3), optional
+        :raises ValueError: Can only process elements of bidimensional
+            topology (surface elements, like triangles, quadrilaterals...)
+        """
+        import BasicTools.Containers.ElementNames as EN
+        if Normal_fieldname is None:
+            Normal_fieldname = 'Normals_' + element_tag
+        
+        # Step 0: identify to which element type or element tag 
+        mesh_elements = self.get_mesh_elem_types_and_number(meshname)
+        mesh_el_tags = self.get_mesh_elem_tags_names(meshname)
+        if element_tag in mesh_elements.keys():
+            el_type = mesh_elements[element_tag]
+        if element_tag in mesh_el_tags.keys():
+            el_type = mesh_el_tags[element_tag]
+            
+        # Step 1: Find out type of element and assert that it is a 2D element
+        # type
+        if EN.dimension[el_type] != 2:
+            raise ValueError('Can compute normals only for sets of elements'
+                             ' with a 2D topology.')
+            
+        # Step 2: Extract element set connectivity and global IDs
+        if element_tag in mesh_elements.keys():
+            connectivity = self.get_mesh_elements(
+                meshname, with_tags=False, get_eltype_connectivity=element_tag)
+        if element_tag in mesh_el_tags.keys():
+            connectivity = self.get_mesh_elem_tags_connectivity(
+                                    meshname, element_tag)
+        element_IDs = self.get_mesh_elem_tag(meshname, element_tag)
+            
+        # Step 3: Compute normals
+        mesh_nodes = self.get_mesh_nodes(meshname, as_numpy=True)
+        vect_1 = (  mesh_nodes[connectivity[:,1],:] 
+                  - mesh_nodes[connectivity[:,0],:])
+        vect_2 = (  mesh_nodes[connectivity[:,2],:] 
+                  - mesh_nodes[connectivity[:,1],:])
+        normals = np.cross(vect_1, vect_2)
+        #     * normalize normals
+        norms = np.linalg.norm(normals, axis=-1)
+        normals[:,0] = normals[:,0] / norms
+        normals[:,1] = normals[:,1] / norms
+        normals[:,2] = normals[:,2] / norms
+        #     * align orientation of surface vectors
+        idx = np.where(np.dot(normals,align_vector) < 0)
+        normals[idx,:] = - normals[idx,:]
+        
+        # Step 4: Create element field to store normals on mesh group
+        Nelem = np.sum(self.get_attribute('Number_of_elements', meshname))
+        Normals_field = np.zeros(shape=(Nelem,3))
+        Normals_field[element_IDs,:] = normals
+        
+        # Step 5: store Normal field in mesh group
+        self.add_field(meshname, Normal_fieldname, Normals_field)
+        return
 
     def get_indexname_from_path(self, node_path):
         """Return the Index name of the node at given path.
@@ -1369,12 +1444,21 @@ class SampleData:
         elems_path = self.get_attribute('elements_path', meshname)
         return self.get_node(elems_path, as_numpy)
 
-    def get_mesh_elements(self, meshname, with_tags=True, as_numpy=True):
+    def get_mesh_elements(self, meshname, with_tags=True, as_numpy=True,
+                          get_eltype_connectivity=None):
         """Return the mesh elements connectivity as HDF5 node or Numpy array.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
             in dataset
-        :return: Return the mesh elements containers as a
+        :param bool with_tags: if `True`, loads the element tags in the
+            returned elements container
+        :param bool as_numpy: if `True`, returns arrays in elements container
+            as numpy array
+        :param str get_eltype_connectivity: if this argument is set to the name
+            of an element type contained in the mesh, the method retuns the
+            connectivity array of these elements, and not the BasicTools
+            elements container.
+        :return: Return the mesh elements container as a
             BasicTools :py:class:`AllElements` object
         """
         # Create AllElementsContainer
@@ -1414,6 +1498,8 @@ class SampleData:
                                      ' is ill-shaped : Xdmf code value wrong'
                                      ' for at least one element.'
                                      ''.format(element_type[i]))
+                if get_eltype_connectivity == element_type[i]:
+                    return local_connect[:,id_offset:]
                 Elements.connectivity = local_connect[:,id_offset:]
                 Elements.cpt = Nelems[i]
                 offset = Nvalues
@@ -1425,17 +1511,94 @@ class SampleData:
             self._load_elements_tags(meshname, AElements, as_numpy)
         return AElements
 
+    def get_mesh_elem_types_and_number(self, meshname):
+        """Returns the list and types of elements tags defined on a mesh.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :return dict: keys are element types in the mesh and values are the
+            number of elements for each element type.
+        """
+        elem_types = self.get_attribute('element_type', meshname)
+        elem_number = self.get_attribute('Number_of_elements', meshname)
+        return {elem_types[i]:elem_number[i] for i in range(len(elem_types))}
+
+    def get_mesh_elem_tag(self, meshname, element_tag, as_numpy=True,
+                          local_IDs=False):
+        """Returns the elements IDs of an element tag for the mesh group.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :param str element_tag: name of the element tag whose connectivity
+            must be returned. Can also be one of the element types contained
+            in the mesh. In this case, the complete global element IDs for
+            these elements is return
+        :param bool as_numpy: if `True`, returns arrays in elements container
+            as numpy array
+        :param bool local_IDs: if `True`, returns the local elements IDs for
+            the element type, i.e. the indexes of elements in the local
+            connectivity array that can be obtain with get_mesh_elements.
+        """
+        # find out if the required element_tag is an element type of the mesh
+        mesh_elements = self.get_mesh_elem_types_and_number(meshname)
+        if element_tag in mesh_elements.keys():
+            # return element type IDs
+            offsets = self._get_mesh_elements_offsets(meshname)
+            el_numbers = self.get_mesh_elem_types_and_number(meshname)
+            tag = np.arange(el_numbers[element_tag])
+            if not local_IDs:
+                tag = tag + offsets[element_tag]
+        else:
+            # Return element tag IDs
+            # Add prefix to element_tag name if needed
+            if not element_tag.startswith('ET_'):
+                el_tag_nodename = 'ET_' + element_tag
+                el_tag_true_name = element_tag
+            else:
+                el_tag_true_name = element_tag[3:]
+            # get mesh group
+            mesh_group = self.get_node(meshname)
+            # get path of Element tag
+            ET_path = os.path.join(mesh_group._v_pathname,'Geometry',
+                                         'ElementsTags',el_tag_nodename)
+            # get element tag type
+            tag = self.get_node(ET_path, as_numpy=as_numpy)
+            if local_IDs:
+                tag_names = self.get_mesh_elem_tags_names(meshname)
+                offsets = self._get_mesh_elements_offsets(meshname)
+                tag = tag - offsets[tag_names[el_tag_true_name]]
+        return tag
+
     def get_mesh_elem_tags_names(self, meshname):
         """Returns the list and types of elements tags defined on a mesh.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
             in dataset
-        :return list elem_tags: list of element tag names defined on this mesh
-        :return list elem_types: list of element types for each element tag
+        :return dict: keys are element tag names in the mesh and values are the
+            element type for each element tag.
         """
         elem_tags = self.get_attribute('Elem_tags_list', meshname)
         elem_types = self.get_attribute('Elem_tag_type_list', meshname)
-        return elem_tags, elem_types
+        return {elem_tags[i]:elem_types[i] for i in range(len(elem_tags))}
+
+    def get_mesh_elem_tags_connectivity(self, meshname, element_tag):
+        """Returns the list and types of elements tags defined on a mesh.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :param str element_tag: name of the element tag whose connectivity
+            must be returned. 
+        """
+        # get element tag type
+        tags = self.get_mesh_elem_tags_names(meshname)
+        el_type = tags[element_tag]
+        # get connectivity of element type
+        type_connectivity = self.get_mesh_elements(
+                                    meshname, get_eltype_connectivity=el_type)
+        # get local element IDs in element tag
+        local_IDs = self.get_mesh_elem_tag(meshname, element_tag,
+                                           local_IDs=True)
+        return type_connectivity[local_IDs,:] 
 
     def get_mesh_node_tags_names(self, meshname):
         """Returns the list of node tags defined on a mesh.
@@ -2295,16 +2458,17 @@ class SampleData:
         mesh = self.get_node(meshname)
         El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
         ID_field = np.zeros((Nelements,1),dtype=float)
-        elem_tags,_ = self.get_mesh_elem_tags_names(meshname)
+        elem_tags = self.get_mesh_elem_tags_names(meshname)
         # if mesh is provided
-        for i in range(len(elem_tags)):
-            set_name = elem_tags[i]
+        i = 0
+        for set_name, set_type in elem_tags.items():
             elset_path = os.path.join(El_tag_path, 'ET_'+set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
             if get_sets_IDs:
                 set_ID = int(set_name.strip(tags_prefix))
             else:
                 set_ID = i
+                i += 1 
             ID_field[element_ids] = set_ID
             if remove_elset_fields:
                 field_path = os.path.join(El_tag_path, 'field_'+set_name)
@@ -3010,9 +3174,6 @@ class SampleData:
                 data = np.zeros((mesh_object.GetNumberOfNodes(),1),
                                 dtype=np.int8)
                 data[node_list] = 1;
-                print(f' adding field to mesh : {mesh_group._v_pathname}')
-                print(f' adding field: field_{name}')
-                print(f' adding field at : {Ntags_group._v_pathname}')
                 node = self.add_field(mesh_group._v_pathname,
                                       fieldname='field_'+name,
                                       array=data, replace=replace,
@@ -3483,6 +3644,11 @@ class SampleData:
         except:
             raise ValueError('Mesh dimension must correspond to a 2D or'
                              '3D mesh.')
+            
+    def _get_mesh_elements_offsets(self, meshname):
+        types = self.get_attribute('element_type', meshname)
+        offsets = self.get_attribute('Elements_offset', meshname)
+        return {types[i]:offsets[i] for i in range(len(types))}
 
     def _get_parent_type(self, name):
         """Get the SampleData group type of the node parent group."""

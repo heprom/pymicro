@@ -1243,9 +1243,9 @@ class SampleData:
                 self.content_index[indexname] = [path, colname]
         return
     
-    def compute_mesh_elements_normals(self, meshname, element_tag,
-                                      Normal_fieldname=None,
-                                      align_vector=[0,0,1]):
+    def compute_mesh_elements_normals(
+            self, meshname, element_tag, Normal_fieldname=None, 
+            align_vector=np.random.rand(3), as_nodal_field=False):
         """Compute the normals of a set of boundary elements of a mesh group.
         
         The normals are stored as en element wise constant field in the mesh
@@ -1311,9 +1311,28 @@ class SampleData:
         
         # Step 4: Create element field to store normals on mesh group
         Nelem = np.sum(self.get_attribute('Number_of_elements', meshname))
-        Normals_field = np.zeros(shape=(Nelem,3))
-        Normals_field[element_IDs,:] = normals
-        
+        Elem_normals_field = np.zeros(shape=(Nelem,3))
+        Elem_normals_field[element_IDs,:] = normals
+        if as_nodal_field:
+            Nodal_normals_field = np.zeros(shape=mesh_nodes.shape)
+            for nodeId in np.unique(connectivity):
+                E_idx, _ = np.where(connectivity == nodeId)
+                idxx = element_IDs[E_idx]
+                Nodal_normals_field[nodeId,:] = (
+                                    np.sum(Elem_normals_field[idxx,:], axis=0)
+                                                 ) / len(idxx) 
+                # print('E_idx :', E_idx, 'idxx :', idxx)
+                # print('local Normals :', Elem_normals_field[idxx,:])
+                # print(Nodal_normals_field[nodeId,:])
+                # print(np.linalg.norm(Nodal_normals_field[nodeId,:]))
+            norms = np.linalg.norm(Nodal_normals_field, axis=-1)
+            idx = np.where(norms > 0)
+            Nodal_normals_field[idx,0] = Nodal_normals_field[idx,0]/norms[idx]
+            Nodal_normals_field[idx,1] = Nodal_normals_field[idx,1]/norms[idx]
+            Nodal_normals_field[idx,2] = Nodal_normals_field[idx,2]/norms[idx]
+            Normals_field = Nodal_normals_field
+        else:
+            Normals_field = Elem_normals_field
         # Step 5: store Normal field in mesh group
         self.add_field(meshname, Normal_fieldname, Normals_field)
         return

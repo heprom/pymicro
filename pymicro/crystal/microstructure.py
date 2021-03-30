@@ -1592,14 +1592,39 @@ class Microstructure(SampleData):
         """
         return self.get_tablecol('GrainDataTable', 'idnumber')
 
+    @staticmethod
+    def id_list_to_condition(id_list):
+        """Convert a list of id to a condition to filter the grain table.
+
+        The condition will be interpreted using Numexpr typically using
+        a `read_where` call on the grain data table.
+
+        :param list id_list: a non empty list of the grain ids.
+        :return: the condition as a string .
+        """
+        if not len(id_list) > 0:
+            raise ValueError('the list of grain ids must not be empty')
+        condition = "\'(idnumber == %d)" % id_list[0]
+        for grain_id in id_list[1:]:
+            condition += " | (idnumber == %d)" % grain_id
+        condition += "\'"
+        print(condition)
+        return condition
+
     def get_grain_volumes(self, id_list=None):
-        if id_list is None:
-            return self.get_tablecol('GrainDataTable', 'volume')
+        """Get the grain volumes.
+
+        The grain data table is queried and the volumes of the grains are
+        returned in a single array.
+
+        :param list id_list: a non empty list of the grain ids.
+        :return: a numpy array containing the grain volumes.
+        """
+        if id_list:
+            condition = Microstructure.id_list_to_condition(id_list)
+            return self.grains.read_where(eval(condition))['volume']
         else:
-            vol = []
-            for g in self.grains:
-                vol.append(g['volume'])
-            return vol
+            return self.get_tablecol('GrainDataTable', 'volume')
 
     def get_grain_centers(self, id_list=None):
         if id_list is None:
@@ -1637,6 +1662,11 @@ class Microstructure(SampleData):
             for g in self.grains:
                 Bbox.append(g['bounding_box'])
             return Bbox
+
+    def get_grain_equivalent_diameters(self, id_list=None):
+        grain_equivalent_diameters = 2 * (3 * self.get_grain_volumes(id_list) /
+                                          4 / np.pi) ** (1 / 3)
+        return grain_equivalent_diameters
 
     def get_voxel_size(self):
         """Get the voxel size for image data of the microstructure.

@@ -1615,7 +1615,8 @@ class Microstructure(SampleData):
         """Get the grain volumes.
 
         The grain data table is queried and the volumes of the grains are
-        returned in a single array.
+        returned in a single array. An optional list of grain ids can be used
+        to restrict the grains, by default all the grain volumes are returned.
 
         :param list id_list: a non empty list of the grain ids.
         :return: a numpy array containing the grain volumes.
@@ -1627,41 +1628,68 @@ class Microstructure(SampleData):
             return self.get_tablecol('GrainDataTable', 'volume')
 
     def get_grain_centers(self, id_list=None):
-        if id_list is None:
-            return self.get_tablecol('GrainDataTable', 'center')
+        """Get the grain centers.
+
+        The grain data table is queried and the centers of the grains are
+        returned in a single array. An optional list of grain ids can be used
+        to restrict the grains, by default all the grain centers are returned.
+
+        :param list id_list: a non empty list of the grain ids.
+        :return: a numpy array containing the grain centers.
+        """
+        if id_list:
+            condition = Microstructure.id_list_to_condition(id_list)
+            return self.grains.read_where(eval(condition))['center']
         else:
-            com = []
-            for g in self.grains:
-                com.append(g['center'])
-            return com
+            return self.get_tablecol('GrainDataTable', 'center')
 
     def get_grain_rodrigues(self, id_list=None):
-        if id_list is None:
-            return self.get_tablecol('GrainDataTable', 'orientation')
+        """Get the grain rodrigues vectors.
+
+        The grain data table is queried and the rodrigues vectors of the grains
+        are returned in a single array. An optional list of grain ids can be
+        used to restrict the grains, by default all the grain rodrigues vectors
+        are returned.
+
+        :param list id_list: a non empty list of the grain ids.
+        :return: a numpy array containing the grain rodrigues vectors.
+        """
+        if id_list:
+            condition = Microstructure.id_list_to_condition(id_list)
+            return self.grains.read_where(eval(condition))['orientation']
         else:
-            o = []
-            for g in self.grains:
-                o.append(g['orientation'])
-            return o
+            return self.get_tablecol('GrainDataTable', 'orientation')
 
     def get_grain_orientations(self, id_list=None):
-        orientations = []
-        for gr in self.grains:
-            if id_list is not None:
-                if gr['idnumber'] not in id_list:
-                    continue
-            o = Orientation.from_rodrigues(gr['orientation'])
-            orientations.append(o)
+        """Get a list of the grain orientations.
+
+        The grain data table is queried to retreiv the rodrigues vectors.
+        An optional list of grain ids can be used to restrict the grains.
+        A list of `Orientation` instances is then created and returned.
+
+        :param list id_list: a non empty list of the grain ids.
+        :return: a list of the grain orientations.
+        """
+        rods = self.get_grain_rodrigues(id_list)
+        orientations = [Orientation.from_rodrigues(rod) for rod in rods]
         return orientations
 
     def get_grain_bounding_boxes(self, id_list=None):
-        if id_list is None:
-            return self.get_tablecol('GrainDataTable', 'bounding_box')
+        """Get the grain bounding boxes.
+
+        The grain data table is queried and the bounding boxes of the grains
+        are returned in a single array. An optional list of grain ids can be
+        used to restrict the grains, by default all the grain bounding boxes
+        are returned.
+
+        :param list id_list: a non empty list of the grain ids.
+        :return: a numpy array containing the grain bounding boxes.
+        """
+        if id_list:
+            condition = Microstructure.id_list_to_condition(id_list)
+            return self.grains.read_where(eval(condition))['bounding_box']
         else:
-            Bbox = []
-            for g in self.grains:
-                Bbox.append(g['bounding_box'])
-            return Bbox
+            return self.get_tablecol('GrainDataTable', 'bounding_box')
 
     def get_grain_equivalent_diameters(self, id_list=None):
         grain_equivalent_diameters = 2 * (3 * self.get_grain_volumes(id_list) /
@@ -1736,12 +1764,9 @@ class Microstructure(SampleData):
             total_volume = use_total_volume_value
         else:
             # sum all the grain volume to compute the total volume
-            total_volume = 0.
-            for grain in self.grains:
-                total_volume += grain['volume']
-        volume_fraction = [grain['volume'] / total_volume for grain
-                           in self.grains.where('(idnumber == gid)')]
-        return volume_fraction[0]
+            total_volume = np.sum(self.get_grain_volumes())
+        volume_fraction = self.get_grain_volumes(id_list=[gid])[0] / total_volume
+        return volume_fraction
 
     def set_orientations(self, orientations):
         """ Store grain orientations array in GrainDataTable

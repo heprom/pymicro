@@ -99,6 +99,25 @@ class MicrostructureTests(unittest.TestCase):
         self.assertTrue(not os.path.exists(xdmf_file))
         del m
 
+    def test_id_list_to_condition(self):
+        m = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5'))
+        id_list = [10, 11, 12]
+        self.assertEqual(len(m.get_grain_volumes(id_list)), 3)
+        del m
+
+    def test_get_grain_properties(self):
+        m = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5'))
+        self.assertAlmostEqual(m.get_grain_volumes(id_list=[3])[0], 0.030025482)
+        center = m.get_grain_centers(id_list=[3])[0]
+        the_center = [-0.25036922, 0.00601893, -0.09261252]
+        for i in range(3):
+            self.assertAlmostEquals(center[i], the_center[i])
+        rod = m.get_grain_rodrigues(id_list=[3])[0]
+        the_rod = [-0.05052439,  0.10440506,  0.23170687]
+        for i in range(3):
+            self.assertAlmostEquals(rod[i], the_rod[i])
+        del m
+
     def test_grain_geometry(self):
         m = Microstructure(name='test', autodelete=True)
         grain_map = np.ones((8, 8, 8), dtype=np.uint8)

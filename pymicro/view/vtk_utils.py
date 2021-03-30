@@ -365,9 +365,9 @@ def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20, color=None):
     axes.SetShaftTypeToCylinder()
     axes.SetCylinderRadius(0.02)
     if axisLabels:
-        axes.SetXAxisLabelText(axisLabels[0])
-        axes.SetYAxisLabelText(axisLabels[1])
-        axes.SetZAxisLabelText(axisLabels[2])
+        axes.GetXAxisCaptionActor2D().GetTextActor().SetTextScaleModeToNone()
+        axes.GetYAxisCaptionActor2D().GetTextActor().SetTextScaleModeToNone()
+        axes.GetZAxisCaptionActor2D().GetTextActor().SetTextScaleModeToNone()
         axprop = vtk.vtkTextProperty()
         axprop.SetColor(0, 0, 0)
         axprop.SetFontSize(fontSize)
@@ -375,6 +375,9 @@ def axes_actor(length=1.0, axisLabels=('x', 'y', 'z'), fontSize=20, color=None):
         axes.GetXAxisCaptionActor2D().SetCaptionTextProperty(axprop)
         axes.GetYAxisCaptionActor2D().SetCaptionTextProperty(axprop)
         axes.GetZAxisCaptionActor2D().SetCaptionTextProperty(axprop)
+        axes.SetXAxisLabelText(axisLabels[0])
+        axes.SetYAxisLabelText(axisLabels[1])
+        axes.SetZAxisLabelText(axisLabels[2])
     else:
         axes.SetAxisLabels(0)
     if color:

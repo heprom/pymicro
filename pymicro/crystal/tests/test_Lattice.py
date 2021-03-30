@@ -266,13 +266,13 @@ class SlipSystemTests(unittest.TestCase):
         for s in ss:
             n = s.get_slip_plane().normal()
             l = s.get_slip_direction().direction()
-            self.assertEqual(np.dot(n, l), 0.)
+            self.assertAlmostEqual(np.dot(n, l), 0.)
         ss = SlipSystem.get_slip_systems('112')
         self.assertEqual(len(ss), 12)
         for s in ss:
             n = s.get_slip_plane().normal()
             l = s.get_slip_direction().direction()
-            self.assertEqual(np.dot(n, l), 0.)
+            self.assertAlmostEqual(np.dot(n, l), 0.)
 
 
 if __name__ == '__main__':

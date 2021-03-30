@@ -247,10 +247,12 @@ class SDZset():
             os.remove(self.inp_script)
         return
     
-    def clean_output_files(self, clean_Zset_output=True):
+    def clean_output_files(self, problem_name=None, clean_Zset_output=True):
         """Remove all Zset output files and output .geof file if possible."""
+        if problem_name is None:
+            problem_name = f'{self.inp_script.stem}_tmp'
         if clean_Zset_output:
-            run(args=['Zclean',f'{self.inp_script.stem}_tmp'])
+            run(args=['Zclean',problem_name])
         if hasattr(self, 'output_meshfile'):
             if self.output_meshfile.exists():
                 print('Removing {} ...'.format(str(self.output_meshfile)))
@@ -579,6 +581,91 @@ class SDZset():
                                 meshname=self.data_outputmesh,
                                 with_tags=with_tags)
         return
+    
+    def write_output_from_data(self, meshname=None, problem_name=None,
+                               fields_sequences=dict(), time_sequence=None):
+        """Write a Zset output from SampleData mesh and fields.
+        
+        This method writes a 
+        
+        :param meshname: SampleData mesh group to write as Zset output. 
+            If `None` (default), uses the `data_inputmesh` class attribute. 
+        :type meshname: str, optional
+        :param problem_name: Name of the Zset problem to write, i.e. basename
+            for the .ut, .node, .integ files.
+            If `None` (default), uses the `inp_script` class attribute basename
+        :type problem_name: TYPE, optional
+        :param fields_sequences: field values to write as Zset output. 
+        :type fields_sequences: TYPE, optional
+        :param time_sequence: DESCRIPTION, defaults to None
+        :type time_sequence: TYPE, optional
+        :raises ValueError: DESCRIPTION
+        """
+        # local imports
+        import collections
+        import BasicTools.IO.UtWriter as UW
+        # get problem name
+        if problem_name is not None:
+            ut_file = Path(problem_name).absolute()
+        else:
+            ut_file = str(self.inp_script.with_suffix('.ut'))
+        # get meshname 
+        if meshname is None:
+            # TODO: if meshgroup is an image, can BT write the mesh ?
+            meshname = self.data_inputmesh
+        # Create time sequence metadata
+        if time_sequence is not None:
+            Nsequence = len(time_sequence)
+        else:
+            Nsequence = 1
+        Tseq = np.ones(shape=(Nsequence, 5))
+        Tseq[:,0] = np.arange(Nsequence, dtype=int) + 1.
+        Tseq[:,4] = np.arange(Nsequence, dtype=float) + 1. 
+        # get fields to write
+        node_fields = collections.OrderedDict()
+        integ_fields = collections.OrderedDict()
+        for field_Zset_name, SD_field_sequence in fields_sequences.items():
+            # loop over all sampledata field datasets that constitute the
+            # Zset field sequence
+            seq_idx = 0
+            if len(SD_field_sequence) != Nsequence:
+                raise ValueError(f'Sequence for field {field_Zset_name} is a '
+                                 ' list of {len(SD_field_sequence)} field data'
+                                 ' but the provided time sequence has '
+                                 '{Nsequence} values.')
+            for SD_field in SD_field_sequence:
+                # get field of the sequence (nodal or integration point)
+                ftype = self.data.get_attribute('field_type', SD_field)
+                field  = self.data.get_field(SD_field)
+                # loop over all components of the field
+                for k in range(field.shape[-1]):
+                    # name of field component for Zset output
+                    s = f'{field_Zset_name}{k+1}'
+                    if ftype == 'Nodal_field':
+                        # initialize if needed
+                        if seq_idx == 0:
+                            shp = (np.product(field.shape[0:-1]),Nsequence)
+                            node_fields[s] = np.empty(shp)
+                        # fill value of field
+                        node_fields[s][:,seq_idx] = field[...,k]
+                    elif (ftype == 'Element_field') or (ftype == 'IP_field'):
+                        # TODO: readapt when IP fields are handled by SampleData
+                        # initialize if needed
+                        if seq_idx == 0:
+                            shp = (np.product(field.shape[0:-1]),Nsequence)
+                            integ_fields[s] = np.empty(shp)
+                        # fill value of field
+                        integ_fields[s][:,seq_idx] = field[...,k]
+                seq_idx += 1
+        # create and set Writer
+        UtW = UW.UtWriter()
+        UtW.SetFileName(ut_file)
+        UtW.AttachMesh(self.data.get_mesh(meshname))
+        UtW.AttachData(data_node=node_fields, data_integ=integ_fields)
+        UtW.AttachSequence(Tseq)
+        # Write files
+        UtW.WriteFiles(writeGeof=True)
+        return node_fields
     
     def write_mesh_to_geof(self, filename=None, meshname=None, with_tags=True):
         """Write data from a SampleData isntance mesh group as a .geof file. 

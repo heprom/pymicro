@@ -1608,7 +1608,6 @@ class Microstructure(SampleData):
         for grain_id in id_list[1:]:
             condition += " | (idnumber == %d)" % grain_id
         condition += "\'"
-        print(condition)
         return condition
 
     def get_grain_volumes(self, id_list=None):

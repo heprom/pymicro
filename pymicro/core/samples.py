@@ -1293,6 +1293,10 @@ class SampleData:
         mesh_object.elements = self.get_mesh_elements(meshname,
                                                       with_tags=with_tags,
                                                       as_numpy=as_numpy)
+        # Set mesh originalIds from 0 to Nelems
+        Nelems = np.sum(self.get_attribute('Number_of_elements', meshname))
+        originalIds = np.arange(Nelems)
+        mesh_object.SetElementsOriginalIDs(originalIds)
         # Get mesh fields
         Field_list =  self.get_attribute('Field_index', meshname)
         if with_fields:
@@ -1354,7 +1358,11 @@ class SampleData:
             :py:class:`tables.Node` object or a `numpy.array`
         """
         nodes_path = self.get_attribute('nodesID_path', meshname)
-        return self.get_node(nodes_path, as_numpy)
+        nodesID = self.get_node(nodes_path, as_numpy)
+        if nodesID is None:
+            Nnodes = self.get_mesh_nodes(meshname).shape[0]
+            nodesID = np.arange(Nnodes)
+        return nodesID
 
     def get_mesh_xdmf_connectivity(self, meshname, as_numpy=False):
         """Return the mesh elements connectivity as HDF5 node or Numpy array.
@@ -2943,11 +2951,11 @@ class SampleData:
             self._verbose_print('Creating Nodes ID data set in group {}'
                                 ' in file {}'
                                 ''.format(geo_group._v_pathname, self.h5_file))
-            self.add_data_array(location=geo_group._v_pathname,
-                                name='Nodes_ID',
-                                array=mesh_object.originalIDNodes,
-                                indexname=mesh_group._v_name+'_Nodes_ID')
-        Node_attributes = {'nodesID_path':Nodes._v_pathname}
+            Nodes_ID = self.add_data_array(
+                location=geo_group._v_pathname, name='Nodes_ID', 
+                array=mesh_object.originalIDNodes, 
+                indexname=mesh_group._v_name+'_Nodes_ID')
+            Node_attributes = {'nodesID_path':Nodes_ID._v_pathname}
         self.add_attributes(Node_attributes, mesh_group._v_pathname)
         return
 

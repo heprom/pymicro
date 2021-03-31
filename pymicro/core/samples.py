@@ -1389,7 +1389,7 @@ class SampleData:
                                                       as_numpy=as_numpy)
         # Set mesh originalIds from 0 to Nelems
         Nelems = np.sum(self.get_attribute('Number_of_elements', meshname))
-        originalIds = np.arange(Nelems)
+        originalIds = np.arange(Nelems) + 1
         mesh_object.SetElementsOriginalIDs(originalIds)
         # Get mesh fields
         Field_list =  self.get_attribute('Field_index', meshname)

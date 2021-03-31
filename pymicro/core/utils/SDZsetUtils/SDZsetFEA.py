@@ -617,7 +617,8 @@ class SDZsetFieldsTransfer(SDZset):
     
     def clean_output_files(self, clean_Zset_output=True):
         """Remove all Zset output files and output .geof file if possible."""
-        super(SDZsetFieldsTransfer, self).clean_output_files(clean_Zset_output)      
+        super(SDZsetFieldsTransfer, self).clean_output_files(
+                                           clean_Zset_output=clean_Zset_output)      
         from subprocess import run
         if clean_Zset_output:
             run(args=['Zclean','output'])

@@ -616,11 +616,13 @@ class SDZset():
         # Create time sequence metadata
         if time_sequence is not None:
             Nsequence = len(time_sequence)
+            tseq = time_sequence
         else:
             Nsequence = 1
+            tseq = 1.
         Tseq = np.ones(shape=(Nsequence, 5))
         Tseq[:,0] = np.arange(Nsequence, dtype=int) + 1.
-        Tseq[:,4] = np.arange(Nsequence, dtype=float) + 1. 
+        Tseq[:,4] = tseq
         # get fields to write
         node_fields = collections.OrderedDict()
         integ_fields = collections.OrderedDict()

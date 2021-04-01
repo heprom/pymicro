@@ -1690,11 +1690,6 @@ class Microstructure(SampleData):
         else:
             return self.get_tablecol('GrainDataTable', 'bounding_box')
 
-    def get_grain_equivalent_diameters(self, id_list=None):
-        grain_equivalent_diameters = 2 * (3 * self.get_grain_volumes(id_list) /
-                                          4 / np.pi) ** (1 / 3)
-        return grain_equivalent_diameters
-
     def get_voxel_size(self):
         """Get the voxel size for image data of the microstructure.
 
@@ -1936,7 +1931,7 @@ class Microstructure(SampleData):
         self.vtkmesh = mesh
 
     def create_grain_ids_field(self, meshname=None, store=True):
-        """Create a grain Id field of grain orientations on the inputed mesh.
+        """Create a grain Id field of grain orientations on the input mesh.
 
         Creates a element wise field from the microsctructure mesh provided,
         adding to each element the value of the Rodrigues vector
@@ -2017,7 +2012,7 @@ class Microstructure(SampleData):
     def create_orientation_map(self, store=True):
         """Create a vector field in CellData of grain orientations.
 
-        Creates a (Nx,Ny,Nz,3) or (Nx,Ny,3) field from the microsctructure
+        Creates a (Nx, Ny, Nz, 3) or (Nx, Ny, 3) field from the microsctructure
         `grain_map`, adding to each voxel the value of the Rodrigues vector
         of the local grain Id, as it is and if it is referenced in the
         `GrainDataTable` node.
@@ -2590,6 +2585,60 @@ class Microstructure(SampleData):
         y_indices = (slices[1].start, slices[1].stop)
         z_indices = (slices[2].start, slices[2].stop)
         return x_indices, y_indices, z_indices
+
+    def compute_grain_equivalent_diameters(self, id_list=None):
+        """Compute the equivalent diameter for a list of grains.
+
+        :param list id_list: the list of the grain ids to include (compute
+        for all grains by default).
+        :return: a 1D numpy array of the grain diameters.
+        """
+        grain_equivalent_diameters = 2 * (3 * self.get_grain_volumes(id_list) /
+                                          4 / np.pi) ** (1 / 3)
+        return grain_equivalent_diameters
+
+    def compute_grain_sphericities(self, id_list=None):
+        """Compute the equivalent diameter for a list of grains.
+
+        The sphericity measures how close to a sphere is a given grain.
+        It can be computed by the ratio between the surface area of a sphere
+        with the same volume and the actual surface area of that grain.
+
+        .. math::
+
+          \psi = \dfrac{\pi^{1/3}(6V)^{2/3}}{A}
+
+        :param list id_list: the list of the grain ids to include (compute
+        for all grains by default).
+        :return: a 1D numpy array of the grain diameters.
+        """
+        volumes = self.get_grain_volumes(id_list)
+        if not id_list:
+            id_list = self.get_grain_ids()
+        grain_map = self.get_grain_map(as_numpy=True)
+        surface_areas = np.empty_like(volumes)
+        for i, grain_id in enumerate(id_list):
+            grain_data = (grain_map == grain_id)
+            surface_areas[i] = np.sum(grain_data - ndimage.morphology.binary_erosion(grain_data))
+        sphericities = np.pi ** (1 / 3) * (6 * volumes) ** (2 / 3) / surface_areas
+        return sphericities
+
+    def compute_grain_aspect_ratios(self, id_list=None):
+        """Compute the aspect ratio for a list of grains.
+
+        The aspect ratio is defined by the ratio between the major and minor
+        axes of the equivalent ellipsoid of each grain.
+
+        :param list id_list: the list of the grain ids to include (compute
+        for all grains by default).
+        :return: a 1D numpy array of the grain aspect ratios.
+        """
+        from skimage.measure import regionprops
+        props = regionprops(self.get_grain_map(as_numpy=True))
+        grain_aspect_ratios = np.array([prop.major_axis_length /
+                                        prop.minor_axis_length
+                                        for prop in props])
+        return grain_aspect_ratios
 
     def recompute_grain_volumes(self, verbose=False):
         """Compute the volume of all grains in the microstructure.

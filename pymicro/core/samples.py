@@ -471,6 +471,10 @@ class SampleData:
             else:
                 path = value
             node = self.get_node(path)
+            if node is None:
+                # precaution to avoid errors when content index references an
+                # empty node
+                continue
             if not(self._is_children_of(node, local_root)):
                 continue
             if node._v_depth > max_depth:
@@ -875,7 +879,8 @@ class SampleData:
 
     def add_field(self, gridname, fieldname, array, location=None,
                   indexname=None, chunkshape=None, replace=False,
-                  filters=None, empty=False, **keywords):
+                  filters=None, empty=False, visualisation_type='Elt_mean',
+                  **keywords):
         """Add a field to a grid (Mesh or 2D/3DImage) group from a numpy array.
 
         This methods checks the compatibility of the input field array with the
@@ -903,7 +908,11 @@ class SampleData:
             specifying compression settings.
         :param bool empty: if `True` create the path, Index Name in dataset and
             store an empty array. Set the node attribute `empty` to True.
-
+        :param str visualisation_type: Type of visualisation used to represent
+            integration point fields with an element wise constant field.
+            Possibilities are 'Elt_max' (maximum value per element), 'Elt_mean'
+            (mean value per element), 'None' (no visualisation field).
+            Default value is 'Elt_mean'
         .. note:: additional keywords arguments can be passed to specify global
                 compression options, see :func:`set_chunkshape_and_compression`
                 documentation for their definition. If some are passed, they
@@ -918,7 +927,7 @@ class SampleData:
                                    ' array in this group.'.format(gridname))
         # If needed, pad the field with 0s to comply with number of bulk and
         # boundary elements
-        array, padding = self._mesh_field_padding(array, gridname)
+        array, padding, vis_array = self._mesh_field_padding(array, gridname)
         # Check if the array shape is consistent with the grid geometry
         # and returns field dimension, xdmf Center attribute
         field_type, dimensionality = self._check_field_compatibility(
@@ -949,6 +958,7 @@ class SampleData:
         node = self.add_data_array(array_location, fieldname, array, indexname,
                                    chunkshape, replace, filters, empty,
                                    **keywords)
+
         Attribute_dic = {'field_type': field_type,
                          'field_dimensionality': dimensionality,
                          'parent_grid_path': self._name_or_node_to_path(
@@ -959,9 +969,24 @@ class SampleData:
                          }
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
+            
+        if (field_type == 'IP_field') and not (visualisation_type=='None'):
+            vis_array = self._IP_field_for_visualisation(vis_array, 
+                                                         visualisation_type)
+            visname = fieldname+f'_{visualisation_type}'
+            visindexname = indexname+f'_{visualisation_type}'
+            node_vis = self.add_data_array(array_location, visname, vis_array, 
+                                           visindexname, chunkshape, replace, 
+                                           filters, empty, **keywords)
+            Attribute_dic['visualisation_type'] = visualisation_type
+            self.add_attributes(Attribute_dic, nodename=visindexname)
+            Attribute_dic['visualisation_field_path'] = node_vis._v_pathname
         self.add_attributes(Attribute_dic, nodename=indexname)
         # Add field description to XDMF file
-        self._add_field_to_xdmf(indexname, array)
+        if (field_type == 'IP_field') and not (visualisation_type=='None'):
+            self._add_field_to_xdmf(visindexname, vis_array)
+        else:
+            self._add_field_to_xdmf(indexname, array)
         # Add field path to grid node Field_list attribute
         self._append_field_index(gridname, fieldname)
         return node
@@ -1703,7 +1728,8 @@ class SampleData:
                 self._verbose_print(msg)
         return data
     
-    def get_field(self, fieldname, unpad_field=True):
+    def get_field(self, fieldname, unpad_field=True, 
+                  get_visualisation_field=False):
         """Return a padded or unpadded field from a grid data group as array.
         
         Use this method to get a mesh element wise field in its original form,
@@ -1717,7 +1743,13 @@ class SampleData:
             to the field to comply with the mesh topology and return it with
             its original size (bulk or boundary field).
         """
-        field = self.get_node(fieldname, as_numpy=True)
+        field_type = self.get_attribute('field_type', fieldname)
+        if (field_type == 'IP_field') and get_visualisation_field:
+            field_path = self.get_attribute('visualisation_field_path', 
+                                            fieldname)
+            field = self.get_node(field_path, as_numpy=True)
+        else:
+            field = self.get_node(fieldname, as_numpy=True)
         padding = self.get_attribute('padding', fieldname)
         parent_mesh =  self.get_attribute('parent_grid_path', fieldname)
         if padding is not None:
@@ -2255,6 +2287,13 @@ class SampleData:
                   ''.format(node_path))
             self._verbose_print(msg)
             return
+
+        # Remove visualisation field if node is a IP field node with an 
+        # additionnal visualisation values array
+        IP_vis = self.get_attribute('visualisation_field_path', Node)
+        if IP_vis is not None:
+            IP = self.get_node(IP_vis)
+            self.remove_node(IP)
 
         # Remove HDF5 node and its childrens
         self._verbose_print('Removing  node {} in content index....'
@@ -2990,6 +3029,8 @@ class SampleData:
         elem_field = False
         Nnodes = self.get_attribute('number_of_nodes', meshname)
         Nelem = np.sum(self.get_attribute('Number_of_elements', meshname))
+        Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements', 
+                                               meshname))
         Nfield_values = field_shape[0]
         if len(field_shape) == 2:
             Field_dim = field_shape[1]
@@ -3001,12 +3042,15 @@ class SampleData:
         elif Nfield_values == Nelem:
             elem_field = True
             field_type='Element_field'
+        elif (Nfield_values % Nelem_bulk) == 0:
+            elem_field = True
+            field_type = 'IP_field'
         compatibility = node_field or elem_field
         if not(compatibility):
             raise ValueError('Field number of values ({}) is not conformant'
                              ' with mesh number of nodes ({}) or number of'
                              ' elements ({}).'
-                             ''.format(field_shape, Nnodes, Nelem))
+                             ''.format(Nfield_values, Nnodes, Nelem))
         if Field_dim not in XDMF_FIELD_TYPE:
             raise ValueError('Field dimensionnality `{}` is not know. '
                              'Supported dimensionnalities are Scalar (1),'
@@ -3065,10 +3109,18 @@ class SampleData:
         Nelem_boundary = np.sum(self.get_attribute(
                                 'Number_of_boundary_elements', meshname))
         padding = 'None'
+        vis_field = None
         if field.shape[0] == Nelem_bulk:
             padding = 'bulk'
         elif field.shape[0] == Nelem_boundary:
             padding = 'boundary'
+        elif (field.shape[0] % Nelem_bulk) == 0:
+            # if the number of values  for the field is a multiplier of the 
+            # number of elements, it is considered that the array describes a
+            # field integration point values and that it is stored as follows:
+            # field[:,k] = [Val_elt1_IP1, Val_elt1_IP2, ...., Val_elt1_IPN,
+            #               Val_elt2_IP1, ...., Val_eltN_IPN] 
+            padding = 'bulk_IP'
         if padding == 'None':
             pass
         elif padding == 'bulk':
@@ -3081,7 +3133,15 @@ class SampleData:
                                     'Number_of_bulk_elements',meshname))
             pad_array = np.zeros(shape=(Nelem_bulk, field.shape[1]))
             field = np.concatenate((pad_array, field), axis=0)
-        return field, padding 
+        elif padding == 'bulk_IP':
+            Nip_elt = field.shape[0] // Nelem_bulk
+            new_shape = (Nelem_bulk,Nip_elt,*field.shape[1:])
+            vis_field = field.reshape(new_shape)
+            Nelem_boundary = np.sum(self.get_attribute(
+                                'Number_of_boundary_elements',meshname))
+            pad_array = np.zeros(shape=(Nelem_boundary, *vis_field.shape[1:]))
+            vis_field = np.concatenate((vis_field, pad_array), axis=0)
+        return field, padding, vis_field
     
     def _mesh_field_unpadding(self, field, parent_mesh, padding):
         """Remove zeros to return field to original shape, before padding."""
@@ -3089,7 +3149,7 @@ class SampleData:
                                                parent_mesh))
         Nelem_boundary = np.sum(self.get_attribute(
                                 'Number_of_boundary_elements', parent_mesh))
-        if padding == 'bulk':
+        if (padding == 'bulk') or (padding == 'bulk_IP'):
             field = field[:Nelem_bulk,:]
         elif padding == 'boundary':
             field = field[Nelem_boundary,:]
@@ -3099,6 +3159,19 @@ class SampleData:
             raise Warning('Cannot unpad the field, unknown padding type `{}`'
                           ''.format(padding))
         return field
+    
+    def _IP_field_for_visualisation(self, array, vis_type):
+        # here it is supposed that the field has shape 
+        # [Nelem, Nip_per_elem, Ncomponent]
+        if vis_type == 'Elt_max':
+            array = np.max(array, axis=1)
+        elif vis_type == 'Elt_mean':
+            array = np.mean(array, axis=1)
+        else:
+            raise ValueError('Unkown integration point field visualisation'
+                             ' convention. Possibilities are "Elt_max",'
+                             ' "Elt_mean", "None"')
+        return array 
 
     def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
                            bin_fields_from_sets):
@@ -3422,6 +3495,8 @@ class SampleData:
         topology_attributes['element_type'] = [element_type]
         n_elements = mesh_object.GetNumberOfElements()
         topology_attributes['Number_of_elements'] = np.array([n_elements])
+        topology_attributes['Number_of_bulk_elements'] = np.array([n_elements])
+        topology_attributes['Number_of_boundary_elements'] = np.array([0])
         topology_attributes['Elements_offset'] = [0]
         topology_attributes['Xdmf_elements_code'] = [XdmfName[element_type]]
         return topology_attributes
@@ -3589,10 +3664,9 @@ class SampleData:
         Grid_name = self.get_attribute('parent_grid_path', fieldname)
         Xdmf_grid_node = self._find_xdmf_grid(Grid_name)
         field_type = self.get_attribute('field_type', fieldname)
-        # TODO: implement here xdmf format for IP fields
         if field_type == 'Nodal_field':
             Center_type = 'Node'
-        elif field_type == 'Element_field':
+        elif (field_type == 'Element_field') or (field_type == 'IP_field'):
             Center_type = 'Cell'
         else:
             raise ValueError('unknown field type, should be `Nodal_field`'
@@ -3816,8 +3890,6 @@ class SampleData:
 
     #=========================================================================
     #   External codes calling methods
-    #   TODO: Externalize ?
-    #   TODO: Create specific method for external scripts templates
     #=========================================================================
 
     def _launch_morphocleaner(self, path, filename, out_file):

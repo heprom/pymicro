@@ -692,7 +692,7 @@ class SDZset():
                                 with_tags=with_tags)
         return
     
-    def write_output_from_data(self, meshname=None, problem_name=None,
+    def write_output_from_SDmesh(self, meshname=None, problem_name=None,
                                fields_sequences=dict(), time_sequence=None):
         """Write a Zset output from SampleData mesh and fields.
         
@@ -711,9 +711,6 @@ class SDZset():
         :type time_sequence: TYPE, optional
         :raises ValueError: DESCRIPTION
         """
-        # local imports
-        import collections
-        import BasicTools.IO.UtWriter as UW
         # get problem name
         if problem_name is not None:
             ut_file = Path(problem_name).absolute()
@@ -721,63 +718,63 @@ class SDZset():
             ut_file = str(self.inp_script.with_suffix('.ut'))
         # get meshname 
         if meshname is None:
-            # TODO: if meshgroup is an image, can BT write the mesh ?
             meshname = self.data_inputmesh
         # Create time sequence metadata
-        if time_sequence is not None:
-            Nsequence = len(time_sequence)
-            tseq = time_sequence
-        else:
-            Nsequence = 1
-            tseq = 1.
-        Tseq = np.ones(shape=(Nsequence, 5))
-        Tseq[:,0] = np.arange(Nsequence, dtype=int) + 1.
-        Tseq[:,4] = tseq
+        Tseq, Nsequence = self._build_timeseq(time_sequence)
         # get fields to write
-        node_fields = collections.OrderedDict()
-        integ_fields = collections.OrderedDict()
-        for field_Zset_name, SD_field_sequence in fields_sequences.items():
-            # loop over all sampledata field datasets that constitute the
-            # Zset field sequence
-            seq_idx = 0
-            if len(SD_field_sequence) != Nsequence:
-                raise ValueError(f'Sequence for field {field_Zset_name} is a '
-                                 ' list of {len(SD_field_sequence)} field data'
-                                 ' but the provided time sequence has '
-                                 '{Nsequence} values.')
-            for SD_field in SD_field_sequence:
-                # get field of the sequence (nodal or integration point)
-                ftype = self.data.get_attribute('field_type', SD_field)
-                field  = self.data.get_field(SD_field)
-                # loop over all components of the field
-                for k in range(field.shape[-1]):
-                    # name of field component for Zset output
-                    s = f'{field_Zset_name}{k+1}'
-                    if ftype == 'Nodal_field':
-                        # initialize if needed
-                        if seq_idx == 0:
-                            shp = (np.product(field.shape[0:-1]),Nsequence)
-                            node_fields[s] = np.empty(shp)
-                        # fill value of field
-                        node_fields[s][:,seq_idx] = field[...,k]
-                    elif (ftype == 'Element_field') or (ftype == 'IP_field'):
-                        # TODO: readapt when IP fields are handled by SampleData
-                        # initialize if needed
-                        if seq_idx == 0:
-                            shp = (np.product(field.shape[0:-1]),Nsequence)
-                            integ_fields[s] = np.empty(shp)
-                        # fill value of field
-                        integ_fields[s][:,seq_idx] = field[...,k]
-                seq_idx += 1
-        # create and set Writer
-        UtW = UW.UtWriter()
-        UtW.SetFileName(ut_file)
-        UtW.AttachMesh(self.data.get_mesh(meshname))
-        UtW.AttachData(data_node=node_fields, data_integ=integ_fields)
-        UtW.AttachSequence(Tseq)
-        # Write files
-        UtW.WriteFiles(writeGeof=True)
-        return node_fields
+        node_fields, integ_fields = self._build_field_dict(fields_sequences,
+                                                           Nsequence)
+        # Write output
+        self._write_Zset_output(ut_file, meshname, node_fields, integ_fields,
+                                Tseq)
+        # Write node and integ file 
+        self._write_node_file(ut_file, node_fields, Tseq)
+        self._write_integ_file(ut_file, integ_fields, Tseq)
+        return 
+        
+    def write_output_from_SDimage(self, imagename=None, problem_name=None,
+                                  fields_sequences=dict(), time_sequence=None):
+        """Write a Zset output from SampleData mesh and fields.
+        
+        This method writes a 
+        
+        :param meshname: SampleData mesh group to write as Zset output. 
+            If `None` (default), uses the `data_inputmesh` class attribute. 
+        :type meshname: str, optional
+        :param problem_name: Name of the Zset problem to write, i.e. basename
+            for the .ut, .node, .integ files.
+            If `None` (default), uses the `inp_script` class attribute basename
+        :type problem_name: TYPE, optional
+        :param fields_sequences: field values to write as Zset output. 
+        :type fields_sequences: TYPE, optional
+        :param time_sequence: DESCRIPTION, defaults to None
+        :type time_sequence: TYPE, optional
+        :raises ValueError: DESCRIPTION
+        """
+        # get problem name
+        if problem_name is not None:
+            ut_file = Path(problem_name).absolute().with_suffix('.ut')
+        else:
+            ut_file = self.inp_script.with_suffix('.ut')
+        # get meshname 
+        if imagename is None:
+            imagename = self.data_inputmesh
+        # Create time sequence metadata
+        Tseq, Nsequence = self._build_timeseq(time_sequence)
+        # get fields to write
+        node_fields, integ_fields = self._build_field_dict(fields_sequences,
+                                                           Nsequence)
+        # Write mesh
+        self._write_SDimage_as_mesh(imagename, ut_file)
+        # Write .ut file
+        self._write_ut_file(ut_file, node_fields, integ_fields, Tseq)
+        # Write .integ file
+        if len(integ_fields) > 0:
+            self._write_integ_file(ut_file, integ_fields, Tseq)
+        # Write .node file
+        if len(node_fields) > 0:
+            self._write_node_file(ut_file, node_fields, Tseq)
+        return 
     
     def write_mesh_to_geof(self, filename=None, meshname=None, with_tags=True):
         """Write data from a SampleData isntance mesh group as a .geof file. 
@@ -964,6 +961,68 @@ class SDZset():
                                 fieldname=fieldname, array=field)
         return
     
+    def _build_timeseq(self, time_sequence):
+        if time_sequence is not None:
+            Nsequence = len(time_sequence)
+            tseq = time_sequence
+        else:
+            Nsequence = 1
+            tseq = 1.
+        Tseq = np.ones(shape=(Nsequence, 5))
+        Tseq[:,0] = np.arange(Nsequence, dtype=int) + 1.
+        Tseq[:,4] = tseq
+        return Tseq, Nsequence
+        
+
+    def _build_field_dict(self, fields_sequences, Nsequence):
+        import collections
+        node_fields = collections.OrderedDict()
+        integ_fields = collections.OrderedDict()
+        for field_Zset_name, SD_field_sequence in fields_sequences.items():
+            # loop over all sampledata field datasets that constitute the
+            # Zset field sequence
+            seq_idx = 0
+            if len(SD_field_sequence) != Nsequence:
+                raise ValueError(f'Sequence for field {field_Zset_name} is a '
+                                 ' list of {len(SD_field_sequence)} field data'
+                                 ' but the provided time sequence has '
+                                 '{Nsequence} values.')
+            for SD_field in SD_field_sequence:
+                # get field of the sequence (nodal or integration point)
+                ftype = self.data.get_attribute('field_type', SD_field)
+                field  = self.data.get_field(SD_field)
+                parent_grid = self.data.get_attribute('parent_grid_path',
+                                                      SD_field)
+                if self.data._is_image(parent_grid) and (len(field.shape) == 3):
+                    field = field.reshape((np.product(field.shape[:]),1))
+                else:
+                    field = field.reshape((np.product(field.shape[0:-1]), 
+                                           field.shape[-1]))
+                # loop over all components of the field
+                for k in range(field.shape[-1]):
+                    # name of field component for Zset output
+                    if field.shape[-1] > 1:
+                        s = f'{field_Zset_name}{k+1}'
+                    else:
+                        s = f'{field_Zset_name}'
+                    if ftype == 'Nodal_field':
+                        # initialize if needed
+                        if seq_idx == 0:
+                            shp = (field.shape[0],Nsequence)
+                            node_fields[s] = np.empty(shp)
+                        # fill value of field
+                        node_fields[s][:,seq_idx] = field[:,k]
+                    elif (ftype == 'Element_field') or (ftype == 'IP_field'):
+                        # TODO: readapt when IP fields are handled by SampleData
+                        # initialize if needed
+                        if seq_idx == 0:
+                            shp = (field.shape[0],Nsequence)
+                            integ_fields[s] = np.empty(shp)
+                        # fill value of field
+                        integ_fields[s][:,seq_idx] = field[:,k]
+                seq_idx += 1
+        return node_fields, integ_fields
+    
     @staticmethod
     def _gather_tensor_components(field_dict):
         # import re to use regexps for finding names of fields
@@ -1042,6 +1101,117 @@ class SDZset():
         Tens_fields.update(tmp_dict)
         return Tens_fields
     
+    def _write_SDimage_as_mesh(self, imagename, ut_file):
+        # imports 
+        import BasicTools.IO.GeofWriter as GW
+        # write image as ConstantRectilinearmesh .geof with BasicTools
+        meshfile = ut_file.with_suffix('.geof')
+        imCRM = self.data.get_image(imagename)
+        Wr = GW.GeofWriter()
+        Wr.Open(meshfile)
+        Wr.Write(imCRM)
+        Wr.Close()
+        # Change elements to reduced integration elements
+        with open(meshfile,'r') as f:
+            lines = []
+            for line in f.readlines():
+                lines.append(line.replace('c3d8', 'c3d8r'))
+        with open(meshfile,'w') as f:
+            f.writelines(lines)
+        return
+    
+    def _write_Zset_output(self, ut_file, meshname, node_fields, integ_fields,
+                           Tseq):
+        import BasicTools.IO.UtWriter as UW
+        # create and set Writer
+        UtW = UW.UtWriter()
+        UtW.SetFileName(ut_file)
+        UtW.AttachMesh(self.data.get_mesh(meshname))
+        UtW.AttachData(data_node=node_fields, data_integ=integ_fields)
+        UtW.AttachSequence(Tseq)
+        # Write files
+        UtW.WriteFiles(writeGeof=True)
+        return
+    
+    def _write_ut_file(self, ut_file, nodal_fields, integ_fields, Tseq):
+        #
+        meshfile = ut_file.with_suffix('.geof')
+        # extract names of field to write
+        nodal_field_names = ''
+        for name in nodal_fields.keys():
+            nodal_field_names += f'{name} '
+        integ_field_names = ''
+        for name in integ_fields.keys():
+            integ_field_names += f'{name} '
+        # prepare lines to write in .ut
+        Ut_file_lines = [
+        f'**meshfile {meshfile}',
+        f'**node {nodal_field_names}',
+        f'**integ {integ_field_names}',
+         '**element'
+            ]
+        for i in range(Tseq.shape[0]):
+            l = Tseq[i,:]
+            line = f'{int(l[0])} {int(l[1])} {int(l[2])} {int(l[3])} {l[4]}'
+            Ut_file_lines.append(line)
+        # Write .ut file
+        with open(ut_file,'w') as f:
+            f.writelines(s + '\n' for s in Ut_file_lines)
+        return
+    
+    def _write_node_file(self, ut_file, node_fields, Tseq):
+        # dimensions of integ data vector to build
+        Ntime = Tseq.shape[0]
+        Nnodes = node_fields[list(node_fields.keys())[0]].shape[0]
+        Nvar = len(node_fields)
+        # Initialize data vector
+        node_data = np.empty(shape=(Ntime*Nnodes*Nvar))
+        node_names = list(node_fields.keys())
+        # prepare vector to write in binary .node file
+        # loop over time steps
+        for t in range(Ntime):
+            # loop over variables
+            for i in range(len(node_names)):
+                # concatenate variables as columns
+                count0 = t*(Nvar*Nnodes) + i*Nnodes
+                count1 = t*(Nvar*Nnodes) + (i+1)*Nnodes
+                node_data[count0:count1] = node_fields[node_names[i]][:].ravel()
+        # write node file
+        nodefile = ut_file.with_suffix('.node')
+        with open(nodefile,'w') as f:
+            node_data.astype(np.float32).byteswap().tofile(f)    
+        return
+    
+    def _write_integ_file(self, ut_file, integ_fields, Tseq):
+        # WARNING: works only for image fields, i.e. fields of hexaedral 
+        # elements with reduced intergration = fields of regular meshes of
+        # 'c3d8r' elements
+        # dimensions of integ data vector to build
+        Ntime = Tseq.shape[0]
+        Nip = integ_fields[list(integ_fields.keys())[0]].shape[0]
+        Nvar = len(integ_fields)
+        # Initialize data vector
+        integ_data = np.empty(shape=(Ntime*Nip*Nvar))
+        integ_names = list(integ_fields.keys())
+        # prepare vector to write in binary .integ file
+        # loop over time steps
+        for t in range(Ntime):
+            # loop over variables
+            loc_integ_data = np.empty(shape=(Nip,Nvar))
+            for i in range(len(integ_names)):
+                # concatenate variables as columns
+                loc_integ_data[:,i] = integ_fields[integ_names[i]][:].ravel()
+            # reshape integ_data to have the values of all variables at one
+            # element that are cosnecutive in the array
+            integ_data[t*Nip*Nvar:(t+1)*Nip*Nvar] = (
+                                           loc_integ_data.reshape((Nip*Nvar,)))
+        # write integ file
+        integfile = ut_file.with_suffix('.integ')
+        with open(integfile,'w') as f:
+            integ_data.astype(np.float32).byteswap().tofile(f)      
+        return
+            
+            
     def _add_templates_to_args(self, input_list):
         """Search input_list values for templates and add them to script args.
         """

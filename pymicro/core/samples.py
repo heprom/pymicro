@@ -2921,6 +2921,8 @@ class SampleData:
     
     def _mesh_field_padding(self, field, meshname):
         """Pad with zeros the mesh elem field to comply with size."""
+        if self._is_image(meshname):
+            return field, 'None', None
         Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements',
                                                meshname))
         Nelem_boundary = np.sum(self.get_attribute(

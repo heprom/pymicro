@@ -17,7 +17,6 @@ import BasicTools.IO.UtReader as UR
 from pymicro.core.utils.templateUtils import ScriptTemplate
 from pymicro.core.samples import SampleData
 
-
 # SD Zset mesher class
 class SDZset():
     """Base class implementing a Zset / SampleData interface.
@@ -253,6 +252,9 @@ class SDZset():
             problem_name = f'{self.inp_script.stem}_tmp'
         if clean_Zset_output:
             run(args=['Zclean',problem_name])
+        mesh_path = Path(problem_name).with_suffix('.geof')
+        if mesh_path.exists():
+            os.remove(mesh_path)
         if hasattr(self, 'output_meshfile'):
             if self.output_meshfile.exists():
                 print('Removing {} ...'.format(str(self.output_meshfile)))
@@ -370,7 +372,8 @@ class SDZset():
             self.data.add_attributes(self.metadata, self.data_inputmesh)
         return
     
-    def load_field_sequence(self, field_sequence, sequence_name, suffix=None):
+    def load_field_sequence(self, field_sequence, sequence_name, suffix=None,
+                            replace=False):
         """Load a field sequence into the SampleData instance.
         
         :param field_sequence: dict of the form {fielname: field array} of
@@ -387,7 +390,7 @@ class SDZset():
         # create a Group to store the sequence in the Mesh group
         if not self.data.__contains__(sequence_name):
             self.data.add_group(groupname=sequence_name,
-                                location=self.data_inputmesh, replace=False)
+                                location=self.data_inputmesh, replace=replace)
         # store fields in the group for the mesh group
         for key, value in field_sequence.items():
             if suffix is None:
@@ -395,13 +398,14 @@ class SDZset():
             else:
                 name = key + suffix
             self.data.add_field(gridname=self.data_inputmesh, fieldname=name,
-                                array=value, location=sequence_name)
+                                array=value, location=sequence_name, 
+                                replace=replace)
         return
     
     def load_displacement_field_sequence(self, ut_file=None,
                                         sequence_list=None, storage_group=None,
                                         field_basename='U', storage_mesh=None):
-        """Load displacement as vector field in SampleData instance.
+        """Load displacement as vector field in SampleData instance from .ut.
         
         :param sequence_list: Load selected only displacement field in output
             sequence (see .ut file, output metadata). Defaults to None (all 
@@ -413,7 +417,7 @@ class SDZset():
         :type storage_group: str, optional
         :param field_basename: Basename to store the displacement fields in the
             SampleData instance. Defaults to 'U' (for a sequence: U_1, U_2....)
-        :type field_basename: TYPE, optional
+        :type field_basename: str, optional
         :param storage_mesh: SampleData Mesh group in which the fields will be
             loaded (Name, path, indexname or alias of the group).
             Defaults to None.
@@ -446,9 +450,113 @@ class SDZset():
                                 fieldname=fieldname, array=U, replace=False)
         return
     
+    def load_strain_field_sequence(self, ut_file=None, sequence_list=None,
+                                   storage_group=None, field_basename='E',
+                                   storage_mesh=None, replace=False):
+        """Load deformation as tensor field in SampleData instance from .ut.
+        
+        :param sequence_list: Load selected only displacement field in output
+            sequence (see .ut file, output metadata). Defaults to None (all 
+            output sequence elements are loaded)
+        :type sequence_list: list[int], optional
+        :param storage_group: HDF5 group to store the displacement field
+            arrays in SampleData group. Defaults to None: in this case they
+            are stored in the data_inputmesh group.
+        :type storage_group: str, optional
+        :param field_basename: Basename to store the displacement fields in the
+            SampleData instance. Defaults to 'E' (for a sequence: E_1, E_2....)
+        :type field_basename: str, optional
+        :param storage_mesh: SampleData Mesh group in which the fields will be
+            loaded (Name, path, indexname or alias of the group).
+            Defaults to None.
+        :type storage_mesh: str, optional
+        """
+        # read the U1, U2, U3 fields
+        fields_list = ['eto11','eto22','eto33', 'eto12', 'eto23', 'eto31']
+        Nodal_fields, _ = self.read_output_fields(ut_file, fields_list,
+                                                  sequence_list)
+        # define SampleData mesh group to store displacement fields
+        if storage_mesh is None:
+            storage_mesh = self.data_inputmesh
+        # define HDF5 storage group
+        if (storage_group is None) and (hasattr(self, 'data_inputmesh')):
+            storage_group = self.data._name_or_node_to_path(
+                                                           self.data_inputmesh)
+        # load the outputs into the SampleData instance
+        for i in range(len(Nodal_fields)):
+            fieldname = f'{field_basename}_{i+1}'
+            field_dic = Nodal_fields[i]
+            if not self.data.__contains__(storage_group):
+                self.data.add_group(storage_group, self.data_inputmesh,
+                                    replace=False)
+            E = np.zeros((len(field_dic['eto11']),6), 
+                            dtype=field_dic['eto11'].dtype)
+            E[:,0] = field_dic['eto11']
+            E[:,1] = field_dic['eto22']
+            E[:,2] = field_dic['eto33']
+            E[:,3] = field_dic['eto12']
+            E[:,4] = field_dic['eto23']
+            E[:,5] = field_dic['eto31']
+            self.data.add_field(gridname=storage_mesh, location=storage_group,
+                                fieldname=fieldname, array=E, replace=replace)
+        return
+    
+    def load_stress_field_sequence(self, ut_file=None, sequence_list=None,
+                                   storage_group=None, field_basename='Sig',
+                                   storage_mesh=None, replace=False):
+        """Load stress as tensor field in SampleData instance from .ut.
+        
+        :param sequence_list: Load selected only displacement field in output
+            sequence (see .ut file, output metadata). Defaults to None (all 
+            output sequence elements are loaded)
+        :type sequence_list: list[int], optional
+        :param storage_group: HDF5 group to store the displacement field
+            arrays in SampleData group. Defaults to None: in this case they
+            are stored in the data_inputmesh group.
+        :type storage_group: str, optional
+        :param field_basename: Basename to store the displacement fields in the
+            SampleData instance. Defaults to 'Sig' 
+            (for a sequence: Sig_1, Sig_2....)
+        :type field_basename: str, optional
+        :param storage_mesh: SampleData Mesh group in which the fields will be
+            loaded (Name, path, indexname or alias of the group).
+            Defaults to None.
+        :type storage_mesh: str, optional
+        """
+        # read the U1, U2, U3 fields
+        fields_list = ['sig11','sig22','sig33', 'sig12', 'sig23', 'sig31']
+        Nodal_fields, _ = self.read_output_fields(ut_file, fields_list,
+                                                  sequence_list)
+        # define SampleData mesh group to store displacement fields
+        if storage_mesh is None:
+            storage_mesh = self.data_inputmesh
+        # define HDF5 storage group
+        if (storage_group is None) and (hasattr(self, 'data_inputmesh')):
+            storage_group = self.data._name_or_node_to_path(
+                                                           self.data_inputmesh)
+        # load the outputs into the SampleData instance
+        for i in range(len(Nodal_fields)):
+            fieldname = f'{field_basename}_{i+1}'
+            field_dic = Nodal_fields[i]
+            if not self.data.__contains__(storage_group):
+                self.data.add_group(storage_group, self.data_inputmesh,
+                                    replace=False)
+            S = np.zeros((len(field_dic['sig11']),6), 
+                            dtype=field_dic['sig11'].dtype)
+            S[:,0] = field_dic['sig11']
+            S[:,1] = field_dic['sig22']
+            S[:,2] = field_dic['sig33']
+            S[:,3] = field_dic['sig12']
+            S[:,4] = field_dic['sig23']
+            S[:,5] = field_dic['sig31']
+            self.data.add_field(gridname=storage_mesh, location=storage_group,
+                                fieldname=fieldname, array=S, replace=replace)
+        return
+    
     def load_output_fields(self, field_list=None, sequence_list=None,
                            sequence_basename='output_fields',
-                           is_time_sequence=True, fields_basename=''):
+                           is_time_sequence=True, fields_suffix='',
+                           replace=False):
         """Load fields from Zset FEA output into the SampleData instance.
         
         :param field_list: List of variables names corresponding to the fields
@@ -472,15 +580,17 @@ class SDZset():
         # load the outputs into the SampleData instance
         for i in range(len(Nodal_fields)):
             if len(Nodal_fields) == 1:
-                suffix = f'{fields_basename}'
+                suffix = f'{fields_suffix}'
             else:
-                suffix = f'{fields_basename}_{i}'
+                suffix = f'{fields_suffix}_{i}'
             if is_time_sequence:
                 sequence_group = sequence_basename+f'time_{i}'
             else:
                 sequence_group = sequence_basename
-            self.load_field_sequence(Nodal_fields[i], sequence_group, suffix)
-            self.load_field_sequence(Integ_fields[i], sequence_group, suffix)
+            N_fields = self._gather_tensor_components(Nodal_fields[i])
+            I_fields = self._gather_tensor_components(Integ_fields[i])
+            self.load_field_sequence(N_fields, sequence_group, suffix, replace)
+            self.load_field_sequence(I_fields, sequence_group, suffix, replace)
         return
         
     def read_output_fields(self, ut_file=None, field_list=None,
@@ -516,7 +626,7 @@ class SDZset():
         SDZset._clean_comments(ut_file)
         # load FEA calc metadata
         self.load_FEA_metadata(ut_file)
-        metadata_field_list = self.metadata['node']
+        metadata_field_list = [*self.metadata['node']]
         metadata_field_list.extend(self.metadata['integ'])
         if field_list is None:
             field_list = metadata_field_list
@@ -853,6 +963,84 @@ class SDZset():
             self.data.add_field(gridname=self.data_outputmesh,
                                 fieldname=fieldname, array=field)
         return
+    
+    @staticmethod
+    def _gather_tensor_components(field_dict):
+        # import re to use regexps for finding names of fields
+        import re 
+        
+        tmp_dict = field_dict.copy()
+        # find out basename of tensor fields
+        Tensor_list = re.findall('\\b[a-zA-z]*\d\d\\b', str(field_dict.keys()))
+        for i in range(len(Tensor_list)):
+            Tensor_list[i] = Tensor_list[i][:-2]
+        # get a list of tensor names without duplicates 
+        Tensor_list = list(set(Tensor_list))
+        
+        # find out basename of vector fields
+        Vector_list = re.findall('\\b[a-zA-z]*\d\\b', str(field_dict.keys()))
+        for i in range(len(Vector_list)):
+            Vector_list[i] = Vector_list[i][:-1]
+        # get a list of vector names without duplicates
+        Vector_list = list(set(Vector_list))
+        
+        # initialize output field dictionnary
+        Tens_fields = {}
+        for tensor in Tensor_list:
+            components = re.findall(f'\\b{tensor}\d\d\\b',
+                                    str(field_dict.keys()))
+            if len(components) == 6:
+                # symetric tensor
+                comp_shape = field_dict[tensor+'11'].shape[0]
+                try:
+                    Tens_fields[tensor] = np.zeros(shape=(comp_shape,6))
+                    Tens_fields[tensor][:,0] = tmp_dict.pop(tensor+'11')
+                    Tens_fields[tensor][:,1] = tmp_dict.pop(tensor+'22')
+                    Tens_fields[tensor][:,2] = tmp_dict.pop(tensor+'33')
+                    Tens_fields[tensor][:,3] = tmp_dict.pop(tensor+'12')
+                    Tens_fields[tensor][:,4] = tmp_dict.pop(tensor+'23')
+                    Tens_fields[tensor][:,5] = tmp_dict.pop(tensor+'31')
+                except:
+                    continue
+            elif len(components) == 9:
+                # not symetric tensor
+                comp_shape = field_dict[tensor+'11'].shape[0]
+                try:
+                    Tens_fields[tensor] = np.zeros(shape=(comp_shape,9))
+                    comp_shape = field_dict[tensor+'11'].shape[0]
+                    Tens_fields[tensor] = np.zeros(shape=(comp_shape,6))
+                    Tens_fields[tensor][:,0] = tmp_dict.pop(tensor+'11')
+                    Tens_fields[tensor][:,1] = tmp_dict.pop(tensor+'22')
+                    Tens_fields[tensor][:,2] = tmp_dict.pop(tensor+'33')
+                    Tens_fields[tensor][:,3] = tmp_dict.pop(tensor+'12')
+                    Tens_fields[tensor][:,4] = tmp_dict.pop(tensor+'21')
+                    Tens_fields[tensor][:,5] = tmp_dict.pop(tensor+'23')
+                    Tens_fields[tensor][:,6] = tmp_dict.pop(tensor+'32')
+                    Tens_fields[tensor][:,7] = tmp_dict.pop(tensor+'13')
+                    Tens_fields[tensor][:,8] = tmp_dict.pop(tensor+'31')
+                except:
+                    continue
+            else:
+                # not a tensor
+                continue       
+        for vector in Vector_list:
+            components = re.findall(f'\\b{vector}\d\\b',
+                                    str(field_dict.keys()))
+            if len(components) == 3:
+                # symetric tensor
+                comp_shape = field_dict[vector+'1'].shape[0]
+                try:
+                    Tens_fields[vector] = np.zeros(shape=(comp_shape,3))
+                    Tens_fields[vector][:,0] = tmp_dict.pop(vector+'1')
+                    Tens_fields[vector][:,1] = tmp_dict.pop(vector+'2')
+                    Tens_fields[vector][:,2] = tmp_dict.pop(vector+'3')
+                except:
+                    continue
+            else:
+                # not a tensor
+                continue    
+        Tens_fields.update(tmp_dict)
+        return Tens_fields
     
     def _add_templates_to_args(self, input_list):
         """Search input_list values for templates and add them to script args.

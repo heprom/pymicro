@@ -951,6 +951,9 @@ class SampleData:
         if self._is_image(gridname):
             array, transpose_indices = self._transpose_image_array(
                 dimensionality, array)
+        if dimensionality in ['Tensor6','Tensor']:
+            array, transpose_components = self._transpose_field_comp(
+                dimensionality, array)
         if indexname is None:
             grid_path = self._name_or_node_to_path(gridname)
             grid_indexname = self.get_indexname_from_path(grid_path)
@@ -969,12 +972,16 @@ class SampleData:
                          }
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
-            
+        if dimensionality in ['Tensor6','Tensor']:
+            Attribute_dic['transpose_components'] = transpose_components         
         if (field_type == 'IP_field') and not (visualisation_type=='None'):
             vis_array = self._IP_field_for_visualisation(vis_array, 
                                                          visualisation_type)
             visname = fieldname+f'_{visualisation_type}'
-            visindexname = indexname+f'_{visualisation_type}'
+            visindexname = indexname+f'_{visualisation_type}'           
+            if dimensionality in ['Tensor6','Tensor']:
+                vis_array, _ = self._transpose_field_comp(
+                    dimensionality, vis_array)
             node_vis = self.add_data_array(array_location, visname, vis_array, 
                                            visindexname, chunkshape, replace, 
                                            filters, empty, **keywords)
@@ -1614,6 +1621,10 @@ class SampleData:
                 node = np.atleast_1d(node.read())
                 if transpose_indices is not None:
                     node = node.transpose(transpose_indices)
+                transpose_components = self.get_attribute('transpose_components',
+                                                       name)
+                if transpose_components is not None:
+                    node = node[...,transpose_components]
         return node
 
     def get_node_info(self, name, as_string=False):
@@ -3453,6 +3464,19 @@ class SampleData:
         Field_index.append(fieldname)
         self.add_attributes({'Field_index': Field_index}, gridname)
         return
+    
+    def _transpose_field_comp(self, dimensionality, array):
+        """Transpose fields components to comply with Paraview ordering."""
+        # based on the conventions:
+        # Tensor6 is passed as [xx,yy,zz,xy,yz,zx]
+        # Tensor is passed as [xx,yy,zz,xy,yx,yz,zy,xz,zx]
+        if dimensionality == 'Tensor6':
+            transpose_indices = [0,3,5,1,4,2]
+            transpose_back = [0,3,5,1,4,2]
+        if dimensionality == 'Tensor':
+            transpose_indices = [0,3,7,4,1,5,8,6,2]
+            transpose_back = [0,4,8,1,3,5,7,2,6]
+        return array[...,transpose_indices], transpose_back
 
     def _transpose_image_array(self, dimensionality, array):
         """Transpose the array X,Y,Z dimensions for XDMF conventions."""

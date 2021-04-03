@@ -727,9 +727,6 @@ class SDZset():
         # Write output
         self._write_Zset_output(ut_file, meshname, node_fields, integ_fields,
                                 Tseq)
-        # Write node and integ file 
-        self._write_node_file(ut_file, node_fields, Tseq)
-        self._write_integ_file(ut_file, integ_fields, Tseq)
         return 
         
     def write_output_from_SDimage(self, imagename=None, problem_name=None,
@@ -1000,11 +997,20 @@ class SDZset():
                                            field.shape[-1]))
                 # loop over all components of the field
                 for k in range(field.shape[-1]):
+                    vect_comp = ['1','2','3']
+                    stens_comp = ['11','22','33','12','23','31']
+                    tens_comp = ['11','22','33','12','21','23','32','13','31']
                     # name of field component for Zset output
-                    if field.shape[-1] > 1:
-                        s = f'{field_Zset_name}{k+1}'
-                    else:
+                    if field.shape[-1] == 1:
                         s = f'{field_Zset_name}'
+                    elif field.shape[-1] == 3:
+                        s = f'{field_Zset_name}{vect_comp[k]}'
+                    elif field.shape[-1] == 6:
+                        s = f'{field_Zset_name}{stens_comp[k]}'
+                    elif field.shape[-1] == 9:
+                        s = f'{field_Zset_name}{tens_comp[k]}'
+                    else:
+                        s = f'{field_Zset_name}{k+1}'
                     if ftype == 'Nodal_field':
                         # initialize if needed
                         if seq_idx == 0:

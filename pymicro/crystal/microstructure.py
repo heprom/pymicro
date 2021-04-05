@@ -2028,11 +2028,11 @@ class Microstructure(SampleData):
         grain_map = self.get_grain_map()
         grainIds = self.get_grain_ids()
         grain_orientations = self.get_grain_rodrigues()
-        # safety check n°2
+        # safety check 2
         grain_list = np.unique(grain_map)
         # remove -1 and 0 from the list of grains in grain map (Ids reserved
         # for background and overlaps in non-dilated reconstructed grain maps)
-        grain_list = np.delete(grain_list, np.isin(grain_list, [-1,0]))
+        grain_list = np.delete(grain_list, np.isin(grain_list, [-1, 0]))
         if not np.all(np.isin(grain_list,grainIds)):
             raise ValueError('Some grain Ids in `grain_map` are not referenced'
                              ' in the `GrainDataTable` array. Cannot create'
@@ -2043,14 +2043,14 @@ class Microstructure(SampleData):
         shape_orientation_map[:-1] = im_dim
         shape_orientation_map[-1] = 3
         orientation_map = np.zeros(shape=shape_orientation_map,dtype=float)
-        omap_X = orientation_map[...,0]
-        omap_Y = orientation_map[...,1]
-        omap_Z = orientation_map[...,2]
+        omap_X = orientation_map[..., 0]
+        omap_Y = orientation_map[..., 1]
+        omap_Z = orientation_map[..., 2]
         for i in range(len(grainIds)):
             slc = np.where(grain_map == grainIds[i])
-            omap_X[slc] = grain_orientations[i,0]
-            omap_Y[slc] = grain_orientations[i,1]
-            omap_Z[slc] = grain_orientations[i,2]
+            omap_X[slc] = grain_orientations[i, 0]
+            omap_Y[slc] = grain_orientations[i, 1]
+            omap_Z[slc] = grain_orientations[i, 2]
         if store:
             self.add_field(gridname='CellData', fieldname='orientation_map',
                            array=orientation_map)

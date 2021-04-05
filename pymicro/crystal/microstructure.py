@@ -2526,8 +2526,8 @@ class Microstructure(SampleData):
         """Compute the volume of the grain given its id.
 
         The total number of voxels with the given id is computed. The value is
-        converted to mm unit using the `voxel_size`. The unit will be mm² for a
-        2D grain map or mm³ for a 3D grain map.
+        converted to mm unit using the `voxel_size`. The unit will be squared
+        mm for a 2D grain map or cubed mm for a 3D grain map.
 
         .. warning::
 

@@ -1529,12 +1529,15 @@ class Microstructure(SampleData):
     def get_number_of_phases(self):
         """Return the number of phases in this microstructure.
 
-        For the moment only one phase is supported, so this function simply
-        returns 1.
+        For the moment the number of phases is the different phase ids
+        in the phase_map array.
 
         :return int: the number of phases in the microstructure.
         """
-        return 1
+        if not self.get_phase_map():
+            return 1
+        else:
+            return np.unique(self.get_phase_map(as_numpy=True))
 
     def get_number_of_grains(self, from_grain_map=False):
         """Return the number of grains in this microstructure.
@@ -1562,6 +1565,16 @@ class Microstructure(SampleData):
             grain_map = grain_map.reshape((grain_map.shape[0],
                                            grain_map.shape[1], 1))
         return grain_map
+
+    def get_phase_map(self, as_numpy=True):
+        phase_map = self.get_node(name='phase_map', as_numpy=as_numpy)
+        if self._is_empty('phase_map'):
+            phase_map = None
+        elif phase_map.ndim == 2:
+            # reshape to 3D
+            phase_map = phase_map.reshape((phase_map.shape[0],
+                                           phase_map.shape[1], 1))
+        return phase_map
 
     def get_mask(self, as_numpy=False):
         mask = self.get_node(name='mask', as_numpy=as_numpy)
@@ -1821,6 +1834,30 @@ class Microstructure(SampleData):
             self.add_field(gridname='CellData', fieldname='grain_map',
                            array=grain_map, replace=True, **keywords)
         return
+
+    def set_phase_map(self, phase_map, voxel_size=None, **keywords):
+        """Set the phase map for this microstructure.
+
+        :param ndarray phase_map: a 2D or 3D numpy array.
+        :param float voxel_size: the size of the voxels in mm unit. Used only
+            if the CellData image Node must be created.
+        """
+        create_image = True
+        if self.__contains__('CellData'):
+            empty = self.get_attribute(attrname='empty', nodename='CellData')
+            if not empty:
+                create_image = False
+        if create_image:
+            if voxel_size is None:
+                msg = 'Please specify voxel size for CellData image'
+                raise ValueError(msg)
+            self.add_image_from_field(phase_map, 'phase_map',
+                                      imagename='CellData', location='/',
+                                      spacing=voxel_size * np.ones((3,)),
+                                      replace=True, **keywords)
+        else:
+            self.add_field(gridname='CellData', fieldname='phase_map',
+                           array=phase_map, replace=True, **keywords)
 
     def set_mask(self, mask, voxel_size=None, **keywords):
         """Set the mask for this microstructure.
@@ -2843,9 +2880,10 @@ class Microstructure(SampleData):
             the beginning and the end of the first two axes.
         :param int exterior_size: thickness of the exterior region.
         """
+        n_phases = self.get_number_of_phases()
         ext = 'bin' if binary else 'txt'
-        grip_id = 1  # material id for the grips
-        ext_id = 2 if add_grips else 1  # material id for the exterior
+        grip_id = n_phases  # material id for the grips
+        ext_id = n_phases + 1 if add_grips else n_phases  # material id for the exterior
         n1x = open('N1X.%s' % ext, 'w')
         n1y = open('N1Y.%s' % ext, 'w')
         n1z = open('N1Z.%s' % ext, 'w')
@@ -2903,7 +2941,7 @@ class Microstructure(SampleData):
                                       Lambda0='90000.0',
                                       Mu0='31000.0'))
             # add each phase as a material
-            for i in range(self.get_number_of_phases()):
+            for i in range(n_phases):
                 mat = etree.Element('Material', numM=str(i + 1),
                                     Lib='libUmatAmitex.so',
                                     Law='elasaniso')
@@ -2931,7 +2969,7 @@ class Microstructure(SampleData):
                 root.append(mat)
             # add a material for top and bottom layers
             if add_grips:
-                grips = etree.Element('Material', numM=str(grip_id + self.get_number_of_phases()),
+                grips = etree.Element('Material', numM=str(grip_id + 1),
                                       Lib='libUmatAmitex.so',
                                       Law='elasiso')
                 grips.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(grip_constants[0])))
@@ -2939,7 +2977,7 @@ class Microstructure(SampleData):
                 root.append(grips)
             # add a material for external buffer
             if add_exterior:
-                exterior = etree.Element('Material', numM=str(ext_id + self.get_number_of_phases()),
+                exterior = etree.Element('Material', numM=str(ext_id + 1),
                                          Lib='libUmatAmitex.so',
                                          Law='elasiso')
                 exterior.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value='0.'))
@@ -2957,7 +2995,11 @@ class Microstructure(SampleData):
             from vtk.util import numpy_support
             #TODO build a continuous grain map for amitex
             grain_ids = self.get_grain_map(as_numpy=True)
-            material_ids = np.zeros_like(grain_ids)
+            if self.__contains__('phase_map'):
+                # use the phase map for the material ids
+                material_ids = self.get_phase_map(as_numpy=True)
+            else:
+                material_ids = np.zeros_like(grain_ids)
             if add_grips:
                 # add a layer of new_id (the value must actually be the first
                 # grain id) above and below the sample.
@@ -3206,9 +3248,20 @@ class Microstructure(SampleData):
                 grain['orientation'] = Orientation.from_euler(euler_angles).rod
                 grain.append()
             micro.grains.flush()
-            # look for **data
+            # look for **data and handle *group if present
+            phase_ids = None
             while True:
                 line = f.readline().strip()
+                if line.startswith('*group'):
+                    print('multi phase sample')
+                    phase_ids = []
+                    while True:
+                        line = f.readline().strip()
+                        if line.startswith('**data'):
+                            break
+                        else:
+                            phase_ids.extend(np.array(line.split()).astype(int).tolist())
+                    print('phase ids are:', phase_ids)
                 if line.startswith('**data'):
                     break
             print(f.tell())
@@ -3222,6 +3275,15 @@ class Microstructure(SampleData):
             micro.recompute_grain_bounding_boxes()
             micro.recompute_grain_centers()
             micro.recompute_grain_volumes()
+            # if necessary set the phase_map
+            if phase_ids:
+                grain_map = micro.get_grain_map(as_numpy=True)
+                phase_map = np.zeros_like(grain_map)
+                for grain_id, phase_id in zip(grain_ids, phase_ids):
+                    # ignore phase id == 1 as this corresponds to phase_map == 0
+                    if phase_id > 1:
+                        phase_map[grain_map == grain_id] = phase_id
+                micro.set_phase_map(phase_map)
         print('done')
         return micro
 

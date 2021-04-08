@@ -973,17 +973,17 @@ class SampleData:
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
         if dimensionality in ['Tensor6','Tensor']:
-            Attribute_dic['transpose_components'] = transpose_components         
+            Attribute_dic['transpose_components'] = transpose_components
         if (field_type == 'IP_field') and not (visualisation_type=='None'):
-            vis_array = self._IP_field_for_visualisation(vis_array, 
+            vis_array = self._IP_field_for_visualisation(vis_array,
                                                          visualisation_type)
             visname = fieldname+f'_{visualisation_type}'
-            visindexname = indexname+f'_{visualisation_type}'           
+            visindexname = indexname+f'_{visualisation_type}'
             if dimensionality in ['Tensor6','Tensor']:
                 vis_array, _ = self._transpose_field_comp(
                     dimensionality, vis_array)
-            node_vis = self.add_data_array(array_location, visname, vis_array, 
-                                           visindexname, chunkshape, replace, 
+            node_vis = self.add_data_array(array_location, visname, vis_array,
+                                           visindexname, chunkshape, replace,
                                            filters, empty, **keywords)
             Attribute_dic['visualisation_type'] = visualisation_type
             self.add_attributes(Attribute_dic, nodename=visindexname)
@@ -1274,15 +1274,15 @@ class SampleData:
             else:
                 self.content_index[indexname] = [path, colname]
         return
-    
+
     def compute_mesh_elements_normals(
-            self, meshname, element_tag, Normal_fieldname=None, 
+            self, meshname, element_tag, Normal_fieldname=None,
             align_vector=np.random.rand(3), as_nodal_field=False):
         """Compute the normals of a set of boundary elements of a mesh group.
-        
+
         The normals are stored as en element wise constant field in the mesh
-        group. 
-        
+        group.
+
         :param meshname: Name, Path, Index name or Alias of the Mesh group
             in dataset
         :type meshname: str
@@ -1301,21 +1301,21 @@ class SampleData:
         import BasicTools.Containers.ElementNames as EN
         if Normal_fieldname is None:
             Normal_fieldname = 'Normals_' + element_tag
-        
-        # Step 0: identify to which element type or element tag 
+
+        # Step 0: identify to which element type or element tag
         mesh_elements = self.get_mesh_elem_types_and_number(meshname)
         mesh_el_tags = self.get_mesh_elem_tags_names(meshname)
         if element_tag in mesh_elements.keys():
             el_type = mesh_elements[element_tag]
         if element_tag in mesh_el_tags.keys():
             el_type = mesh_el_tags[element_tag]
-            
+
         # Step 1: Find out type of element and assert that it is a 2D element
         # type
         if EN.dimension[el_type] != 2:
             raise ValueError('Can compute normals only for sets of elements'
                              ' with a 2D topology.')
-            
+
         # Step 2: Extract element set connectivity and global IDs
         if element_tag in mesh_elements.keys():
             connectivity = self.get_mesh_elements(
@@ -1324,12 +1324,12 @@ class SampleData:
             connectivity = self.get_mesh_elem_tags_connectivity(
                                     meshname, element_tag)
         element_IDs = self.get_mesh_elem_tag(meshname, element_tag)
-            
+
         # Step 3: Compute normals
         mesh_nodes = self.get_mesh_nodes(meshname, as_numpy=True)
-        vect_1 = (  mesh_nodes[connectivity[:,1],:] 
+        vect_1 = (  mesh_nodes[connectivity[:,1],:]
                   - mesh_nodes[connectivity[:,0],:])
-        vect_2 = (  mesh_nodes[connectivity[:,2],:] 
+        vect_2 = (  mesh_nodes[connectivity[:,2],:]
                   - mesh_nodes[connectivity[:,1],:])
         normals = np.cross(vect_1, vect_2)
         #     * normalize normals
@@ -1340,7 +1340,7 @@ class SampleData:
         #     * align orientation of surface vectors
         idx = np.where(np.dot(normals,align_vector) < 0)
         normals[idx,:] = - normals[idx,:]
-        
+
         # Step 4: Create element field to store normals on mesh group
         Nelem = np.sum(self.get_attribute('Number_of_elements', meshname))
         Elem_normals_field = np.zeros(shape=(Nelem,3))
@@ -1352,7 +1352,7 @@ class SampleData:
                 idxx = element_IDs[E_idx]
                 Nodal_normals_field[nodeId,:] = (
                                     np.sum(Elem_normals_field[idxx,:], axis=0)
-                                                 ) / len(idxx) 
+                                                 ) / len(idxx)
                 # print('E_idx :', E_idx, 'idxx :', idxx)
                 # print('local Normals :', Elem_normals_field[idxx,:])
                 # print(Nodal_normals_field[nodeId,:])
@@ -1646,7 +1646,7 @@ class SampleData:
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
             in dataset
         :param str element_tag: name of the element tag whose connectivity
-            must be returned. 
+            must be returned.
         """
         # get element tag type
         tags = self.get_mesh_elem_tags_names(meshname)
@@ -1657,7 +1657,7 @@ class SampleData:
         # get local element IDs in element tag
         local_IDs = self.get_mesh_elem_tag(meshname, element_tag,
                                            local_IDs=True)
-        return type_connectivity[local_IDs,:] 
+        return type_connectivity[local_IDs,:]
 
     def get_mesh_node_tags_names(self, meshname):
         """Returns the list of node tags defined on a mesh.
@@ -1734,16 +1734,16 @@ class SampleData:
                 msg = ('(get_tablecol) Data is not an table node.')
                 self._verbose_print(msg)
         return data
-    
-    def get_field(self, fieldname, unpad_field=True, 
+
+    def get_field(self, fieldname, unpad_field=True,
                   get_visualisation_field=False):
         """Return a padded or unpadded field from a grid data group as array.
-        
+
         Use this method to get a mesh element wise field in its original form,
         i.e. bulk element fields (defined on elements of the same dimensonality
         than the mesh) or a boundary field (defined on elements of a lower
         dimensionality than the mesh).
-        
+
         :param str fieldname: Name, Path, Index, Alias or Node of the field in
             dataset
         :param bool unpad_field: if `True` (default), remove the zeros added to
@@ -1752,7 +1752,7 @@ class SampleData:
         """
         field_type = self.get_attribute('field_type', fieldname)
         if (field_type == 'IP_field') and get_visualisation_field:
-            field_path = self.get_attribute('visualisation_field_path', 
+            field_path = self.get_attribute('visualisation_field_path',
                                             fieldname)
             field = self.get_node(field_path, as_numpy=True)
         else:
@@ -1763,7 +1763,7 @@ class SampleData:
             return self._mesh_field_unpadding(field, parent_mesh, padding)
         else:
             return field
-        
+
 
     def get_node(self, name, as_numpy=False):
         """Return a HDF5 node in the dataset.
@@ -1975,13 +1975,13 @@ class SampleData:
         """
         self.add_attributes({'description': description}, node)
         return
-    
+
     def set_new_indexname(self, nodename, new_indexname):
-        """Change the indexname of a node in the dataset. 
-        
+        """Change the indexname of a node in the dataset.
+
         Usefull to solve indexname duplicates issues that can arises when
         automatically adding elements to the dataset, that have the same name.
-        
+
         :param nodename: Name, Path, Indexname or Alias of the node whose
             indexname is to be changed
         :type nodename: str
@@ -1993,7 +1993,7 @@ class SampleData:
         index_content = self.content_index.pop(old_indexname)
         self.content_index[new_indexname] = index_content
         return
-        
+
 
     def set_voxel_size(self, image_group, voxel_size):
         """Set voxel size for an HDF5/XDMF image data group.
@@ -2299,7 +2299,7 @@ class SampleData:
             self._verbose_print(msg)
             return
 
-        # Remove visualisation field if node is a IP field node with an 
+        # Remove visualisation field if node is a IP field node with an
         # additionnal visualisation values array
         IP_vis = self.get_attribute('visualisation_field_path', Node)
         if IP_vis is not None:
@@ -2384,122 +2384,8 @@ class SampleData:
             del new_sample
             return
 
-    def morphological_image_cleaner(self, target_image_field='',
-                                    clean_fieldname='', indexname='',
-                                    replace=False, **keywords):
-        """Apply a morphological cleaning treatment to a multiphase image.
-
-        A Matlab morphological cleaner is called to smooth the morphology of
-        the different phases of a multiphase image: a voxelized/pixelized
-        field of integers identifying the different phases of a
-        microstructure.
-
-        This cleaning treatment is typically used to improve the quality of a
-        mesh produced from the multiphase image, or improved image based
-        mechanical modelisation techniques results, such as FFT-based
-        computational homogenization solvers.
-
-        The cleaner path must be correctly set in the `global_variables.py`
-        file, as well as the definition and path of the Matlab command. The
-        multiphase cleaner is a Matlab program that has been developed by
-        Franck Nguyen (Centre des Matériaux).
-
-        :param str target_image_field: Path, Name, Index Name or Alias of
-            the multiphase image field to clean.
-        :param str clean_fieldname: name used to add the morphologically
-            cleaned field to the image group
-        :param indexname: Index name used to reference the Mesh group
-        :param bool replace: If `True`, overwrite any preexisting field node
-            with the name `clean_fieldname` in the image group with the
-            morphologically cleaned field.
-        """
-        imagename = self._get_parent_name(target_image_field)
-        if not self._is_image(imagename):
-            raise tables.NodeError('{}, parent of {}, is not an Image group,'
-                                   'cannot apply image morphological cleaner.'
-                                   ''.format(imagename, target_image_field))
-        self.sync()
-        # Set data and file pathes
-        DATA_DIR, _ = os.path.split(self.h5_path)
-        DATA_PATH = self._name_or_node_to_path(target_image_field)
-        OUT_FILE = os.path.join(DATA_DIR, 'Clean_image.mat')
-        # launch mesher
-        self._launch_morphocleaner(DATA_PATH, self.h5_path, OUT_FILE)
-        # Add image to SD instance
-        from scipy.io import loadmat
-        mat_dic = loadmat(OUT_FILE)
-        image = mat_dic['mat3D_clean']
-        self.add_field(gridname=imagename, fieldname=clean_fieldname,
-                       array=image, replace=replace, **keywords)
-        # Remove tmp mesh files
-        os.remove(OUT_FILE)
-        return
-
-    def multi_phase_mesher(self, multiphase_image_name='', meshname='',
-                           indexname='', location='', load_surface_mesh=False,
-                           bin_fields_from_sets=True, replace=False,
-                           **keywords):
-        """Create a conformal mesh from a multiphase image.
-
-        A Matlab multiphase mesher is called to create a conformal mesh of a
-        multiphase image: a voxelized/pixelized field of integers identifying
-        the different phases of a microstructure. Then, the mesh is stored in
-        the calling SampleData instance at the desired location with the
-        desired name and Indexname.
-
-        The meshing procedure involves the construction of a surface mesh that
-        is conformant with the phase boundaries in the image. The space
-        between boundary elements is then filled with tetrahedra to construct
-        a volumic mesh. This intermediate surface mesh can be store into the
-        SampleData instance if required.
-
-        The mesher path must be correctly set in the `global_variables.py`
-        file, as well as the definition and path of the Matlab command. The
-        multiphase mesher is a Matlab program that has been developed by
-        Franck Nguyen (Centre des Matériaux).
-
-        :param str multiphase_image_name: Path, Name, Index Name or Alias of
-            the multiphase image field to mesh.
-        :param str meshname: name used to create the Mesh group in dataset
-        :param indexname: Index name used to reference the Mesh group
-        :param str location: Path, Name, Index Name or Alias of the parent
-            group where the Mesh group is to be created
-        :param bool load_surface_mesh: If `True`, load the intermediate
-            surface mesh in the dataset.
-        :param bool bin_fields_from_sets: If `True`, stores all Node and
-            Element Sets in mesh_object as binary fields (1 on Set, 0 else)
-        :param bool replace: if `True`, overwrites pre-existing Mesh group
-            with the same `meshname` to add the new mesh.
-        """
-        self.sync()
-        # Set data and file pathes
-        DATA_DIR, _ = os.path.split(self.h5_path)
-        DATA_PATH = self._name_or_node_to_path(multiphase_image_name)
-        OUT_DIR = os.path.join(DATA_DIR, 'Tmp/')
-        # create temp directory for mesh files
-        if not os.path.exists(OUT_DIR):
-           os.mkdir(OUT_DIR)
-        # Get meshing parameters eventually passed as keyword arguments
-        mesh_params = self._get_mesher_parameters(**keywords)
-        # launch mesher
-        self._launch_mesher(DATA_PATH, self.h5_path, OUT_DIR, mesh_params)
-        # Add mesh to SD instance
-        out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra_p.geof')
-        self.add_mesh(file=out_file, meshname=meshname, indexname=indexname,
-                      location=location, replace=replace,
-                      bin_fields_from_sets=bin_fields_from_sets)
-        # Add surface mesh if required
-        if load_surface_mesh:
-            out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor.geof')
-            self.add_mesh(file=out_file, meshname=meshname+'_surface',
-                          location=location, replace=replace,
-                          bin_fields_from_sets=bin_fields_from_sets)
-        # Remove tmp mesh files
-        shutil.rmtree(OUT_DIR)
-        return
-
     def create_elset_ids_field(self, meshname=None, store=True, fieldname=None,
-                               get_sets_IDs=False, tags_prefix='elset',
+                               get_sets_IDs=True, tags_prefix='elset',
                                remove_elset_fields=False):
         """Create an element tag Id field on the inputed mesh.
 
@@ -2545,7 +2431,7 @@ class SampleData:
                 set_ID = int(set_name.strip(tags_prefix))
             else:
                 set_ID = i
-                i += 1 
+                i += 1
             ID_field[element_ids] = set_ID
             if remove_elset_fields:
                 field_path = os.path.join(El_tag_path, 'field_'+set_name)
@@ -2875,6 +2761,9 @@ class SampleData:
         # name_or_node is a Node
         if isinstance(name_or_node, tables.Node):
             return name_or_node._v_pathname
+        # name or node is none
+        if name_or_node is None:
+            return None
         # name_or_node is a string or else
         name_tmp = os.path.join('/', name_or_node)
         if self.h5_dataset.__contains__(name_tmp):
@@ -3040,7 +2929,7 @@ class SampleData:
         elem_field = False
         Nnodes = self.get_attribute('number_of_nodes', meshname)
         Nelem = np.sum(self.get_attribute('Number_of_elements', meshname))
-        Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements', 
+        Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements',
                                                meshname))
         Nfield_values = field_shape[0]
         if len(field_shape) == 2:
@@ -3112,7 +3001,7 @@ class SampleData:
                              'Maybe are you trying to add a 3D field into a'
                              '3D grid.')
         return field_type, XDMF_FIELD_TYPE[dimension]
-    
+
     def _mesh_field_padding(self, field, meshname):
         """Pad with zeros the mesh elem field to comply with size."""
         if self._is_image(meshname):
@@ -3128,11 +3017,11 @@ class SampleData:
         elif field.shape[0] == Nelem_boundary:
             padding = 'boundary'
         elif (field.shape[0] % Nelem_bulk) == 0:
-            # if the number of values  for the field is a multiplier of the 
+            # if the number of values  for the field is a multiplier of the
             # number of elements, it is considered that the array describes a
             # field integration point values and that it is stored as follows:
             # field[:,k] = [Val_elt1_IP1, Val_elt1_IP2, ...., Val_elt1_IPN,
-            #               Val_elt2_IP1, ...., Val_eltN_IPN] 
+            #               Val_elt2_IP1, ...., Val_eltN_IPN]
             padding = 'bulk_IP'
         if padding == 'None':
             pass
@@ -3155,7 +3044,7 @@ class SampleData:
             pad_array = np.zeros(shape=(Nelem_boundary, *vis_field.shape[1:]))
             vis_field = np.concatenate((vis_field, pad_array), axis=0)
         return field, padding, vis_field
-    
+
     def _mesh_field_unpadding(self, field, parent_mesh, padding):
         """Remove zeros to return field to original shape, before padding."""
         Nelem_bulk = np.sum(self.get_attribute('Number_of_bulk_elements',
@@ -3172,9 +3061,9 @@ class SampleData:
             raise Warning('Cannot unpad the field, unknown padding type `{}`'
                           ''.format(padding))
         return field
-    
+
     def _IP_field_for_visualisation(self, array, vis_type):
-        # here it is supposed that the field has shape 
+        # here it is supposed that the field has shape
         # [Nelem, Nip_per_elem, Ncomponent]
         if vis_type == 'Elt_max':
             array = np.max(array, axis=1)
@@ -3184,7 +3073,7 @@ class SampleData:
             raise ValueError('Unkown integration point field visualisation'
                              ' convention. Possibilities are "Elt_max",'
                              ' "Elt_mean", "None"')
-        return array 
+        return array
 
     def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
                            bin_fields_from_sets):
@@ -3221,8 +3110,8 @@ class SampleData:
                                 ' in file {}'
                                 ''.format(geo_group._v_pathname, self.h5_file))
             Nodes_ID = self.add_data_array(
-                location=geo_group._v_pathname, name='Nodes_ID', 
-                array=mesh_object.originalIDNodes, 
+                location=geo_group._v_pathname, name='Nodes_ID',
+                array=mesh_object.originalIDNodes,
                 indexname=mesh_group._v_name+'_Nodes_ID')
             Node_attributes = {'nodesID_path':Nodes_ID._v_pathname}
         self.add_attributes(Node_attributes, mesh_group._v_pathname)
@@ -3442,7 +3331,7 @@ class SampleData:
                 tag = elem_container.tags.CreateTag(tag_name,False)
                 tag_path = os.path.join(Etags_group._v_pathname,'ET_'+tag_name)
                 nodes_Ids = self.get_node(tag_path, as_numpy)
-                ## Need to add local ids !! Substract the offset stored by 
+                ## Need to add local ids !! Substract the offset stored by
                 ## get_mesh_elements
                 tag.SetIds(nodes_Ids- offset_dic[el_type])
         return AllElements
@@ -3647,7 +3536,7 @@ class SampleData:
         Field_index.append(fieldname)
         self.add_attributes({'Field_index': Field_index}, gridname)
         return
-    
+
     def _transpose_field_comp(self, dimensionality, array):
         """Transpose fields components to comply with Paraview ordering."""
         # based on the conventions:
@@ -3771,7 +3660,7 @@ class SampleData:
         except:
             raise ValueError('Mesh dimension must correspond to a 2D or'
                              '3D mesh.')
-            
+
     def _get_mesh_elements_offsets(self, meshname):
         types = self.get_attribute('element_type', meshname)
         offsets = self.get_attribute('Elements_offset', meshname)
@@ -3913,70 +3802,3 @@ class SampleData:
         Retstr =  str(Retstr).strip('[').strip(']')
         Retstr =  str(Retstr).replace(',', ' ')
         return Retstr
-
-    #=========================================================================
-    #   External codes calling methods
-    #=========================================================================
-
-    def _launch_morphocleaner(self, path, filename, out_file):
-        from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
-        from pymicro.core.global_variables import CLEANER_TEMPLATE, CLEANER_TMP
-        # Create specific mesher script
-        shutil.copyfile(CLEANER_TEMPLATE, CLEANER_TMP)
-        with open(CLEANER_TMP,'r') as file:
-            lines = file.read()
-        lines = lines.replace('DATA_PATH', path)
-        lines = lines.replace('DATA_H5FILE', filename)
-        lines = lines.replace('OUT_FILE', out_file)
-        with open(CLEANER_TMP,'w') as file:
-            file.write(lines)
-        # Launch mesher
-        CWD = os.getcwd()
-        matlab_command = '"'+"run('" + CLEANER_TMP + "');exit;"+'"'
-        subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
-        os.remove(CLEANER_TMP)
-        os.chdir(CWD)
-        return
-
-    def _get_mesher_parameters(self, **keywords):
-        MEM = 50
-        HGRAD = 1.5
-        HMIN = 5
-        HMAX = 50
-        HAUSD = 3
-        ANG = 50
-        if 'MEM' in keywords: MEM = keywords['MEM']
-        if 'HGRAD' in keywords: HGRAD = keywords['HGRAD']
-        if 'HMIN' in keywords: HMIN = keywords['HMIN']
-        if 'HMAX' in keywords: HMAX = keywords['HMAX']
-        if 'HAUSD' in keywords: HAUSD = keywords['HAUSD']
-        if 'ANG' in keywords: ANG = keywords['ANG']
-        return {'MEM':MEM, 'HGRAD':HGRAD, 'HMIN':HMIN, 'HMAX':HMAX,
-                'HAUSD':HAUSD, 'ANG':ANG}
-
-    def _launch_mesher(self, path, filename, out_dir, params):
-        from pymicro.core.global_variables import MATLAB, MATLAB_OPTS
-        from pymicro.core.global_variables import MESHER_TEMPLATE, MESHER_TMP
-        print(filename)
-        # Create specific mesher script
-        shutil.copyfile(MESHER_TEMPLATE, MESHER_TMP)
-        with open(MESHER_TMP,'r') as file:
-            lines = file.read()
-        lines = lines.replace('DATA_PATH', path)
-        lines = lines.replace('DATA_H5FILE', filename)
-        lines = lines.replace('OUT_DIR', out_dir)
-        lines = lines.replace('MEM', str(params['MEM']))
-        lines = lines.replace('HGRAD', str(params['HGRAD']))
-        lines = lines.replace('HMIN', str(params['HMIN']))
-        lines = lines.replace('HMAX', str(params['HMAX']))
-        lines = lines.replace('HAUSD', str(params['HAUSD']))
-        lines = lines.replace('ANG', str(params['ANG']))
-        with open(MESHER_TMP,'w') as file:
-            file.write(lines)
-        # Launch mesher
-        CWD = os.getcwd()
-        matlab_command = '"'+"run('" + MESHER_TMP + "');exit;"+'"'
-        subprocess.run(args=[MATLAB,MATLAB_OPTS,matlab_command])
-        os.remove(MESHER_TMP)
-        os.chdir(CWD)
-        return

@@ -681,10 +681,11 @@ class SDImageMesher():
         # launch mesher
         CWD = os.getcwd()
         self.data.sync() # flushes H5 dataset
-        mesher.runScript(workdir=OUT_DIR, append_filename=False)
+        mesher.runScript(workdir=OUT_DIR, append_filename=False,
+                         print_output=True)
         os.chdir(CWD)
         # Add mesh to SD instance
-        out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra.geof')
+        out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra_p.geof')
         self.data.add_mesh(file=out_file, meshname=meshname, replace=replace,
                            indexname=indexname, location=location,
                            bin_fields_from_sets=bin_fields_from_sets)

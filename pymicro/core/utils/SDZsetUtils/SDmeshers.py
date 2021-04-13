@@ -657,7 +657,8 @@ class SDImageMesher():
         # Local Imports
         from pymicro.core.utils.SDUtilsGlobals import MATLAB, MATLAB_OPTS
         from pymicro.core.utils.SDUtilsGlobals import (MESHER3D_TEMPLATE,
-                                                       MESHER3D_TMP)
+                                                       MESHER3D_TMP,
+                                                       mesher3D_file_dir)
         # get data and output pathes
         DATA_PATH = self.data._name_or_node_to_path(multiphase_image_name)
         DATA_DIR, _ = os.path.split(self.data.h5_path)
@@ -673,7 +674,8 @@ class SDImageMesher():
         mesher.set_script_command_options([MATLAB_OPTS, matlab_command])
         # set mesher script parameters
         mesher_arguments = {'DATA_PATH':DATA_PATH,'OUT_DIR':OUT_DIR,
-                            'DATA_H5FILE': self.data.h5_path}
+                            'DATA_H5FILE': self.data.h5_path,
+                            'SRC_PATH': mesher3D_file_dir}
         mesher_arguments.update(default_params)
         mesher_arguments.update(mesher_opts)
         mesher.set_arguments(mesher_arguments)
@@ -755,10 +757,9 @@ class SDImageMesher():
         """
         # Local Imports
         from pymicro.core.utils.SDUtilsGlobals import MATLAB, MATLAB_OPTS
-        from pymicro.core.utils.SDUtilsGlobals import (MESHER2D_TEMPLATE,
-                                                       MESHER2D_TMP,
-                                                       MESHER2D_LIBS,
-                                                       MESHER2D_ENV)
+        from pymicro.core.utils.SDUtilsGlobals import (
+            MESHER2D_TEMPLATE, MESHER2D_TMP, MESHER2D_LIBS, MESHER2D_ENV,
+                                     mesher2D_file_dir)
         # Set environnement variable
         os.environ["PRG_ZEB"] = MESHER2D_ENV
         # Defaults mesh parameters
@@ -779,7 +780,8 @@ class SDImageMesher():
         mesher.set_script_command_options([MATLAB_OPTS, matlab_command])
         # set mesher script parameters
         mesher_arguments = {'DATA_PATH':DATA_PATH,'OUT_DIR':OUT_DIR,
-                            'DATA_H5FILE': self.data.h5_path}
+                            'DATA_H5FILE': self.data.h5_path,
+                            'SRC_PATH': mesher2D_file_dir}
         mesher_arguments.update(default_params)
         mesher_arguments.update(mesher_opts)
         mesher.set_arguments(mesher_arguments)
@@ -833,7 +835,8 @@ class SDImageMesher():
         # Local Imports
         from pymicro.core.utils.SDUtilsGlobals import MATLAB, MATLAB_OPTS
         from pymicro.core.utils.SDUtilsGlobals import (CLEANER_TEMPLATE,
-                                                       CLEANER_TMP)
+                                                       CLEANER_TMP,
+                                                       mesher3D_file_dir)
         self.data.sync()
         # get data and output pathes
         imagename = self.data._get_parent_name(target_image_field)
@@ -849,7 +852,8 @@ class SDImageMesher():
         cleaner.set_script_command_options([MATLAB_OPTS, matlab_command])
         # set mesher script parameters and create script file
         cleaner_arguments = {'DATA_PATH':DATA_PATH,'OUT_FILE':OUT_FILE,
-                            'DATA_H5FILE': self.data.h5_path}
+                            'DATA_H5FILE': self.data.h5_path,
+                            'SRC_PATH': mesher3D_file_dir}
         cleaner.set_arguments(cleaner_arguments)
         cleaner.createScript(filename=CLEANER_TMP)
         # launch cleaner

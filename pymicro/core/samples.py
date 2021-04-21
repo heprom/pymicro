@@ -3681,6 +3681,8 @@ class SampleData:
         """Print a human readable information on the Pytables Group object."""
         s = ''
         Group = self.get_node(groupname)
+        if Group is None:
+            return f'No group named {groupname}'
         gname = Group._v_name
         s += str('\n Group {}\n'.format(gname))
         s += str('=====================\n')

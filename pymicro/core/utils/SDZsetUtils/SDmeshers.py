@@ -859,7 +859,7 @@ class SDImageMesher():
         # launch cleaner
         CWD = os.getcwd()
         self.data.sync() # flushes H5 dataset
-        cleaner.runScript(append_filename=False)
+        cleaner.runScript(append_filename=False, print_output=True)
         os.chdir(CWD)
         # Add image to SD instance
         from scipy.io import loadmat

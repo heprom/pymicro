@@ -2372,7 +2372,8 @@ class Microstructure(SampleData):
         grain_volume_final = (grain_map == grain_id).sum()
         print('grain %s was dilated by %d voxels' % (grain_id,
                                                      grain_volume_final - grain_volume_init))
-        self.set_grain_map(grain_map, self.get_voxel_size())
+        self.set_grain_map(grain_map, self.get_voxel_size(),
+                           map_name=self.active_grain_map)
         self.sync()
 
     @staticmethod
@@ -2493,6 +2494,35 @@ class Microstructure(SampleData):
         # finally assign the dilated grain map to the microstructure
         self.set_grain_map(grain_map, map_name='dilated_grain_map')
 
+    def clean_grain_map(self):
+        """Apply a morphological cleaning treatment to the active grain map.
+
+
+        A Matlab morphological cleaner is called to smooth the morphology of
+        the different IDs in the grain map.
+
+        This cleaning treatment is typically used to improve the quality of a
+        mesh produced from the grain_map, or improved image based
+        mechanical modelisation techniques results, such as FFT-based
+        computational homogenization of the polycrystalline microstructure.
+
+          ..Warning::
+
+              This method relies on the code of the 'core.utils' and on Matlab
+              code developed by F. Nguyen at the 'Centre des Matériaux, Mines
+              Paris'. These tools and codes must be installed and referenced
+              in the PATH of your workstation for this method to work. For
+              more details, see the 'utils' package.
+        """
+        from pymicro.core.utils.SDZsetUtils.SDmeshers import SDImageMesher
+        Mesher = SDImageMesher(data=self)
+        Mesher.morphological_image_cleaner(
+            target_image_field=self.active_grain_map,
+            clean_fieldname='grain_map_clean', replace=True)
+        del Mesher
+        self.set_active_grain_map('grain_map_clean')
+        return
+
     def crop(self, x_start=None, x_end=None, y_start=None, y_end=None,
              z_start=None, z_end=None, crop_name=None, autodelete=False):
         """Crop the microstructure to create a new one.
@@ -2572,7 +2602,8 @@ class Microstructure(SampleData):
         self.add_grains_in_map()
         return
 
-    def renumber_grains(self, sort_by_size=False):
+    def renumber_grains(self, sort_by_size=False, overwrite_active_map=True,
+                        new_map_name=None):
         """Renumber the grains in the microstructure.
 
         Renumber the grains from 1 to n, with n the total number of grains
@@ -2582,6 +2613,11 @@ class Microstructure(SampleData):
 
         :param bool sort_by_size: use the grain volume to sort the grain ids
             (the larger grain will become grain 1, etc).
+        :param bool overwrite_active_map: if 'True', overwrites the active
+            grain map with the renumbered map. If 'False', the active grain map
+            is kept and a 'renumbered_grain_map' is added to CellData.
+        :param str new_map_name: Used as name for the renumbered grain map
+            field if is not None and overwrite_active_map is False.
         """
         if self._is_empty('grain_map'):
             print('warning: a grain map is needed to renumber the grains')
@@ -2607,7 +2643,15 @@ class Microstructure(SampleData):
             g.update()
         print('maxium grain id is now %d' % max(new_ids))
         # assign the renumbered grain_map to the microstructure
-        self.set_grain_map(grain_map_renum, self.get_voxel_size())
+        if overwrite_active_map:
+            map_name = self.active_grain_map
+        else:
+            if new_map_name is not None:
+                map_name = new_map_name
+            else:
+                map_name = 'renumbered_grain_map'
+        self.set_grain_map(grain_map_renum, self.get_voxel_size(),
+                           map_name=map_name)
 
     def compute_grain_volume(self, gid):
         """Compute the volume of the grain given its id.

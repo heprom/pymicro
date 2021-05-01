@@ -1457,6 +1457,11 @@ class Microstructure(SampleData):
 
         SampleData.__init__(self, filename, name, description, verbose,
                             overwrite_hdf5, autodelete, **keywords)
+        if not (self._file_exist):
+            self.set_active_grain_map()
+        else:
+            self.active_grain_map = self.get_attribute('active_grain_map',
+                                                       'CellData')
         # TODO find a way not to overwrite the sample name when an existing file is read
         #self.set_sample_name(name)
         self.grains = self.get_node('GrainDataTable')
@@ -1557,32 +1562,21 @@ class Microstructure(SampleData):
         return self._lattice
 
     def get_grain_map(self, as_numpy=True):
-        grain_map = self.get_node(name='grain_map', as_numpy=as_numpy)
+        grain_map = self.get_field('grain_map')
         if self._is_empty('grain_map'):
             grain_map = None
-        elif grain_map.ndim == 2:
-            # reshape to 3D
-            grain_map = grain_map.reshape((grain_map.shape[0],
-                                           grain_map.shape[1], 1))
         return grain_map
 
     def get_phase_map(self, as_numpy=True):
-        phase_map = self.get_node(name='phase_map', as_numpy=as_numpy)
+        phase_map = self.get_field('phase_map')
         if self._is_empty('phase_map'):
             phase_map = None
-        elif phase_map.ndim == 2:
-            # reshape to 3D
-            phase_map = phase_map.reshape((phase_map.shape[0],
-                                           phase_map.shape[1], 1))
         return phase_map
 
     def get_mask(self, as_numpy=False):
-        mask = self.get_node(name='mask', as_numpy=as_numpy)
+        mask = self.get_field('mask')
         if self._is_empty('mask'):
             mask = None
-        elif mask.ndim == 2:
-            # reshape to 3D
-            mask = mask.reshape((mask.shape[0], mask.shape[1], 1))
         return mask
 
     def get_ids_from_grain_map(self):
@@ -1810,7 +1804,18 @@ class Microstructure(SampleData):
         """
         self._lattice = lattice
 
-    def set_grain_map(self, grain_map, voxel_size=None, **keywords):
+    def set_active_grain_map(self, map_name='grain_map'):
+        """Set the active grain map name to inputed string.
+
+        The active_grain_map string is used as Name to get the grain_map field
+        in the dataset through the SampleData "get_field" method.
+        """
+        self.active_grain_map = map_name
+        self.add_attributes({'active_grain_map':map_name}, 'CellData')
+        return
+
+    def set_grain_map(self, grain_map, voxel_size=None,
+                      map_name='grain_map', **keywords):
         """Set the grain map for this microstructure.
 
         :param ndarray grain_map: a 2D or 3D numpy array.
@@ -1826,13 +1831,23 @@ class Microstructure(SampleData):
             if (voxel_size is None):
                 msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
-            self.add_image_from_field(grain_map, 'grain_map',
+            if np.isscalar(voxel_size):
+                dim = len(grain_map.shape)
+                spacing_array = voxel_size*np.ones((dim,))
+            else:
+                if len(voxel_size) != len(grain_map.shape):
+                    raise ValueError('voxel_size array must have a length '
+                                     'equal to grain_map shape')
+                spacing_array = voxel_size
+            self.add_image_from_field(field_array=grain_map,
+                                      fieldname=map_name,
                                       imagename='CellData', location='/',
-                                      spacing=voxel_size*np.ones((3,)),
+                                      spacing=spacing_array,
                                       replace=True, **keywords)
         else:
-            self.add_field(gridname='CellData', fieldname='grain_map',
+            self.add_field(gridname='CellData', fieldname=map_name,
                            array=grain_map, replace=True, **keywords)
+        self.set_active_grain_map(map_name)
         return
 
     def set_phase_map(self, phase_map, voxel_size=None, **keywords):
@@ -1851,9 +1866,17 @@ class Microstructure(SampleData):
             if voxel_size is None:
                 msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
+            if np.isscalar(voxel_size):
+                dim = len(phase_map.shape)
+                spacing_array = voxel_size*np.ones((dim,))
+            else:
+                if len(voxel_size) != len(phase_map.shape):
+                    raise ValueError('voxel_size array must have a length '
+                                     'equal to grain_map shape')
+                spacing_array = voxel_size
             self.add_image_from_field(phase_map, 'phase_map',
                                       imagename='CellData', location='/',
-                                      spacing=voxel_size * np.ones((3,)),
+                                      spacing=spacing_array,
                                       replace=True, **keywords)
         else:
             self.add_field(gridname='CellData', fieldname='phase_map',
@@ -1875,9 +1898,17 @@ class Microstructure(SampleData):
             if (voxel_size is None):
                 msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
+            if np.isscalar(voxel_size):
+                dim = len(mask.shape)
+                spacing_array = voxel_size*np.ones((dim,))
+            else:
+                if len(voxel_size) != len(mask.shape):
+                    raise ValueError('voxel_size array must have a length '
+                                     'equal to grain_map shape')
+                spacing_array = voxel_size
             self.add_image_from_field(mask, 'mask',
                                       imagename='CellData', location='/',
-                                      spacing=voxel_size*np.ones((3,)),
+                                      spacing=spacing_array,
                                       replace=True, **keywords)
         else:
             self.add_field(gridname='CellData', fieldname='mask',
@@ -2105,9 +2136,13 @@ class Microstructure(SampleData):
                   'this method')
             return
         grain_map = self.get_grain_map(as_numpy=True)
-        if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
-            slice = grain_map.shape[2] // 2
-            print('using slice value %d' % slice)
+        if len(grain_map.shape) == 2:
+            plot_slice = grain_map.T
+        else:
+            if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
+                slice = grain_map.shape[2] // 2
+                print('using slice value %d' % slice)
+                plot_slice =grain_map[:, :, slice].T
         if color == 'random':
             grain_cmap = Microstructure.rand_cmap(first_is_black=True)
         elif color == 'ipf':
@@ -2115,14 +2150,17 @@ class Microstructure(SampleData):
         else:
             grain_cmap = 'viridis'
         fig, ax = plt.subplots()
-        ax.imshow(grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
+        ax.imshow(plot_slice, cmap=grain_cmap, vmin=0)
         ax.xaxis.set_label_position('top')
         plt.xlabel('X')
         plt.ylabel('Y')
         if not self._is_empty('mask') and show_mask:
             from pymicro.view.vol_utils import alpha_cmap
-            mask = self.get_mask()
-            plt.imshow(mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
+            if len(grain_map.shape) == 2:
+                plot_slice =  self.get_mask()
+            else:
+                plot_slice =  self.get_mask()[:,:,slice]
+            plt.imshow(plot_slice.T, cmap=alpha_cmap(opacity=0.3))
         plt.show()
 
     @staticmethod
@@ -2365,10 +2403,13 @@ class Microstructure(SampleData):
                 grains = np.isin(array, dilation_ids)
             else:
                 grains = (array > 0).astype(np.uint8)
+                print(grains.shape)
             grains_dil = ndimage.morphology.binary_dilation(grains,
                                                             structure=struct).astype(np.uint8)
             if mask is not None:
                 # only dilate within the mask
+                print(grains_dil.shape)
+                print(mask.shape)
                 grains_dil *= mask.astype(np.uint8)
             todo = (grains_dil - grains)
             # get the list of voxel for this dilation step
@@ -2450,7 +2491,7 @@ class Microstructure(SampleData):
                                                      dilation_steps=dilation_steps,
                                                      dilation_ids=dilation_ids)
         # finally assign the dilated grain map to the microstructure
-        self.set_grain_map(grain_map)
+        self.set_grain_map(grain_map, map_name='dilated_grain_map')
 
     def crop(self, x_start=None, x_end=None, y_start=None, y_end=None,
              z_start=None, z_end=None, crop_name=None, autodelete=False):
@@ -2476,13 +2517,13 @@ class Microstructure(SampleData):
             x_start = 0
         if not y_start:
             y_start = 0
-        if not z_start:
+        if (not z_start) and (len(self.get_grain_map()) == 3):
             z_start = 0
         if not x_end:
             x_end = self.get_grain_map().shape[0]
         if not y_end:
             y_end = self.get_grain_map().shape[1]
-        if not z_end:
+        if (not z_end) and (len(self.get_grain_map()) == 3):
             z_end = self.get_grain_map().shape[2]
         if not crop_name:
             crop_name = self.get_sample_name() + \
@@ -2491,14 +2532,22 @@ class Microstructure(SampleData):
                                     autodelete=autodelete)
         micro_crop.set_lattice(self.get_lattice())
         print('cropping microstructure to %s' % micro_crop.h5_file)
-        grain_map_crop = self.get_grain_map()[x_start:x_end,
-                         y_start:y_end, z_start:z_end]
+        if len(self.get_grain_map()) == 3:
+            grain_map_crop = self.get_grain_map()[x_start:x_end,
+                             y_start:y_end, z_start:z_end]
+        elif len(self.get_grain_map()) == 2:
+            grain_map_crop = self.get_grain_map()[x_start:x_end,
+                                                  y_start:y_end]
         print(micro_crop.h5_dataset)
         micro_crop.set_grain_map(grain_map_crop,
                                  voxel_size=self.get_voxel_size())
         if not self._is_empty('mask'):
-            mask_crop = self.get_mask()[x_start:x_end, y_start:y_end,
-                                z_start:z_end]
+            if len(self.get_grain_map()) == 3:
+                mask_crop = self.get_mask()[x_start:x_end,
+                                 y_start:y_end, z_start:z_end]
+            elif len(self.get_grain_map()) == 2:
+                mask_crop = self.get_mask()[x_start:x_end,
+                                                      y_start:y_end]
             micro_crop.set_mask(mask_crop)
         grain_ids = np.unique(grain_map_crop)
         for gid in grain_ids:
@@ -2621,7 +2670,10 @@ class Microstructure(SampleData):
             return slices
         x_indices = (slices[0].start, slices[0].stop)
         y_indices = (slices[1].start, slices[1].stop)
-        z_indices = (slices[2].start, slices[2].stop)
+        if len(slices) == 3:
+            z_indices = (slices[2].start, slices[2].stop)
+        else:
+            z_indices = None
         return x_indices, y_indices, z_indices
 
     def compute_grain_equivalent_diameters(self, id_list=None):
@@ -2654,6 +2706,9 @@ class Microstructure(SampleData):
         if not id_list:
             id_list = self.get_grain_ids()
         grain_map = self.get_grain_map(as_numpy=True)
+        if len(grain_map.shape) < 3:
+            raise ValueError('Cannot compute grain sphericities on a non'
+                             ' tridimensional grain map.')
         surface_areas = np.empty_like(volumes)
         for i, grain_id in enumerate(id_list):
             grain_data = (grain_map == grain_id)
@@ -2770,15 +2825,23 @@ class Microstructure(SampleData):
                 g_slice = slices[g['idnumber'] - 1]
                 x_indices = (g_slice[0].start, g_slice[0].stop)
                 y_indices = (g_slice[1].start, g_slice[1].stop)
-                z_indices = (g_slice[2].start, g_slice[2].stop)
-                bbox = x_indices, y_indices, z_indices
+                if len(slices) == 3:
+                    z_indices = (g_slice[2].start, g_slice[2].stop)
+                    bbox = x_indices, y_indices, z_indices
+                else:
+                    bbox = x_indices, y_indices
             except (ValueError, TypeError):
                 print('skipping grain %d' % g['idnumber'])
                 continue
             if verbose:
-                print('grain %d bounding box: [%d:%d, %d:%d, %d:%d]'
-                      % (g['idnumber'], bbox[0][0], bbox[0][1], bbox[1][0],
-                         bbox[1][1], bbox[2][0], bbox[2][1]))
+                if len(slices) == 3:
+                    print('grain %d bounding box: [%d:%d, %d:%d, %d:%d]'
+                          % (g['idnumber'], bbox[0][0], bbox[0][1], bbox[1][0],
+                             bbox[1][1], bbox[2][0], bbox[2][1]))
+                else:
+                    print('grain %d bounding box: [%d:%d, %d:%d]'
+                          % (g['idnumber'], bbox[0][0], bbox[0][1], bbox[1][0],
+                             bbox[1][1]))
             g['bounding_box'] = bbox
             g.update()
         self.grains.flush()
@@ -2956,7 +3019,7 @@ class Microstructure(SampleData):
                 '''
                 Note that Amitex uses a different reduced number:
                 (1, 2, 3, 4, 5, 6) = (11, 22, 33, 12, 13, 23)
-                Because of this indices 4 and 6 are inversed with respect to the Voigt convention. 
+                Because of this indices 4 and 6 are inversed with respect to the Voigt convention.
                 '''
                 mat.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(C11)))
                 mat.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(C12)))
@@ -2995,6 +3058,7 @@ class Microstructure(SampleData):
             # convert the grain map to vtk file
             from vtk.util import numpy_support
             #TODO build a continuous grain map for amitex
+            #TODO adapt to 2D grain maps
             grain_ids = self.get_grain_map(as_numpy=True)
             if self.__contains__('phase_map'):
                 # use the phase map for the material ids
@@ -3446,9 +3510,11 @@ class Microstructure(SampleData):
         :param list roi: a list of 4 integers to crop the EBSD scan.
         :return: a new instance of `Microstructure`.
         """
+        # Get name of file and create microstructure instance
         name = os.path.splitext(os.path.basename(file_path))[0]
         micro = Microstructure(name=name, autodelete=False, overwrite_hdf5=True)
         from pymicro.crystal.ebsd import OimScan
+        # Read raw EBSD .h5 data file from OIM
         scan = OimScan.from_file(file_path)
         if roi:
             print('importing data from region {}'.format(roi))
@@ -3463,32 +3529,36 @@ class Microstructure(SampleData):
         mask = np.ones_like(iq)
         # segment the grains
         grain_ids = scan.segment_grains()
-        micro.set_grain_map(grain_ids, scan.xStep)
+        voxel_size = np.array([scan.xStep, scan.yStep])
+        micro.set_grain_map(grain_ids, voxel_size)
 
-        # add each array to the data file
-        mask_array = np.reshape(mask, (mask.shape[0], mask.shape[1], 1))
-        iq_array = np.reshape(iq, (iq.shape[0], iq.shape[1], 1))
-        ci_array = np.reshape(ci, (ci.shape[0], ci.shape[1], 1))
-        micro.add_data_array(location='CellData', name='mask', array=mask_array, replace=True)
-        micro.add_data_array(location='CellData', name='iq', array=iq_array, replace=True)
-        micro.add_data_array(location='CellData', name='ci', array=ci_array, replace=True)
-        from pymicro.core.images import ImageObject
-        image_euler = ImageObject()
-        image_euler.dimension = euler.shape
-        image_euler.spacing = np.array([scan.xStep, scan.xStep, scan.xStep])
-        image_euler.add_field(euler, 'euler')
-        micro.add_image(image_euler, imagename='OrientationData', location='/', replace=True)
+        # add each array to the data file to the CellData image Group
+        micro.add_field(gridname='CellData', fieldname='mask', array=mask,
+                        replace=True)
+        micro.add_field(gridname='CellData', fieldname='iq', array=iq,
+                        replace=True)
+        micro.add_field(gridname='CellData', fieldname='ci', array=ci,
+                        replace=True)
+        micro.add_field(gridname='CellData', fieldname='euler',
+                        array=euler, replace=True)
 
-
+        # Fill GrainDataTable
         grains = micro.grains.row
         for gid in np.unique(grain_ids):
             if gid == 0:
                 continue
             print('adding grain %d' % gid)
             # use the first pixel of the grain
-            pixel = np.where(grain_ids == gid)[0][0], np.where(grain_ids == gid)[1][0]
+            idx = np.where(grain_ids == gid)[0][0]
+            idy = np.where(grain_ids == gid)[1][0]
             # TODO compute mean grain orientation
-            o_tsl = Orientation.from_euler(np.degrees(micro.get_node('euler')[pixel]))
+            # IMPORTANT: indexes idx and idy are inverted because 'get_node' is
+            # without option 'as_numpy=True', to leverage HDF5 lazy access to
+            # data. As Image fields are stored with their dimension transposed
+            # (to be consistent with ordering convention of both SampleData and
+            # Paraview/XDMF) indexes must be inverted here.
+            local_euler = np.degrees(micro.get_node('euler')[idy, idx,:])
+            o_tsl = Orientation.from_euler(local_euler)
             # TODO link OimScan lattice to pymicro
             # o_fz = o_tsl.move_to_FZ(symmetry=Ti7Al._symmetry)
             grains['idnumber'] = gid
@@ -3497,6 +3567,7 @@ class Microstructure(SampleData):
         micro.grains.flush()
         micro.recompute_grain_centers(verbose=False)
         micro.recompute_grain_volumes(verbose=False)
+        micro.recompute_grain_bounding_boxes(verbose=False)
         micro.sync()
         return micro
 
@@ -3524,6 +3595,7 @@ class Microstructure(SampleData):
                  microstructure.
         """
         # TODO: test
+        # TODO adapt to 2D grain maps
         from scipy import ndimage
 
         # perform some sanity checks
@@ -3540,6 +3612,11 @@ class Microstructure(SampleData):
             raise ValueError('both microstructure must have the same'
                              ' voxel size')
         voxel_size = micros[0].get_voxel_size()
+
+        if len(micros[0].get_grain_map().shape) == 2:
+            raise ValueError('Microstructures to merge must be tridimensional')
+        if len(micros[1].get_grain_map().shape) == 2:
+            raise ValueError('Microstructures to merge must be tridimensional')
 
         # create two microstructures for the two overlapping regions:
         # end slices in first scan and first slices in second scan

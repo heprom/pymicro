@@ -794,8 +794,7 @@ class SampleData:
 
     def add_image_from_field(self, field_array, fieldname, imagename='',
                              indexname='', location='/', description=' ',
-                             replace=False, origin=np.array([0.,0.,0.]),
-                             spacing=np.array([1.,1.,1.]),
+                             replace=False, origin=None, spacing=None,
                              is_scalar=True, is_elemField=True,
                              **keywords):
         """Create a 2D/3M Image group in the dataset from a field data array.
@@ -841,6 +840,10 @@ class SampleData:
         else:
             field_dim = len(field_array.shape)-1
             field_dimensions = field_array.shape[:-1]
+        if spacing is None:
+            spacing = np.ones((len(field_dimensions),))
+        if origin is None:
+            origin = np.zeros((len(field_dimensions),))
         if is_elemField:
             field_dimensions = field_dimensions + np.ones((field_dim,))
         image_object = ConstantRectilinearMesh(dim=field_dim)
@@ -3061,9 +3064,9 @@ class SampleData:
             raise Warning('Cannot unpad the field, unknown padding type `{}`'
                           ''.format(padding))
         return field
-    
+
     def _IP_field_for_visualisation(self, array, vis_type):
-        # here it is supposed that the field has shape 
+        # here it is supposed that the field has shape
         # [Nelem, Nip_per_elem, Ncomponent]
         if vis_type == 'Elt_max':
             array = np.max(array, axis=1)
@@ -3073,7 +3076,7 @@ class SampleData:
             raise ValueError('Unkown integration point field visualisation'
                              ' convention. Possibilities are "Elt_max",'
                              ' "Elt_mean", "None"')
-        return array 
+        return array
 
     def _IP_field_for_visualisation(self, array, vis_type):
         # here it is supposed that the field has shape
@@ -3549,7 +3552,7 @@ class SampleData:
         Field_index.append(fieldname)
         self.add_attributes({'Field_index': Field_index}, gridname)
         return
-    
+
     def _transpose_field_comp(self, dimensionality, array):
         """Transpose fields components to comply with Paraview ordering."""
         # based on the conventions:

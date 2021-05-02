@@ -3402,6 +3402,81 @@ class Microstructure(SampleData):
         return micro
 
     @staticmethod
+    def from_labdct(labdct_file, data_dir='.', include_IPF_map=False,
+                    include_rodrigues_map=False):
+        """Create a microstructure from a DCT reconstruction.
+
+        :param str labdct_file: the name of the file containing the labDCT data.
+        :param str data_dir: the path to the folder containing the HDF5
+            reconstruction file.
+        :param bool include_IPF_map: if True, the IPF maps will be included
+            in the microstructure fields.
+        :param bool include_rodrigues_map: if True, the rodrigues map will be
+            included in the microstructure fields.
+        :return: a `Microstructure` instance created from the labDCT
+        reconstruction file.
+        """
+        file_path = os.path.join(data_dir, labdct_file)
+        print('creating microstructure for labDCT scan %s' % file_path)
+        name, ext = os.path.splitext(labdct_file)
+        # get the phase data
+        with h5py.File(file_path, 'r') as f:
+            #TODO handle multiple phases
+            phase01 = f['PhaseInfo']['Phase01']
+            phase_name = phase01['Name'][0].decode('utf-8')
+            parameters = phase01['UnitCell'][()]  # length unit is angstrom
+            a, b, c = parameters[:3] / 10  # use nm unit
+            alpha, beta, gamma = parameters[3:]
+            print(parameters)
+            sym = Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
+            print('found %s symmetry' % sym)
+            lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
+            phase = CrystallinePhase(phase_id=1, name=phase_name, lattice=lattice)
+        # create the microstructure with the phase infos
+        micro = Microstructure(name=name, path=data_dir, overwrite_hdf5=True, phase=phase)
+
+        # load cell data
+        with h5py.File(file_path, 'r') as f:
+            spacing = f['LabDCT']['Spacing'][0]
+            rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()]
+            grain_map = f['LabDCT']['Data']['GrainId'][()]
+            print(grain_map.shape)
+            micro.set_grain_map(grain_map, voxel_size=spacing)
+            mask = f['LabDCT']['Data']['Mask'][()]
+            micro.set_mask(mask, voxel_size=spacing)
+            phase_map = f['LabDCT']['Data']['PhaseId'][()]
+            micro.set_phase_map(phase_map, voxel_size=spacing)
+            if include_IPF_map:
+                IPF001_map = f['LabDCT']['Data']['IPF001'][()]
+                micro.add_field(gridname='CellData', fieldname='IPF001_map',
+                                array=IPF001_map)
+                IPF010_map = f['LabDCT']['Data']['IPF010'][()]
+                micro.add_field(gridname='CellData', fieldname='IPF010_map',
+                                array=IPF010_map)
+                IPF100_map = f['LabDCT']['Data']['IPF100'][()]
+                micro.add_field(gridname='CellData', fieldname='IPF100_map',
+                                array=IPF100_map)
+            if include_rodrigues_map:
+                micro.add_field(gridname='CellData', fieldname='rodrigues_map',
+                                array=rodrigues_map)
+
+        # create grain data table infos
+        grain_ids = np.unique(grain_map)
+        print(grain_ids)
+        micro.build_grain_table_from_grain_map()
+        # now get each grain orientation from the rodrigues map
+        for g in micro.grains:
+            gid = g['idnumber']
+            print(gid, g['center'])
+            x, y, z = np.where(micro.get_grain_map() == gid)
+            orientation = rodrigues_map[x[0], y[0], z[0]]
+            # assign orientation to this grain
+            g['orientation'] = orientation
+            g.update()
+        micro.grains.flush()
+        return micro
+
+    @staticmethod
     def from_dct(data_dir='.', grain_file='index.mat',
                  vol_file='phase_01_vol.mat', mask_file='volume_mask.mat',
                  use_dct_path=True, verbose=True):

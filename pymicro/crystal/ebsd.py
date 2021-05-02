@@ -3,18 +3,12 @@ import h5py
 import numpy as np
 import os
 from pymicro.crystal.microstructure import Orientation
-from pymicro.crystal.lattice import Symmetry
+from pymicro.crystal.lattice import Symmetry, CrystallinePhase, Lattice
 
-class OimPhase:
+class OimPhase(CrystallinePhase):
     def __init__(self, id):
-        self.id = id
-        self.materialName = ''
-        self.formula = ''
-        self.info = ''
-        self.symmetry = 0
-        self.latticeConstants =[0] * 6 # a, b, c, alpha, beta, gamma (degrees)
+        CrystallinePhase.__init__(self, phase_id=id, name='unknown', lattice=None)
         self.hklFamilies = []
-        self.elasticConstants = []
         self.categories = []
 
 
@@ -107,16 +101,19 @@ class OimScan:
             # 'Lattice Constant b', 'Lattice Constant beta', 'Lattice Constant c', 'Lattice Constant gamma',
             # 'Laue Group', 'MaterialName', 'NumberFamilies', 'Point Group', 'Symmetry', 'hkl Families'
             phase = OimPhase(int(key))
-            phase.materialName = header['Phase'][key]['MaterialName'][0].decode('utf-8')
+            phase.name = header['Phase'][key]['MaterialName'][0].decode('utf-8')
             phase.formula = header['Phase'][key]['Formula'][0].decode('utf-8')
-            phase.info = header['Phase'][key]['Info'][0].decode('utf-8')
-            phase.symmetry = header['Phase'][key]['Symmetry'][0]
-            phase.latticeConstants[0] = header['Phase'][key]['Lattice Constant a'][0]
-            phase.latticeConstants[1] = header['Phase'][key]['Lattice Constant b'][0]
-            phase.latticeConstants[2] = header['Phase'][key]['Lattice Constant c'][0]
-            phase.latticeConstants[3] = header['Phase'][key]['Lattice Constant alpha'][0]
-            phase.latticeConstants[4] = header['Phase'][key]['Lattice Constant beta'][0]
-            phase.latticeConstants[5] = header['Phase'][key]['Lattice Constant gamma'][0]
+            phase.description = header['Phase'][key]['Info'][0].decode('utf-8')
+            # create a crystal lattice for this phase
+            sym = Symmetry.from_tsl(header['Phase'][key]['Symmetry'][0])
+            a = header['Phase'][key]['Lattice Constant a'][0]
+            b = header['Phase'][key]['Lattice Constant b'][0]
+            c = header['Phase'][key]['Lattice Constant c'][0]
+            alpha = header['Phase'][key]['Lattice Constant alpha'][0]
+            beta = header['Phase'][key]['Lattice Constant beta'][0]
+            gamma = header['Phase'][key]['Lattice Constant gamma'][0]
+            lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
+            phase.set_lattice(lattice)
             for row in header['Phase'][key]['hkl Families']:
                 family = OimHklFamily()
                 family.hkl = [row[0], row[1], row[2]]
@@ -124,7 +121,6 @@ class OimScan:
                 family.diffractionIntensity = row[3]
                 family.showBands = row[5]
                 phase.hklFamilies.append(family)
-            phase.elasticConstants = [[0, 0, 0, 0, 0, 0] * 6 for i in range(6)]
             phase.categories = [0, 0, 0, 0, 0]
             self.phase_list.append(phase)
 

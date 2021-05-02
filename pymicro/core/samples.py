@@ -588,7 +588,7 @@ class SampleData:
 
     def add_mesh(self, mesh_object=None, meshname='', indexname='',
                  location='/', description=' ', replace=False,
-                 bin_fields_from_sets=True, **keywords):
+                 bin_fields_from_sets=True, file=None, **keywords):
         """Create a Mesh group in the dataset from a MeshObject.
 
         A Mesh group is a HDF5 Group that contains arrays describing mesh
@@ -620,16 +620,10 @@ class SampleData:
             name/location if `True` and such group exists
         :param bool bin_fields_from_sets: If `True`, stores all Node and
             Element Sets in mesh_object as binary fields (1 on Set, 0 else)
-
-        .. warning::
-
-            - Handling of fields defined at integration points not implemented
-               yet
-
         """
         # Check if the input array is in an external file
-        if 'file' in keywords:
-            mesh_object = self._read_mesh_from_file(**keywords)
+        if file is not None:
+            mesh_object = self._read_mesh_from_file(file)
         ### Create or fetch mesh group
         mesh_group = self.add_group(meshname, location, indexname, replace)
         ### empty meshes creation
@@ -2462,7 +2456,7 @@ class SampleData:
             self.Filters = self.h5_dataset.filters
             self._init_data_model()
             self._verbose_print('**** FILE CONTENT ****')
-            # self._verbose_print(SampleData.__repr__(self))
+            self._verbose_print(SampleData.__repr__(self))
         except IOError:
             self._file_exist = False
             self._verbose_print('-- File "{}" not found : file'
@@ -2505,8 +2499,8 @@ class SampleData:
                             Description=content_type[key])
                     if self._is_empty(content_paths[key]):
                         self._verbose_print('Warning: node {} specified in the'
-                                            'minimal data model for this class'
-                                            'is empty'
+                                            ' minimal data model for this class'
+                                            ' is empty'
                                             ''.format(content_paths[key]))
                     continue
                 elif content_type[key] == 'Group':
@@ -3795,7 +3789,7 @@ class SampleData:
                 Filters.least_significant_digit = keywords[word]
         return Filters
 
-    def _read_mesh_from_file(self, file=None, **keywords):
+    def _read_mesh_from_file(self, file=''):
         """Read a data array from a file, depending on the extension."""
         mesh_object = None
         # Get file extension

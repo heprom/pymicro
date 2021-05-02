@@ -536,25 +536,72 @@ def output_tikzpicture(proj_dif, omegas, gid=1, d_uv=[0, 0], suffix=''):
     f.close()
 
 
-def tt_stack(scan_name, data_dir='.', save_edf=False, TOPO_N=-1, dark_factor=1.):
+def tt_rock(scan_name, data_dir='.', n_topo=-1, dark_factor=1.):
+    from pymicro.file.file_utils import edf_read
+
+    # parse the info file
+    f = open(os.path.join(data_dir, scan_name, '%s.info' % scan_name))
+    infos = dict()
+    for line in f.readlines():
+        tokens = line.split('=')
+        # convert the value into int/float/str depending on the case
+        try:
+            value = int(tokens[1].strip())
+        except ValueError:
+            try:
+                value = float(tokens[1].strip())
+            except ValueError:
+                value = tokens[1].strip()
+        infos[tokens[0]] = value
+    print(infos)
+
+    if n_topo < 0:
+        import glob
+        # figure out the number of frames per topograph n_topo
+        n_frames = len(glob.glob(os.path.join(data_dir, scan_name, '%s*.edf' % scan_name)))
+        n_topo = int(n_frames / infos['TOMO_N'])
+    print('number of frames to sum for a topograph = %d' % n_topo)
+
+    # load dark image
+    dark = dark_factor * edf_read(os.path.join(data_dir, scan_name, 'darkend0000.edf'))
+    print('dark average: ' % np.mean(dark))
+
+    # build the stack by combining individual images
+    tt_rock = np.empty((infos['TOMO_N'], n_topo), dtype=float)
+    for n in range(int(infos['TOMO_N'])):
+        print('computing rocking curve %d' % (n + 1))
+        offset = n_topo * n
+        for i in range(n_topo):
+            index = offset + i + 1
+            frame_path = os.path.join(data_dir, scan_name, '%s%04d.edf' % (scan_name, index))
+            im = edf_read(frame_path) - dark
+            tt_rock[n, i] = np.sum(im)
+            if n == 2:
+                print(frame_path, tt_rock[n, i])
+    print('done')
+
+    return tt_rock
+
+def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.):
     """Build a topotomography stack from raw detector images.
 
-    The number of image to sum for a topograph can be determined automatically from the total number of images present
-    in `data_dir` or directly specified using the variable `TOPO_N`.
+    The number of image to sum for a topograph can be determined automatically
+    from the total number of images present in `data_dir` or directly specified
+    using the variable `TOPO_N`.
 
     :param str scan_name: the name of the scan to process.
     :param str data_dir: the path to the data folder.
     :param bool save_edf: flag to save the tt stack as an EDF file.
-    :param int TOPO_N: the number of images to sum for a topograph.
+    :param int n_topo: the number of images to sum for a topograph.
     :param float dark_factor: a multiplicative factor for the dark image.
     """
     from pymicro.file.file_utils import edf_read, edf_write
-    if TOPO_N < 0:
+    if n_topo < 0:
         import glob
-        # figure out the number of frames per topograph TOPO_N
+        # figure out the number of frames per topograph n_topo
         n_frames = len(glob.glob(os.path.join(data_dir, scan_name, '%s*.edf' % scan_name)))
-        TOPO_N = int(n_frames / 90)
-    print('number of frames to sum for a topograph = %d' % TOPO_N)
+        n_topo = int(n_frames / 90)
+    print('number of frames to sum for a topograph = %d' % n_topo)
 
     # parse the info file
     f = open(os.path.join(data_dir, scan_name, '%s.info' % scan_name))
@@ -581,8 +628,8 @@ def tt_stack(scan_name, data_dir='.', save_edf=False, TOPO_N=-1, dark_factor=1.)
     for n in range(int(infos['TOMO_N'])):
         print('building topograph %d' % (n + 1))
         topograph = np.zeros((infos['Dim_1'], infos['Dim_2']))
-        offset = TOPO_N * n
-        for i in range(TOPO_N):
+        offset = n_topo * n
+        for i in range(n_topo):
             index = offset + i + 1
             frame_path = os.path.join(data_dir, scan_name, '%s%04d.edf' % (scan_name, index))
             im = edf_read(frame_path) - dark

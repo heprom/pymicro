@@ -1561,8 +1561,8 @@ class Microstructure(SampleData):
         return self._lattice
 
     def get_grain_map(self, as_numpy=True):
-        grain_map = self.get_field('grain_map')
-        if self._is_empty('grain_map'):
+        grain_map = self.get_field(self.active_grain_map)
+        if self._is_empty(self.active_grain_map):
             grain_map = None
         elif grain_map.ndim == 2:
             # reshape to 3D
@@ -1856,6 +1856,10 @@ class Microstructure(SampleData):
                                       spacing=spacing_array,
                                       replace=True, **keywords)
         else:
+            # Handle case of a 2D Microstrucutre: squeeze grain map to
+            # ensure (Nx,Ny,1) array will be stored as (Nx,Ny)
+            if self._get_group_type('CellData')  == '2DImage':
+                grain_map = grain_map.squeeze()
             self.add_field(gridname='CellData', fieldname=map_name,
                            array=grain_map, replace=True, **keywords)
         self.set_active_grain_map(map_name)
@@ -1941,6 +1945,38 @@ class Microstructure(SampleData):
         self.remove_grains_from_table(not_in_map)
         return
 
+    def remove_small_grains(self, min_volume=1.0, sync_table=False,
+                            new_grain_map_name=None):
+        """Remove from grain_map and grain data table small volume grains.
+
+        Removed grains in grain map will be replaced by background ID (0).
+        To be sure that the method acts consistently with the current grain
+        map, activate sync_table options.
+
+        :param float min_volume: Grains whose volume is under or equal to this
+            value willl be suppressed from grain_map and grain data table.
+        :param bool sync_table: If `True`, synchronize gran data table with
+            grain map before removing grains.
+        :param str new_grain_map_name: If provided, store the new grain map
+            with removed grain with this new name. If not, overright  the
+            current active grain map
+        """
+        if sync_table:
+            self.sync_grain_table_with_grain_map(sync_geometry=True)
+        condition = f"(volume <= {min_volume})"
+        id_list = self.grains.read_where(condition)['idnumber']
+        # Remove grains from grain map
+        grain_map = self.get_grain_map()
+        grain_map[np.where(np.isin(grain_map,id_list))] = 0
+        if new_grain_map_name is not None:
+            map_name = new_grain_map_name
+        else:
+            map_name = self.active_grain_map
+        self.set_grain_map(grain_map.squeeze(), map_name=map_name)
+        # Remove grains from table
+        self.remove_grains_from_table(id_list)
+        return
+
     def remove_grains_from_table(self, ids):
         """Remove from GrainDataTable the grains with given ids.
 
@@ -1980,10 +2016,16 @@ class Microstructure(SampleData):
     def add_grains_in_map(self):
         """Add to GrainDataTable the grains in grain map missing in table.
 
-        The grains are added with a (0,0,0) orientation by convention.
+        The grains are added with a random orientation by convention.
         """
         _, _, not_in_table = self.compute_grains_map_table_intersection()
-        euler_list = np.zeros((len(not_in_table), 3))
+        # remove ID <0 from list (reserved to background)
+        not_in_table = np.delete(not_in_table, np.where(not_in_table <= 0))
+        # generate random eule r angles
+        phi1 = np.random.rand(len(not_in_table),1) * 360.
+        Phi = 180. * np.arccos(2 * np.random.rand(len(not_in_table),1)- 1) / np.pi
+        phi2 = np.random.rand(len(not_in_table),1) * 360.
+        euler_list = np.concatenate((phi1,Phi,phi2), axis=1)
         self.add_grains(euler_list, grain_ids=not_in_table)
         return
 
@@ -2414,13 +2456,10 @@ class Microstructure(SampleData):
                 grains = np.isin(array, dilation_ids)
             else:
                 grains = (array > 0).astype(np.uint8)
-                print(grains.shape)
             grains_dil = ndimage.morphology.binary_dilation(grains,
                                                             structure=struct).astype(np.uint8)
             if mask is not None:
                 # only dilate within the mask
-                print(grains_dil.shape)
-                print(mask.shape)
                 grains_dil *= mask.astype(np.uint8)
             todo = (grains_dil - grains)
             # get the list of voxel for this dilation step
@@ -2495,7 +2534,7 @@ class Microstructure(SampleData):
         if not self._is_empty('mask'):
             grain_map = Microstructure.dilate_labels(grain_map,
                                                      dilation_steps=dilation_steps,
-                                                     mask=self.get_node('mask', as_numpy=True),
+                                                     mask=self.get_mask(as_numpy=True),
                                                      dilation_ids=dilation_ids)
         else:
             grain_map = Microstructure.dilate_labels(grain_map,
@@ -2603,19 +2642,19 @@ class Microstructure(SampleData):
         # crop CellData fields
         field_list = self.get_attribute('Field_index','CellData')
         for fieldname in field_list:
+            spacing_array = self.get_attribute('spacing','CellData')
             print('cropping field %s' % fieldname)
             field = self.get_field(fieldname)
             if not self._is_empty(fieldname):
-                if field.ndim == 2:
-                    # reshape to 3D
-                    field = field.reshape((field.shape[0],
-                                               field.shape[1], 1))
-                field_crop = field[x_start:x_end,y_start:y_end, z_start:z_end]
-                field_crop = field_crop.squeeze()
+                if self._get_group_type('CellData') == '2DImage':
+                    field_crop = field[x_start:x_end,y_start:y_end, ...]
+                else:
+                    field_crop = field[x_start:x_end,y_start:y_end,
+                                       z_start:z_end, ...]
+                print('field crop shape is:',field_crop.shape)
                 empty = micro_crop.get_attribute(attrname='empty',
                                            nodename='CellData')
                 if empty:
-                    spacing_array = self.get_attribute('spacing','CellData')
                     micro_crop.add_image_from_field(
                         field_array=field_crop, fieldname=fieldname,
                         imagename='CellData', location='/',
@@ -2643,16 +2682,24 @@ class Microstructure(SampleData):
         micro_crop.recompute_grain_volumes(verbose)
         return micro_crop
 
-    def sync_grain_table_with_grain_map(self):
-        """Update GrainDataTable with only grain IDs from active grain map."""
+    def sync_grain_table_with_grain_map(self, sync_geometry=False):
+        """Update GrainDataTable with only grain IDs from active grain map.
+
+        :param bool sync_geometry: If `True`, recomputes the geometrical
+            parameters of the grains in the GrainDataTable from active grain
+            map.
+        """
         # Remove grains that are not in grain map from GrainDataTable
         self.remove_grains_not_in_map()
         # Add grains that are in grain map but not in GrainDataTable
         self.add_grains_in_map()
+        if sync_geometry:
+            self.recompute_grain_bounding_boxes()
+            self.recompute_grain_centers()
+            self.recompute_grain_volumes()
         return
 
-    def renumber_grains(self, sort_by_size=False, overwrite_active_map=True,
-                        new_map_name=None):
+    def renumber_grains(self, sort_by_size=False, new_map_name=None):
         """Renumber the grains in the microstructure.
 
         Renumber the grains from 1 to n, with n the total number of grains
@@ -2692,13 +2739,10 @@ class Microstructure(SampleData):
             g.update()
         print('maxium grain id is now %d' % max(new_ids))
         # assign the renumbered grain_map to the microstructure
-        if overwrite_active_map:
+        if new_map_name is None:
             map_name = self.active_grain_map
         else:
-            if new_map_name is not None:
-                map_name = new_map_name
-            else:
-                map_name = 'renumbered_grain_map'
+            map_name = new_map_name
         self.set_grain_map(grain_map_renum, self.get_voxel_size(),
                            map_name=map_name)
 
@@ -3963,3 +4007,31 @@ class Microstructure(SampleData):
             merged_micro.set_mask(mask_merged, voxel_size)
         merged_micro.sync()
         return merged_micro
+
+    def pause_for_visualization(self, Vitables=False, Paraview=False,
+                                **keywords):
+        """Flushes data, close files and pause interpreter for visualization.
+
+        This method pauses the interpreter until you press the <Enter> key.
+        During the pause, the HDF5 file object is closed, so that it can be
+        read by visualization softwares like Paraview or ViTables. Two
+        optional arguments allow to directly open the dataset with Paraview
+        and/or Vitables, as a subprocess of Python. In these cases, the Python
+        interpreter is paused until you close the visualization software.
+
+        Paraview allows to visualize the volumic data that is stored in the
+        SampleData dataset, *i.e.* Mesh and Images groups (geometry and
+        stored fields). Vitables allows to visualize the content of the HDF5
+        dataset in term of data tree, arrays content and nodes attributes. If
+        both are requested, Vitables is executed before Paraview.
+
+
+        :param bool Vitables: set to `True` to launch Vitables on the HDF5 file
+            of the instance HDF5 dataset.
+        :param bool Paraview: set to `True` to launch Paraview on the XDMF file
+            of the instance.
+        """
+        super(Microstructure, self).pause_for_visualization(Vitables, Paraview,
+                                                            **keywords)
+        self.grains = self.get_node('GrainDataTable')
+        return

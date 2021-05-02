@@ -509,7 +509,8 @@ class SDImageMesher():
 
     def multi_phase_mesher(self, multiphase_image_name='', meshname='',
                            indexname='', location='', load_surface_mesh=False,
-                           bin_fields_from_sets=True, replace=False,
+                           elset_id_field=True,
+                           bin_fields_from_sets=False, replace=False,
                            mesher_opts=dict()):
         """Create a conformal mesh from a multiphase image.
 
@@ -580,11 +581,12 @@ class SDImageMesher():
         if ImType == '2DImage':
             self.multi_phase_mesher2D(multiphase_image_name, meshname,
                                       indexname, location,
-                                      bin_fields_from_sets, replace,
-                                      mesher_opts)
+                                      bin_fields_from_sets, elset_id_field,
+                                      replace, mesher_opts)
         elif ImType == '3DImage':
             self.multi_phase_mesher3D(multiphase_image_name, meshname,
                                       indexname, location, load_surface_mesh,
+                                      elset_id_field,
                                       bin_fields_from_sets, replace,
                                       mesher_opts)
         else:
@@ -594,7 +596,8 @@ class SDImageMesher():
 
     def multi_phase_mesher3D(self, multiphase_image_name='', meshname='',
                             indexname='', location='', load_surface_mesh=False,
-                            bin_fields_from_sets=True, replace=False,
+                            elset_id_field=True,
+                            bin_fields_from_sets=False, replace=False,
                             mesher_opts=dict()):
         """Create a conformal mesh from a multiphase 3D image.
 
@@ -697,7 +700,7 @@ class SDImageMesher():
             self.data.add_mesh(file=out_file, meshname=meshname+'_surface',
                                location=location, replace=replace,
                                bin_fields_from_sets=bin_fields_from_sets)
-        if bin_fields_from_sets:
+        if elset_id_field:
             self.data.create_elset_ids_field(meshname=meshname)
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
@@ -705,8 +708,9 @@ class SDImageMesher():
 
     def multi_phase_mesher2D(self, multiphase_image_name='', meshname='',
                             indexname='', location='',
-                            bin_fields_from_sets=True, replace=False,
-                            mesher_opts=dict()):
+                            bin_fields_from_sets=False,
+                            elset_id_field=True, replace=False,
+                            mesher_opts=dict(), print_output=False):
         """Create a conformal mesh from a 2D multiphase image.
 
         A Matlab multiphase mesher is called to create a conformal mesh of a
@@ -790,14 +794,14 @@ class SDImageMesher():
         CWD = os.getcwd()
         self.data.sync() # flushes H5 dataset
         mesher.runScript(workdir=OUT_DIR, append_filename=False,
-                         print_output=True)
+                         print_output=print_output)
         os.chdir(CWD)
         # Add mesh to SD instance
         out_file = os.path.join(OUT_DIR,'Tmp_mesh_fuse_remesh.geof')
         self.data.add_mesh(file=out_file, meshname=meshname, replace=replace,
                             indexname=indexname, location=location,
                             bin_fields_from_sets=bin_fields_from_sets)
-        if bin_fields_from_sets:
+        if elset_id_field:
             self.data.create_elset_ids_field(meshname=meshname)
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
@@ -805,7 +809,8 @@ class SDImageMesher():
 
     def morphological_image_cleaner(self, target_image_field='',
                                     clean_fieldname='', indexname='',
-                                    replace=False, **keywords):
+                                    replace=False, print_output=False,
+                                    **keywords):
         """Apply a morphological cleaning treatment to a multiphase image.
 
         A Matlab morphological cleaner is called to smooth the morphology of
@@ -859,7 +864,7 @@ class SDImageMesher():
         # launch cleaner
         CWD = os.getcwd()
         self.data.sync() # flushes H5 dataset
-        cleaner.runScript(append_filename=False, print_output=True)
+        cleaner.runScript(append_filename=False, print_output=print_output)
         os.chdir(CWD)
         # Add image to SD instance
         from scipy.io import loadmat

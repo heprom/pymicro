@@ -511,7 +511,7 @@ class SDImageMesher():
                            indexname='', location='', load_surface_mesh=False,
                            elset_id_field=True,
                            bin_fields_from_sets=False, replace=False,
-                           mesher_opts=dict()):
+                           mesher_opts=dict(), print_output=False):
         """Create a conformal mesh from a multiphase image.
 
         A Matlab multiphase mesher is called to create a conformal mesh of a
@@ -582,13 +582,13 @@ class SDImageMesher():
             self.multi_phase_mesher2D(multiphase_image_name, meshname,
                                       indexname, location,
                                       bin_fields_from_sets, elset_id_field,
-                                      replace, mesher_opts)
+                                      replace, mesher_opts, print_output)
         elif ImType == '3DImage':
             self.multi_phase_mesher3D(multiphase_image_name, meshname,
                                       indexname, location, load_surface_mesh,
                                       elset_id_field,
                                       bin_fields_from_sets, replace,
-                                      mesher_opts)
+                                      mesher_opts, print_output)
         else:
             raise ValueError('Could not find an appropriate parent Image Group'
                              f' for node {multiphase_image_name}')
@@ -598,7 +598,7 @@ class SDImageMesher():
                             indexname='', location='', load_surface_mesh=False,
                             elset_id_field=True,
                             bin_fields_from_sets=False, replace=False,
-                            mesher_opts=dict()):
+                            mesher_opts=dict(), print_output=False):
         """Create a conformal mesh from a multiphase 3D image.
 
         A Matlab multiphase mesher is called to create a conformal mesh of a
@@ -687,7 +687,7 @@ class SDImageMesher():
         CWD = os.getcwd()
         self.data.sync() # flushes H5 dataset
         mesher.runScript(workdir=OUT_DIR, append_filename=False,
-                         print_output=True)
+                         print_output=print_output)
         os.chdir(CWD)
         # Add mesh to SD instance
         out_file = os.path.join(OUT_DIR,'Tmp_mesh_vor_tetra_p.geof')
@@ -704,6 +704,25 @@ class SDImageMesher():
             self.data.create_elset_ids_field(meshname=meshname)
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
+        # Resize mesh to Image domain
+        image_group = self.data.get_attribute('parent_grid_path',
+                                              multiphase_image_name)
+        Im_range = (self.data.get_attribute('dimension',image_group)
+                    * self.data.get_attribute('spacing',image_group) )
+        Im_origin = self.data.get_attribute('origin',image_group)
+        # get mesh nodes and rescale mesh
+        nodes = self.data.get_mesh_nodes(meshname)
+        X_range = nodes[:,0].max() - nodes[:,0].min()
+        Y_range = nodes[:,1].max() - nodes[:,1].min()
+        Z_range = nodes[:,2].max() - nodes[:,2].min()
+        nodes[:,0] = (nodes[:,0]/X_range)*Im_range[0] + Im_origin[0]
+        nodes[:,1] = (nodes[:,1]/Y_range)*Im_range[1] + Im_origin[1]
+        nodes[:,2] = (nodes[:,2]/Z_range)*Im_range[2] + Im_origin[2]
+        if load_surface_mesh:
+            nodes = self.data.get_mesh_nodes(meshname+'_surface')
+            nodes[:,0] = (nodes[:,0]/X_range)*Im_range[0] + Im_origin[0]
+            nodes[:,1] = (nodes[:,1]/Y_range)*Im_range[1] + Im_origin[1]
+            nodes[:,2] = (nodes[:,2]/Z_range)*Im_range[2] + Im_origin[2]
         return
 
     def multi_phase_mesher2D(self, multiphase_image_name='', meshname='',

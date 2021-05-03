@@ -60,13 +60,20 @@ class CrystallinePhase:
         self.formula = ''
         if lattice is None:
             lattice = Lattice.cubic(1.0)
-        self._lattice = lattice
+        self.set_lattice(lattice)
         # a list of C_IJ values
         self.elastic_constants = []
 
     def get_lattice(self):
         """Returns the crystal lattice."""
         return self._lattice
+
+    def set_lattice(self, lattice):
+        """Set the crystal lattice.
+
+        :param Lattice lattice: the crystal lattice.
+        """
+        self._lattice = lattice
 
     def get_symmetry(self):
         """Returns the type of `Symmetry` of the Lattice."""

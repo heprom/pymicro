@@ -2,7 +2,7 @@ import unittest
 import os
 import numpy as np
 from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
-from pymicro.crystal.lattice import Symmetry, Lattice, HklPlane, HklDirection, SlipSystem
+from pymicro.crystal.lattice import Symmetry, Lattice, CrystallinePhase, HklPlane, HklDirection, SlipSystem
 from pymicro.xray.xray_utils import lambda_keV_to_nm
 from config import PYMICRO_EXAMPLES_DATA_DIR
 
@@ -11,6 +11,14 @@ class MicrostructureTests(unittest.TestCase):
     def setUp(self):
         print('testing the Microstructure class')
         self.test_eulers = [(45., 45, 0.), (10., 20, 30.), (191.9, 69.9, 138.9)]
+
+    def test_add_phases(self):
+        micro = Microstructure(name='test', autodelete=True)
+        self.assertEqual(micro.get_number_of_phases(), 1)
+        micro.add_phase(CrystallinePhase(phase_id=2))
+        self.assertEqual(micro.get_number_of_phases(), 2)
+        self.assertEqual(micro.get_phase_ids_list(), [1, 2])
+        del micro
 
     def test_add_grains(self):
         micro = Microstructure(name='test', autodelete=True)

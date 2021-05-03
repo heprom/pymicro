@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from math import pi, cos, sin, acos, atan
-from pymicro.crystal.lattice import Lattice, Symmetry, HklObject, HklDirection, HklPlane, SlipSystem
+from pymicro.crystal.lattice import Lattice, CrystallinePhase, Symmetry, HklObject, HklDirection, HklPlane, SlipSystem
 
 
 class LatticeTests(unittest.TestCase):
@@ -47,6 +47,16 @@ class LatticeTests(unittest.TestCase):
         self.assertAlmostEqual(cstar[0], 0.420, 3)
         self.assertAlmostEqual(cstar[1], 0., 3)
         self.assertAlmostEqual(cstar[2], 1.464, 3)
+
+
+class CrystallinePhaseTests(unittest.TestCase):
+    def setUp(self):
+        print('testing the CrystallinePhase class')
+
+    def test_init(self):
+        phase = CrystallinePhase(name='test')
+        self.assertEqual(phase.phase_id, 1)
+        self.assertEqual(phase.name, 'test')
 
 
 class HklDirectionTests(unittest.TestCase):

@@ -55,15 +55,53 @@ class CrystallinePhase:
         The `phase_id` attribute is used to identify the phase in data sets
         where it can be referred to in phase_map for instance."""
         self.phase_id = phase_id
-        self.name = ''
+        self.name = name
         self.description = ''
         self.formula = ''
-        # symmetry should be an instance of Symmetry
-        self.symmetry = None
-        # lattice constants: a, b, c, alpha, beta, gamma (degrees)
-        self.lattice_parameters = [0, 0, 0, 0, 0, 0]
+        if lattice is None:
+            lattice = Lattice.cubic(1.0)
+        self.set_lattice(lattice)
         # a list of C_IJ values
         self.elastic_constants = []
+
+    def get_lattice(self):
+        """Returns the crystal lattice."""
+        return self._lattice
+
+    def set_lattice(self, lattice):
+        """Set the crystal lattice.
+
+        :param Lattice lattice: the crystal lattice.
+        """
+        self._lattice = lattice
+
+    def get_symmetry(self):
+        """Returns the type of `Symmetry` of the Lattice."""
+        return self.get_lattice().get_symmetry()
+
+    def to_dict(self):
+        d = {'phase_id': self.phase_id,
+             'name': self.name,
+             'description': self.description,
+             'formula': self.formula,
+             'symmetry': self.get_symmetry().to_string(),
+             'lattice_parameters': self.get_lattice().get_lattice_parameters(),
+             'lattice_parameters_unit': 'nm',
+             'elastic_constants': self.elastic_constants,
+             'elastic_constants_unit': 'MPa'
+             }
+        print(d)
+        return d
+
+    @staticmethod
+    def from_dict(d):
+        sym = Symmetry.from_string(d['symmetry'])
+        lattice = Lattice.from_symmetry(sym, d['lattice_parameters'])
+        phase = CrystallinePhase(d['phase_id'], d['name'], lattice)
+        phase.description = d['description']
+        phase.formula = d['formula']
+        phase.elastic_constants = d['elastic_constants']
+        return phase
 
 
 class Symmetry(enum.Enum):
@@ -112,6 +150,30 @@ class Symmetry(enum.Enum):
             return 'monoclinic'
         elif self is Symmetry.triclinic:
             return 'triclinic'
+        else:
+            return None
+
+    @staticmethod
+    def from_tsl(tsl_number):
+        """Create an instance of the `Symmetry` class from a TSL symmetry
+        number.
+
+        :return: an instance of the `Symmetry` class
+        """
+        if tsl_number == 43:
+            return Symmetry.cubic
+        elif tsl_number == 62:
+            return Symmetry.hexagonal
+        elif tsl_number == 22:
+            return Symmetry.orthorhombic
+        elif tsl_number == 42:
+            return Symmetry.tetragonal
+        elif tsl_number == 32:
+            return Symmetry.trigonal
+        elif tsl_number == 2:
+            return Symmetry.monoclinic
+        elif tsl_number == 1:
+            return Symmetry.triclinic
         else:
             return None
 
@@ -1103,9 +1165,9 @@ class HklDirection(HklObject):
     @staticmethod
     def four_to_three_indices(U, V, T, W):
         """Convert from Miller-Bravais indices to Miller indices. this is used for hexagonal crystal lattice."""
-        import fractions
+        import math
         u, v, w = U - T, V - T, W
-        gcd = functools.reduce(fractions.gcd, (u, v, w))
+        gcd = functools.reduce(math.gcd, (u, v, w))
         return u / gcd, v / gcd, w / gcd
 
     @staticmethod

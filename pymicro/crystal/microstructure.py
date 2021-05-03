@@ -18,7 +18,7 @@ import h5py
 import math
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
-from pymicro.crystal.lattice import Lattice, Symmetry
+from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
@@ -1449,7 +1449,7 @@ class Microstructure(SampleData):
 
     def __init__(self,
                  filename=None, name='micro', description='empty',
-                 verbose=False, overwrite_hdf5=False, lattice=None,
+                 verbose=False, overwrite_hdf5=False, phase=None,
                  autodelete=False, **keywords):
         if filename is None:
             # only add '_' if not present at the end of name
@@ -1465,7 +1465,9 @@ class Microstructure(SampleData):
         # TODO find a way not to overwrite the sample name when an existing file is read
         #self.set_sample_name(name)
         self.grains = self.get_node('GrainDataTable')
-        self._init_lattice(lattice)
+        self._init_phase(phase)
+        self.active_phase_id = 1
+        self.vtkmesh = None
         self.sync()
         return
 
@@ -1473,6 +1475,7 @@ class Microstructure(SampleData):
         """Provide a string representation of the class."""
         s = '%s\n' % self.__class__.__name__
         s += '* name: %s\n' % self.get_sample_name()
+        # TODO print phases here
         s += '* lattice: %s\n' % self.get_lattice()
         s += '\n'
         # if self._verbose:
@@ -1492,56 +1495,96 @@ class Microstructure(SampleData):
         """
         minimal_content_index_dic = {'Image_data': '/CellData',
                                      'grain_map': '/CellData/grain_map',
+                                     'phase_map': '/CellData/phase_map',
                                      'mask': '/CellData/mask',
                                      'Mesh_data': '/MeshData',
                                      'Grain_data': '/GrainData',
                                      'GrainDataTable': ('/GrainData/'
                                                         'GrainDataTable'),
-                                     'Crystal_data': '/CrystalStructure',
-                                     'lattice_params': ('/CrystalStructure'
-                                                        '/LatticeParameters'), }
+                                     'Phase_data': '/PhaseData'}
         minimal_content_type_dic = {'Image_data': '3DImage',
                                     'grain_map': 'Array',
+                                    'phase_map': 'Array',
                                     'mask': 'Array',
                                     'Mesh_data': 'Mesh',
                                     'Grain_data': 'Group',
                                     'GrainDataTable': GrainData,
-                                    'Crystal_data': 'Group',
-                                    'lattice_params': 'Array', }
+                                    'Phase_data': 'Group'}
         return minimal_content_index_dic, minimal_content_type_dic
 
-    def _init_lattice(self, lattice):
-        if lattice is None:
-            lattice = Lattice.cubic(1.0)
-        if not (self._file_exist):
-            self._lattice = lattice
-            sym = {'symmetry': self._lattice.get_symmetry().to_string()}
-            params = np.array(self.get_lattice().get_lattice_parameters(),
-                              dtype=np.float32)
-            self.add_attributes(sym, 'Crystal_data')
-            self.add_data_array('Crystal_data', name='LatticeParameters',
-                                array=params, indexname='lattice_params',
-                                replace=True)
+    def _init_phase(self, phase):
+        self._phases = []
+        if phase is None:
+            # create a default crystalline phase
+            phase = CrystallinePhase()
+        # if the h5 file does not exist yet, store the phase as metadata
+        if not self._file_exist:  #FIXME is this useful?
+            self.add_phase(phase)
         else:
-            sym = Symmetry.from_string(self.get_attribute('symmetry',
-                                                          'Crystal_data'))
-            params = self.get_node('LatticeParameters', as_numpy=True)
-            lattice = Lattice.from_symmetry(sym, params)
-            self._lattice = lattice
+            self.sync_phases()
+            # if no phase is there, create one
+            if len(self.get_phase_ids_list()) == 0:
+                print('no phase was found in this dataset, adding a defualt one')
+                self.add_phase(phase)
         return
+
+    def sync_phases(self):
+        """This method sync the _phases attribute with the content of the hdf5
+        file.
+        """
+        self._phases = []
+        # loop on the phases present in the group /PhaseData
+        phase_group = self.get_node('/PhaseData')
+        for child in phase_group._v_children:
+            d = self.get_dic_from_attributes('/PhaseData/%s' % child)
+            print(d)
+            phase = CrystallinePhase.from_dict(d)
+            self._phases.append(phase)
+        print('%d phases found in the data set' % len(self._phases))
+
+    def set_phase(self, phase):
+        """Set a phase for the given `phase_id`.
+
+        If the phase id does not correspond to one of the existing phase,
+        nothing is done.
+
+        :param CrystallinePhase phase: the phase to use.
+        :param int phase_id:
+        """
+        if phase.phase_id > self.get_number_of_phases():
+            print('the phase_id given (%d) does not correspond to any existing '
+                  'phase, the phase list has not been modified.')
+            return
+        d = phase.to_dict()
+        print('setting phase %d with %s' % (phase.phase_id, phase.name))
+        self.add_attributes(d, '/PhaseData/phase_%02d' % phase.phase_id)
+        self.sync_phases()
+
+    def set_phases(self, phase_list):
+        """Set a list of phases for this microstructure.
+
+        The different phases in the list are added in that order.
+
+        :param list phase_list: the list of phases to use.
+        """
+        # delete all node in the phase_group
+        self.remove_node('/PhaseData', recursive=True)
+        self.add_group('PhaseData', location='/', indexname='Phase_data')
+        self.sync_phases()
+        # add each phase
+        for phase in phase_list:
+            self.add_phase(phase)
 
     def get_number_of_phases(self):
         """Return the number of phases in this microstructure.
 
-        For the moment the number of phases is the different phase ids
-        in the phase_map array.
+        Each crystal phase is stored in a list attribute: `_phases`. Note that
+        it may be different (although it should not) from the different
+        phase ids in the phase_map array.
 
         :return int: the number of phases in the microstructure.
         """
-        if not self.get_phase_map():
-            return 1
-        else:
-            return np.unique(self.get_phase_map(as_numpy=True))
+        return len(self._phases)
 
     def get_number_of_grains(self, from_grain_map=False):
         """Return the number of grains in this microstructure.
@@ -1553,12 +1596,51 @@ class Microstructure(SampleData):
         else:
             return self.grains.nrows
 
-    def get_lattice(self):
+    def add_phase(self, phase):
+        """Add a new phase to this microstructure.
+
+        Before adding this phase, the phase id is set to the corresponding id.
+
+        :param CrystallinePhase phase: the phase to add.
+        """
+        # this phase should have id self.get_number_of_phases() + 1
+        new_phase_id = self.get_number_of_phases() + 1
+        if not phase.phase_id == new_phase_id:
+            print('warning, adding phase with phase_id = %d (was %d)' %
+                  (new_phase_id, phase.phase_id))
+        phase.phase_id = new_phase_id
+        self._phases.append(phase)
+        self.add_group('phase_%02d' % new_phase_id, location='/PhaseData',
+                       indexname='phase_%02d' % new_phase_id, replace=True)
+        d = phase.to_dict()
+        self.add_attributes(d, '/PhaseData/phase_%02d' % new_phase_id)
+        print('new phase added: %s' % phase.name)
+
+    def get_phase_ids_list(self):
+        """Return the list of the phase ids."""
+        return [phase.phase_id for phase in self._phases]
+
+    def get_phase(self, phase_id=None):
+        """Get a crystalline phase.
+
+        If no phase_id is given, the active phase is returned.
+
+        :param int phase_id: the id of the phase to return.
+        :return: the `CrystallinePhase` corresponding to the id.
+        """
+        if phase_id is None:
+            phase_id = self.active_phase_id
+        index = self.get_phase_ids_list().index(phase_id)
+        return self._phases[index]
+
+    def get_lattice(self, phase_id=None):
         """Get the crystallographic lattice associated with this microstructure.
+
+        If no phase_id is given, the `Lattice` of the active phase is returned.
 
         :return: an instance of the `Lattice class`.
         """
-        return self._lattice
+        return self.get_phase(phase_id).get_lattice()
 
     def get_grain_map(self, as_numpy=True):
         grain_map = self.get_field(self.active_grain_map)
@@ -1808,12 +1890,18 @@ class Microstructure(SampleData):
         self.set_tablecol('GrainDataTable', 'volume', column=volumes)
         return
 
-    def set_lattice(self, lattice):
+    def set_lattice(self, lattice, phase_id=None):
         """Set the crystallographic lattice associated with this microstructure.
 
+        If no `phase_id` is specified, the lattice will be set for the active
+        phase.
+
         :param Lattice lattice: an instance of the `Lattice class`.
+        :param int phase_id: the id of the phase to set the lattice.
         """
-        self._lattice = lattice
+        if phase_id is None:
+            phase_id = self.active_phase_id
+        self.get_phase(phase_id)._lattice = lattice
 
     def set_active_grain_map(self, map_name='grain_map'):
         """Set the active grain map name to inputed string.
@@ -2378,6 +2466,34 @@ class Microstructure(SampleData):
             print('%d/%d grains were matched ' % (len(matched),
                                                   len(grains_to_match)))
         return matched, candidates, unmatched
+
+    def match_orientation(self, orientation, use_grain_ids=None):
+        """Find the best match between an orientation and the grains from this
+        microstructure.
+
+        :param orientation: an instance of `Orientation` to match the grains.
+        :param list use_grain_ids: a list of ids to restrict the grains
+            in which to search for matches.
+        :return tuple: the grain id of the best match and the misorientation.
+        """
+        sym = self.get_lattice().get_symmetry()
+        if use_grain_ids is None:
+            grains_to_match = self.get_tablecol(tablename='GrainDataTable',
+                                                colname='idnumber')
+        else:
+            grains_to_match = use_grain_ids
+        best_mis = 180.
+        for g in self.grains:
+            if not (g['idnumber'] in grains_to_match):
+                continue
+            o = Orientation.from_rodrigues(g['orientation'])
+            # compute disorientation
+            mis, _, _ = o.disorientation(orientation, crystal_structure=sym)
+            mis_deg = np.degrees(mis)
+            if mis_deg < best_mis:
+                best_mis = mis_deg
+                best_match = g['idnumber']
+        return best_match, best_mis
 
     def find_neighbors(self, grain_id, distance=1):
         """Find the neighbor ids of a given grain.
@@ -3025,6 +3141,8 @@ class Microstructure(SampleData):
             return
         grain_map = self.get_grain_map(as_numpy=True)
         map_ids = np.unique(grain_map)
+        # only positive integer values are considered as valid grain ids, remove everything else:
+        map_ids = np.delete(map_ids, range(0, np.where(map_ids > 0)[0][0]))
         table_ids = self.get_grain_ids()
         intersection = np.intersect1d(map_ids, table_ids)
         not_in_map = table_ids[np.isin(table_ids, map_ids, invert=True,
@@ -3051,6 +3169,33 @@ class Microstructure(SampleData):
         self.recompute_grain_volumes()
         return
 
+    @staticmethod
+    def voronoi(self, shape=(256, 256), n_grain=50):
+        """Simple voronoi tesselation to create a grain map.
+
+        The method works both in 2 and 3 dimensions. The grains are labeled
+        from 1 to `n_grains` (included).
+
+        :param tuple shape: grain map shape in 2 or 3 dimensions.
+        :param int n_grains: number of grains to generate.
+        :return: a numpy array  grain_map
+        """
+        if len(shape) not in [2, 3]:
+            raise ValueError('specified shape must be either 2D or 3D')
+        grain_map = np.zeros(shape)
+        nx, ny = shape[0], shape[1]
+        x = np.linspace(-0.5, 0.5, nx, endpoint=True)
+        y = np.linspace(-0.5, 0.5, ny, endpoint=True)
+        if len(shape) == 3:
+            nz = shape[2]
+            z = np.linspace(-0.5, 0.5, nz, endpoint=True)
+        XX, YY = np.meshgrid(x, y)
+        seeds = Dx * np.random.rand(n_grains, 2)
+        distance = np.zeros(shape=(nx, ny, n_grains))
+
+        XX, YY, ZZ = np.meshgrid(x, y, z)
+        # TODO finish this...
+        return grain_map
 
     def to_amitex_fftp(self, binary=True, mat_file=True, add_grips=False,
                        grip_size=10, grip_constants=(104100., 49440.),
@@ -3140,32 +3285,36 @@ class Microstructure(SampleData):
             root.append(etree.Element('Reference_Material',
                                       Lambda0='90000.0',
                                       Mu0='31000.0'))
-            # add each phase as a material
-            for i in range(n_phases):
-                mat = etree.Element('Material', numM=str(i + 1),
+            # add each phase as a material for Amitex
+            phase_ids = self.get_phase_ids_list()
+            phase_ids.sort()
+            # here phase_ids needs to be equal to [1, ..., n_phases]
+            if not phase_ids == list(range(1, n_phases + 1)):
+                raise ValueError('inconsistent phase numbering (should be from '
+                                 '1 to n_phases): {}'.format(phase_ids))
+            for phase_id in phase_ids:
+                mat = etree.Element('Material', numM=str(phase_id),
                                     Lib='libUmatAmitex.so',
                                     Law='elasaniso')
                 # get the C_IJ values
-                '''TODO
                 phase = self.get_phase(phase_id)
-                C = symmetry.stiffness_matrix(phase.elastic_constants)
-                '''
-                C11, C12, C13, C22, C23, C33, C44, C55, C66 = 162000., 92000., 69000., 162000., 69000., 180000., \
-                                                              46700., 46700., 35000.
+                C = phase.get_symmetry().stiffness_matrix(phase.elastic_constants)
+                #C11, C12, C13, C22, C23, C33, C44, C55, C66 = 162000., 92000., 69000., 162000., 69000., 180000., \
+                #                                              46700., 46700., 35000.
                 '''
                 Note that Amitex uses a different reduced number:
                 (1, 2, 3, 4, 5, 6) = (11, 22, 33, 12, 13, 23)
-                Because of this indices 4 and 6 are inversed with respect to the Voigt convention.
+                Because of this indices 4 and 6 are inverted with respect to the Voigt convention.
                 '''
-                mat.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(C11)))
-                mat.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(C12)))
-                mat.append(etree.Element(_tag='Coeff', Index='3', Type='Constant', Value=str(C13)))
-                mat.append(etree.Element(_tag='Coeff', Index='4', Type='Constant', Value=str(C22)))
-                mat.append(etree.Element(_tag='Coeff', Index='5', Type='Constant', Value=str(C23)))
-                mat.append(etree.Element(_tag='Coeff', Index='6', Type='Constant', Value=str(C33)))
-                mat.append(etree.Element(_tag='Coeff', Index='7', Type='Constant', Value=str(C66)))
-                mat.append(etree.Element(_tag='Coeff', Index='8', Type='Constant', Value=str(C55)))
-                mat.append(etree.Element(_tag='Coeff', Index='9', Type='Constant', Value=str(C44)))
+                mat.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(C[0, 0])))  # C11
+                mat.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(C[0, 1])))  # C12
+                mat.append(etree.Element(_tag='Coeff', Index='3', Type='Constant', Value=str(C[0, 2])))  # C13
+                mat.append(etree.Element(_tag='Coeff', Index='4', Type='Constant', Value=str(C[1, 1])))  # C22
+                mat.append(etree.Element(_tag='Coeff', Index='5', Type='Constant', Value=str(C[1, 2])))  # C23
+                mat.append(etree.Element(_tag='Coeff', Index='6', Type='Constant', Value=str(C[2, 2])))  # C33
+                mat.append(etree.Element(_tag='Coeff', Index='7', Type='Constant', Value=str(C[5, 5])))  # C66
+                mat.append(etree.Element(_tag='Coeff', Index='8', Type='Constant', Value=str(C[4, 4])))  # C55
+                mat.append(etree.Element(_tag='Coeff', Index='9', Type='Constant', Value=str(C[3, 3])))  # C44
                 root.append(mat)
             # add a material for top and bottom layers
             if add_grips:
@@ -3484,9 +3633,84 @@ class Microstructure(SampleData):
                 for grain_id, phase_id in zip(grain_ids, phase_ids):
                     # ignore phase id == 1 as this corresponds to phase_map == 0
                     if phase_id > 1:
-                        phase_map[grain_map == grain_id] = phase_id
+                        phase_map[grain_map == grain_id] = phase_id - 1
                 micro.set_phase_map(phase_map)
         print('done')
+        return micro
+
+    @staticmethod
+    def from_labdct(labdct_file, data_dir='.', include_IPF_map=False,
+                    include_rodrigues_map=False):
+        """Create a microstructure from a DCT reconstruction.
+
+        :param str labdct_file: the name of the file containing the labDCT data.
+        :param str data_dir: the path to the folder containing the HDF5
+            reconstruction file.
+        :param bool include_IPF_map: if True, the IPF maps will be included
+            in the microstructure fields.
+        :param bool include_rodrigues_map: if True, the rodrigues map will be
+            included in the microstructure fields.
+        :return: a `Microstructure` instance created from the labDCT
+        reconstruction file.
+        """
+        file_path = os.path.join(data_dir, labdct_file)
+        print('creating microstructure for labDCT scan %s' % file_path)
+        name, ext = os.path.splitext(labdct_file)
+        # get the phase data
+        with h5py.File(file_path, 'r') as f:
+            #TODO handle multiple phases
+            phase01 = f['PhaseInfo']['Phase01']
+            phase_name = phase01['Name'][0].decode('utf-8')
+            parameters = phase01['UnitCell'][()]  # length unit is angstrom
+            a, b, c = parameters[:3] / 10  # use nm unit
+            alpha, beta, gamma = parameters[3:]
+            print(parameters)
+            sym = Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
+            print('found %s symmetry' % sym)
+            lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
+            phase = CrystallinePhase(phase_id=1, name=phase_name, lattice=lattice)
+        # create the microstructure with the phase infos
+        micro = Microstructure(name=name, path=data_dir, overwrite_hdf5=True, phase=phase)
+
+        # load cell data
+        with h5py.File(file_path, 'r') as f:
+            spacing = f['LabDCT']['Spacing'][0]
+            rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()].transpose(2, 1, 0, 3)
+            grain_map = f['LabDCT']['Data']['GrainId'][()].transpose(2, 1, 0)
+            print(grain_map.shape)
+            micro.set_grain_map(grain_map, voxel_size=spacing)
+            mask = f['LabDCT']['Data']['Mask'][()].transpose(2, 1, 0)
+            micro.set_mask(mask, voxel_size=spacing)
+            phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
+            micro.set_phase_map(phase_map, voxel_size=spacing)
+            if include_IPF_map:
+                IPF001_map = f['LabDCT']['Data']['IPF001'][()].transpose(2, 1, 0, 3)
+                micro.add_field(gridname='CellData', fieldname='IPF001_map',
+                                array=IPF001_map)
+                IPF010_map = f['LabDCT']['Data']['IPF010'][()].transpose(2, 1, 0, 3)
+                micro.add_field(gridname='CellData', fieldname='IPF010_map',
+                                array=IPF010_map)
+                IPF100_map = f['LabDCT']['Data']['IPF100'][()].transpose(2, 1, 0, 3)
+                micro.add_field(gridname='CellData', fieldname='IPF100_map',
+                                array=IPF100_map)
+            if include_rodrigues_map:
+                micro.add_field(gridname='CellData', fieldname='rodrigues_map',
+                                array=rodrigues_map)
+
+        # create grain data table infos
+        grain_ids = np.unique(grain_map)
+        print(grain_ids)
+        micro.build_grain_table_from_grain_map()
+        # now get each grain orientation from the rodrigues map
+        for g in micro.grains:
+            gid = g['idnumber']
+            print(gid, g['center'])
+            x, y, z = np.where(micro.get_grain_map() == gid)
+            orientation = rodrigues_map[x[0], y[0], z[0]]
+            # assign orientation to this grain
+            g['orientation'] = orientation
+            g.update()
+        micro.grains.flush()
         return micro
 
     @staticmethod
@@ -3653,6 +3877,7 @@ class Microstructure(SampleData):
         from pymicro.crystal.ebsd import OimScan
         # Read raw EBSD .h5 data file from OIM
         scan = OimScan.from_file(file_path)
+        micro.set_phases(scan.phase_list)
         if roi:
             print('importing data from region {}'.format(roi))
             scan.cols = roi[1] - roi[0]

@@ -2,7 +2,7 @@ import os
 import sys
 import vtk
 import numpy as np
-from vtk.util.colors import red, green, black, white, grey, blue, orange
+from vtk.util.colors import red, green, black, white, grey, blue, orange, peacock
 from vtk.util import numpy_support
 
 # see if some of the stuff needs to be moved to the Microstructure module
@@ -286,6 +286,42 @@ def add_hklplane_to_grain(hkl_plane, grid, orientation, origin=(0, 0, 0), opacit
     rot_plane.SetNormal(n_rot)
     return add_plane_to_grid(rot_plane, grid, opacity=opacity, show_normal=show_normal, normal_length=normal_length,
                              show_intersection=show_intersection, color_intersection=color_intersection)
+
+
+def add_slip_system_to_grain(slip_system, grid, orientation, origin=(0, 0, 0), opacity=1.0,
+                          show_normal=False, normal_length=1.0, show_intersection=False, color_intersection=red):
+    """Add a slip system to a VTK grid.
+
+    :param slip_system: an instance of `SlipSystem` describing the slip system.
+    :param grid: a vtkunstructuredgrid instance representing the geometry of the grain.
+    :param orientation: the grain orientation.
+    :param origin: the origin of the plane in the grain.
+    :param float opacity: opacity value of the plane.
+    :param show_normal: A flag to show the plane normal.
+    :param normal_length: The length of the plane normal.
+    :param show_intersection: A flag to show the intersection of the plane with the grain.
+    :param tuple color_intersection: The color to display the intersection of the plane with the grain.
+    :return: A VTK assembly with the grain, the plane, its normal and edge intersection if requested and the slip
+    direction.
+    """
+    # compute the plane normal in the laboratory frame using the grain orientation
+    gt = orientation.orientation_matrix().transpose()
+    slip_plane = slip_system.get_slip_plane()
+    slip_dir = slip_system.get_slip_direction()
+    n_rot = np.dot(gt, slip_plane.normal() / np.linalg.norm(slip_plane.normal()))
+    l_rot = np.dot(gt, slip_dir.direction() / np.linalg.norm(slip_dir.direction()))
+    rot_plane = vtk.vtkPlane()
+    rot_plane.SetOrigin(origin)
+    # rotate the plane by setting the normal
+    rot_plane.SetNormal(n_rot)
+    assembly = add_plane_to_grid(rot_plane, grid, opacity=opacity,
+                                 show_normal=show_normal, normal_length=normal_length,
+                                 show_intersection=show_intersection,
+                                 color_intersection=color_intersection)
+    slip_dir_actor = unit_arrow_3d(origin, normal_length * l_rot,
+                                   make_unit=False, color=peacock)
+    assembly.AddPart(slip_dir_actor)
+    return assembly
 
 
 def add_plane_to_grid(plane, grid, origin=None, color=None, opacity=0.3, show_normal=False, normal_length=1.0,

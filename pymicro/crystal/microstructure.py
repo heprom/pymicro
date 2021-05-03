@@ -2152,7 +2152,7 @@ class Microstructure(SampleData):
             raise RuntimeError('The microstructure instance has an empty'
                                 '`grain_map` node. Cannot create orientation'
                                 ' map')
-        grain_map = self.get_grain_map()
+        grain_map = self.get_grain_map().squeeze()
         grainIds = self.get_grain_ids()
         grain_orientations = self.get_grain_rodrigues()
         # safety check 2
@@ -2572,7 +2572,7 @@ class Microstructure(SampleData):
         self.set_active_grain_map('grain_map_clean')
         return
 
-    def mesh_grain_map(self, mesher_opts=dict()):
+    def mesh_grain_map(self, mesher_opts=dict(), print_output=False):
         """ Create a 2D or 3D conformal mesh from the grain map.
 
         A Matlab multiphase_image mesher is called to create a conformal mesh
@@ -2594,14 +2594,17 @@ class Microstructure(SampleData):
         Mesher.multi_phase_mesher(
             multiphase_image_name=self.active_grain_map,
             meshname='grains_mesh', location='/MeshData', replace=True,
-            mesher_opts=mesher_opts)
+            mesher_opts=mesher_opts, print_output=print_output)
         del Mesher
         return
 
     def crop(self, x_start=None, x_end=None, y_start=None, y_end=None,
              z_start=None, z_end=None, crop_name=None, autodelete=False,
-             verbose=False):
+             recompute_geometry=True, verbose=False):
         """Crop the microstructure to create a new one.
+
+        This method crops the CellData image group to a new microstructure,
+        and adapts the GrainDataTable to the crop.
 
         :param int x_start: start value for slicing the first axis.
         :param int x_end: end value for slicing the first axis.
@@ -2613,6 +2616,11 @@ class Microstructure(SampleData):
             (the default is to append '_crop' to the initial name).
         :param bool autodelete: a flag to delete the microstructure files
             on the disk when it is not needed anymore.
+        :param bool recompute_geometry: If `True` (defaults), recompute the
+            grain centers, volumes, and bounding boxes in the croped micro.
+            Use `False` when using a crop that do not cut grains, for instance
+            when cropping a microstructure within the mask, to avoid the heavy
+            computational cost of the grain geometry data update.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
         if self._is_empty('grain_map'):
@@ -2651,7 +2659,6 @@ class Microstructure(SampleData):
                 else:
                     field_crop = field[x_start:x_end,y_start:y_end,
                                        z_start:z_end, ...]
-                print('field crop shape is:',field_crop.shape)
                 empty = micro_crop.get_attribute(attrname='empty',
                                            nodename='CellData')
                 if empty:
@@ -2676,10 +2683,11 @@ class Microstructure(SampleData):
         print('%d grains in cropped microstructure' % micro_crop.grains.nrows)
         micro_crop.grains.flush()
         # recompute the grain geometry
-        print('updating grain geometry')
-        micro_crop.recompute_grain_bounding_boxes(verbose)
-        micro_crop.recompute_grain_centers(verbose)
-        micro_crop.recompute_grain_volumes(verbose)
+        if recompute_geometry:
+            print('updating grain geometry')
+            micro_crop.recompute_grain_bounding_boxes(verbose)
+            micro_crop.recompute_grain_centers(verbose)
+            micro_crop.recompute_grain_volumes(verbose)
         return micro_crop
 
     def sync_grain_table_with_grain_map(self, sync_geometry=False):
@@ -3376,7 +3384,8 @@ class Microstructure(SampleData):
         SampleData.copy_sample(src_micro_file, dst_micro_file, overwrite,
                                new_sample_name=dst_name)
         if get_object:
-            return Microstructure(filename=dst_micro_file, autodelete=autodelete)
+            return Microstructure(filename=dst_micro_file,
+                                  autodelete=autodelete)
         else:
             return
 

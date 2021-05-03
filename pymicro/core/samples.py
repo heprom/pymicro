@@ -18,6 +18,8 @@ import numpy as np
 import tables
 import lxml.builder
 from lxml import etree
+from pathlib import Path
+# BasicTool imports
 from BasicTools.Containers.ConstantRectilinearMesh import (
     ConstantRectilinearMesh)
 from BasicTools.Containers.UnstructuredMesh import (UnstructuredMesh,
@@ -207,12 +209,9 @@ class SampleData:
                  autodelete=False, **keywords):
         """Sample Data constructor."""
         # get file directory and file name
-        file_dir, filename_tmp = os.path.split(filename)
-        if file_dir == '':
-            file_dir = os.getcwd()
-        # check if filename has a file extension
-        if filename_tmp.rfind('.') != -1:
-            filename_tmp = filename_tmp[:filename_tmp.rfind('.')]
+        path_file = Path(filename).absolute()
+        filename_tmp = path_file.stem
+        file_dir = str(path_file.parent)
 
         self.h5_file = filename_tmp + '.h5'
         self.xdmf_file = filename_tmp + '.xdmf'
@@ -225,7 +224,7 @@ class SampleData:
             self._verbose_print('-- File "{}" exists  and will be '
                                 'overwritten'.format(self.h5_path))
             os.remove(self.h5_path)
-            os.remove(self.xdmf_file)
+            os.remove(self.xdmf_path)
         self._init_file_object(sample_name, sample_description, **keywords)
         self.sync()
         return
@@ -568,7 +567,7 @@ class SampleData:
                    self.xdmf_file))
             print('Once you will close Paraview, you may resume data'
                   ' management with your SampleData instance.')
-            subprocess.run(args=[software_cmd,self.xdmf_file])
+            subprocess.run(args=[software_cmd,self.xdmf_path])
             Pause = False
         if Pause:
             input('Paused interpreter, you may open {} and {} files with'
@@ -3543,7 +3542,8 @@ class SampleData:
         Field_index = self.get_attribute('Field_index', gridname)
         if Field_index is None:
             Field_index = []
-        Field_index.append(fieldname)
+        if fieldname not in Field_index:
+            Field_index.append(fieldname)
         self.add_attributes({'Field_index': Field_index}, gridname)
         return
 

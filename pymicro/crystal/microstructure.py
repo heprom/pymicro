@@ -1513,41 +1513,62 @@ class Microstructure(SampleData):
             # create a default crystalline phase
             phase = CrystallinePhase()
         # if the h5 file does not exist yet, store the phase as metadata
-        if not self._file_exist:
+        if not self._file_exist:  #FIXME is this useful?
             self.add_phase(phase)
-            self.add_group('phase_01', location='/PhaseData', indexname='phase_01')
-            d = phase.to_dict()
-            self.add_attributes(d, '/PhaseData/phase_01')
         else:
-            # loop on the phases present in the group /PhaseData
-            phase_group = self.get_node('/PhaseData')
-            for child in phase_group._v_children:
-                d = self.get_dic_from_attributes('/PhaseData/%s' % child)
-                print(d)
-                """
-                phase_group = self.get_node('/PhaseData/%s' % child)
-                print('looking at node', child)
-                d = {'phase_id': phase_group.phase_id,
-                     'name': phase_group.get_attribute('name'),
-                     'description': phase_group.get_attribute('description'),
-                     'formula': phase_group.get_attribute('formula'),
-                     'symmetry': phase_group.get_attribute('symmetry'),
-                     'lattice_parameters': phase_group.get_attribute(
-                     'LatticeParameters'),
-                     'elastic_constants': phase_group.get_attribute(
-                         'elastic_constants')
-                     }
-                """
-                phase = CrystallinePhase.from_dict(d)
-                self.add_phase(phase)
+            self.sync_phases()
             # if no phase is there, create one
             if len(self.get_phase_ids_list()) == 0:
                 print('no phase was found in this dataset, adding a defualt one')
                 self.add_phase(phase)
-                self.add_group('phase_01', location='/PhaseData', indexname='phase_01')
-                d = phase.to_dict()
-                self.add_attributes(d, '/PhaseData/phase_01')
         return
+
+    def sync_phases(self):
+        """This method sync the _phases attribute with the content of the hdf5
+        file.
+        """
+        self._phases = []
+        # loop on the phases present in the group /PhaseData
+        phase_group = self.get_node('/PhaseData')
+        for child in phase_group._v_children:
+            d = self.get_dic_from_attributes('/PhaseData/%s' % child)
+            print(d)
+            phase = CrystallinePhase.from_dict(d)
+            self._phases.append(phase)
+        print('%d phases found in the data set' % len(self._phases))
+
+    def set_phase(self, phase):
+        """Set a phase for the given `phase_id`.
+
+        If the phase id does not correspond to one of the existing phase,
+        nothing is done.
+
+        :param CrystallinePhase phase: the phase to use.
+        :param int phase_id:
+        """
+        if phase.phase_id > self.get_number_of_phases():
+            print('the phase_id given (%d) does not correspond to any existing '
+                  'phase, the phase list has not been modified.')
+            return
+        d = phase.to_dict()
+        print('setting phase %d with %s' % (phase.phase_id, phase.name))
+        self.add_attributes(d, '/PhaseData/phase_%02d' % phase.phase_id)
+        self.sync_phases()
+
+    def set_phases(self, phase_list):
+        """Set a list of phases for this microstructure.
+
+        The different phases in the list are added in that order.
+
+        :param list phase_list: the list of phases to use.
+        """
+        # delete all node in the phase_group
+        self.remove_node('/PhaseData', recursive=True)
+        self.add_group('PhaseData', location='/', indexname='Phase_data')
+        self.sync_phases()
+        # add each phase
+        for phase in phase_list:
+            self.add_phase(phase)
 
     def get_number_of_phases(self):
         """Return the number of phases in this microstructure.
@@ -1573,9 +1594,22 @@ class Microstructure(SampleData):
     def add_phase(self, phase):
         """Add a new phase to this microstructure.
 
+        Before adding this phase, the phase id is set to the corresponding id.
+
         :param CrystallinePhase phase: the phase to add.
         """
+        # this phase should have id self.get_number_of_phases() + 1
+        new_phase_id = self.get_number_of_phases() + 1
+        if not phase.phase_id == new_phase_id:
+            print('warning, adding phase with phase_id = %d (was %d)' %
+                  (new_phase_id, phase.phase_id))
+        phase.phase_id = new_phase_id
         self._phases.append(phase)
+        self.add_group('phase_%02d' % new_phase_id, location='/PhaseData',
+                       indexname='phase_%02d' % new_phase_id, replace=True)
+        d = phase.to_dict()
+        self.add_attributes(d, '/PhaseData/phase_%02d' % new_phase_id)
+        print('new phase added: %s' % phase.name)
 
     def get_phase_ids_list(self):
         """Return the list of the phase ids."""
@@ -3638,6 +3672,7 @@ class Microstructure(SampleData):
         micro = Microstructure(name=name, autodelete=False, overwrite_hdf5=True)
         from pymicro.crystal.ebsd import OimScan
         scan = OimScan.from_file(file_path)
+        micro.set_phases(scan.phase_list)
         if roi:
             print('importing data from region {}'.format(roi))
             scan.cols = roi[1] - roi[0]
@@ -3660,13 +3695,7 @@ class Microstructure(SampleData):
         micro.add_data_array(location='CellData', name='mask', array=mask_array, replace=True)
         micro.add_data_array(location='CellData', name='iq', array=iq_array, replace=True)
         micro.add_data_array(location='CellData', name='ci', array=ci_array, replace=True)
-        from pymicro.core.images import ImageObject
-        image_euler = ImageObject()
-        image_euler.dimension = euler.shape
-        image_euler.spacing = np.array([scan.xStep, scan.xStep, scan.xStep])
-        image_euler.add_field(euler, 'euler')
-        micro.add_image(image_euler, imagename='OrientationData', location='/', replace=True)
-
+        micro.add_field(gridname='CellData', fieldname='euler', array=euler)
 
         grains = micro.grains.row
         for gid in np.unique(grain_ids):

@@ -3438,22 +3438,22 @@ class Microstructure(SampleData):
         # load cell data
         with h5py.File(file_path, 'r') as f:
             spacing = f['LabDCT']['Spacing'][0]
-            rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()]
-            grain_map = f['LabDCT']['Data']['GrainId'][()]
+            rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()].transpose(2, 1, 0, 3)
+            grain_map = f['LabDCT']['Data']['GrainId'][()].transpose(2, 1, 0)
             print(grain_map.shape)
             micro.set_grain_map(grain_map, voxel_size=spacing)
-            mask = f['LabDCT']['Data']['Mask'][()]
+            mask = f['LabDCT']['Data']['Mask'][()].transpose(2, 1, 0)
             micro.set_mask(mask, voxel_size=spacing)
-            phase_map = f['LabDCT']['Data']['PhaseId'][()]
+            phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
             micro.set_phase_map(phase_map, voxel_size=spacing)
             if include_IPF_map:
-                IPF001_map = f['LabDCT']['Data']['IPF001'][()]
+                IPF001_map = f['LabDCT']['Data']['IPF001'][()].transpose(2, 1, 0, 3)
                 micro.add_field(gridname='CellData', fieldname='IPF001_map',
                                 array=IPF001_map)
-                IPF010_map = f['LabDCT']['Data']['IPF010'][()]
+                IPF010_map = f['LabDCT']['Data']['IPF010'][()].transpose(2, 1, 0, 3)
                 micro.add_field(gridname='CellData', fieldname='IPF010_map',
                                 array=IPF010_map)
-                IPF100_map = f['LabDCT']['Data']['IPF100'][()]
+                IPF100_map = f['LabDCT']['Data']['IPF100'][()].transpose(2, 1, 0, 3)
                 micro.add_field(gridname='CellData', fieldname='IPF100_map',
                                 array=IPF100_map)
             if include_rodrigues_map:

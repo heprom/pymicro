@@ -2180,12 +2180,21 @@ class Microstructure(SampleData):
                            array=orientation_map)
         return orientation_map
 
-    def view_slice(self, slice=None, color='random', show_mask=True):
+    def view_slice(self, slice=None, color='random', show_mask=True,
+                   show_grain_ids=False, highlight_ids=None):
         """A simple utility method to show one microstructure slice.
+
+        The plot can be customized in several ways. Annotations can be added
+        in the grains (ids, lattice plane traces) and the list of grains where
+        annotations are shown can be controled using the `highlight_ids`
+        argument. By default, if present, the mask will be shown.
 
         :param int slice: the slice number
         :param str color: a string to chose the colormap from ('random', 'ipf')
         :param bool show_mask: a flag to show the mask by transparency.
+        :param bool show_grain_ids: a flag to annotate the plot with the grain ids.
+        :param list highlight_ids: a list of grain ids to restrict the
+        annotations (by default all grains are annotated).
         """
         if self._is_empty('grain_map'):
             print('Microstructure instance mush have a grain_map field to use '
@@ -2201,8 +2210,10 @@ class Microstructure(SampleData):
             grain_cmap = self.ipf_cmap()
         else:
             grain_cmap = 'viridis'
+        grains_slice = grain_map[:, :, slice]
+        print(grains_slice.shape)
         fig, ax = plt.subplots()
-        ax.imshow(grain_map[:, :, slice].T, cmap=grain_cmap, vmin=0)
+        ax.imshow(grains_slice.T, cmap=grain_cmap, vmin=0)
         ax.xaxis.set_label_position('top')
         plt.xlabel('X')
         plt.ylabel('Y')
@@ -2210,6 +2221,22 @@ class Microstructure(SampleData):
             from pymicro.view.vol_utils import alpha_cmap
             mask = self.get_mask()
             plt.imshow(mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
+        if show_grain_ids:
+            gids = np.unique(grains_slice)
+            print(gids)
+            print(len(gids))
+            centers = np.zeros((len(gids), 2))
+            for i, gid in enumerate(gids):
+                if highlight_ids and gid not in highlight_ids:
+                    continue
+                # compute the center of mass of each grain in this image
+                centers[i] = ndimage.measurements.center_of_mass(grains_slice == gid, grains_slice)
+                plt.annotate('%d' % gids[i], xycoords='data',
+                             xy=(centers[i, 0], centers[i, 1]),
+                             horizontalalignment='center',
+                             verticalalignment='center',
+                             color='k',
+                             fontsize=12)
         plt.show()
 
     @staticmethod
@@ -3712,6 +3739,7 @@ class Microstructure(SampleData):
             grains['orientation'] = o_tsl.rod
             grains.append()
         micro.grains.flush()
+        micro.recompute_grain_bounding_boxes()
         micro.recompute_grain_centers(verbose=False)
         micro.recompute_grain_volumes(verbose=False)
         micro.sync()

@@ -911,6 +911,14 @@ class Lattice:
         planes = HklPlane.get_family(hkl, lattice=self, crystal_structure=self._symmetry)
         return planes
 
+    def get_slip_systems(self, slip_type='oct'):
+        """Create a list of the slip systems of a given type for this lattice.
+
+        :param str slip_type: a string describing the slip system type, should
+        be in (oct, 111, cube, 001, 112, basal, prism)
+        """
+        return SlipSystem.get_slip_systems(slip_type, lattice=self)
+
 
 class SlipSystem:
     '''A class to represent a crystallographic slip system.

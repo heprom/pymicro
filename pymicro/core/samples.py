@@ -3163,10 +3163,10 @@ class SampleData:
         for tag in mesh_object.nodesTags:
             # Add the node list of the tag in a data array
             name = tag.name
-            Node_tags_list.append(name)
             node_list = mesh_object.nodesTags[tag.name].GetIds()
             if len(node_list) == 0:
                 continue
+            Node_tags_list.append(name)
             node = self.add_data_array(location=Ntags_group._v_pathname,
                                        name='NT_'+name, array=node_list,
                                        replace=replace)

@@ -68,18 +68,7 @@ class OimScan:
         base_name, ext = os.path.splitext(os.path.basename(file_path))
         print(base_name, ext)
         if ext in ['.h5', '.hdf5']:
-            scan = OimScan((0, 0))
-            with h5py.File(file_path, 'r') as f:
-                # find out the scan key (the third one)
-                key_list = [key for key in f.keys()]
-                scan_key = key_list[2]
-                print('reading EBSD scan %s from file %s' % (scan_key, file_path))
-                header = f[scan_key]['EBSD']['Header']
-                scan.read_header(header)
-                # now initialize the fields
-                scan.init_arrays()
-                data = f[scan_key]['EBSD']['Data']
-                scan.read_data(data)
+            scan = OimScan.read_h5(file_path)
         elif ext == '.ang':
             scan = OimScan.read_ang(file_path)
         else:
@@ -132,6 +121,7 @@ class OimScan:
                     scan.phase_list.append(phase)
                 elif tokens[1] == 'GRID:':
                     scan.grid_type = tokens[2]
+                    print('grid type is %s' % tokens[2])
                     if scan.grid_type != 'SqrGrid':
                         raise ValueError('only square grid is supported, please convert your scan')
                 elif tokens[1] == 'XSTEP':
@@ -217,21 +207,70 @@ class OimScan:
             phase.categories = [0, 0, 0, 0, 0]
             self.phase_list.append(phase)
 
-    def read_data(self, data):
-        self.euler[:, :, 0] = np.reshape(data['Phi1'],
-                                         (self.rows, self.cols)).transpose(1, 0)
-        self.euler[:, :, 1] = np.reshape(data['Phi'],
-                                         (self.rows, self.cols)).transpose(1, 0)
-        self.euler[:, :, 2] = np.reshape(data['Phi2'],
-                                         (self.rows, self.cols)).transpose(1, 0)
-        self.x = np.reshape(data['X Position'],
-                            (self.rows, self.cols)).transpose(1, 0)
-        self.y = np.reshape(data['Y Position'],
-                            (self.rows, self.cols)).transpose(1, 0)
-        self.iq = np.reshape(data['IQ'], (self.rows, self.cols)).transpose(1, 0)
-        self.ci = np.reshape(data['CI'], (self.rows, self.cols)).transpose(1, 0)
-        self.phase = np.reshape(data['Phase'],
-                                (self.rows, self.cols)).transpose(1, 0)
+    @staticmethod
+    def read_data(file_path):
+        scan = OimScan((0, 0))
+        with h5py.File(file_path, 'r') as f:
+            # find out the scan key (the third one)
+            key_list = [key for key in f.keys()]
+            scan_key = key_list[2]
+            print('reading EBSD scan %s from file %s' % (scan_key, file_path))
+            header = f[scan_key]['EBSD']['Header']
+            scan.read_header(header)
+            # now initialize the fields
+            scan.init_arrays()
+            data = f[scan_key]['EBSD']['Data']
+            scan.euler[:, :, 0] = np.reshape(
+                data['Phi1'], (scan.rows, scan.cols)).transpose(1, 0)
+            scan.euler[:, :, 1] = np.reshape(
+                data['Phi'], (scan.rows, scan.cols)).transpose(1, 0)
+            scan.euler[:, :, 2] = np.reshape(
+                data['Phi2'], (scan.rows, scan.cols)).transpose(1, 0)
+            scan.x = np.reshape(data['X Position'],
+                                (scan.rows, scan.cols)).transpose(1, 0)
+            scan.y = np.reshape(data['Y Position'],
+                                (scan.rows, scan.cols)).transpose(1, 0)
+            scan.iq = np.reshape(data['IQ'], (scan.rows, scan.cols)).transpose(1, 0)
+            scan.ci = np.reshape(data['CI'], (scan.rows, scan.cols)).transpose(1, 0)
+            scan.phase = np.reshape(data['Phase'],
+                                    (scan.rows, scan.cols)).transpose(1, 0)
+        return scan
+
+    def compute_ipf_maps(self):
+        """Compute the IPF maps for the 3 cartesian directions.
+
+        .. warning::
+
+          This function is not vectorized and will be slow for large EBSD maps.
+
+        """
+        self.ipf001 = np.empty_like(self.euler)
+        self.ipf010 = np.empty_like(self.euler)
+        self.ipf100 = np.empty_like(self.euler)
+        for i in range(self.rows):
+            for j in range(self.cols):
+                o = Orientation.from_euler(np.degrees(self.euler[j, i]))
+                sym = self.phase_list[int(self.phase[j, i])].get_symmetry()
+                # compute IPF-Z
+                try:
+                    self.ipf001[j, i] = o.ipf_color(axis=np.array([0., 0., 1.]),
+                                                    symmetry=sym)
+                except ValueError:
+                    self.ipf001[j, i] = [0., 0., 0.]
+                # compute IPF-Y
+                try:
+                    self.ipf010[j, i] = o.ipf_color(axis=np.array([0., 1., 0.]),
+                                                    symmetry=sym)
+                except ValueError:
+                    self.ipf010[j, i] = [0., 0., 0.]
+                # compute IPF-X
+                try:
+                    self.ipf100[j, i] = o.ipf_color(axis=np.array([1., 0., 0.]),
+                                                    symmetry=sym)
+                except ValueError:
+                    self.ipf100[j, i] = [0., 0., 0.]
+            progress = 100 * (i + 1) / self.rows
+            print('computing IPF maps: {0:.2f} %'.format(progress), end='\r')
 
     def segment_grains(self, tol=5.):
         """Segment the grains based on the euler angle maps.

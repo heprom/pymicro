@@ -5,7 +5,13 @@ import os
 from pymicro.crystal.microstructure import Orientation
 from pymicro.crystal.lattice import Symmetry, CrystallinePhase, Lattice
 
+
 class OimPhase(CrystallinePhase):
+    """A class to handle a phase. This is just a child of the class
+    `CrystallinePhase` where we add 2 additional attributes: `hklFamilies` and
+    `categories`.
+    """
+
     def __init__(self, id):
         CrystallinePhase.__init__(self, phase_id=id, name='unknown', lattice=None)
         self.hklFamilies = []
@@ -41,6 +47,7 @@ class OimScan:
         self.init_arrays()
 
     def init_arrays(self):
+        """Memory allocation for all necessary arrays."""
         self.euler = np.zeros((self.cols, self.rows, 3))
         self.x = np.zeros((self.cols, self.rows))
         self.y = np.zeros((self.cols, self.rows))
@@ -54,26 +61,112 @@ class OimScan:
 
         At present, only hdf5 format is supported.
 
-        :param str file_path: the path to the ABSD scan.
+        :param str file_path: the path to the EBSD scan.
         :raise ValueError: if the scan is not in format HDF5.
         :return: a new `OimScan` instance.
         """
         base_name, ext = os.path.splitext(os.path.basename(file_path))
         print(base_name, ext)
-        if ext not in ['.h5', '.hdf5']:
-            raise ValueError('only HDF5 format is supported, please convert your scan')
+        if ext in ['.h5', '.hdf5']:
+            scan = OimScan((0, 0))
+            with h5py.File(file_path, 'r') as f:
+                # find out the scan key (the third one)
+                key_list = [key for key in f.keys()]
+                scan_key = key_list[2]
+                print('reading EBSD scan %s from file %s' % (scan_key, file_path))
+                header = f[scan_key]['EBSD']['Header']
+                scan.read_header(header)
+                # now initialize the fields
+                scan.init_arrays()
+                data = f[scan_key]['EBSD']['Data']
+                scan.read_data(data)
+        elif ext == '.ang':
+            scan = OimScan.read_ang(file_path)
+        else:
+            raise ValueError('only HDF5 or ANG formats are supported, please '
+                             'convert your scan')
+        return scan
+
+    @staticmethod
+    def read_ang(file_path):
+        """Read a scan in ang ascii format.
+
+        :raise ValueError: if the grid type in not square.
+        :param str file_path: the path to the ang file to read.
+        :return: a new instance of OimScan populated with the data from the file.
+        """
         scan = OimScan((0, 0))
-        with h5py.File(file_path, 'r') as f:
-            # find out the scan key (the third one)
-            key_list = [key for key in f.keys()]
-            scan_key = key_list[2]
-            print('reading EBSD scan %s from file %s' % (scan_key, file_path))
-            header = f[scan_key]['EBSD']['Header']
-            scan.read_header(header)
-            # now initialize the fields
+        with open(file_path, 'r') as f:
+            # start by parsing the header
+            line = f.readline().strip()
+            while line.startswith('#'):
+                tokens = line.split()
+                if len(tokens) <= 2:
+                    line = f.readline().strip()
+                    continue
+                if tokens[1] == 'TEM_PIXperUM':
+                    pass
+                elif tokens[1] == 'x-star':
+                    scan.x_star = float(tokens[2])
+                elif tokens[1] == 'y-star':
+                    scan.y_star = float(tokens[2])
+                elif tokens[1] == 'z-star':
+                    scan.z_star = float(tokens[2])
+                elif tokens[1] == 'WorkingDistance':
+                    scan.working_distance = float(tokens[2])
+                elif tokens[1] == 'Phase':
+                    phase = OimPhase(int(tokens[2]))
+                    line = f.readline().strip()
+                    phase.name = line.split()[2]
+                    line = f.readline().strip()
+                    phase.formula = line.split()[2]
+                    line = f.readline().strip()
+                    line = f.readline().strip()
+                    sym = Symmetry.from_tsl(int(line.split()[2]))
+                    tokens = f.readline().strip().split()
+                    lattice = Lattice.from_parameters(float(tokens[2]), float(tokens[3]),
+                                                      float(tokens[4]), float(tokens[5]),
+                                                      float(tokens[6]), float(tokens[7]),
+                                                      symmetry=sym)
+                    phase.set_lattice(lattice)
+                    scan.phase_list.append(phase)
+                elif tokens[1] == 'GRID:':
+                    scan.grid_type = tokens[2]
+                    if scan.grid_type != 'SqrGrid':
+                        raise ValueError('only square grid is supported, please convert your scan')
+                elif tokens[1] == 'XSTEP':
+                    scan.xStep = float(tokens[2])
+                elif tokens[1] == 'YSTEP':
+                    scan.yStep = float(tokens[2])
+                elif tokens[1].startswith('NCOLS'):
+                    scan.cols = int(tokens[2])
+                elif tokens[1].startswith('NROWS'):
+                    scan.rows = int(tokens[2])
+                elif tokens[1] == 'OPERATOR:':
+                    scan.operator = tokens[2]
+                elif tokens[1] == 'SAMPLEID:':
+                    scan.sample_id = tokens[2] if len(tokens) >= 3 else ''
+                elif tokens[1] == 'SCANID:':
+                    scan.scan_id = tokens[2] if len(tokens) >= 3 else ''
+                line = f.readline().strip()
+            print('finished reading header, scan size is %d x %d' % (scan.cols, scan.rows))
+            # now read the payload
+            data = np.zeros((scan.cols * scan.rows, len(line.split())))
+            data[0] = np.fromstring(line, sep=' ')
+            i = 1
+            for line in f:
+                data[i] = np.fromstring(line, sep=' ')
+                i += 1
+            # we have read all the data, now repack everything into the different arrays
             scan.init_arrays()
-            data = f[scan_key]['EBSD']['Data']
-            scan.read_data(data)
+            scan.euler[:, :, 0] = np.reshape(data[:, 0], (scan.rows, scan.cols)).T
+            scan.euler[:, :, 1] = np.reshape(data[:, 1], (scan.rows, scan.cols)).T
+            scan.euler[:, :, 2] = np.reshape(data[:, 2], (scan.rows, scan.cols)).T
+            scan.x = np.reshape(data[:, 3], (scan.rows, scan.cols)).T
+            scan.y = np.reshape(data[:, 4], (scan.rows, scan.cols)).T
+            scan.iq = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
+            scan.ci = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
+            scan.phase = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
         return scan
 
     def read_header(self, header):
@@ -207,7 +300,11 @@ class OimScan:
         return grain_ids
 
     def to_h5(self, file_name):
-        """Write the EBSD scan as a hdf5 file compatible OIM software (in progress)."""
+        """Write the EBSD scan as a hdf5 file compatible OIM software (in
+        progress).
+
+        :param str file_name: name of the output file.
+        """
         f = h5py.File('%s.h5' % file_name, 'w')
         f.attrs[' Manufacturer'] = np.string_('EDAX')
         f.attrs[' Version'] = np.string_('OIM Analysis 7.3.0 x64  [09-01-15]')

@@ -208,7 +208,13 @@ class OimScan:
             self.phase_list.append(phase)
 
     @staticmethod
-    def read_data(file_path):
+    def read_h5(file_path):
+        """Read a scan in H5 format.
+
+        :raise ValueError: if the grid type in not square.
+        :param str file_path: the path to the h5 file to read.
+        :return: a new instance of OimScan populated with the data from the file.
+        """
         scan = OimScan((0, 0))
         with h5py.File(file_path, 'r') as f:
             # find out the scan key (the third one)

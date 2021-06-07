@@ -253,7 +253,8 @@ class SampleData:
 
     def __repr__(self):
         """Return a string representation of the dataset content."""
-        s = self.print_index(as_string=True, max_depth=3)
+        s = ''
+        s += self.print_index(as_string=True, max_depth=3)
         s += self.print_dataset_content(as_string=True, max_depth=3)
         return s
 
@@ -420,7 +421,6 @@ class SampleData:
         """
         s = '\n\n****** Group {} CONTENT ******'.format(groupname)
         group = self.get_node(groupname)
-        print(group)
         if group._v_depth > max_depth:
             return ''
         if group._v_nchildren == 0:
@@ -491,7 +491,7 @@ class SampleData:
                 s += '\n'
         if not(as_string):
             print(s)
-            s = ''
+            return
         return s
 
     def sync(self):
@@ -1949,14 +1949,14 @@ class SampleData:
         """
         self.add_attributes({'sample_name': sample_name}, '/')
 
-    def get_description(self, nodename='/'):
+    def get_description(self, node):
         """Get the string describing this node.
 
         By defaut the sample description is returned, from the root HDF5 Group.
 
         :param str nodename: the path or name of the node of interest.
         """
-        return self.get_attribute(attrname='description', nodename='/')
+        return self.get_attribute(attrname='description', nodename=node)
 
     def set_description(self, description, node='/'):
         """Set the description of a node.
@@ -2332,6 +2332,7 @@ class SampleData:
         # BUG: copy_file from tables returns exception with large mesh and lot
         # of elsets. Use external utility ptrepack ? For now, taken out of
         # class destructor
+        # TODO: improve this method --> add sync(), use Pathlib
         head, tail = os.path.split(self.h5_path)
         tmp_file = os.path.join(head, 'tmp_'+tail)
         self.h5_dataset.copy_file(tmp_file)
@@ -2354,6 +2355,7 @@ class SampleData:
         :param bool autodelete: remove copied dataset files when copied
             instance is destroyed.
         """
+        # TODO: improve method --> use Pathlib
         sample = SampleData(filename=src_sample_file)
         if new_sample_name is None:
             new_sample_name = sample.get_attribute('sample_name', '/')

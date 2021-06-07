@@ -1462,6 +1462,8 @@ class Microstructure(SampleData):
         else:
             self.active_grain_map = self.get_attribute('active_grain_map',
                                                        'CellData')
+            if self.active_grain_map is None:
+                self.set_active_grain_map()
         # TODO find a way not to overwrite the sample name when an existing file is read
         #self.set_sample_name(name)
         self.grains = self.get_node('GrainDataTable')

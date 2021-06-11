@@ -90,7 +90,7 @@ class CrystallinePhase:
              'elastic_constants': self.elastic_constants,
              'elastic_constants_unit': 'MPa'
              }
-        print(d)
+        #print(d)
         return d
 
     @staticmethod
@@ -322,65 +322,65 @@ class Symmetry(enum.Enum):
             if len(elastic_constants) != 5:
                 raise ValueError('Error: need 5 elastic constants for hexagonal '
                                  'symmetry, got %d' % len(elastic_constants))
-                C11, C12, C13, C33, C44 = elastic_constants
-                C66 = (C11 - C12) / 2
-                C = np.array([[C11, C12, C13,   0,   0,   0],
-                              [C12, C11, C13,   0,   0,   0],
-                              [C13, C13, C33,   0,   0,   0],
-                              [  0,   0,   0, C44,   0,   0],
-                              [  0,   0,   0,   0, C44,   0],
-                              [  0,   0,   0,   0,   0, C66]])
-                return C
+            C11, C12, C13, C33, C44 = elastic_constants
+            C66 = (C11 - C12) / 2
+            C = np.array([[C11, C12, C13,   0,   0,   0],
+                          [C12, C11, C13,   0,   0,   0],
+                          [C13, C13, C33,   0,   0,   0],
+                          [  0,   0,   0, C44,   0,   0],
+                          [  0,   0,   0,   0, C44,   0],
+                          [  0,   0,   0,   0,   0, C66]])
+            return C
         elif self is Symmetry.tetragonal:
             if len(elastic_constants) != 6:
                 raise ValueError('Error: need 6 elastic constants for tetragonal '
                                  'symmetry, got %d' % len(elastic_constants))
-                C11, C12, C13, C33, C44, C66 = elastic_constants
-                C = np.array([[C11, C12, C13,   0,   0,   0],
-                              [C12, C11, C13,   0,   0,   0],
-                              [C13, C13, C33,   0,   0,   0],
-                              [  0,   0,   0, C44,   0,   0],
-                              [  0,   0,   0,   0, C44,   0],
-                              [  0,   0,   0,   0,   0, C66]])
-                return C
+            C11, C12, C13, C33, C44, C66 = elastic_constants
+            C = np.array([[C11, C12, C13,   0,   0,   0],
+                          [C12, C11, C13,   0,   0,   0],
+                          [C13, C13, C33,   0,   0,   0],
+                          [  0,   0,   0, C44,   0,   0],
+                          [  0,   0,   0,   0, C44,   0],
+                          [  0,   0,   0,   0,   0, C66]])
+            return C
         elif self is Symmetry.orthorhombic:
             if len(elastic_constants) != 9:
                 raise ValueError('Error: need 9 elastic constants for tetragonal '
                                  'symmetry, got %d' % len(elastic_constants))
-                C11, C12, C13, C22, C23, C33, C44, C55, C66 = elastic_constants
-                C = np.array([[C11, C12, C13,   0,   0,   0],
-                              [C12, C22, C23,   0,   0,   0],
-                              [C13, C23, C33,   0,   0,   0],
-                              [  0,   0,   0, C44,   0,   0],
-                              [  0,   0,   0,   0, C55,   0],
-                              [  0,   0,   0,   0,   0, C66]])
-                return C
+            C11, C12, C13, C22, C23, C33, C44, C55, C66 = elastic_constants
+            C = np.array([[C11, C12, C13,   0,   0,   0],
+                          [C12, C22, C23,   0,   0,   0],
+                          [C13, C23, C33,   0,   0,   0],
+                          [  0,   0,   0, C44,   0,   0],
+                          [  0,   0,   0,   0, C55,   0],
+                          [  0,   0,   0,   0,   0, C66]])
+            return C
         elif self is Symmetry.monoclinic:
             if len(elastic_constants) != 13:
                 raise ValueError('Error: need 13 elastic constants for monoclinic '
                                  'symmetry, got %d' % len(elastic_constants))
-                C11, C12, C13, C16, C22, C23, C26, C33, C36, C44, C45, \
-                C55, C66 = elastic_constants
-                C = np.array([[C11, C12, C13,   0,   0, C16],
-                              [C12, C22, C23,   0,   0, C26],
-                              [C13, C23, C33,   0,   0, C36],
-                              [  0,   0,   0, C44, C45,   0],
-                              [  0,   0,   0, C45, C55, C56],
-                              [C16, C26, C36,   0,   0, C66]])
-                return C
+            C11, C12, C13, C16, C22, C23, C26, C33, C36, C44, C45, \
+            C55, C66 = elastic_constants
+            C = np.array([[C11, C12, C13,   0,   0, C16],
+                          [C12, C22, C23,   0,   0, C26],
+                          [C13, C23, C33,   0,   0, C36],
+                          [  0,   0,   0, C44, C45,   0],
+                          [  0,   0,   0, C45, C55,   0],
+                          [C16, C26, C36,   0,   0, C66]])
+            return C
         elif self is Symmetry.triclinic:
             if len(elastic_constants) != 21:
                 raise ValueError('Error: need 21 elastic constants for triclinic '
                                  'symmetry, got %d' % len(elastic_constants))
-                C11, C12, C13, C14, C15, C16, C22, C23, C24, C25, C26, C33, \
-                C34, C35, C36, C44, C45, C46, C55, C56, C66 = elastic_constants
-                C = np.array([[C11, C12, C13, C14, C15, C16],
-                              [C12, C22, C23, C24, C25, C26],
-                              [C13, C23, C33, C34, C35, C36],
-                              [C14, C24, C34, C44, C45, C46],
-                              [C15, C25, C35, C45, C55, C56],
-                              [C16, C26, C36, C46, C56, C66]])
-                return C
+            C11, C12, C13, C14, C15, C16, C22, C23, C24, C25, C26, C33, \
+            C34, C35, C36, C44, C45, C46, C55, C56, C66 = elastic_constants
+            C = np.array([[C11, C12, C13, C14, C15, C16],
+                          [C12, C22, C23, C24, C25, C26],
+                          [C13, C23, C33, C34, C35, C36],
+                          [C14, C24, C34, C44, C45, C46],
+                          [C15, C25, C35, C45, C55, C56],
+                          [C16, C26, C36, C46, C56, C66]])
+            return C
         else:
             raise ValueError('warning, symmetry not supported: %s' % self)
 

@@ -16,6 +16,7 @@ import os
 import vtk
 import h5py
 import math
+from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
@@ -1539,7 +1540,7 @@ class Microstructure(SampleData):
         phase_group = self.get_node('/PhaseData')
         for child in phase_group._v_children:
             d = self.get_dic_from_attributes('/PhaseData/%s' % child)
-            print(d)
+            #print(d)
             phase = CrystallinePhase.from_dict(d)
             self._phases.append(phase)
         print('%d phases found in the data set' % len(self._phases))
@@ -2825,7 +2826,8 @@ class Microstructure(SampleData):
             self.recompute_grain_volumes()
         return
 
-    def renumber_grains(self, sort_by_size=False, new_map_name=None):
+    def renumber_grains(self, sort_by_size=False, new_map_name=None,
+                        only_grain_map=False):
         """Renumber the grains in the microstructure.
 
         Renumber the grains from 1 to n, with n the total number of grains
@@ -2840,6 +2842,9 @@ class Microstructure(SampleData):
             is kept and a 'renumbered_grain_map' is added to CellData.
         :param str new_map_name: Used as name for the renumbered grain map
             field if is not None and overwrite_active_map is False.
+        :param bool only_grain_map: If `True`, do not modify the grain map
+            and GrainDataTable in dataset, but return the renumbered grain_map
+            as a numpy array.
         """
         if self._is_empty('grain_map'):
             print('warning: a grain map is needed to renumber the grains')
@@ -2861,9 +2866,12 @@ class Microstructure(SampleData):
                 continue
             new_id = new_ids[i]
             grain_map_renum[grain_map == gid] = new_id
-            g['idnumber'] = new_id
-            g.update()
+            if not only_grain_map:
+                g['idnumber'] = new_id
+                g.update()
         print('maxium grain id is now %d' % max(new_ids))
+        if only_grain_map:
+            return grain_map_renum
         # assign the renumbered grain_map to the microstructure
         if new_map_name is None:
             map_name = self.active_grain_map
@@ -2871,6 +2879,7 @@ class Microstructure(SampleData):
             map_name = new_map_name
         self.set_grain_map(grain_map_renum, self.get_voxel_size(),
                            map_name=map_name)
+        return
 
     def compute_grain_volume(self, gid):
         """Compute the volume of the grain given its id.
@@ -3229,8 +3238,8 @@ class Microstructure(SampleData):
         """
         n_phases = self.get_number_of_phases()
         ext = 'bin' if binary else 'txt'
-        grip_id = n_phases  # material id for the grips
-        ext_id = n_phases + 1 if add_grips else n_phases  # material id for the exterior
+        grip_id = n_phases   # material id for the grips
+        ext_id = n_phases if add_grips else n_phases # material id for the exterior
         n1x = open('N1X.%s' % ext, 'w')
         n1y = open('N1Y.%s' % ext, 'w')
         n1z = open('N1Z.%s' % ext, 'w')
@@ -3344,14 +3353,15 @@ class Microstructure(SampleData):
         if self.__contains__('grain_map'):
             # convert the grain map to vtk file
             from vtk.util import numpy_support
-            #TODO build a continuous grain map for amitex
             #TODO adapt to 2D grain maps
-            grain_ids = self.get_grain_map(as_numpy=True)
-            if self.__contains__('phase_map'):
+            #TODO build a continuous grain map for amitex
+            # grain_ids = self.get_grain_map(as_numpy=True)
+            grain_ids = self.renumber_grains(only_grain_map=True)
+            if not self._is_empty('phase_map'):
                 # use the phase map for the material ids
                 material_ids = self.get_phase_map(as_numpy=True)
             else:
-                material_ids = np.zeros_like(grain_ids)
+                material_ids = np.ones_like(grain_ids)
             if add_grips:
                 # add a layer of new_id (the value must actually be the first
                 # grain id) above and below the sample.
@@ -3362,7 +3372,7 @@ class Microstructure(SampleData):
                 material_ids = np.pad(material_ids, ((0, 0),
                                                      (0, 0),
                                                      (grip_size, grip_size)),
-                                      mode='constant', constant_values=grip_id)
+                                      mode='constant', constant_values=grip_id+1)
             if add_exterior:
                 # add a layer of new_id around the first two dimensions
                 grain_ids = np.pad(grain_ids, ((exterior_size, exterior_size),
@@ -3373,7 +3383,7 @@ class Microstructure(SampleData):
                                       ((exterior_size, exterior_size),
                                        (exterior_size, exterior_size),
                                        (0, 0)),
-                                      mode='constant', constant_values=ext_id)
+                                      mode='constant', constant_values=ext_id+1)
             # write both arrays as VTK files for amitex
             voxel_size = self.get_voxel_size()
             for array, array_name in zip([grain_ids, material_ids],
@@ -3396,6 +3406,54 @@ class Microstructure(SampleData):
                 writer.Write()
                 print('%s array written in legacy vtk form for AMITEX_FFTP' %
                       array_name)
+
+    def from_amitex_fftp(self, results_basename, grip_size=0, ext_size=0,
+                         sim_prefix='', int_var_names=dict()):
+        """Read output of a Amitex_fftp simulation and stores in dataset.
+
+        Read a Amitex_fftp result directory containing a mechanical simulation
+        of the microstructure. See method 'to_amitex_fftp' to generate input
+        files for such simulation of Microstructure instances.
+
+        The results are stored as fields of the CellData group by default.
+        If generated by the simulation, the strain and stress tensor fields
+        are stored, as well as the internal variables fields.
+
+        Mechanical fields and macroscopical curves are stored. The latter is
+        stored in the data group '/Mechanical_simulation' as a structured
+        array.
+
+            .. Warning 1::
+                For now, this methods works only for one output snapshot.
+                It is soon to be adapted to outputs with several snapshots.
+
+            .. Warning 2::
+                For now, results are only stored on CellData group. Method will
+                be modified in the future to allow to specify a new image data
+                group to store de results (created if needed).
+
+        :param results_basename: Basename of Amitex .std, .vtk output files to
+            load in dataset.
+        :type results_basename: str
+        :param grip_size: Thickness of the grips added to simulation unit cell
+            by the method 'to_amitex_fftp' of this class, defaults to 0. This
+            value corresponds to a number of voxels on both ends of the cell.
+        :type grip_size: int, optional
+        :param ext_size: Thickness of the exterior region added to simulation
+            unit cell by the method 'to_amitex_fftp' of this class,
+            defaults to 0.  This value corresponds to a number of voxels on
+            both ends of the cell.
+        :type ext_size: int, optional
+        :param sim_prefix: Prefix of the name of the fields that will be
+            stored on the CellData group from simulation results.
+        :type sim_prefix: str, optional
+        :param int_var_names: Dictionnary whose keys are the names of
+            internal variables stored in Amitex output files
+            (varInt1, varInt2...) and values are corresponding names for
+            these variables in the dataset.
+        :type int_var_names: dict, optional
+        """
+        return
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """

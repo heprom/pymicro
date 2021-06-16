@@ -3210,7 +3210,8 @@ class Microstructure(SampleData):
 
     def to_amitex_fftp(self, binary=True, mat_file=True, add_grips=False,
                        grip_size=10, grip_constants=(104100., 49440.),
-                       add_exterior=False, exterior_size=10):
+                       add_exterior=False, exterior_size=10,
+                       use_mask=False):
         """Write orientation data to ascii files to prepare for FFT computation.
 
         AMITEX_FFTP can be used to compute the elastoplastic response of
@@ -3235,11 +3236,14 @@ class Microstructure(SampleData):
         :param bool add_exterior: add a constant region around the sample at
             the beginning and the end of the first two axes.
         :param int exterior_size: thickness of the exterior region.
+        :param bool use_mask: use mask to define exterior material, and use
+            mask to extrude grips with same shapes as microstructure top and
+            bottom surfaces.
         """
         n_phases = self.get_number_of_phases()
         ext = 'bin' if binary else 'txt'
         grip_id = n_phases   # material id for the grips
-        ext_id = n_phases if add_grips else n_phases # material id for the exterior
+        ext_id = n_phases + 1 if add_grips else n_phases # material id for the exterior
         n1x = open('N1X.%s' % ext, 'w')
         n1y = open('N1Y.%s' % ext, 'w')
         n1z = open('N1Z.%s' % ext, 'w')
@@ -3336,7 +3340,7 @@ class Microstructure(SampleData):
                 grips.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(grip_constants[1])))
                 root.append(grips)
             # add a material for external buffer
-            if add_exterior:
+            if add_exterior or use_mask:
                 exterior = etree.Element('Material', numM=str(ext_id + 1),
                                          Lib='libUmatAmitex.so',
                                          Law='elasiso')
@@ -3360,6 +3364,9 @@ class Microstructure(SampleData):
             if not self._is_empty('phase_map'):
                 # use the phase map for the material ids
                 material_ids = self.get_phase_map(as_numpy=True)
+            elif use_mask:
+                material_ids = self.get_mask(as_numpy=True).astype(
+                                                            grain_ids.dtype)
             else:
                 material_ids = np.ones_like(grain_ids)
             if add_grips:
@@ -3369,11 +3376,21 @@ class Microstructure(SampleData):
                                                (0, 0),
                                                (grip_size, grip_size)),
                                    mode='constant', constant_values=1)
-                material_ids = np.pad(material_ids, ((0, 0),
-                                                     (0, 0),
-                                                     (grip_size, grip_size)),
-                                      mode='constant', constant_values=grip_id+1)
-            if add_exterior:
+                if use_mask:
+                    # create top and bottom mask extrusions
+                    mask_top = material_ids[:,:,[-1]]
+                    mask_bot = material_ids[:,:,[0]]
+                    top_grip = np.tile(mask_top, (1,1,grip_size))
+                    bot_grip = np.tile(mask_top, (1,1,grip_size))
+                    # add grip layers to unit cell matID
+                    material_ids = np.concatenate(
+                        ((grip_id+1)*bot_grip, material_ids,
+                         (grip_id+1)*top_grip), axis=2)
+                else:
+                    material_ids = np.pad(
+                        material_ids, ((0, 0), (0, 0), (grip_size, grip_size)),
+                        mode='constant', constant_values=grip_id+1)
+            if add_exterior and not use_mask:
                 # add a layer of new_id around the first two dimensions
                 grain_ids = np.pad(grain_ids, ((exterior_size, exterior_size),
                                                (exterior_size, exterior_size),
@@ -3384,10 +3401,14 @@ class Microstructure(SampleData):
                                        (exterior_size, exterior_size),
                                        (0, 0)),
                                       mode='constant', constant_values=ext_id+1)
+            if use_mask:
+                grain_ids[np.where(grain_ids == 0)] = 1
+                material_ids[np.where(material_ids == 0)] = ext_id + 1
             # write both arrays as VTK files for amitex
             voxel_size = self.get_voxel_size()
             for array, array_name in zip([grain_ids, material_ids],
                                          ['grain_ids', 'material_ids']):
+                print('array name:', array_name, 'array type:', array.dtype)
                 vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array,
                                                                      order='F'),
                                                             deep=1)

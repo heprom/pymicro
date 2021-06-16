@@ -1194,6 +1194,83 @@ class SampleData:
                 self.set_tablecol(tablename, colname, column)
         return
 
+    def add_string_array(self, name, location, indexname=None,
+                         replace=False, data=[]):
+        """Add an enlargeable array to store strings of max 255 characters.
+
+        String arrays are typically used to store large list of strings that
+        are too large to be stored as HDF5 attributes into the dataset.
+
+            .. Warning::
+                The string are stored as byte strings. You will need to
+                use the str.decode() method to get the elements of the
+                string_array as UTF-8 or  ASCII formatted strings.
+
+        To manipulate a string array use the 'get_node' method to get the
+        array, and then manipulate as a list of binary strings.
+
+        :param str name: Name of the array to create
+        :param str location: Path where the array will be added in the dataset
+        :param str indexname: Index name used to reference the node
+            composition as a sequence of named fields (analogous to Numpy
+            structured arrays). It must be an instance of the
+            :py:class:`tables.IsDescription` class from the
+            `Pytables <https://www.pytables.org/index.html>`_ package
+        :param bool replace: remove array in the dataset with the same
+            name/location if `True`
+        :param list[str] data: List of strings to add to the string array upon
+            creation.
+        """
+        self._verbose_print('Adding String Array `{}` into Group `{}`'
+                            ''.format(name, location))
+        # get location path
+        location_path = self._name_or_node_to_path(location)
+        if (location_path is None):
+            msg = ('(add_string_array): location {} does not exist, string'
+                   ' array cannot be added.'
+                   ''.format(location))
+            self._verbose_print(msg)
+            return
+        else:
+            # check location nature
+            if not(self._get_node_class(location) == 'GROUP'):
+                msg = ('(add_string_array): location {} is not a Group. '
+                       'Please choose an empty location or a HDF5 '
+                       'Group to store table'.format(location))
+                self._verbose_print(msg)
+                return
+            # check if array location exists and remove node if asked
+            array_path = os.path.join(location_path, name)
+            if self.h5_dataset.__contains__(array_path):
+                if replace:
+                    msg = ('(add_string_array): existing node {} will be '
+                           'overwritten and all of its childrens removed'
+                           ''.format(array_path))
+                    self._verbose_print(msg)
+                    self.remove_node(array_path, recursive=True)
+                else:
+                    msg = ('(add_string_array): node {} already exists. To '
+                           'overwrite, use optional argument "replace=True"'
+                           ''.format(array_path))
+                    self._verbose_print(msg)
+
+        # Create String array
+        string_atom = tables.StringAtom(itemsize=255)
+        str_array = self.h5_dataset.create_earray(where=location, name=name,
+                                                  atom=string_atom,
+                                                  shape=(0,))
+        # Append input string list
+        if data is not None:
+            str_array.append(data)
+            # add to index
+        if indexname is None:
+            warn_msg = (' (add_string_array) indexname not provided, '
+                        ' the string array name `{}` is used as index name '
+                        ''.format(name))
+            self._verbose_print(warn_msg)
+            indexname = name
+        self.add_to_index(indexname, str_array._v_pathname)
+        return str_array
 
     def add_attributes(self, dic, nodename):
         """Add a dictionary entries as HDF5 Attributes to a Node or Group.

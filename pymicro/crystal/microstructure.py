@@ -3408,7 +3408,8 @@ class Microstructure(SampleData):
                       array_name)
 
     def from_amitex_fftp(self, results_basename, grip_size=0, ext_size=0,
-                         sim_prefix='', int_var_names=dict()):
+                         grip_dim=2, sim_prefix='Amitex', int_var_names=dict(),
+                         finite_strain=False):
         """Read output of a Amitex_fftp simulation and stores in dataset.
 
         Read a Amitex_fftp result directory containing a mechanical simulation
@@ -3424,8 +3425,9 @@ class Microstructure(SampleData):
         array.
 
             .. Warning 1::
-                For now, this methods works only for one output snapshot.
-                It is soon to be adapted to outputs with several snapshots.
+                For now, this methods can store the results of several
+                snapshots but without writing them as a xdmf time serie. This
+                feature will be implemented in the future.
 
             .. Warning 2::
                 For now, results are only stored on CellData group. Method will
@@ -3439,6 +3441,9 @@ class Microstructure(SampleData):
             by the method 'to_amitex_fftp' of this class, defaults to 0. This
             value corresponds to a number of voxels on both ends of the cell.
         :type grip_size: int, optional
+        :param grip_dim: Dimension along which the tension test has been
+            simulated (0:x, 1:y, 2:z)
+        :type grip_dim: int, optional
         :param ext_size: Thickness of the exterior region added to simulation
             unit cell by the method 'to_amitex_fftp' of this class,
             defaults to 0.  This value corresponds to a number of voxels on
@@ -3453,7 +3458,290 @@ class Microstructure(SampleData):
             these variables in the dataset.
         :type int_var_names: dict, optional
         """
+        # TODO: implement XDMF time series in SampleData and create one here
+        # to store output fields
+        # TODO: Adapt to finite strain calculations
+        # TODO: Add loading of internal variables fields
+        # Get std file result
+        p_std = Path(results_basename).absolute().with_suffix('.std')
+        # safety check
+        if not p_std.exists():
+            raise ValueError('results not found, "results_basename" argument'
+                             ' not associated with Amitex_fftp simulation'
+                             ' results.')
+        # load .std results
+        # TODO: load vtk results and create a group per timestep in CellDAta
+        # then add results in Cell Data
+        std_res = Microstructure._load_std(p_std)
+        # Store macro data in specific group
+        self.add_group(groupname=f'{sim_prefix}_Results', location='/',
+                       indexname='fft_sim')
+        self.add_data_array(location='fft_sim', name='simulation_time',
+                            array=std_res['time'])
+        self.add_data_array(location='fft_sim', name='simulation_iterations',
+                            array=std_res['N_iterations'])
+        self.add_data_array(location='fft_sim', name='mean_stress',
+                            array=std_res['sigma'])
+        self.add_data_array(location='fft_sim', name='mean_strain',
+                            array=std_res['epsilon'])
+        self.add_data_array(location='fft_sim', name='rms_stress',
+                            array=std_res['sigma_rms'])
+        self.add_data_array(location='fft_sim', name='rms_strain',
+                            array=std_res['epsilon_rms'])
+        # Get vtk files results
+        Stress, Strain = Microstructure._load_amitex_stress_strain(
+            results_basename, grip_size=grip_size, ext_size=ext_size,
+            grip_dim=2)
+        ## Loop over time steps: create group to store results
+        self.add_group(groupname=f'{sim_prefix}_output_fields', location='/CellData',
+                       indexname='fft_fields')
+        for incr in Stress:
+            fieldname = f'{sim_prefix}_stress_{incr}'
+            self.add_field(gridname='CellData', fieldname=fieldname,
+                           array=Stress[incr], location='fft_fields')
+            fieldname = f'{sim_prefix}_strain_{incr}'
+            self.add_field(gridname='CellData', fieldname=fieldname,
+                           array=Strain[incr], location='fft_fields')
         return
+
+    @staticmethod
+    def _load_std(std_path, finite_strain=False):
+        """Read content of a .std file and returns as Numpy structured array.
+
+        This method must be transfered to a new subpackage SDAmitex_utils
+
+        :param std_path: name/path of the .std file.
+        :type std_path: Path(pathlib) object or string
+        :param finite_strain: finite strain simulation flag, defaults to False
+        :type finite_strain: bool, optional
+        :return: Results, Numpy structured array containing the output values
+            in .std file: the array fields are 'time', 'sigma' (Cauchy stress),
+            'epsilon' (small strains tensor), 'sigma_rms' and 'epsilon_rms'
+            root mean square of tensors over the unit cell, 'N_iterations'
+            number of iterations of the FFT algorithm to reach convergence at
+            each increment.
+        :rtype:
+        """
+        # TODO: create SDAmiutexUtils and transfer
+        # TODO: implement reading results with start:step:stop
+        # TODO: implement finite strains
+        std_lines = []
+        p = Path(std_path).absolute()
+        # read txt content of .std file
+        with open(p,'r') as f:
+            l = f.readline()
+            while l:
+                if not l.startswith('#'):
+                    A = np.array(l.split()).astype(np.double)
+                    std_lines.append(A)
+                l = f.readline()
+        # create Numpy structured array
+        if finite_strain:
+            raise RuntimeError('Finite strain outputs not handled for now.')
+        else:
+            dt = np.dtype([('time', np.double, (1,)),
+                           ('sigma', np.double, (6,)),
+                           ('epsilon', np.double, (6,)),
+                           ('sigma_rms', np.double, (6,)),
+                           ('epsilon_rms', np.double, (6,)),
+                           ('N_iterations', np.double, (1,))])
+        # fill results array for each time step
+        N_times = len(std_lines)
+        Results = np.empty(shape=(N_times,), dtype=dt)
+        for t in range(N_times):
+            Results[t]['time'] = std_lines[t][0]
+            Results[t]['sigma'] = std_lines[t][[1,2,3,6,5,4]]
+            Results[t]['epsilon'] = std_lines[t][[7,8,9,12,11,10]]
+            Results[t]['sigma_rms'] = std_lines[t][[13,14,15,18,17,16]]
+            Results[t]['epsilon_rms'] = std_lines[t][[19,20,21,24,23,22]]
+            Results[t]['N_iterations'] = std_lines[t][-1]
+        return Results
+
+    @staticmethod
+    def _load_amitex_stress_strain(vtk_basename, grip_size=0, ext_size=0,
+                                   grip_dim=2):
+        """Return stress/strain fields as numpy tensors from Amitex vtk output.
+
+        This method must be transfered to a new subpackage SDAmitex_utils
+
+        :param vtk_basename: Basename of vtk stress/Strain fields to load.
+            Fields names are outputed by Amitex with the following structure:
+            'basename' + '_field_component' + '_increment' + '.vtk'.
+        :type vtk_basename: str
+        :param int grip_size: Width in voxels of the material layer used in
+            simulation unit cell for tension grips
+        :param int ext_size: Width in voxels of the void material layer used to
+            simulate free surfaces.
+        :param int grip_dim: Dimension along which the tension test has been
+            simulated (0:x, 1:y, 2:z)
+        :return Stress: Stress tensors dict read from output.
+        :rtype: Dict of Numpy arrays for each increment
+            {Incr(int):[Nx,Ny,Nz,6]}
+        :return Strain: Strain tensors dict read from output.
+        :rtype: Dict of Numpy arrays for each increment
+            {Incr(int):[Nx,Ny,Nz,6]}
+        """
+        # TODO: create SDAmiutexUtils and transfer
+        # local imports
+        import re
+        # Check if stress outputs exist
+        vtk_path = Path(vtk_basename).absolute()
+        # Get all names of vtk files in the directory and associeted increments
+        pattern = re.compile(vtk_path.stem+'_sig\d?_\d+.vtk')
+        incr_pattern = re.compile('\d+.vtk')
+        comp_pattern = re.compile('sig\d')
+        sig_files = []
+        sig_incr = []
+        for filepath in os.listdir(vtk_path.parent):
+            if pattern.match(filepath):
+                fileP = vtk_path.parent / filepath
+                sig_files.append(str(fileP))
+                incr = int(incr_pattern.findall(filepath)[0].strip('.vtk'))
+                if incr is None:
+                    raise ValueError('At least one Amitex_fftp .vtk file in '
+                                     'the directory has no increment number in'
+                                     ' its name.')
+                sig_incr.append(incr)
+        # Get first value to initialize Stress output and find output_slice
+        sig_tmp = Microstructure._read_vtk_legacy(sig_files[0])
+        Sl = Microstructure._get_amitex_tension_test_relevant_slice(
+            init_shape=sig_tmp.shape, grip_size=grip_size, grip_dim=grip_dim,
+            ext_size=ext_size)
+        # TODO: adapt if loading a non symmetric Stress tensor (finite strains)
+        sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0], Sl[2,1] - Sl[2,0],
+                     6)
+        Increments = np.unique(np.array(sig_incr))
+        # Initialize stress dict
+        Stress_dict = {}
+        for incr in Increments:
+            Stress_dict[incr] = np.zeros(shape=sig_shape, dtype=np.double)
+        # Fill Stress dict with output
+        for file in sig_files:
+            sig_tmp = Microstructure._read_vtk_legacy(file, Sl)
+            increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
+            comp_list = comp_pattern.findall(file)
+            if len(comp_list) == 0:
+                Stress_dict[increment] = sig_tmp
+            elif len(comp_list) == 1:
+                component = int(comp_list[0].strip('sig')) - 1
+                # change component to comply to pymicro Voigt convention
+                if component == 3:
+                    component = 5
+                elif component == 5:
+                    component = 3
+                Stress_dict[increment][...,component] = sig_tmp
+            else:
+                raise ValueError(f' Vtk file {file} name has an invalid'
+                                 ' component value (must be one digit).')
+        # Same for strain fields
+        # Get all names of vtk files in the directory and associeted increments
+        pattern = re.compile(vtk_path.stem+'_def\d?_\d+.vtk')
+        incr_pattern = re.compile('\d+.vtk')
+        comp_pattern = re.compile('def\d')
+        eps_files = []
+        eps_incr = []
+        for filepath in os.listdir(vtk_path.parent):
+            if pattern.match(filepath):
+                fileP = vtk_path.parent / filepath
+                eps_files.append(str(fileP))
+                incr = int(incr_pattern.findall(filepath)[0].strip('.vtk'))
+                if incr is None:
+                    raise ValueError('At least one Amitex_fftp .vtk file in '
+                                     'the directory has no increment number in'
+                                     ' its name.')
+                eps_incr.append(incr)
+        Increments = np.unique(np.array(sig_incr))
+        # Initialize stress dict
+        Strain_dict = {}
+        for incr in Increments:
+            Strain_dict[incr] = np.zeros(shape=sig_shape, dtype=np.double)
+        # Fill Stress dict with output
+        for file in eps_files:
+            eps_tmp = Microstructure._read_vtk_legacy(file, Sl)
+            increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
+            comp_list = comp_pattern.findall(file)
+            if len(comp_list) == 0:
+                Strain_dict[increment] = eps_tmp
+            elif len(comp_list) == 1:
+                component = int(comp_list[0].strip('def')) - 1
+                # change component to comply to pymicro Voigt convention
+                if component == 3:
+                    component = 5
+                elif component == 5:
+                    component = 3
+                Strain_dict[increment][...,component] = eps_tmp
+            else:
+                raise ValueError(f' Vtk file {file} name has an invalid'
+                                 ' component value (must be one digit).')
+        return Stress_dict, Strain_dict
+
+    @staticmethod
+    def _read_vtk_legacy(vtk_path, output_slice=None):
+        """Read a Amitex_fftp vtk output and return the fields stored in it.
+
+        This method must be transfered to a new subpackage SDAmitex_utils
+
+        :param vtk_path: name/path of the .vtk file.
+        :type vtk_path: string
+        :param output_slice: Interesting slice of data to get. Used if simulation
+            has been carried with additional materials for tension grips and
+            sample exterior. The slice can be generated with the method
+            '_get_amitex_tension_test_relevant_slice'
+        :type output_slice: numpy array (3,2)
+        :return: Return a dict. of the amitex_fftp output fields stored in
+            the vtk. file, whose keys are the field names.
+        :rtype: dict( 'fieldname':np.double array)
+        """
+        # TODO: create SDAmiutexUtils and transfer
+        # local imports
+        from vtk.util import numpy_support
+        # set file path
+        p = Path(vtk_path).absolute().with_suffix('.vtk')
+        # init vtk reader
+        reader = vtk.vtkGenericDataObjectReader()
+        reader.SetFileName(str(p))
+        reader.Update()
+        # read raw data
+        Array = reader.GetOutput().GetCellData().GetArray(0)
+        spacing = reader.GetOutput().GetSpacing()
+        dim = reader.GetOutput().GetDimensions()
+        output_shape = tuple([i-1 for i in dim])
+        data = numpy_support.vtk_to_numpy(Array)
+        data = data.reshape(output_shape, order='F')
+        # get usefull slice
+        if output_slice is not None:
+            data = data[output_slice[0,0]:output_slice[0,1],
+                        output_slice[1,0]:output_slice[1,1],
+                        output_slice[2,0]:output_slice[2,1],...]
+        return data
+
+    @staticmethod
+    def _get_amitex_tension_test_relevant_slice(init_shape, grip_size=1,
+                                                grip_dim=2, ext_size=1):
+        """Return indices of material unit cell in amitex tension results.
+
+        This method must be transfered to a new subpackage SDAmitex_utils
+
+        :param int grip_size: Width in voxels of the material layer used in
+            simulation unit cell for tension grips
+        :param int grip_dim: Dimension along which the tension test has been
+            simulated (0:x, 1:y, 2:z)
+        :param int ext_size: Width in voxels of the void material layer used to
+            simulate free surfaces.
+        """
+        # TODO: create SDAmiutexUtils and transfer
+        ext_indices = np.setdiff1d([0,1,2], grip_dim)
+        Mat_slice = np.empty(shape=(3,2), dtype=int)
+        # slice for grip
+        Mat_slice[grip_dim,0] = grip_size
+        Mat_slice[grip_dim,1] = init_shape[grip_dim] - grip_size
+        # slice for exterior
+        Mat_slice[ext_indices[0],0] = ext_size
+        Mat_slice[ext_indices[0],1] = init_shape[ext_indices[0]] - ext_size
+        Mat_slice[ext_indices[1],0] = ext_size
+        Mat_slice[ext_indices[1],1] = init_shape[ext_indices[1]] - ext_size
+        return Mat_slice
+
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
         """

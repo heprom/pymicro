@@ -1256,7 +1256,8 @@ class SampleData:
 
         # Create String array
         string_atom = tables.StringAtom(itemsize=255)
-        str_array = self.h5_dataset.create_earray(where=location, name=name,
+        str_array = self.h5_dataset.create_earray(where=location_path,
+                                                  name=name,
                                                   atom=string_atom,
                                                   shape=(0,))
         # Append input string list
@@ -1497,16 +1498,19 @@ class SampleData:
         originalIds = np.arange(Nelems) + 1
         mesh_object.SetElementsOriginalIDs(originalIds)
         # Get mesh fields
-        Field_list =  self.get_attribute('Field_index', meshname)
-        if with_fields:
-            for fieldname in Field_list:
-                field_type = self.get_attribute('field_type', fieldname)
+        mesh_group = self.get_node(meshname)
+        FIndex_path = os.path.join(mesh_group._v_pathname,'Field_index')
+        Field_index = self.get_node(FIndex_path)
+        if with_fields and (Field_index is not None):
+            for fieldname in Field_index:
+                name = fieldname.decode('utf-8')
+                field_type = self.get_attribute('field_type', name)
                 if field_type == 'Nodal_field':
-                    data = self.get_field(fieldname, unpad_field=True)
-                    mesh_object.nodeFields[meshname] = data
+                    data = self.get_field(name, unpad_field=True)
+                    mesh_object.nodeFields[name] = data
                 elif field_type == 'Element_field':
-                    data = self.get_field(fieldname, unpad_field=True)
-                    mesh_object.elemFields[meshname] = data
+                    data = self.get_field(name, unpad_field=True)
+                    mesh_object.elemFields[name] = data
         mesh_object.PrepareForOutput()
         return mesh_object
 
@@ -1709,9 +1713,15 @@ class SampleData:
         :return dict: keys are element tag names in the mesh and values are the
             element type for each element tag.
         """
-        elem_tags = self.get_attribute('Elem_tags_list', meshname)
-        elem_types = self.get_attribute('Elem_tag_type_list', meshname)
-        return {elem_tags[i]:elem_types[i] for i in range(len(elem_tags))}
+        mesh_group = self.get_node(meshname)
+        Etag_list_indexname = mesh_group._v_name+'_ElTagsList'
+        Etag_list = self.get_node(Etag_list_indexname)
+        Etag_Etype_list_indexname = mesh_group._v_name+'_ElTagsTypeList'
+        Etag_Etype_list = self.get_node(Etag_Etype_list_indexname)
+        Tags_dict = {
+            Etag_list[i].decode('utf-8'):Etag_Etype_list[i].decode('utf-8')
+                     for i in range(len(Etag_list))}
+        return Tags_dict
 
     def get_mesh_elem_tags_connectivity(self, meshname, element_tag):
         """Returns the list and types of elements tags defined on a mesh.
@@ -1739,7 +1749,12 @@ class SampleData:
             in dataset
         :return list node_tags: list of node tag names defined on this mesh
         """
-        node_tags = self.get_attribute('Node_tags_list', meshname)
+        mesh_group = self.get_node(meshname)
+        Ntag_list_indexname = mesh_group._v_name+'_NodeTagsList'
+        NTags_list = self.get_node(Ntag_list_indexname).read()
+        node_tags = []
+        for tag in NTags_list:
+            node_tags.append(tag.decode('utf-8'))
         return node_tags
 
 
@@ -1768,16 +1783,19 @@ class SampleData:
         image_object.SetSpacing(spacing)
         image_object.SetOrigin(origin)
         # Get image fields
-        Field_list =  self.get_attribute('Field_index', imagename)
-        if with_fields and (Field_list is not None):
-            for fieldname in Field_list:
-                field_type = self.get_attribute('field_type', fieldname)
+        image_group = self.get_node(imagename)
+        FIndex_path = os.path.join(image_group._v_pathname,'Field_index')
+        Field_index = self.get_node(FIndex_path)
+        if with_fields and (Field_index is not None):
+            for fieldname in Field_index:
+                name = fieldname.decode('utf-8')
+                field_type = self.get_attribute('field_type', name)
                 if field_type == 'Nodal_field':
-                    data = self.get_node(fieldname,as_numpy=True)
-                    image_object.nodeFields[fieldname] = data
+                    data = self.get_node(name,as_numpy=True)
+                    image_object.nodeFields[name] = data
                 elif field_type == 'Element_field':
-                    data = self.get_node(fieldname,as_numpy=True)
-                    image_object.elemFields[fieldname] = data
+                    data = self.get_node(name,as_numpy=True)
+                    image_object.elemFields[name] = data
         return image_object
 
     def get_tablecol(self, tablename, colname):
@@ -3252,13 +3270,6 @@ class SampleData:
             # remove from index : Nodesets may be too numerous and overload
             # content index --> actual choice is to remove them from index
             self._remove_from_index(node._v_pathname)
-            # ???: Xdmf Sets --> utility not clear for now, code kept as
-            # comments as a precaution
-            # node_list_path = os.path.join(Ntags_group._v_pathname,'NT_'+name)
-            # self._add_xdmf_node_element_set(
-            #     subset_list_path=node_list_path, set_type='Node',
-            #     setname=name, grid_name=mesh_group._v_pathname,
-            #     attributename=name)
             if bin_fields_from_sets:
                 # Add node tags as fields in the dataset and XDMF file
                 data = np.zeros((mesh_object.GetNumberOfNodes(),1),
@@ -3274,8 +3285,10 @@ class SampleData:
                 # overload content index --> actual choice is to remove
                 # them from index
                 self._remove_from_index(node._v_pathname)
-        self.add_attributes({'Node_tags_list': Node_tags_list},
-                            mesh_group._v_pathname)
+        self.add_string_array(
+            name='Node_tags_list', location=geo_group._v_pathname,
+            indexname=mesh_group._v_name+'_NodeTagsList', data=Node_tags_list)
+        return
 
     def _add_mesh_elems_tags(self, mesh_object, mesh_group, geo_group,
                              replace, bin_fields_from_sets):
@@ -3308,14 +3321,6 @@ class SampleData:
                 # remove from index : Elsets may be too numerous and overload
                 # content index --> actual choice is to remove them from index
                 self._remove_from_index(node._v_pathname)
-                # ???: Xdmf Sets --> utility not clear for now, code kept as
-                # comments as a precaution
-                # elem_list_path = os.path.join(Etags_group._v_pathname,
-                #                               'ET_'+name)
-                # self._add_xdmf_node_element_set(
-                #     subset_list_path=elem_list_path, set_type='Cell',
-                #     setname=name, grid_name=mesh_group._v_pathname,
-                #     attributename=name)
                 if bin_fields_from_sets:
                     # Add elem tags as fields in the dataset and XDMF file
                     elem_list_field = mesh_object.GetElementsInTag(tagname)
@@ -3332,9 +3337,13 @@ class SampleData:
                     # overload content index --> actual choice is to remove
                     # them from index
                     self._remove_from_index(node._v_pathname)
-        self.add_attributes({'Elem_tags_list': Elem_tags_list,
-                             'Elem_tag_type_list': Elem_tag_type_list},
-                            mesh_group._v_pathname)
+        self.add_string_array(
+            name='Elem_tags_list', location=geo_group._v_pathname,
+            indexname=mesh_group._v_name+'_ElTagsList', data=Elem_tags_list)
+        self.add_string_array(
+            name='Elem_tag_type_list', location=geo_group._v_pathname,
+            indexname=mesh_group._v_name+'_ElTagsTypeList',
+            data=Elem_tag_type_list)
 
     def _add_xdmf_node_element_set(self, subset_list_path, set_type='Cell',
                                    setname='', grid_name='',
@@ -3390,8 +3399,10 @@ class SampleData:
         mesh_group = self.get_node(meshname)
         Ntags_group = self.get_node(mesh_group._v_name+'_NodeTags')
         if Ntags_group is not None:
-            Ntag_list = self.get_attribute('Node_tags_list', meshname)
-            for tag_name in Ntag_list:
+            Ntag_list_indexname = mesh_group._v_name+'_NodeTagsList'
+            Ntag_list = self.get_node(Ntag_list_indexname)
+            for name in Ntag_list:
+                tag_name = name.decode('utf-8')
                 tag = mesh_object.GetNodalTag(tag_name)
                 tag_path = os.path.join(Ntags_group._v_pathname,'NT_'+tag_name)
                 tag.SetIds(self.get_node(tag_path, as_numpy))
@@ -3409,12 +3420,14 @@ class SampleData:
         offset_dic = {element_type[i]:offsets[i] for i in range(len(offsets))}
         # load element tags
         if Etags_group is not None:
-            Etag_list = self.get_attribute('Elem_tags_list', meshname)
-            Etag_Etype_list = self.get_attribute('Elem_tag_type_list',
-                                                 meshname)
+            Etag_list_indexname = mesh_group._v_name+'_ElTagsList'
+            Etag_list = self.get_node(Etag_list_indexname)
+            Etag_Etype_list_indexname = mesh_group._v_name+'_ElTagsTypeList'
+            Etag_Etype_list = self.get_node(Etag_Etype_list_indexname)
+
             for i in range(len(Etag_list)):
-                tag_name = Etag_list[i]
-                el_type = Etag_Etype_list[i]
+                tag_name = Etag_list[i].decode('UTF-8')
+                el_type = Etag_Etype_list[i].decode('UTF-8')
                 elem_container = AllElements.GetElementsOfType(el_type)
                 tag = elem_container.tags.CreateTag(tag_name,False)
                 tag_path = os.path.join(Etags_group._v_pathname,'ET_'+tag_name)
@@ -3618,12 +3631,16 @@ class SampleData:
 
     def _append_field_index(self, gridname, fieldname):
         """Append field name to the field index of a grid group."""
-        Field_index = self.get_attribute('Field_index', gridname)
+        grid = self.get_node(gridname)
+        index_path = os.path.join(grid._v_pathname,'Field_index')
+        Field_index = self.get_node(index_path)
         if Field_index is None:
-            Field_index = []
-        if fieldname not in Field_index:
-            Field_index.append(fieldname)
-        self.add_attributes({'Field_index': Field_index}, gridname)
+            Field_index = self.add_string_array(
+                'Field_index', location=grid._v_pathname,
+                indexname=grid._v_name+'Field_index')
+        test_str = bytes(fieldname,'utf-8')
+        if test_str not in Field_index:
+            Field_index.append([fieldname])
         return
 
     def _transpose_field_comp(self, dimensionality, array):

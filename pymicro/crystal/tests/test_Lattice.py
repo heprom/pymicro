@@ -118,14 +118,14 @@ class HklDirectionTests(unittest.TestCase):
         self.assertEqual(v, 0)
         self.assertEqual(w, 0)
         u, v, w = HklDirection.four_to_three_indices(1, 0, -1, 1)
-        self.assertEqual(u, 1)
-        self.assertEqual(v, 0)
+        self.assertEqual(u, 2)
+        self.assertEqual(v, 1)
         self.assertEqual(w, 1)
         U, V, T, W = HklDirection.three_to_four_indices(1, 1, 1)
         self.assertEqual(U, 1)
         self.assertEqual(V, 1)
         self.assertEqual(T, -2)
-        self.assertEqual(W, 1)
+        self.assertEqual(W, 3)
         U, V, T, W = HklDirection.three_to_four_indices(2, 1, 0)
         self.assertEqual(U, 1)
         self.assertEqual(V, 0)
@@ -273,6 +273,26 @@ class HklPlaneTests(unittest.TestCase):
         l = Lattice.cubic(0.287)  # FCC iron
         hkl = HklPlane(2, 0, 0, l)  # 200 reflection at 8 keV is at 32.7 deg
         self.assertAlmostEqual(hkl.bragg_angle(8), 0.5704164)
+
+    def test_4indices_representation(self):
+        h, k, l = HklPlane.four_to_three_indices(2, -1, -1, 0)
+        self.assertEqual(h, 2)
+        self.assertEqual(k, -1)
+        self.assertEqual(l, 0)
+        h, k, l = HklPlane.four_to_three_indices(1, 0, -1, 1)
+        self.assertEqual(h, 1)
+        self.assertEqual(k, 0)
+        self.assertEqual(l, 1)
+        h, k, i, l = HklPlane.three_to_four_indices(1, 1, 1)
+        self.assertEqual(h, 1)
+        self.assertEqual(k, 1)
+        self.assertEqual(i, -2)
+        self.assertEqual(l, 1)
+        h, k, i, l = HklPlane.three_to_four_indices(2, 1, 0)
+        self.assertEqual(h, 2)
+        self.assertEqual(k, 1)
+        self.assertEqual(i, -3)
+        self.assertEqual(l, 0)
 
 
 class SlipSystemTests(unittest.TestCase):

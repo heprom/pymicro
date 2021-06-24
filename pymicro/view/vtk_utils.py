@@ -559,8 +559,8 @@ def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, labe
     arrowSource.SetTipRadius(10 * radius / 3.)
     # We build a local direct base with X being the unit arrow vector
     X = vector / n
-    arb = np.array([1, 0, 0])  # used numpy here, could used the vtkMath module as well...
-    if np.dot(X, arb) == 1:
+    arb = np.array([1, 0, 0])
+    if abs(np.dot(X, arb)) == 1:  # avoid using 2 colinear vectors
         arb = np.array([0, 1, 0])
     Z = np.cross(X, arb)
     Y = np.cross(Z, X)
@@ -571,11 +571,12 @@ def unit_arrow_3d(start, vector, color=orange, radius=0.03, make_unit=True, labe
                 0, 0, 1, start[2],
                 0, 0, 0, 1))
     # Create the direction cosine matrix
-    if make_unit: n = 1
+    if make_unit:
+        n = 1
     for i in range(3):
-        m.SetElement(i, 0, n * X[i]);
-        m.SetElement(i, 1, n * Y[i]);
-        m.SetElement(i, 2, n * Z[i]);
+        m.SetElement(i, 0, n * X[i])
+        m.SetElement(i, 1, n * Y[i])
+        m.SetElement(i, 2, n * Z[i])
     t = vtk.vtkTransform()
     t.Identity()
     t.Concatenate(m)
@@ -2124,7 +2125,7 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
             #workaround as SetCellVisibilityArray is not available anymore after vtk 6.3
             if (vtk.vtkVersion().GetVTKMajorVersion() > 6) | (vtk.vtkVersion().GetVTKMajorVersion() == 6 and vtk.vtkVersion().GetVTKMinorVersion() > 2):
                 ids_to_blank = np.argwhere(data.transpose(2, 1, 0).flatten() == 0)
-                [grid.BlankCell(i) for i in ids_to_blank]
+                [grid.BlankCell(i) for i in np.ravel(ids_to_blank)]
             else:
                 visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
                 grid.SetCellVisibilityArray(visible)

@@ -536,7 +536,7 @@ def output_tikzpicture(proj_dif, omegas, gid=1, d_uv=[0, 0], suffix=''):
     f.close()
 
 
-def tt_rock(scan_name, data_dir='.', n_topo=-1, dark_factor=1.):
+def tt_rock(scan_name, data_dir='.', n_topo=-1, mask=None, dark_factor=1.):
     from pymicro.file.file_utils import edf_read
 
     # parse the info file
@@ -562,6 +562,16 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, dark_factor=1.):
         n_topo = int(n_frames / infos['TOMO_N'])
     print('number of frames to sum for a topograph = %d' % n_topo)
 
+    # handle mask
+    if mask is None:
+        mask = np.ones((infos['Dim_1'], infos['Dim_2'], infos['TOMO_N']), dtype=np.uint8)
+    else:
+        # double check mask size
+        if not (mask.shape[0] == infos['Dim_1'] and mask.shape[1] == infos['Dim_2']
+            and mask.shape[2] == infos['TOMO_N']):
+            print('wrong mask size: {}, should be ({}, {}, {})'.format(
+                mask.shape, infos['Dim_1'], infos['Dim_2'], infos['TOMO_N']))
+            mask = np.ones((infos['Dim_1'], infos['Dim_2'], infos['TOMO_N']), dtype=np.uint8)
     # load dark image
     dark = dark_factor * edf_read(os.path.join(data_dir, scan_name, 'darkend0000.edf'))
     print('dark average: ' % np.mean(dark))
@@ -575,7 +585,7 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, dark_factor=1.):
             index = offset + i + 1
             frame_path = os.path.join(data_dir, scan_name, '%s%04d.edf' % (scan_name, index))
             im = edf_read(frame_path) - dark
-            tt_rock[n, i] = np.sum(im)
+            tt_rock[n, i] = np.sum(im * mask[:, :, n])
             if n == 2:
                 print(frame_path, tt_rock[n, i])
     print('done')

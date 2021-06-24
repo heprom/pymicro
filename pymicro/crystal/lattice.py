@@ -970,18 +970,35 @@ class SlipSystem:
         """create a slip system from the indices of the plane and the direction.
 
         This method create a `SlipSystem` instance by associating a slip plane
-        and a slip direction both given by their Miller indices.
+        and a slip direction both given by their Miller indices. In the case of
+        a hexagonal crystal lattice, the Miller-Bravais (4 indices) notation
+        can be used. If this notation is used without specifying any lattice,
+        a default hexagonal lattice is created.
 
         :param tuple plane_indices: the miller indices for the slip plane.
         :param tuple direction_indices: the miller indices for the slip direction.
         :param Lattice lattice: the crystal lattice.
         :return: the new `SlipSystem` instance.
+        :raise: ValueError if the 4 indices notation is used with a non
+        hexagonal crystal lattice.
         """
+        hexagonal = False
         if len(plane_indices) == 4:
+            # hexagonal case, compute the 3 indices representation
             plane_indices = HklPlane.four_to_three_indices(plane_indices)
-        plane = HklPlane(*plane_indices, lattice)
-        if len(plane_indices) == 4:
+            hexagonal = True
+        if len(direction_indices) == 4:
             direction_indices = HklDirection.four_to_three_indices(direction_indices)
+            hexagonal = True
+        if hexagonal:
+            # verify the lattice is hexagonal or create a default one
+            if lattice and lattice.get_symmetry() != 'hexagonal':
+                raise ValueError('4 indices notation can only be used with '
+                                 'a hexagonal lattice')
+            else:
+                print('creating a default hexagonal lattice')
+                lattice = Lattice.hexagonal(1.0, 1.0)
+        plane = HklPlane(*plane_indices, lattice)
         direction = HklDirection(*direction_indices, lattice)
         return SlipSystem(plane, direction)
 

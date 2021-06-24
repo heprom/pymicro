@@ -4,6 +4,7 @@ import os
 from pymicro.external import CifFile_module as CifFile
 import enum
 import functools
+import math
 import numpy as np
 from numpy import pi, dot, transpose, radians
 from matplotlib import pyplot as plt
@@ -266,12 +267,30 @@ class Symmetry(enum.Enum):
             raise ValueError('warning, symmetry not supported: %s' % self)
         return sym
 
-    def move_rotation_to_FZ(self, g, verbose=False):
+    def move_vector_to_FZ(self, v):
         """
-        Compute the rotation matrix in the Fundamental Zone of a given `Symmetry` instance.
+        Move the vector to the Fundamental Zone of a given `Symmetry` instance.
 
-        :param g: a 3x3 matrix representing the rotation
-        :param verbose: flag for verbose mode
+        :param v: a 3 components vector.
+        :return: a new 3 components vector in the fundamental zone.
+        """
+        omegas = []  # list to store all the rotation angles
+        syms = self.symmetry_operators()
+        for sym in syms:
+            # apply symmetry to the vector and compute the corresponding angle
+            v_sym = np.dot(sym, v)
+            omega = 2 * np.arctan(np.linalg.norm(v_sym)) * 180 / np.pi
+            omegas.append(omega)
+        # the fundamental zone corresponds to the minimum angle
+        index = np.argmin(omegas)
+        return np.dot(syms[index], v)
+
+    def move_rotation_to_FZ(self, g, verbose=False):
+        """Compute the rotation matrix in the Fundamental Zone of a given
+        `Symmetry` instance.
+
+        :param g: a 3x3 matrix representing the rotation.
+        :param verbose: flag for verbose mode.
         :return: a new 3x3 matrix for the rotation in the fundamental zone.
         """
         omegas = []  # list to store all the rotation angles
@@ -1168,12 +1187,13 @@ class HklDirection(HklObject):
     @staticmethod
     def three_to_four_indices(u, v, w):
         """Convert from Miller indices to Miller-Bravais indices. this is used for hexagonal crystal lattice."""
-        return (2 * u - v) / 3., (2 * v - u) / 3., -(u + v) / 3., w
+        U, V, T, W = 2 * u - v, 2 * v - u, -(u + v), 3 * w
+        gcd = functools.reduce(math.gcd, (U, V, T, W))
+        return U / gcd, V / gcd, T / gcd, W / gcd
 
     @staticmethod
     def four_to_three_indices(U, V, T, W):
         """Convert from Miller-Bravais indices to Miller indices. this is used for hexagonal crystal lattice."""
-        import math
         u, v, w = U - T, V - T, W
         gcd = functools.reduce(math.gcd, (u, v, w))
         return u / gcd, v / gcd, w / gcd

@@ -152,6 +152,62 @@ class Orientation:
         phi2 = random() * 360.
         return Orientation.from_euler([phi1, Phi, phi2])
 
+    def ipf_color(self, axis=np.array([0., 0., 1.]), symmetry=Symmetry.cubic, saturate=True):
+        """Compute the IPF (inverse pole figure) colour for this orientation.
+
+        This method has bee adapted from the DCT code.
+
+        .. note::
+
+          This method coexist with the `get_ipf_colour` for the moment.
+
+        :param ndarray axis: the direction to use to compute the IPF colour.
+        :param Symmetry symmetry: the symmetry operator to use.
+        :return bool saturate: a flag to saturate the RGB values.
+        """
+        axis /= np.linalg.norm(axis)
+        Vc = np.dot(self.orientation_matrix(), axis)
+        # get the symmetry operators
+        syms = symmetry.symmetry_operators()
+        syms = np.concatenate((syms, -syms))
+        Vc_syms = np.dot(syms, Vc)
+        # phi: rotation around 001 axis, from 100 axis to Vc vector, projected on (100,010) plane
+        Vc_phi = np.arctan2(Vc_syms[:, 1], Vc_syms[:, 0]) * 180 / pi
+        # chi: rotation around 010 axis, from 001 axis to Vc vector, projected on (100,001) plane
+        Vc_chi = np.arctan2(Vc_syms[:, 0], Vc_syms[:, 2]) * 180 / pi
+        # psi : angle from 001 axis to Vc vector
+        Vc_psi = np.arccos(Vc_syms[:, 2]) * 180 / pi
+        if symmetry is Symmetry.cubic:
+            angleR = 45 - Vc_chi  # red color proportional to (45 - chi)
+            minAngleR = 0
+            maxAngleR = 45
+            angleB = Vc_phi  # blue color proportional to phi
+            minAngleB = 0
+            maxAngleB = 45
+        elif symmetry is Symmetry.hexagonal:
+            angleR = 90 - Vc_psi  # red color proportional to (90 - psi)
+            minAngleR = 0
+            maxAngleR = 90
+            angleB = Vc_phi  # blue color proportional to phi
+            minAngleB = 0
+            maxAngleB = 30
+        else:
+            raise(ValueError('unsupported crystal symmetry to compute IPF color'))
+        # find the axis lying in the fundamental zone
+        fz_list = ((angleR >= minAngleR) & (angleR < maxAngleR) &
+                   (angleB >= minAngleB) & (angleB < maxAngleB)).tolist()
+        if not fz_list.count(True) == 1:
+            raise(ValueError('problem moving to the fundamental zone'))
+            return None
+        i_SST = fz_list.index(True)
+        r = angleR[i_SST] / maxAngleR
+        g = (maxAngleR - angleR[i_SST]) / maxAngleR * (maxAngleB - angleB[i_SST]) / maxAngleB
+        b = (maxAngleR - angleR[i_SST]) / maxAngleR * angleB[i_SST] / maxAngleB
+        rgb = np.array([r, g, b])
+        if saturate:
+            rgb = rgb / rgb.max()
+        return rgb
+
     def get_ipf_colour(self, axis=np.array([0., 0., 1.]), symmetry=Symmetry.cubic):
         """Compute the IPF (inverse pole figure) colour for this orientation.
 
@@ -1657,7 +1713,7 @@ class Microstructure(SampleData):
                                            phase_map.shape[1], 1))
         return phase_map
 
-    def get_mask(self, as_numpy=False):
+    def get_mask(self, as_numpy=True):
         mask = self.get_node(name='mask', as_numpy=as_numpy)
         if self._is_empty('mask'):
             mask = None
@@ -2157,16 +2213,16 @@ class Microstructure(SampleData):
         # remove -1 and 0 from the list of grains in grain map (Ids reserved
         # for background and overlaps in non-dilated reconstructed grain maps)
         grain_list = np.delete(grain_list, np.isin(grain_list, [-1, 0]))
-        if not np.all(np.isin(grain_list,grainIds)):
+        if not np.all(np.isin(grain_list, grainIds)):
             raise ValueError('Some grain Ids in `grain_map` are not referenced'
                              ' in the `GrainDataTable` array. Cannot create'
                              ' orientation map.')
         # create empty orientation map with right dimensions
-        im_dim = self.get_attribute('dimension','CellData')
+        im_dim = self.get_attribute('dimension', 'CellData')
         shape_orientation_map = np.empty(shape=(len(im_dim)+1), dtype='int32')
         shape_orientation_map[:-1] = im_dim
         shape_orientation_map[-1] = 3
-        orientation_map = np.zeros(shape=shape_orientation_map,dtype=float)
+        orientation_map = np.zeros(shape=shape_orientation_map, dtype=float)
         omap_X = orientation_map[..., 0]
         omap_Y = orientation_map[..., 1]
         omap_Z = orientation_map[..., 2]
@@ -2177,24 +2233,58 @@ class Microstructure(SampleData):
             omap_Z[slc] = grain_orientations[i, 2]
         if store:
             self.add_field(gridname='CellData', fieldname='orientation_map',
-                           array=orientation_map)
+                           array=orientation_map, replace=True)
         return orientation_map
 
+    def create_IPF_map(self, axis=np.array([0., 0., 1.]), store=True):
+        """Create a vector field in CellData to store the IPF colors.
+
+        Creates a (Nx, Ny, Nz, 3) field with the IPF color for each voxel.
+        Note that this function assumes a single orientation per grain.
+
+        :param axis: the unit vector for the load direction to compute IPF
+        colors.
+        :param bool store: If `True`, store the IPF map in the `CellData`
+        image group, with name `ipf_map`
+        """
+        dims = self.get_attribute('dimension', 'CellData')
+        grain_ids = self.get_grain_ids()
+        grain_map = self.get_grain_map()
+        shape_ipf_map = list(dims) + [3]
+        ipf_map = np.zeros(shape=shape_ipf_map, dtype=float)
+        for i in range(len(grain_ids)):
+            gid = grain_ids[i]
+            o = self.get_grain(gid).orientation
+            ipf_map[grain_map == gid] = o.ipf_color(axis)
+        if store:
+            self.add_field(gridname='CellData', fieldname='ipf_map',
+                           array=ipf_map, replace=True)
+        return ipf_map
+
     def view_slice(self, slice=None, color='random', show_mask=True,
-                   show_grain_ids=False, highlight_ids=None):
+                   show_grain_ids=False, highlight_ids=None, slip_system=None,
+                   axis=[0., 0., 1]):
         """A simple utility method to show one microstructure slice.
 
+        The microstructure can be colored using different fields such as a
+        random color (default), the grain ids, the Schmid factor or the grain
+        orientation using IPF coloring.
         The plot can be customized in several ways. Annotations can be added
         in the grains (ids, lattice plane traces) and the list of grains where
         annotations are shown can be controled using the `highlight_ids`
         argument. By default, if present, the mask will be shown.
 
         :param int slice: the slice number
-        :param str color: a string to chose the colormap from ('random', 'ipf')
+        :param str color: a string to chose the colormap from ('random',
+        'grain_ids', 'schmid', 'ipf')
         :param bool show_mask: a flag to show the mask by transparency.
         :param bool show_grain_ids: a flag to annotate the plot with the grain ids.
         :param list highlight_ids: a list of grain ids to restrict the
         annotations (by default all grains are annotated).
+        :param slip_system: an instance (or a list of instances) of the class
+        SlipSystem to compute the Schmid factor.
+        :param axis: the unit vector for the load direction to compute
+        the Schmid factor or to display IPF coloring.
         """
         if self._is_empty('grain_map'):
             print('Microstructure instance mush have a grain_map field to use '
@@ -2204,16 +2294,52 @@ class Microstructure(SampleData):
         if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
             slice = grain_map.shape[2] // 2
             print('using slice value %d' % slice)
-        if color == 'random':
-            grain_cmap = Microstructure.rand_cmap(first_is_black=True)
-        elif color == 'ipf':
-            grain_cmap = self.ipf_cmap()
-        else:
-            grain_cmap = 'viridis'
         grains_slice = grain_map[:, :, slice]
         print(grains_slice.shape)
+        gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
+        print(gids)
+        print(len(gids))
         fig, ax = plt.subplots()
-        ax.imshow(grains_slice.T, cmap=grain_cmap, vmin=0)
+        if color == 'random':
+            grain_cmap = Microstructure.rand_cmap(first_is_black=True)
+            ax.imshow(grains_slice.T, cmap=grain_cmap, vmin=0, interpolation='nearest')
+        elif color == 'grain_ids':
+            ax.imshow(grains_slice.T, cmap='viridis', vmin=0, interpolation='nearest')
+        elif color == 'schmid':
+            # construct a Schmid factor image
+            schmid_image = np.zeros_like(grains_slice, dtype=float)
+            for gid in gids:
+                o = self.get_grain(gid).orientation
+                if type(slip_system) == list:
+                    # compute max Schmid factor
+                    sf = max(o.compute_all_schmid_factors(
+                        slip_systems=slip_system, load_direction=axis))
+                else:
+                    sf = o.schmid_factor(slip_system, axis)
+                schmid_image[grains_slice == gid] = sf
+            from matplotlib import cm
+            plt.imshow(schmid_image.T, cmap=cm.gray, vmin=0, vmax=0.5, interpolation='nearest')
+            cb = plt.colorbar()
+            cb.set_label('Schmid factor')
+        elif color == 'ipf':
+            # build IPF image
+            ipf_image = np.zeros((*grains_slice.shape, 3), dtype=float)
+            print(ipf_image.shape)
+            for gid in gids:
+                o = self.get_grain(gid).orientation
+                try:
+                    c = o.ipf_color(axis, symmetry=self.get_lattice().get_symmetry(), saturate=True)
+                except ValueError:
+                    print('problem moving to the fundamental zone for rodrigues vector {}'.format(o.rod))
+                    c = np.array([0., 0., 0.])
+                ipf_image[grains_slice == gid] = c
+            print(ipf_image.ndim, ipf_image.shape[-1])
+            print(ipf_image[0, 0, :])
+            plt.imshow(ipf_image.transpose(1, 0, 2), interpolation='nearest')
+        else:
+            print('unknown color scheme requested, please chose between {random, '
+                  'grain_ids, schmid, ipf}, returning')
+            return
         ax.xaxis.set_label_position('top')
         plt.xlabel('X')
         plt.ylabel('Y')
@@ -2222,9 +2348,6 @@ class Microstructure(SampleData):
             mask = self.get_mask()
             plt.imshow(mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
         if show_grain_ids:
-            gids = np.unique(grains_slice)
-            print(gids)
-            print(len(gids))
             centers = np.zeros((len(gids), 2))
             for i, gid in enumerate(gids):
                 if highlight_ids and gid not in highlight_ids:
@@ -3501,7 +3624,7 @@ class Microstructure(SampleData):
             spacing = f['LabDCT']['Spacing'][0]
             rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()].transpose(2, 1, 0, 3)
             grain_map = f['LabDCT']['Data']['GrainId'][()].transpose(2, 1, 0)
-            print(grain_map.shape)
+            print('adding cell data with shape {}'.format(grain_map.shape))
             micro.set_grain_map(grain_map, voxel_size=spacing)
             mask = f['LabDCT']['Data']['Mask'][()].transpose(2, 1, 0)
             micro.set_mask(mask, voxel_size=spacing)
@@ -3526,9 +3649,10 @@ class Microstructure(SampleData):
         print(grain_ids)
         micro.build_grain_table_from_grain_map()
         # now get each grain orientation from the rodrigues map
-        for g in micro.grains:
+        for i, g in enumerate(micro.grains):
             gid = g['idnumber']
-            print(gid, g['center'])
+            progress = (1 + i) / len(micro.grains)
+            print('adding grains: {0:.2f} %'.format(progress), end='\r')
             x, y, z = np.where(micro.get_grain_map() == gid)
             orientation = rodrigues_map[x[0], y[0], z[0]]
             # assign orientation to this grain
@@ -3580,6 +3704,7 @@ class Microstructure(SampleData):
             return None
         from scipy.io import loadmat
         index = loadmat(index_path)
+        #TODO fetch pixel size from detgeo instead
         voxel_size = index['cryst'][0][0][25][0][0]
         # grab the crystal lattice
         lattice_params = index['cryst'][0][0][3][0]
@@ -3723,16 +3848,24 @@ class Microstructure(SampleData):
         micro.add_data_array(location='CellData', name='iq', array=iq_array, replace=True)
         micro.add_data_array(location='CellData', name='ci', array=ci_array, replace=True)
         micro.add_field(gridname='CellData', fieldname='euler', array=euler)
-
+        print('grain_ids shape', grain_ids.shape)
+        print('iq shape', iq.shape)
+        print('iq node shape', micro.get_node('iq').shape)
+        print('euler shape', euler.shape)
+        print('euler node shape', micro.get_node('euler').shape)
         grains = micro.grains.row
-        for gid in np.unique(grain_ids):
+        grain_ids_list = np.unique(grain_ids).tolist()
+        for gid in grain_ids_list:
             if gid == 0:
                 continue
+            progress = 100 * (1 + grain_ids_list.index(gid)) / len(grain_ids_list)
+            print('addding grains: {0:.2f} %'.format(progress))#, end='\r')
             print('adding grain %d' % gid)
             # use the first pixel of the grain
             pixel = np.where(grain_ids == gid)[0][0], np.where(grain_ids == gid)[1][0]
+            print(pixel)
             # TODO compute mean grain orientation
-            o_tsl = Orientation.from_euler(np.degrees(micro.get_node('euler')[pixel]))
+            o_tsl = Orientation.from_euler(np.degrees(euler[pixel]))
             # TODO link OimScan lattice to pymicro
             # o_fz = o_tsl.move_to_FZ(symmetry=Ti7Al._symmetry)
             grains['idnumber'] = gid

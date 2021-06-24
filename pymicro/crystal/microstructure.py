@@ -2236,7 +2236,25 @@ class Microstructure(SampleData):
                            array=orientation_map, replace=True)
         return orientation_map
 
-    def create_IPF_map(self, axis=np.array([0., 0., 1.]), store=True):
+    def add_IPF_maps(self):
+        """Add IPF maps to the data set.
+
+        IPF colors are computed for the 3 cartesian directions and stored into
+        the h5 file in the `CellData` image group, with names `ipf_map_100`,
+        `ipf_map_010`, `ipf_map_001`.
+        """
+        ipf100 = self.create_IPF_map(self, axis=np.array([1., 0., 0.]))
+        self.add_field(gridname='CellData', fieldname='ipf_map_100',
+                       array=ipf100, replace=True)
+        ipf010 = self.create_IPF_map(self, axis=np.array([0., 1., 0.]))
+        self.add_field(gridname='CellData', fieldname='ipf_map_010',
+                       array=ipf010, replace=True)
+        ipf001 = self.create_IPF_map(self, axis=np.array([0., 0., 1.]))
+        self.add_field(gridname='CellData', fieldname='ipf_map_001',
+                       array=ipf001, replace=True)
+        del ipf100, ipf010, ipf001
+
+    def create_IPF_map(self, axis=np.array([0., 0., 1.])):
         """Create a vector field in CellData to store the IPF colors.
 
         Creates a (Nx, Ny, Nz, 3) field with the IPF color for each voxel.
@@ -2244,8 +2262,6 @@ class Microstructure(SampleData):
 
         :param axis: the unit vector for the load direction to compute IPF
         colors.
-        :param bool store: If `True`, store the IPF map in the `CellData`
-        image group, with name `ipf_map`
         """
         dims = self.get_attribute('dimension', 'CellData')
         grain_ids = self.get_grain_ids()
@@ -2256,9 +2272,6 @@ class Microstructure(SampleData):
             gid = grain_ids[i]
             o = self.get_grain(gid).orientation
             ipf_map[grain_map == gid] = o.ipf_color(axis)
-        if store:
-            self.add_field(gridname='CellData', fieldname='ipf_map',
-                           array=ipf_map, replace=True)
         return ipf_map
 
     def view_slice(self, slice=None, color='random', show_mask=True,

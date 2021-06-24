@@ -2243,13 +2243,13 @@ class Microstructure(SampleData):
         the h5 file in the `CellData` image group, with names `ipf_map_100`,
         `ipf_map_010`, `ipf_map_001`.
         """
-        ipf100 = self.create_IPF_map(self, axis=np.array([1., 0., 0.]))
+        ipf100 = self.create_IPF_map(axis=np.array([1., 0., 0.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_100',
                        array=ipf100, replace=True)
-        ipf010 = self.create_IPF_map(self, axis=np.array([0., 1., 0.]))
+        ipf010 = self.create_IPF_map(axis=np.array([0., 1., 0.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_010',
                        array=ipf010, replace=True)
-        ipf001 = self.create_IPF_map(self, axis=np.array([0., 0., 1.]))
+        ipf001 = self.create_IPF_map(axis=np.array([0., 0., 1.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_001',
                        array=ipf001, replace=True)
         del ipf100, ipf010, ipf001
@@ -2265,7 +2265,7 @@ class Microstructure(SampleData):
         """
         dims = self.get_attribute('dimension', 'CellData')
         grain_ids = self.get_grain_ids()
-        grain_map = self.get_grain_map()
+        grain_map = np.squeeze(self.get_grain_map())
         shape_ipf_map = list(dims) + [3]
         ipf_map = np.zeros(shape=shape_ipf_map, dtype=float)
         for i in range(len(grain_ids)):
@@ -3830,7 +3830,8 @@ class Microstructure(SampleData):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
-        :param list roi: a list of 4 integers to crop the EBSD scan.
+        :param list roi: a list of 4 integers in the form [x1, x2, y1, y2]
+        to crop the EBSD scan.
         :return: a new instance of `Microstructure`.
         """
         name = os.path.splitext(os.path.basename(file_path))[0]

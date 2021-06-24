@@ -1066,8 +1066,23 @@ class SlipSystem:
             pss2 = SlipSystem(p_prism2, HklDirection(*HklDirection.four_to_three_indices(-1, 2, -1, 0), lattice))
             pss3 = SlipSystem(p_prism3, HklDirection(*HklDirection.four_to_three_indices(-1, -1, 2, 0), lattice))
             slip_systems = [pss1, pss2, pss3]
+        elif slip_type == 'pyr1_a':
+            p_pyr1 = HklPlane(*HklPlane.four_to_three_indices(1, 0, -1, 1), lattice)
+            p_pyr2 = HklPlane(*HklPlane.four_to_three_indices(0, -1, 1, 1), lattice)
+            p_pyr3 = HklPlane(*HklPlane.four_to_three_indices(-1, 1, 0, 1), lattice)
+            p_pyr4 = HklPlane(*HklPlane.four_to_three_indices(-1, 0, 1, 1), lattice)
+            p_pyr5 = HklPlane(*HklPlane.four_to_three_indices(0, 1, -1, 1), lattice)
+            p_pyr6 = HklPlane(*HklPlane.four_to_three_indices(1, -1, 0, 1), lattice)
+            # pyramidal1 <a> slip systems
+            pyrss1 = SlipSystem(p_pyr1, HklDirection(*HklDirection.four_to_three_indices(-1, 2, -1, 0), lattice))
+            pyrss2 = SlipSystem(p_pyr2, HklDirection(*HklDirection.four_to_three_indices(2, -1, -1, 0), lattice))
+            pyrss3 = SlipSystem(p_pyr3, HklDirection(*HklDirection.four_to_three_indices(-1, -1, 2, 0), lattice))
+            pyrss4 = SlipSystem(p_pyr4, HklDirection(*HklDirection.four_to_three_indices(1, -2, 1, 0), lattice))
+            pyrss5 = SlipSystem(p_pyr5, HklDirection(*HklDirection.four_to_three_indices(-2, 1, 1, 0), lattice))
+            pyrss6 = SlipSystem(p_pyr6, HklDirection(*HklDirection.four_to_three_indices(1, 1, -2, 0), lattice))
+            slip_systems = [pyrss1, pyrss2, pyrss3, pyrss4, pyrss5, pyrss6]
         else:
-            print('unsupported slip system type: %s, try one of (cube, oct, 112, basal, prism)' % slip_type)
+            print('unsupported slip system type: %s, try one of (cube, oct, 112, basal, prism, pyr1_a)' % slip_type)
         return slip_systems
 
 

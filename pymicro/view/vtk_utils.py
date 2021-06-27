@@ -328,8 +328,8 @@ def add_plane_to_grid(plane, grid, origin=None, color=None, opacity=0.3, show_no
                       show_intersection=False, color_intersection=red):
     """Add a 3d plane inside another object.
 
-    This function adds a plane inside another object described by a mesh (vtkunstructuredgrid). 
-    The method is to use a vtkCutter with the mesh as input and the plane as the cut function. 
+    This function adds a plane inside another object described by a mesh (vtkunstructuredgrid).
+    The method is to use a vtkCutter with the mesh as input and the plane as the cut function.
     The plane normal can be displayed and its length controlled.
     This may be used directly to add hkl planes inside a lattice cell or
     a grain.
@@ -1150,8 +1150,8 @@ def pole_figure_3d(pf, radius=1.0, show_lattice=False):
     """
     Method to display a pole figure in 3d.
 
-    This method displays a sphere of radius 1 with a crystal lattice placed at the center (only shown if 
-    the show_lattice parameter is True). The poles associated with the pole figure are shown on the outbounding 
+    This method displays a sphere of radius 1 with a crystal lattice placed at the center (only shown if
+    the show_lattice parameter is True). The poles associated with the pole figure are shown on the outbounding
     sphere as well as the projection n the equatorial plane.
 
     :param pf: the `PoleFigure` instance .
@@ -1470,11 +1470,11 @@ def data_outline(data, corner=False, color=black):
 def box_3d(origin=(0, 0, 0), size=(100, 100, 100), line_color=black):
     """
     Create a box of a given size.
-        
-    :param tuple origin: the origin of the box in the laboratory frame. 
-    :param tuple size: the size of the box. 
+
+    :param tuple origin: the origin of the box in the laboratory frame.
+    :param tuple size: the size of the box.
     :param line_color: the color to use to draw the box.
-    :return: 
+    :return:
     """
     box_source = vtk.vtkCubeSource()
     box_source.SetBounds(origin[0], origin[0] + size[0],
@@ -1500,7 +1500,7 @@ def detector_3d(detector, image_name=None, show_axes=False, see_reference=True):
     from pymicro.xray.detectors import RegArrayDetector2d
     assembly = vtk.vtkAssembly()
     detector_3d = vtk.vtkPlaneSource()
-    '''TODO we should define the detector plane with its origin in the top left corner, but currently this would need 
+    '''TODO we should define the detector plane with its origin in the top left corner, but currently this would need
     to flip the image to fit our geometrical conventions, probably due to the way the texture is rendered.'''
     detector_3d.SetOrigin(0., detector.get_size_mm()[0] / 2, -detector.get_size_mm()[1] / 2)
     detector_3d.SetPoint1(0., -detector.get_size_mm()[0] / 2, -detector.get_size_mm()[1] / 2)
@@ -1563,7 +1563,7 @@ def detector_3d(detector, image_name=None, show_axes=False, see_reference=True):
 
 def build_line_mesh(points):
     '''Function to construct a vtkUnstructuredGrid representing a line mesh.
-    
+
     :param list points: the list of points.
     :returns line_mesh: the vtkUnstructuredGrid.
     '''
@@ -1627,7 +1627,7 @@ def circle_line_3d(center=(0, 0, 0), radius=1, normal=(0, 0, 1), resolution=1):
 
 def point_cloud_3d(data_points, point_color=(0, 0, 0), point_size=1):
     '''Function to display a point cloud in a 3d scene.
-    
+
     :param list data_points: the list of points in he cloud.
     :param tuple point_color: the color to use to display the points.
     :param float point_size: the size of the points.
@@ -2046,7 +2046,7 @@ def render(ren, ren_size=(600, 600), display=True, save=False, name='render_3d.p
 
 def extract_poly_data(grid, inside=True, boundary=True):
     '''Convert from vtkUnstructuredGrid to vtkPolyData.
-    
+
     :param grid: the vtkUnstructuredGrid instance.
     :param bool inside: flag to extract inside cells or not.
     :param bool boundary: flag to include boundary cells.
@@ -2108,32 +2108,36 @@ def select(grid, id_list, verbose=False):
 
 
 def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
-    '''Create a 3d actor representing a numpy array.
+    """Create a 3d actor representing a numpy array.
 
     Given a 3d array, this function compute the skin of the volume.
     The scalars can be mapped to the created surface and the colormap
     adjusted. If the data is in numpy format it is converted to VTK first.
 
     :param data: the dataset, in numpy or VTK format.
-    :param bool map_scalars: map the scalar in the data array to the created surface (False by default).
+    :param bool map_scalars: map the scalar in the data array to the created
+    surface (False by default).
     :param lut: a vtk lookup table (colormap) used to map the scalars.
+    :param bool hide_zero_values: blank cells with a value of zero (True
+    by default)
     :return: a vtk actor that can be added to a rendered to show the 3d array.
-    '''
+    """
     if type(data) == np.ndarray:
         grid = numpy_array_to_vtk_grid(data, cell_data=True)
         if hide_zero_values:
-            #workaround as SetCellVisibilityArray is not available anymore after vtk 6.3
-            if (vtk.vtkVersion().GetVTKMajorVersion() > 6) | (vtk.vtkVersion().GetVTKMajorVersion() == 6 and vtk.vtkVersion().GetVTKMinorVersion() > 2):
-                ids_to_blank = np.argwhere(data.transpose(2, 1, 0).flatten() == 0)
-                [grid.BlankCell(i) for i in np.ravel(ids_to_blank)]
+            # workaround as SetCellVisibilityArray is not available anymore after vtk 6.3
+            if (vtk.vtkVersion().GetVTKMajorVersion() > 6) | \
+                    (vtk.vtkVersion().GetVTKMajorVersion() == 6 and
+                     vtk.vtkVersion().GetVTKMinorVersion() > 2):
+                ids_to_blank = np.squeeze(np.argwhere(
+                    data.transpose(2, 1, 0).flatten() == 0))
+                [grid.BlankCell(i) for i in ids_to_blank]
             else:
-                visible = numpy_support.numpy_to_vtk(np.ravel(data > 0, order='F').astype(np.uint8), deep=1)
+                visible = numpy_support.numpy_to_vtk(np.ravel(
+                    data > 0, order='F').astype(np.uint8), deep=1)
                 grid.SetCellVisibilityArray(visible)
-                #grid.SetPointVisibilityArray(visible)
-        size = data.shape
     else:
         grid = data
-        bounds = grid.GetBounds()
     extract = extract_poly_data(grid)
     return show_mesh(extract.GetOutput(), map_scalars, lut)
 

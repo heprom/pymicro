@@ -29,7 +29,7 @@ COMPRESSION_KEYS = ['complib', 'complevel', 'shuffle', 'bitshuffle',
                     'default_compression']
 
 #### External software commands and pathes
-
+# TODO : externalize in utils.SDZsetUtils
 # Matlab software : alias or path to the Matlab software executable file
 MATLAB = 'matlab'
 MATLAB_OPTS = '-nodisplay -nosplash -nodesktop -r '

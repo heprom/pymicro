@@ -62,8 +62,8 @@ class Orientation:
 
     def __repr__(self):
         """Provide a string representation of the class."""
-        s = 'Crystal Orientation'
-        s += '\norientation matrix = %s' % self._matrix.view()
+        s = 'Crystal Orientation \n-------------------'
+        s += '\norientation matrix = \n %s' % self._matrix.view()
         s += '\nEuler angles (degrees) = (%8.3f,%8.3f,%8.3f)' % (self.phi1(), self.Phi(), self.phi2())
         s += '\nRodrigues vector = %s' % self.OrientationMatrix2Rodrigues(self._matrix)
         s += '\nQuaternion = %s' % self.OrientationMatrix2Quaternion(self._matrix, P=1)

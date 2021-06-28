@@ -65,6 +65,14 @@ class CrystallinePhase:
         # a list of C_IJ values
         self.elastic_constants = []
 
+    def __repr__(self):
+        """Generate a string representation of this instance."""
+        out = 'Phase %d (%s) ' % (self.phase_id, self.name)
+        out += self.get_lattice().__repr__()
+        if self.elastic_constants:
+            out += 'elastic constants: %s' % self.elastic_constants
+        return out
+
     def get_lattice(self):
         """Returns the crystal lattice."""
         return self._lattice
@@ -501,14 +509,13 @@ class Lattice:
         return True
 
     def __repr__(self):
-        f = lambda x: "%0.1f" % x
-        out = ["Lattice", " abc : " + " ".join(map(f, self._lengths)),
-               " angles : " + " ".join(map(f, self._angles)),
-               " volume : %0.4f" % self.volume(),
-               " A : " + " ".join(map(f, self._matrix[0])),
-               " B : " + " ".join(map(f, self._matrix[1])),
-               " C : " + " ".join(map(f, self._matrix[2]))]
-        return "\n".join(out)
+        """Gives a string representation of this instance of the Lattice class."""
+        a, b, c = self._lengths
+        alpha, beta, gamma = self._angles
+        out = 'Lattice (symmetry %s)' % self._symmetry
+        out += ' a = %.3f, b=%.3f, c=%.3f' % (a, b, c)
+        out += ' alpha = %.1f, beta=%.1f, gamma=%.1f' % (alpha, beta, gamma)
+        return out
 
     def reciprocal_lattice(self):
         '''Compute the reciprocal lattice.

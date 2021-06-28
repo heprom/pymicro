@@ -2359,13 +2359,22 @@ class Microstructure(SampleData):
         """
         dims = self.get_attribute('dimension', 'CellData')
         grain_ids = self.get_grain_ids()
-        grain_map = np.squeeze(self.get_grain_map())
         shape_ipf_map = list(dims) + [3]
         ipf_map = np.zeros(shape=shape_ipf_map, dtype=float)
         for i in range(len(grain_ids)):
             gid = grain_ids[i]
+            # use the bounding box for this grain
+            bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
+            grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                             bb[1][0]:bb[1][1],
+                                             bb[2][0]:bb[2][1]]
             o = self.get_grain(gid).orientation
-            ipf_map[grain_map == gid] = o.ipf_color(axis)
+            ipf_map[bb[0][0]:bb[0][1],
+                    bb[1][0]:bb[1][1],
+                    bb[2][0]:bb[2][1]][grain_map == gid] = o.ipf_color(axis, symmetry=self.get_lattice(
+            ).get_symmetry(), saturate=True)
+            progress = 100 * (1 + i) / len(grain_ids)
+            print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
         return ipf_map
 
     def view_slice(self, slice=None, color='random', show_mask=True,

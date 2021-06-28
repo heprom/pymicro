@@ -1791,10 +1791,10 @@ class SampleData:
                 name = fieldname.decode('utf-8')
                 field_type = self.get_attribute('field_type', name)
                 if field_type == 'Nodal_field':
-                    data = self.get_node(name,as_numpy=True)
+                    data = self.get_field(fieldname=name)
                     image_object.nodeFields[name] = data
                 elif field_type == 'Element_field':
-                    data = self.get_node(name,as_numpy=True)
+                    data = self.get_field(fieldname=name)
                     image_object.elemFields[name] = data
         return image_object
 

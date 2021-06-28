@@ -2929,8 +2929,11 @@ class Microstructure(SampleData):
         micro_crop.set_lattice(self.get_lattice())
         print('cropping microstructure to %s' % micro_crop.h5_file)
         # crop CellData fields
-        field_list = self.get_attribute('Field_index','CellData')
-        for fieldname in field_list:
+        image_group = self.get_node('CellData')
+        FIndex_path = os.path.join(image_group._v_pathname,'Field_index')
+        field_list = self.get_node(FIndex_path)
+        for name in field_list:
+            fieldname = name.decode('utf-8')
             spacing_array = self.get_attribute('spacing','CellData')
             print('cropping field %s' % fieldname)
             field = self.get_field(fieldname)

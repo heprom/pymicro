@@ -113,9 +113,13 @@ class OimScan:
                     line = f.readline().strip()
                     sym = Symmetry.from_tsl(int(line.split()[2]))
                     tokens = f.readline().strip().split()
-                    lattice = Lattice.from_parameters(float(tokens[2]), float(tokens[3]),
-                                                      float(tokens[4]), float(tokens[5]),
-                                                      float(tokens[6]), float(tokens[7]),
+                    # convert lattice constants to nm
+                    lattice = Lattice.from_parameters(float(tokens[2]) / 10,
+                                                      float(tokens[3]) / 10,
+                                                      float(tokens[4]) / 10,
+                                                      float(tokens[5]),
+                                                      float(tokens[6]),
+                                                      float(tokens[7]),
                                                       symmetry=sym)
                     phase.set_lattice(lattice)
                     scan.phase_list.append(phase)
@@ -189,9 +193,10 @@ class OimScan:
             phase.description = header['Phase'][key]['Info'][0].decode('utf-8')
             # create a crystal lattice for this phase
             sym = Symmetry.from_tsl(header['Phase'][key]['Symmetry'][0])
-            a = header['Phase'][key]['Lattice Constant a'][0]
-            b = header['Phase'][key]['Lattice Constant b'][0]
-            c = header['Phase'][key]['Lattice Constant c'][0]
+            # convert lattice constants to nm
+            a = header['Phase'][key]['Lattice Constant a'][0] / 10
+            b = header['Phase'][key]['Lattice Constant b'][0] / 10
+            c = header['Phase'][key]['Lattice Constant c'][0] / 10
             alpha = header['Phase'][key]['Lattice Constant alpha'][0]
             beta = header['Phase'][key]['Lattice Constant beta'][0]
             gamma = header['Phase'][key]['Lattice Constant gamma'][0]

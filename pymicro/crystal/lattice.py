@@ -512,9 +512,9 @@ class Lattice:
         """Gives a string representation of this instance of the Lattice class."""
         a, b, c = self._lengths
         alpha, beta, gamma = self._angles
-        out = 'Lattice (symmetry %s)' % self._symmetry
-        out += ' a = %.3f, b=%.3f, c=%.3f' % (a, b, c)
-        out += ' alpha = %.1f, beta=%.1f, gamma=%.1f' % (alpha, beta, gamma)
+        out = 'Lattice (%s)' % self._symmetry
+        out += ' a=%.3f, b=%.3f, c=%.3f' % (a, b, c)
+        out += ' alpha=%.1f, beta=%.1f, gamma=%.1f' % (alpha, beta, gamma)
         return out
 
     def reciprocal_lattice(self):

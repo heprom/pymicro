@@ -23,15 +23,13 @@ class SDAmitexIO():
     """
 
     @staticmethod
-    def load_std(std_path, finite_strain=False):
+    def load_std(std_path):
         """Read content of a .std file and returns as Numpy structured array.
 
         This method must be transfered to a new subpackage SDAmitex_utils
 
         :param std_path: name/path of the .std file.
         :type std_path: Path(pathlib) object or string
-        :param finite_strain: finite strain simulation flag, defaults to False
-        :type finite_strain: bool, optional
         :return: Results, Numpy structured array containing the output values
             in .std file: the array fields are 'time', 'sigma' (Cauchy stress),
             'epsilon' (small strains tensor), 'sigma_rms' and 'epsilon_rms'
@@ -41,7 +39,7 @@ class SDAmitexIO():
         :rtype:
         """
         # TODO: implement reading results with start:step:stop
-        # TODO: implement finite strains
+        finite_strain=False
         std_lines = []
         p = Path(std_path).absolute()
         # read txt content of .std file
@@ -51,10 +49,22 @@ class SDAmitexIO():
                 if not l.startswith('#'):
                     A = np.array(l.split()).astype(np.double)
                     std_lines.append(A)
+                else:
+                    if 'xx,yy,zz,xy,xz,yz,yx,zx,zy' in l:
+                        finite_strain = True
                 l = f.readline()
         # create Numpy structured array
         if finite_strain:
-            raise RuntimeError('Finite strain outputs not handled for now.')
+            dt = np.dtype([('time', np.double, (1,)),
+                           ('sigma', np.double, (6,)),
+                           ('boussinesq', np.double, (9,)),
+                           ('GL_strain', np.double, (6,)),
+                           ('grad_u', np.double, (9,)),
+                           ('sigma_rms', np.double, (6,)),
+                           ('boussinesq_rms', np.double, (9,)),
+                           ('GL_strain_rms', np.double, (6,)),
+                           ('grad_u_rms', np.double, (9,)),
+                           ('N_iterations', np.double, (1,))])
         else:
             dt = np.dtype([('time', np.double, (1,)),
                            ('sigma', np.double, (6,)),
@@ -65,13 +75,30 @@ class SDAmitexIO():
         # fill results array for each time step
         N_times = len(std_lines)
         Results = np.empty(shape=(N_times,), dtype=dt)
-        for t in range(N_times):
-            Results[t]['time'] = std_lines[t][0]
-            Results[t]['sigma'] = std_lines[t][[1,2,3,6,5,4]]
-            Results[t]['epsilon'] = std_lines[t][[7,8,9,12,11,10]]
-            Results[t]['sigma_rms'] = std_lines[t][[13,14,15,18,17,16]]
-            Results[t]['epsilon_rms'] = std_lines[t][[19,20,21,24,23,22]]
-            Results[t]['N_iterations'] = std_lines[t][-1]
+        if finite_strain:
+            for t in range(N_times):
+                Results[t]['time'] = std_lines[t][0]
+                Results[t]['sigma'] = std_lines[t][[1,2,3,4,6,5]]
+                Results[t]['boussinesq'] = std_lines[t][[7,8,9,10,14,13,11,15,
+                                                         12]]
+                Results[t]['GL_strain'] = std_lines[t][[16,17,18,19,21,20]]
+                Results[t]['grad_u'] = std_lines[t][[22,23,24,25,29,28,26,30,
+                                                     27]]
+                Results[t]['sigma_rms'] = std_lines[t][[31,32,33,34,36,35]]
+                Results[t]['boussinesq_rms'] = std_lines[t][[37,38,39,40,44,43,
+                                                             41,45,42]]
+                Results[t]['GL_strain_rms'] = std_lines[t][[46,47,48,49,51,50]]
+                Results[t]['grad_u_rms'] = std_lines[t][[52,53,54,55,59,58,56,
+                                                         60,57]]
+                Results[t]['N_iterations'] = std_lines[t][-1]
+        else:
+            for t in range(N_times):
+                Results[t]['time'] = std_lines[t][0]
+                Results[t]['sigma'] = std_lines[t][[1,2,3,4,6,5]]
+                Results[t]['epsilon'] = std_lines[t][[7,8,9,10,12,11]]
+                Results[t]['sigma_rms'] = std_lines[t][[13,14,15,16,18,17]]
+                Results[t]['epsilon_rms'] = std_lines[t][[19,20,21,22,24,23]]
+                Results[t]['N_iterations'] = std_lines[t][-1]
         return Results
 
     @staticmethod
@@ -218,7 +245,7 @@ class SDAmitexIO():
         reader.Update()
         # read raw data
         Array = reader.GetOutput().GetCellData().GetArray(0)
-        spacing = reader.GetOutput().GetSpacing()
+        # spacing = reader.GetOutput().GetSpacing()
         dim = reader.GetOutput().GetDimensions()
         output_shape = tuple([i-1 for i in dim])
         data = numpy_support.vtk_to_numpy(Array)

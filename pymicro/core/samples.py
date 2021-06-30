@@ -3168,19 +3168,6 @@ class SampleData:
                              ' "Elt_mean", "None"')
         return array
 
-    def _IP_field_for_visualisation(self, array, vis_type):
-        # here it is supposed that the field has shape
-        # [Nelem, Nip_per_elem, Ncomponent]
-        if vis_type == 'Elt_max':
-            array = np.max(array, axis=1)
-        elif vis_type == 'Elt_mean':
-            array = np.mean(array, axis=1)
-        else:
-            raise ValueError('Unkown integration point field visualisation'
-                             ' convention. Possibilities are "Elt_max",'
-                             ' "Elt_mean", "None"')
-        return array
-
     def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
                            bin_fields_from_sets):
         """Add Geometry data items of a mesh object to mesh group/xdmf."""
@@ -3647,26 +3634,13 @@ class SampleData:
         """Transpose fields components to comply with Paraview ordering."""
         # based on the conventions:
         # Tensor6 is passed as [xx,yy,zz,xy,yz,zx]
-        # Tensor is passed as [xx,yy,zz,xy,yx,yz,zy,xz,zx]
+        # Tensor is passed as [xx,yy,zz,xy,yz,zx,yx,zy,xz]
         if dimensionality == 'Tensor6':
             transpose_indices = [0,3,5,1,4,2]
             transpose_back = [0,3,5,1,4,2]
         if dimensionality == 'Tensor':
-            transpose_indices = [0,3,7,4,1,5,8,6,2]
-            transpose_back = [0,4,8,1,3,5,7,2,6]
-        return array[...,transpose_indices], transpose_back
-
-    def _transpose_field_comp(self, dimensionality, array):
-        """Transpose fields components to comply with Paraview ordering."""
-        # based on the conventions:
-        # Tensor6 is passed as [xx,yy,zz,xy,yz,zx]
-        # Tensor is passed as [xx,yy,zz,xy,yx,yz,zy,xz,zx]
-        if dimensionality == 'Tensor6':
-            transpose_indices = [0,3,5,1,4,2]
-            transpose_back = [0,3,5,1,4,2]
-        if dimensionality == 'Tensor':
-            transpose_indices = [0,3,7,4,1,5,8,6,2]
-            transpose_back = [0,4,8,1,3,5,7,2,6]
+            transpose_indices = [0,3,8,6,1,4,5,7,2]
+            transpose_back = [0,4,8,1,5,6,3,7,2]
         return array[...,transpose_indices], transpose_back
 
     def _transpose_image_array(self, dimensionality, array):

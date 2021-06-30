@@ -26,8 +26,6 @@ class SDAmitexIO():
     def load_std(std_path):
         """Read content of a .std file and returns as Numpy structured array.
 
-        This method must be transfered to a new subpackage SDAmitex_utils
-
         :param std_path: name/path of the .std file.
         :type std_path: Path(pathlib) object or string
         :return: Results, Numpy structured array containing the output values
@@ -102,11 +100,17 @@ class SDAmitexIO():
         return Results
 
     @staticmethod
-    def load_amitex_stress_strain(vtk_basename, grip_size=0, ext_size=0,
-                                   grip_dim=2):
+    def load_amitex_output_fields(vtk_basename, grip_size=0, ext_size=0,
+                                   grip_dim=2, Boussinesq_stress=False):
         """Return stress/strain fields as numpy tensors from Amitex vtk output.
 
-        This method must be transfered to a new subpackage SDAmitex_utils
+        This method loads stress, strain and internal variables output fields
+        from Amitex fft simulation outputs. It loads the Cauchy Stress and
+        infinitesimal strain tensor for simulations conducted with the
+        infinitesimal strain hypothesis. It loads, by default, the Cauchy
+        Stress and the Green-Lagrange strain tensor for a finite strain
+        simulation. If requested, the Boussinesq (PKI) stress tensor can be
+        outputed.
 
         :param vtk_basename: Basename of vtk stress/Strain fields to load.
             Fields names are outputed by Amitex with the following structure:
@@ -118,17 +122,86 @@ class SDAmitexIO():
             simulate free surfaces.
         :param int grip_dim: Dimension along which the tension test has been
             simulated (0:x, 1:y, 2:z)
-        :return Stress: Stress tensors dict read from output.
+        :param bool Boussinesq_stress: if `True`, return the Boussinesq stress
+            tensor fields for finite strain simulations instead of the Cauchy
+            stress tensor.
+        :return Stress: Cauchy stress tensors dict read from output or
+            Boussinesq stress tensor if finite strain and requested.
         :rtype: Dict of Numpy arrays for each increment
-            {Incr(int):[Nx,Ny,Nz,6]}
-        :return Strain: Strain tensors dict read from output.
+            {Incr(int):[Nx,Ny,Nz,6 or 9]}
+        :return Strain: Strain tensors dict read from output (infinitesimal
+            strain or Green-Lagrange strain tensor for finite strain
+            simulations).
         :rtype: Dict of Numpy arrays for each increment
-            {Incr(int):[Nx,Ny,Nz,6]}
+            {Incr(int):[Nx,Ny,Nz,6 or 9]}
+        :return VarInt: Internal variables fields dict. One subdict for each
+            material with internal variable field outputs, which has one
+            subdict for each output increment.
+        :rtype: Dict of Numpy arrays for each increment
+            {material(int):{Incr(int):{VarInt_number(int):[Nx,Ny,Nz,1]}}}
         """
         # local imports
         import re
-        # Check if stress outputs exist
+        # initialize finite strain flag to False
+        finite_strain = False
+        # Check if strain outputs exist
         vtk_path = Path(vtk_basename).absolute()
+        # Get all names of vtk files in the directory and associeted increments
+        pattern = re.compile(vtk_path.stem+'_def\d?_\d+.vtk')
+        incr_pattern = re.compile('\d+.vtk')
+        comp_pattern = re.compile('def\d')
+        fs_pattern = re.compile('def9')
+        eps_files = []
+        eps_incr = []
+        for filepath in os.listdir(vtk_path.parent):
+            if pattern.match(filepath):
+                fileP = vtk_path.parent / filepath
+                eps_files.append(str(fileP))
+                incr = int(incr_pattern.findall(filepath)[0].strip('.vtk'))
+                if incr is None:
+                    raise ValueError('At least one Amitex_fftp .vtk file in '
+                                     'the directory has no increment number in'
+                                     ' its name.')
+                fs_list = fs_pattern.findall(filepath)
+                if len(fs_list) > 0:
+                    finite_strain = True
+                eps_incr.append(incr)
+        # Get first value shape to initialize Strain output and
+        # find output_slice
+        eps_tmp = SDAmitexIO.read_vtk_legacy(eps_files[0])
+        Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
+            init_shape=eps_tmp.shape, grip_size=grip_size, grip_dim=grip_dim,
+            ext_size=ext_size)
+        if finite_strain:
+            eps_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
+                         Sl[2,1] - Sl[2,0], 9)
+        else:
+            eps_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
+                         Sl[2,1] - Sl[2,0], 6)
+        Increments = np.unique(np.array(eps_incr))
+        # Initialize stress dict
+        Strain_dict = {}
+        for incr in Increments:
+            Strain_dict[incr] = np.zeros(shape=eps_shape, dtype=np.double)
+        # Fill Stress dict with output
+        for file in eps_files:
+            eps_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
+            increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
+            comp_list = comp_pattern.findall(file)
+            if len(comp_list) == 0:
+                # all components are within the same vtk file
+                Strain_dict[increment] = eps_tmp
+            elif len(comp_list) == 1:
+                # Component is in a specific vtk file
+                component = int(comp_list[0].strip('def')) - 1
+                # change component to comply to pymicro convention
+                component = SDAmitexIO.get_sd_comp_from_amitex_comp(
+                                                      component, finite_strain)
+                Strain_dict[increment][...,component] = eps_tmp
+            else:
+                raise ValueError(f' Vtk file {file} name has an invalid'
+                                 ' component value (must be one digit).')
+        # Same for stress fields
         # Get all names of vtk files in the directory and associeted increments
         pattern = re.compile(vtk_path.stem+'_sig\d?_\d+.vtk')
         incr_pattern = re.compile('\d+.vtk')
@@ -145,16 +218,14 @@ class SDAmitexIO():
                                      'the directory has no increment number in'
                                      ' its name.')
                 sig_incr.append(incr)
-        # Get first value to initialize Stress output and find output_slice
-        sig_tmp = SDAmitexIO.read_vtk_legacy(sig_files[0])
-        Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
-            init_shape=sig_tmp.shape, grip_size=grip_size, grip_dim=grip_dim,
-            ext_size=ext_size)
-        # TODO: adapt if loading a non symmetric Stress tensor (finite strains)
-        sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0], Sl[2,1] - Sl[2,0],
-                     6)
         Increments = np.unique(np.array(sig_incr))
         # Initialize stress dict
+        if finite_strain and Boussinesq_stress:
+            sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
+                         Sl[2,1] - Sl[2,0], 9)
+        else:
+            sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
+                         Sl[2,1] - Sl[2,0], 6)
         Stress_dict = {}
         for incr in Increments:
             Stress_dict[incr] = np.zeros(shape=sig_shape, dtype=np.double)
@@ -166,63 +237,58 @@ class SDAmitexIO():
             if len(comp_list) == 0:
                 Stress_dict[increment] = sig_tmp
             elif len(comp_list) == 1:
+                # Component is in a specific vtk file
                 component = int(comp_list[0].strip('sig')) - 1
-                # change component to comply to pymicro Voigt convention
-                if component == 3:
-                    component = 5
-                elif component == 5:
-                    component = 3
+                # change component to comply to pymicro convention
+                component = SDAmitexIO.get_sd_comp_from_amitex_comp(
+                                component, finite_strain and Boussinesq_stress)
                 Stress_dict[increment][...,component] = sig_tmp
             else:
                 raise ValueError(f' Vtk file {file} name has an invalid'
                                  ' component value (must be one digit).')
-        # Same for strain fields
+        # Same for internal variables fields
         # Get all names of vtk files in the directory and associeted increments
-        pattern = re.compile(vtk_path.stem+'_def\d?_\d+.vtk')
+        pattern = re.compile(vtk_path.stem+'_M\d_varInt\d+_\d+.vtk')
         incr_pattern = re.compile('\d+.vtk')
-        comp_pattern = re.compile('def\d')
-        eps_files = []
-        eps_incr = []
+        comp_pattern = re.compile('varInt\d+')
+        material_pattern = re.compile('_M\d+')
+        varI_files = []
+        varI_incr = []
+        varI_mat = []
         for filepath in os.listdir(vtk_path.parent):
             if pattern.match(filepath):
                 fileP = vtk_path.parent / filepath
-                eps_files.append(str(fileP))
+                varI_files.append(str(fileP))
                 incr = int(incr_pattern.findall(filepath)[0].strip('.vtk'))
                 if incr is None:
                     raise ValueError('At least one Amitex_fftp .vtk file in '
                                      'the directory has no increment number in'
                                      ' its name.')
-                eps_incr.append(incr)
-        Increments = np.unique(np.array(sig_incr))
-        # Initialize stress dict
-        Strain_dict = {}
-        for incr in Increments:
-            Strain_dict[incr] = np.zeros(shape=sig_shape, dtype=np.double)
-        # Fill Stress dict with output
-        for file in eps_files:
-            eps_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
+                mat = int(material_pattern.findall(filepath)[0].strip('_M'))
+                varI_incr.append(incr)
+                if not varI_mat.__contains__(mat):
+                    varI_mat.append(mat)
+        Increments = np.unique(np.array(varI_incr))
+        # Initialize internal variables dict
+        VarInt_dict = {}
+        for mat in varI_mat:
+            VarInt_dict[mat] = {}
+        # Fill dict with output
+        for file in varI_files:
+            varInt_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
             increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
             comp_list = comp_pattern.findall(file)
-            if len(comp_list) == 0:
-                Strain_dict[increment] = eps_tmp
-            elif len(comp_list) == 1:
-                component = int(comp_list[0].strip('def')) - 1
-                # change component to comply to pymicro Voigt convention
-                if component == 3:
-                    component = 5
-                elif component == 5:
-                    component = 3
-                Strain_dict[increment][...,component] = eps_tmp
-            else:
-                raise ValueError(f' Vtk file {file} name has an invalid'
-                                 ' component value (must be one digit).')
-        return Stress_dict, Strain_dict
+            component = int(comp_list[0].strip('varInt'))
+            mat = int(material_pattern.findall(filepath)[0].strip('_M'))
+            # TODO : dict[mat] = dict[incr] = dict[varint] --> triple dict
+            if not VarInt_dict[mat].__contains__(increment):
+                VarInt_dict[mat][increment] = {}
+            VarInt_dict[mat][increment][component] = varInt_tmp
+        return Stress_dict, Strain_dict, VarInt_dict
 
     @staticmethod
     def read_vtk_legacy(vtk_path, output_slice=None):
         """Read a Amitex_fftp vtk output and return the fields stored in it.
-
-        This method must be transfered to a new subpackage SDAmitex_utils
 
         :param vtk_path: name/path of the .vtk file.
         :type vtk_path: string
@@ -262,8 +328,6 @@ class SDAmitexIO():
                                                 grip_dim=2, ext_size=1):
         """Return indices of material unit cell in amitex tension results.
 
-        This method must be transfered to a new subpackage SDAmitex_utils
-
         :param int grip_size: Width in voxels of the material layer used in
             simulation unit cell for tension grips
         :param int grip_dim: Dimension along which the tension test has been
@@ -283,3 +347,12 @@ class SDAmitexIO():
         Mat_slice[ext_indices[1],1] = init_shape[ext_indices[1]] - ext_size
         return Mat_slice
 
+    @staticmethod
+    def get_sd_comp_from_amitex_comp(amitex_comp, finite_strain=False):
+        """Return the Amitex component index value in SampleData convention."""
+        indices_small_strain = [0,1,2,3,5,4]
+        indices_finite_strain = [0,1,2,3,7,6,4,8,5]
+        if finite_strain:
+            return indices_finite_strain[amitex_comp]
+        else:
+            return indices_small_strain[amitex_comp]

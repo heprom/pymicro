@@ -3670,32 +3670,36 @@ class Microstructure(SampleData):
         # Store macro data in specific group
         self.add_group(groupname=f'{sim_prefix}_Results', location='/',
                        indexname='fft_sim', replace=True)
-        self.add_data_array(location='fft_sim', name='simulation_time',
-                            array=std_res['time'])
-        self.add_data_array(location='fft_sim', name='simulation_iterations',
-                            array=std_res['N_iterations'])
-        self.add_data_array(location='fft_sim', name='mean_stress',
-                            array=std_res['sigma'])
-        self.add_data_array(location='fft_sim', name='mean_strain',
-                            array=std_res['epsilon'])
-        self.add_data_array(location='fft_sim', name='rms_stress',
-                            array=std_res['sigma_rms'])
-        self.add_data_array(location='fft_sim', name='rms_strain',
-                            array=std_res['epsilon_rms'])
+        # std_res is a numpy structured array whose fields depend on
+        # the type of output (finite strain ou infinitesimal strain sim.)
+        # ==> we iterate over dtype fields to fill the dataset with
+        #     output data
+        for field in std_res.dtype.fields:
+            self.add_data_array(location='fft_sim', name=f'{field}',
+                                array=std_res[field])
         # Get vtk files results
-        Stress, Strain = SDAmitexIO.load_amitex_stress_strain(
+        Stress, Strain, VarInt = SDAmitexIO.load_amitex_output_fields(
             results_basename, grip_size=grip_size, ext_size=ext_size,
             grip_dim=2)
         ## Loop over time steps: create group to store results
         self.add_group(groupname=f'{sim_prefix}_output_fields', location='/CellData',
-                       indexname='fft_fields', replace=True)
+                        indexname='fft_fields', replace=True)
         for incr in Stress:
             fieldname = f'{sim_prefix}_stress_{incr}'
             self.add_field(gridname='CellData', fieldname=fieldname,
-                           array=Stress[incr], location='fft_fields')
+                            array=Stress[incr], location='fft_fields')
             fieldname = f'{sim_prefix}_strain_{incr}'
             self.add_field(gridname='CellData', fieldname=fieldname,
-                           array=Strain[incr], location='fft_fields')
+                            array=Strain[incr], location='fft_fields')
+            for mat in VarInt:
+                for var in VarInt[mat][incr]:
+                    varname = var
+                    if int_var_names.__contains__(var):
+                        varname = int_var_names[var]
+                    fieldname = f'{sim_prefix}_mat{mat}_{varname}_{incr}'
+                    self.add_field(gridname='CellData', fieldname=fieldname,
+                                   array=VarInt[mat][incr][var],
+                                   location='fft_fields')
         return
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):

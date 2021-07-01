@@ -2097,11 +2097,22 @@ class SampleData:
         :param np.array voxel_size: (dx, dy, dz) array of the voxel size in
             each dimension of the 3Dimage
         """
+        old_spacing = self.get_attribute('spacing', image_group)
+        if isinstance(voxel_size, float):
+            voxel_size = np.ones(shape=(len(old_spacing),))*voxel_size
+        if len(old_spacing) != len(voxel_size):
+            raise ValueError('Dimension mismatch between image group old'
+                             f' grid spacing {old_spacing} and inputed'
+                             f' new grid spacing {voxel_size}')
         self.add_attributes({'spacing': np.array(voxel_size)},
                             image_group)
         xdmf_geometry = self._find_xdmf_geometry(image_group)
         spacing_node = xdmf_geometry.getchildren()[1]
-        spacing_text = str(voxel_size).strip('[').strip(']').replace(',', ' ')
+        if len(voxel_size) == 2:
+            VoxSize = voxel_size[[1,0]]
+        elif len(voxel_size) == 3:
+            VoxSize = voxel_size[[2,1,0]]
+        spacing_text = str(VoxSize).strip('[').strip(']').replace(',', ' ')
         spacing_node.text = spacing_text
         self.sync()
         return
@@ -2118,10 +2129,19 @@ class SampleData:
         :param np.array voxel_size: (Ox, Oy, Oz) array of the coordinates in
             each dimension of the origin of the 3Dimage
         """
+        old_origin = self.get_attribute('origin', image_group)
+        if len(old_origin) != len(origin):
+            raise ValueError('Dimension mismatch between image group origin'
+                             f' {old_origin} and inputed new origin'
+                             f' {origin}')
         self.add_attributes({'origin': origin}, image_group)
         xdmf_geometry = self._find_xdmf_geometry(image_group)
+        if len(origin) == 2:
+            Or = origin[[1,0]]
+        elif len(origin) == 3:
+            Or = origin[[2,1,0]]
         origin_node = xdmf_geometry.getchildren()[0]
-        origin_text = str(origin).strip('[').strip(']').replace(',', ' ')
+        origin_text = str(Or).strip('[').strip(']').replace(',', ' ')
         origin_node.text = origin_text
         self.sync()
         return
@@ -3533,13 +3553,19 @@ class SampleData:
         # Get image dimension with reverted shape to compensate for Paraview
         # X,Y,Z indexing convention
         Dimension_tmp = image_object.GetDimensions()
+        Spacing_tmp = image_object.GetSpacing()
+        Origin_tmp = image_object.GetOrigin()
         if len(Dimension_tmp) == 2:
             Dimension_tmp = Dimension_tmp[[1,0]]
+            Spacing_tmp = Spacing_tmp[[1,0]]
+            Origin_tmp = Origin_tmp[[1,0]]
         elif len(Dimension_tmp) == 3:
             Dimension_tmp = Dimension_tmp[[2,1,0]]
+            Spacing_tmp = Spacing_tmp[[2,1,0]]
+            Origin_tmp = Origin_tmp[[2,1,0]]
         Dimension = self._np_to_xdmf_str(Dimension_tmp)
-        Spacing = self._np_to_xdmf_str(image_object.GetSpacing())
-        Origin = self._np_to_xdmf_str(image_object.GetOrigin())
+        Spacing = self._np_to_xdmf_str(Spacing_tmp)
+        Origin = self._np_to_xdmf_str(Origin_tmp)
         Dimensionality = str(image_object.GetDimensionality())
         self._verbose_print('Updating xdmf tree...', line_break=False)
         # Creatge Grid element

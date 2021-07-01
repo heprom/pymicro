@@ -711,18 +711,14 @@ class SDImageMesher():
                     * self.data.get_attribute('spacing',image_group) )
         Im_origin = self.data.get_attribute('origin',image_group)
         # get mesh nodes and rescale mesh
-        nodes = self.data.get_mesh_nodes(meshname)
-        X_range = nodes[:,0].max() - nodes[:,0].min()
-        Y_range = nodes[:,1].max() - nodes[:,1].min()
-        Z_range = nodes[:,2].max() - nodes[:,2].min()
-        nodes[:,0] = (nodes[:,0]/X_range)*Im_range[0] + Im_origin[0]
-        nodes[:,1] = (nodes[:,1]/Y_range)*Im_range[1] + Im_origin[1]
-        nodes[:,2] = (nodes[:,2]/Z_range)*Im_range[2] + Im_origin[2]
+        from pymicro.core.utils.SDMeshUtils import SDMeshTools
+        SDMeshTools.rescale_and_translate_mesh(
+            data=self.data, meshname=meshname, mesh_new_origin=Im_origin,
+            mesh_new_size=Im_range)
         if load_surface_mesh:
-            nodes = self.data.get_mesh_nodes(meshname+'_surface')
-            nodes[:,0] = (nodes[:,0]/X_range)*Im_range[0] + Im_origin[0]
-            nodes[:,1] = (nodes[:,1]/Y_range)*Im_range[1] + Im_origin[1]
-            nodes[:,2] = (nodes[:,2]/Z_range)*Im_range[2] + Im_origin[2]
+            SDMeshTools.rescale_and_translate_mesh(
+                data=self.Data, meshname=meshname+'_surface',
+                mesh_new_origin=Im_origin, mesh_new_size=Im_range)
         return
 
     def multi_phase_mesher2D(self, multiphase_image_name='', meshname='',
@@ -824,6 +820,17 @@ class SDImageMesher():
             self.data.create_elset_ids_field(meshname=meshname)
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
+        # Resize mesh to Image domain
+        image_group = self.data.get_attribute('parent_grid_path',
+                                              multiphase_image_name)
+        Im_range = (self.data.get_attribute('dimension',image_group)
+                    * self.data.get_attribute('spacing',image_group) )
+        Im_origin = self.data.get_attribute('origin',image_group)
+        # get mesh nodes and rescale mesh
+        from pymicro.core.utils.SDMeshUtils import SDMeshTools
+        SDMeshTools.rescale_and_translate_mesh(
+            data=self.data, meshname=meshname, mesh_new_origin=Im_origin,
+            mesh_new_size=Im_range)
         return
 
     def morphological_image_cleaner(self, target_image_field='',

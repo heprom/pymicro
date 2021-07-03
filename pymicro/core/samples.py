@@ -194,10 +194,6 @@ class SampleData:
             #. If needed, develop dedicated methods to offer a specific API to
                support the derived class practical application
 
-        When creating a derived Class from SampleData, users can defined their
-        own default compression settings by overwritting the method
-        :func:`set_default_compression`.
-
         | See documentation of :func:`minimal_data_model` for further details
         | To see examples of such derived classes see:
         | - the :py:class:`pymicro.crystal.microstructure`
@@ -587,7 +583,8 @@ class SampleData:
 
     def add_mesh(self, mesh_object=None, meshname='', indexname='',
                  location='/', description=' ', replace=False,
-                 bin_fields_from_sets=True, file=None, **keywords):
+                 bin_fields_from_sets=True, file=None,
+                 compression_options=dict()):
         """Create a Mesh group in the dataset from a MeshObject.
 
         A Mesh group is a HDF5 Group that contains arrays describing mesh
@@ -619,6 +616,9 @@ class SampleData:
             name/location if `True` and such group exists
         :param bool bin_fields_from_sets: If `True`, stores all Node and
             Element Sets in mesh_object as binary fields (1 on Set, 0 else)
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
         """
         # Check if the input array is in an external file
         if file is not None:
@@ -649,17 +649,20 @@ class SampleData:
         for field_name, field in mesh_object.nodeFields.items():
             self.add_field(gridname=mesh_group._v_pathname,
                            fieldname=field_name, array=field,
-                           replace=replace, **keywords)
+                           replace=replace,
+                           compression_options=compression_options)
         for field_name, field in mesh_object.elemFields.items():
             self.add_field(gridname=mesh_group._v_pathname,
                            fieldname=field_name, array=field,
-                           replace=replace, **keywords)
+                           replace=replace,
+                           compression_options=compression_options)
         return mesh_object
 
     def add_mesh_from_image(self, imagename, with_fields=True, ofTetras=False,
                             meshname='', indexname='', location='/',
                             description=' ', replace=False,
-                            bin_fields_from_sets=True, **keywords):
+                            bin_fields_from_sets=True,
+                            compression_options=dict()):
         """Create a Mesh group in the dataset from an Image dataset.
 
         The mesh group created can represent a mesh of tetrahedra or a mesh of
@@ -682,6 +685,9 @@ class SampleData:
             name/location if `True` and such group exists
         :param bool bin_fields_from_sets: If `True`, stores all Node and
             Element Sets in mesh_object as binary fields
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
         """
 
         Mesh_o = self.get_mesh_from_image(imagename, with_fields, ofTetras)
@@ -693,12 +699,13 @@ class SampleData:
         for key in field_names:
             Mesh_o.elemFields[key+'_'+meshname] = Mesh_o.elemFields.pop(key)
         self.add_mesh(Mesh_o, meshname, indexname, location, description,
-                      replace, bin_fields_from_sets)
+                      replace, bin_fields_from_sets,
+                      compression_options=compression_options)
         return
 
     def add_image(self, image_object=None, imagename='', indexname='',
                   location='/', description=' ', replace=False,
-                  **keywords):
+                  compression_options=dict()):
         """Create a 2D/3D Image group in the dataset from an ImageObject.
 
         An Image group is a HDF5 Group that contains arrays describing fields
@@ -743,6 +750,9 @@ class SampleData:
         :param str description: Description metadata for this 3D image
         :param bool replace: remove Image group in the dataset with the same
             name/location if `True` and such group exists
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
         """
         ### Create or fetch image group
         image_group = self.add_group(imagename, location, indexname, replace)
@@ -777,19 +787,19 @@ class SampleData:
         ### Add fields if some are stored in the image object
         for field_name, field in image_object.nodeFields.items():
             self.add_field(gridname=image_group._v_pathname,
-                           fieldname=field_name, array=field,
-                           replace=replace, **keywords)
+                           fieldname=field_name, array=field, replace=replace,
+                           compression_options=compression_options)
         for field_name, field in image_object.elemFields.items():
             self.add_field(gridname=image_group._v_pathname,
-                           fieldname=field_name, array=field,
-                           replace=replace, **keywords)
+                           fieldname=field_name, array=field, replace=replace,
+                           compression_options=compression_options)
         return image_object
 
     def add_image_from_field(self, field_array, fieldname, imagename='',
                              indexname='', location='/', description=' ',
                              replace=False, origin=None, spacing=None,
                              is_scalar=True, is_elemField=True,
-                             **keywords):
+                             compression_options=dict()):
         """Create a 2D/3M Image group in the dataset from a field data array.
 
         Construct an image object from the inputed field array. This array is
@@ -825,6 +835,9 @@ class SampleData:
         :param bool is_elemField: If `True` (default value), the array is
             considered as a pixel/voxel wise field value array. If `False`, the
             field is considered as a nodal value array.
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
 
         """
         if is_scalar:
@@ -845,7 +858,7 @@ class SampleData:
         image_object.SetSpacing(spacing)
         image_object.elemFields[fieldname] = field_array
         self.add_image(image_object, imagename, indexname, location,
-                       description, replace, **keywords)
+                       description, replace, compression_options)
         return
 
     def add_group(self, groupname, location, indexname='', replace=False):
@@ -874,9 +887,8 @@ class SampleData:
         return Group
 
     def add_field(self, gridname, fieldname, array, location=None,
-                  indexname=None, chunkshape=None, replace=False,
-                  filters=None, empty=False, visualisation_type='Elt_mean',
-                  **keywords):
+                  indexname=None, chunkshape=None, replace=False, empty=False,
+                  visualisation_type='Elt_mean', compression_options=dict()):
         """Add a field to a grid (Mesh or 2D/3DImage) group from a numpy array.
 
         This methods checks the compatibility of the input field array with the
@@ -909,10 +921,9 @@ class SampleData:
             Possibilities are 'Elt_max' (maximum value per element), 'Elt_mean'
             (mean value per element), 'None' (no visualisation field).
             Default value is 'Elt_mean'
-        .. note:: additional keywords arguments can be passed to specify global
-                compression options, see :func:`set_chunkshape_and_compression`
-                documentation for their definition. If some are passed, they
-                are prioritised over the settings in the inputed Filter object.
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
 
         """
         self._verbose_print('Adding field `{}` into Grid `{}`'
@@ -928,6 +939,13 @@ class SampleData:
         # and returns field dimension, xdmf Center attribute
         field_type, dimensionality = self._check_field_compatibility(
                                                         gridname,array.shape)
+        # Get storage location for field data array
+        if (location is None) and replace:
+            # if replace, try to get the parent node of the possibly
+            # existing node to replace
+            node_field = self.get_node(fieldname)
+            if node_field is not None:
+                location = node_field._v_parent._v_pathname
         if location is None:
             # FIELD STORAGE DEFAULT CONVENTION :
             # fields are stored directly into the HDF5 grid group
@@ -955,8 +973,8 @@ class SampleData:
             grid_indexname = self.get_indexname_from_path(grid_path)
             indexname = grid_indexname+'_'+fieldname
         node = self.add_data_array(array_location, fieldname, array, indexname,
-                                   chunkshape, replace, filters, empty,
-                                   **keywords)
+                                   chunkshape, replace, empty,
+                                   compression_options=compression_options)
 
         Attribute_dic = {'field_type': field_type,
                          'field_dimensionality': dimensionality,
@@ -978,9 +996,9 @@ class SampleData:
             if dimensionality in ['Tensor6','Tensor']:
                 vis_array, _ = self._transpose_field_comp(
                     dimensionality, vis_array)
-            node_vis = self.add_data_array(array_location, visname, vis_array,
-                                           visindexname, chunkshape, replace,
-                                           filters, empty, **keywords)
+            node_vis = self.add_data_array(
+                array_location, visname, vis_array, visindexname, chunkshape,
+                replace, empty, compression_options=compression_options)
             Attribute_dic['visualisation_type'] = visualisation_type
             self.add_attributes(Attribute_dic, nodename=visindexname)
             Attribute_dic['visualisation_field_path'] = node_vis._v_pathname
@@ -995,8 +1013,8 @@ class SampleData:
         return node
 
     def add_data_array(self, location, name, array=None, indexname=None,
-                       chunkshape=None, replace=False, filters=None,
-                       empty=False, **keywords):
+                       chunkshape=None, replace=False, empty=False,
+                       compression_options=dict()):
         """Add a data array node at the given location in the HDF5 dataset.
 
         The method uses the :py:class:`CArray` and
@@ -1017,28 +1035,21 @@ class SampleData:
             specifying compression settings.
         :param bool empty: if `True` create the path, Index Name in dataset and
             store an empty array. Set the node attribute `empty` to True.
-        :param file:
-        :type str, optional:
-
-        .. note:: additional keywords arguments can be passed to specify global
-            compression options, see :func:`set_chunkshape_and_compression`
-            documentation for their definition. If some are passed, they are
-            prioritised over the settings in the inputed Filter object.
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
 
         """
         self._verbose_print('Adding array `{}` into Group `{}`'
                             ''.format(name, location))
         # Safety checks
         self._check_SD_array_init(name, location, replace)
-        # Check if the input array is in an external file
-        if 'file' in keywords:
-            array = self._read_array_from_file(**keywords)
         if array is None:
             raise ValueError('Received a `None` array. Cannot add data array.')
         # get location path
         location_path = self._name_or_node_to_path(location)
         # get compression options
-        Filters = self._get_compression_opt(filters, **keywords)
+        Filters = self._get_compression_opt(compression_options)
         # add to index
         if indexname is None:
             indexname = name
@@ -1058,8 +1069,8 @@ class SampleData:
         return Node
 
     def add_table(self, location, name, description, indexname=None,
-                  chunkshape=None, replace=False, data=None, filters=None,
-                  **keywords):
+                  chunkshape=None, replace=False, data=None,
+                  compression_options=dict()):
         """Add a structured storage table in HDF5 dataset.
 
         :param str location: Path where the array will be added in the dataset
@@ -1080,11 +1091,9 @@ class SampleData:
             specifying compression settings.
         :param bool empty: if `True` create the path, Index Name in dataset and
             store an empty table. Set the table attribute `empty` to True.
-
-        .. note:: additional keywords arguments can be passed to specify global
-                compression options, see :func:`set_chunkshape_and_compression`
-                documentation for their definition. If some are passed, they
-                are prioritised over the settings in the inputed Filter object.
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
         """
         self._verbose_print('Adding table `{}` into Group `{}`'
                             ''.format(name, location))
@@ -1121,11 +1130,7 @@ class SampleData:
                     self._verbose_print(msg)
 
         # get compression options
-        # keywords compression options prioritized over input filters instances
-        if (filters is None) or bool(keywords):
-            Filters = self._get_compression_opt(**keywords)
-        else:
-            Filters = filters
+        Filters = self._get_compression_opt(compression_options)
         self._verbose_print('-- Compression Options for dataset {}'
                             ''.format(name))
         if (self.Filters.complevel > 0):
@@ -2173,35 +2178,41 @@ class SampleData:
         return
 
     def set_nodes_compression_chunkshape(self, node_list=None, chunkshape=None,
-                                         filters=None, **keywords):
+                                         compression_options=dict()):
         """Set compression options for a list of nodes in the dataset.
+
+        This methods sets the same set of compression options for a
+        list of nodes in the dataset.
 
         :param list node_list: list of Name, Path, Index name or Alias of the
             HDF5 array nodes where to set the compression settings.
         :param tuple  chunkshape: The shape of the data chunk to be read or
             written in a single HDF5 I/O operation
-        :param Filters filters: instance of :py:class:`tables.Filters` class
-            specifying compression settings.
+        :param dict compression_options: Dictionary containing compression
+            options items (keys are options names, values are )
 
-        .. rubric:: Additional keyword arguments
+        .. rubric:: Compression Options
 
-        Compression settings can be passed as keyword arguments to this method.
-        They are the `Filters
+        Compression settings can be passed through the `compression_options`
+        dictionary as follows:
+            compression_options[option_name] = option_value
+        These options are the Pytables package `Filters
         <https://www.pytables.org/_modules/tables/filters.html#Filters>`_
         class constructor parameters (see `PyTables` documentation for details)
+        The list of available compression options is provided here:
 
-        :param str complevel: Compression level for data. Allowed range is 0-9.
+          * complevel: Compression level for data. Allowed range is 0-9.
             A value of 0 (the default) disables compression.
-        :param str complib: Compression library to use. Possibilities are:
+          * complib: Compression library to use. Possibilities are:
             zlib' (the default), 'lzo', 'bzip2' and 'blosc'.
-        :param bool shuffle:  Whether or not to use the *Shuffle* filter in the
+          * shuffle:  Whether or not to use the *Shuffle* filter in the
             HDF5 library (may improve compression ratio).
-        :param bool bitshuffle: Whether or not to use the *BitShuffle* filter
+          * bitshuffle: Whether or not to use the *BitShuffle* filter
             in the Blosc library (may improve compression ratio).
-        :param bool fletcher32: Whether or not to use the *Fletcher32* filter
+          * fletcher32: Whether or not to use the *Fletcher32* filter
             in the HDF5 library. This is used to add a checksum on each data
             chunk.
-        :param int least_significant_digit:
+          * least_significant_digit:
             If specified, data will be truncated using
             ``around(scale*data)/scale``, where
             ``scale = 2**least_significant_digit``.
@@ -2226,24 +2237,27 @@ class SampleData:
                 if self._is_array(node):
                     node_list.append(node)
         for nodename in node_list:
-            self.set_chunkshape_and_compression(nodename, chunkshape, filters,
-                                                **keywords)
+            self.set_chunkshape_and_compression(nodename, chunkshape,
+                                                compression_options)
         return
 
-    def set_chunkshape_and_compression(self, node, chunkshape=None,
-                                       filters=None, **keywords):
+    def set_chunkshape_and_compression(self, nodename, chunkshape=None,
+                                       compression_options=dict()):
         """Set the chunkshape and compression settings for a HDF5 array node.
 
         :param str node: Name, Path, Index name or Alias of the node
         :param tuple  chunkshape: The shape of the data chunk to be read or
             written in a single HDF5 I/O operation
-        :param Filters filters: instance of :py:class:`tables.Filters` class
-            specifying compression settings.
+        :param dict compression_options: Dictionary containing compression
+            options items (keys are options names, values are )
 
-        .. rubric:: Additional keyword arguments
+        .. rubric:: Compression options
 
-        Compression settings can be passed as keyword arguments to this method.
-        See :func:`set_nodes_compression_chunkshape`.
+        Compression settings can be passed through the `compression_options`
+        dictionary as follows:
+            compression_options[option_name] = option_value
+        See :func:`set_nodes_compression_chunkshape`, for the list of
+        available compression options.
 
         .. important:: If the new compression settings reduce the size of the
             node in the dataset, the file size will not be changed. This is a
@@ -2257,83 +2271,64 @@ class SampleData:
             arguments, they are prioritised over the settings in the inputed
             Filter object.
         """
-        if not self._is_array(node):
+        if not self._is_array(nodename):
             msg = ('(set_chunkshape) Cannot set chunkshape or compression'
                    ' settings for a non array node')
             raise tables.NodeError(msg)
-        node_tmp = self.get_node(node)
+        # Get HDF5 node whose compression and chunkshape settings are to
+        # be changed
+        # chunkshape cannot be changed for a Pytables dataset node, and
+        # changing compression settings can lead to errors or unexpected
+        # behaviors
+        # ==> New settings are set by reading rewriting data on the dataset
+        # First get the hdf5 attributes of the target node
+        attributes = self.get_dic_from_attributes(nodename)
+        node_tmp = self.get_node(nodename)
+        # Get node name, indexname and path
         nodename = node_tmp._v_name
         node_indexname = self.get_indexname_from_path(node_tmp._v_pathname)
         node_path = os.path.dirname(node_tmp._v_pathname)
+        # Set new chunkshape if provided or get old one
         node_chunkshape = node_tmp.chunkshape
         if chunkshape is not None:
             node_chunkshape = chunkshape
-        if filters is None:
-            node_filters = node_tmp.filters
-        else:
-            node_filters = filters
+        # Get node aliases
         if self.aliases.__contains__(node_indexname):
             node_aliases = self.aliases[node_indexname]
         else:
             node_aliases = []
-        array = node_tmp.read()
-        if self._is_table(node):
+        if self._is_table(nodename):
+            # get stored array values
+            array = node_tmp.read()
             description = node_tmp.description
-            new_array = self.add_table(location=node_path, name=nodename,
-                                       description=description,
-                                       indexname=node_indexname,
-                                       chunkshape=node_chunkshape,
-                                       replace=True, data=array,
-                                       filters=node_filters, **keywords)
+            new_array = self.add_table(
+                location=node_path, name=nodename, description=description,
+                indexname=node_indexname, chunkshape=node_chunkshape,
+                replace=True, data=array,
+                compression_options=compression_options)
+        elif self._is_field(nodename):
+            # TODO: recreate visualization fields
+            array = self.get_field(nodename)
+            parent_grid = self.get_attribute('parent_grid_path', nodename)
+            visu_type = self.get_attribute('visualisation_type', nodename)
+            if visu_type is None:
+                visu_type = 'None'
+            new_array = self.add_field(
+                gridname=parent_grid, fieldname=nodename, array=array,
+                chunkshape=node_chunkshape, replace=True,
+                visualisation_type=visu_type,
+                compression_options=compression_options)
         else:
-            new_array = self.add_data_array(location=node_path, name=nodename,
-                                            indexname=node_indexname,
-                                            array=array, filters=node_filters,
-                                            chunkshape=node_chunkshape,
-                                            replace=True, **keywords)
+            new_array = self.add_data_array(
+                location=node_path, name=nodename, indexname=node_indexname,
+                array=array, chunkshape=node_chunkshape,
+                replace=True, compression_options=compression_options)
         for alias in node_aliases:
             self.add_alias(aliasname=alias, indexname=node_indexname)
+        self.add_attributes(attributes, nodename)
         if self._verbose:
             self._verbose_print(self.get_node_compression_info(
                 new_array._v_pathname))
-        return
-
-    def set_default_compression(self):
-        """Return a Filter object with defaut compression parameters."""
-        Filters = tables.Filters(complib='zlib', complevel=0, shuffle=True)
-        return Filters
-
-    def set_global_compression_opt(self, **keywords):
-        """Set default compression settings for the dataset.
-
-        .. rubric:: Additional keyword arguments
-
-        Compression settings can be passed as keyword arguments to this method.
-        See :func:`set_nodes_compression_chunkshape`.
-        """
-        # initialize general compression Filters object (from PyTables)
-        # with no compression (default behavior)
-        default = False
-        # ------ check if default compression is required
-        if 'default_compression' in keywords:
-            default = True
-        self.Filters = self._get_compression_opt(default=default, **keywords)
-
-        # ----- message and Pytables Filter (comp option container) set up
-        self._verbose_print('-- General Compression Options for datasets'
-                            ' in {}'.format(self.h5_file))
-
-        self.h5_dataset.filters = self.Filters
-
-        if (self.Filters.complevel > 0):
-            if default:
-                self._verbose_print('\t Default Compression Parameters ')
-            msg_list = str(self.Filters).strip('Filters(').strip(')').split()
-            self._verbose_print(str(msg_list))
-            for msg in msg_list:
-                self._verbose_print('\t * {}'.format(msg), line_break=False)
-        else:
-            self._verbose_print('\t * No Compression')
         return
 
     def set_verbosity(self, verbosity=True):
@@ -2379,7 +2374,6 @@ class SampleData:
         self.xdmf_tree = etree.parse(self.xdmf_path)
         self.sync()
         return
-
 
     def remove_node(self, name, recursive=False):
         """Remove a node from the dataset.
@@ -2428,6 +2422,7 @@ class SampleData:
             self._remove_from_xdmf(Node)
             Node._f_remove(recursive=True)
         else:
+            print('')
             self._remove_from_index(node_path=Node._v_pathname)
             # remove node in xdmf tree
             self._remove_from_xdmf(Node)
@@ -2560,8 +2555,7 @@ class SampleData:
     # =========================================================================
     #  SampleData private methods
     # =========================================================================
-    def _init_file_object(self, sample_name='', sample_description='',
-                          **keywords):
+    def _init_file_object(self, sample_name='', sample_description=''):
         """Initiate or create PyTable HDF5 file object."""
         try:
             self.h5_dataset = tables.File(self.h5_path, mode='r+')
@@ -2583,10 +2577,6 @@ class SampleData:
             # add sample name and description
             self.h5_dataset.root._v_attrs.sample_name = sample_name
             self.h5_dataset.root._v_attrs.description = sample_description
-            # get compression options
-            Compression_keywords = {k: v for k, v in keywords.items() if k in
-                                    COMPRESSION_KEYS}
-            self.set_global_compression_opt(**Compression_keywords)
             # Generic Data Model initialization
             self._init_data_model()
         return
@@ -3847,42 +3837,24 @@ class SampleData:
             s = ''
         return s
 
-    def _get_compression_opt(self, filters=None, **keywords):
+    def _get_compression_opt(self, compression_opts=dict()):
         """Get inputed compression settings as `tables.Filters` instance."""
-        # get pre-defined compression settings
-        default_cp = False
-        global_cp = False
-        if 'default' in keywords:
-            default_cp = keywords['default']
-        else:
-            # use global Filters as base settings if defined
-            if hasattr(self, 'Filters'):
-                global_cp = True
-        # Apply pre-defined compression settings)
-        if default_cp:
-            Filters = self.set_default_compression()
-        elif filters is not None:
-            Filters = filters
-        elif global_cp:
-            Filters = self.Filters
-        else:
-            Filters = tables.Filters()
-        # ------ read specified values of compression options
-        #  These are prioritised over pre-defined settings when both are
-        #  specified
-        for word in keywords:
-            if (word == 'complib'):
-                Filters.complib = keywords[word]
-            elif (word == 'complevel'):
-                Filters.complevel = keywords[word]
-            elif (word == 'shuffle'):
-                Filters.shuffle = keywords[word]
-            elif (word == 'bitshuffle'):
-                Filters.bitshuffle = keywords[word]
-            elif (word == 'checksum'):
-                Filters.fletcher32 = keywords[word]
-            elif (word == 'least_significant_digit'):
-                Filters.least_significant_digit = keywords[word]
+        # TODO; apply predefined compression settings
+        Filters = tables.Filters()
+        # ------ read compression options in dict
+        for option in compression_opts:
+            if (option == 'complib'):
+                Filters.complib = compression_opts[option]
+            elif (option == 'complevel'):
+                Filters.complevel = compression_opts[option]
+            elif (option == 'shuffle'):
+                Filters.shuffle = compression_opts[option]
+            elif (option == 'bitshuffle'):
+                Filters.bitshuffle = compression_opts[option]
+            elif (option == 'checksum'):
+                Filters.fletcher32 = compression_opts[option]
+            elif (option == 'least_significant_digit'):
+                Filters.least_significant_digit = compression_opts[option]
         return Filters
 
     def _read_mesh_from_file(self, file=''):
@@ -3895,19 +3867,6 @@ class SampleData:
             import BasicTools.IO.GeofReader as GR
             mesh_object = GR.ReadGeof(file)
         return mesh_object
-
-    def _read_array_from_file(self, file=None, **keywords):
-        """Read a data array from a file, depending on the extension."""
-        array = None
-        # Get file extension
-        _, tail = os.path.splitext(file)
-        # HDF5 files
-        if tail == '.h5':
-            with tables.File(file, mode='r') as f:
-                if 'h5_path' in keywords:
-                    h5_path = keywords['h5_path']
-                array = f.get_node(where=h5_path).read()
-        return array
 
     def _verbose_print(self, message, line_break=True):
         """Print message if verbose flag is `True`."""

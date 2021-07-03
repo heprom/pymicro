@@ -1061,11 +1061,27 @@ class SampleData:
                     title=indexname)
             self.add_attributes({'empty': True}, Node._v_pathname)
         else:
+            if 'normalization' in compression_options:
+                optn = compression_options['normalization']
+                array, norm_attributes = self._data_normalization(array, optn)
             Node = self.h5_dataset.create_carray(
                     where=location_path, name=name, filters=Filters,
                     obj=array, chunkshape=chunkshape,
                     title=indexname)
             self.add_attributes({'empty': False}, Node._v_pathname)
+            if 'normalization' in compression_options:
+                if optn == 'standard_per_component':
+                    mean_array = norm_attributes.pop('norm_mean_array')
+                    std_array = norm_attributes.pop('norm_std_array')
+                    Mean = self.h5_dataset.create_carray(
+                        where=location_path, name=name+'_norm_mean',
+                        filters=Filters, obj=mean_array, chunkshape=chunkshape)
+                    Std = self.h5_dataset.create_carray(
+                        where=location_path, name=name+'_norm_std',
+                        filters=Filters, obj=std_array, chunkshape=chunkshape)
+                    norm_attributes['norm_mean_array_path'] = Mean._v_pathname
+                    norm_attributes['norm_std_array_path'] = Std._v_pathname
+                self.add_attributes(norm_attributes, Node._v_pathname)
         return Node
 
     def add_table(self, location, name, description, indexname=None,
@@ -1894,9 +1910,26 @@ class SampleData:
             if as_numpy and self._is_array(name) and (colname is None):
                 # note : np.atleast_1d is used here to avoid returning a 0d
                 # array when squeezing a scalar node
+                node = np.atleast_1d(node.read())
+                # Reverse data normalization if it has been applied
+                # NOTE: it is very important to keep these lines before
+                # those aiming at reversing transpositions for ordering
+                # conventions as the arrays containing normalization parameters
+                # comply to the in-memory ordering conventions
+                norm = self.get_attribute('data_normalization', name)
+                if norm == 'standard':
+                    mu = self.get_attribute('normalization_mean', name)
+                    std = self.get_attribute('normalization_std', name)
+                    node = (node * std) + mu
+                elif norm == 'standard_per_component':
+                    mu = self.get_attribute('normalization_mean', name)
+                    std = self.get_attribute('normalization_std', name)
+                    for comp in range(node.shape[-1]):
+                        node[...,comp] = (node[..., comp]*std[comp]) + mu[comp]
+                # Reverse indices transpositions apply to ensure compatibility
+                # between SampleData and Paraview ordering conventions
                 transpose_indices = self.get_attribute('transpose_indices',
                                                        name)
-                node = np.atleast_1d(node.read())
                 if transpose_indices is not None:
                     node = node.transpose(transpose_indices)
                 transpose_components = self.get_attribute('transpose_components',
@@ -2307,7 +2340,6 @@ class SampleData:
                 replace=True, data=array,
                 compression_options=compression_options)
         elif self._is_field(nodename):
-            # TODO: recreate visualization fields
             array = self.get_field(nodename)
             parent_grid = self.get_attribute('parent_grid_path', nodename)
             visu_type = self.get_attribute('visualisation_type', nodename)
@@ -2319,6 +2351,7 @@ class SampleData:
                 visualisation_type=visu_type,
                 compression_options=compression_options)
         else:
+            array = node_tmp.read()
             new_array = self.add_data_array(
                 location=node_path, name=nodename, indexname=node_indexname,
                 array=array, chunkshape=node_chunkshape,
@@ -2410,6 +2443,16 @@ class SampleData:
         if IP_vis is not None:
             IP = self.get_node(IP_vis)
             self.remove_node(IP)
+
+        # Remove array used for per component data normalization.
+        mean_path = self.get_attribute('norm_mean_array_path', Node)
+        if mean_path is not None:
+            mean = self.get_node(mean_path)
+            self.remove_node(mean)
+        std_path = self.get_attribute('norm_std_array_path', Node)
+        if std_path is not None:
+            Std = self.get_node(std_path)
+            self.remove_node(Std)
 
         # Remove HDF5 node and its childrens
         self._verbose_print('Removing  node {} in content index....'
@@ -3688,6 +3731,8 @@ class SampleData:
         Grid_name = self.get_attribute('parent_grid_path', fieldname)
         Xdmf_grid_node = self._find_xdmf_grid(Grid_name)
         field_type = self.get_attribute('field_type', fieldname)
+        mu = self.get_attribute('normalization_mean', fieldname)
+        std = self.get_attribute('normalization_std', fieldname)
         if field_type == 'Nodal_field':
             Center_type = 'Node'
         elif (field_type == 'Element_field') or (field_type == 'IP_field'):
@@ -3718,8 +3763,49 @@ class SampleData:
                                        Precision=Precision)
         Attribute_data.text = (self.h5_file + ':'
                                + self._name_or_node_to_path(fieldname))
-        # add data item to attribute
-        Attribute_xdmf.append(Attribute_data)
+        # if data normalization is used, a intermediate DataItem is created
+        # to apply a linear function to the dataitem
+        norm = self.get_attribute('data_normalization', fieldname)
+        if norm == 'standard':
+            Func = f'{std}*($0) + {mu}'
+            Function_data = etree.Element(_tag='DataItem',
+                                          ItemType='Function',
+                                          Function=Func,
+                                          Dimensions=Dimension)
+            # add data item to function data item
+            Function_data.append(Attribute_data)
+            # add data item to attribute
+            Attribute_xdmf.append(Function_data)
+        elif norm == 'standard_per_component':
+            # Create dataitem for per component mean
+            mean_path = self.get_attribute('norm_mean_array_path', fieldname)
+            Attribute_mean = etree.Element(_tag='DataItem', Format='HDF',
+                                                   Dimensions=Dimension,
+                                                   NumberType=NumberType,
+                                                   Precision=Precision)
+            Attribute_mean.text = (self.h5_file + ':' + mean_path)
+            # Create dataitem for per component std
+            std_path = self.get_attribute('norm_std_array_path', fieldname)
+            Attribute_std = etree.Element(_tag='DataItem', Format='HDF',
+                                                   Dimensions=Dimension,
+                                                   NumberType=NumberType,
+                                                   Precision=Precision)
+            Attribute_std.text = (self.h5_file + ':' + std_path)
+            # Create dataitem for Function
+            Func = f'($2*$0) + $1'
+            Function_data = etree.Element(_tag='DataItem',
+                                          ItemType='Function',
+                                          Function=Func,
+                                          Dimensions=Dimension)
+            # add data items to function data item
+            Function_data.append(Attribute_data)
+            Function_data.append(Attribute_mean)
+            Function_data.append(Attribute_std)
+            # add function data item to attribute
+            Attribute_xdmf.append(Function_data)
+        else:
+            # add data item to attribute
+            Attribute_xdmf.append(Attribute_data)
         # add attribute to Grid
         Xdmf_grid_node.append(Attribute_xdmf)
         self.add_attributes({'xdmf_fieldname': Attribute_xdmf.get('Name')},
@@ -3839,7 +3925,6 @@ class SampleData:
 
     def _get_compression_opt(self, compression_opts=dict()):
         """Get inputed compression settings as `tables.Filters` instance."""
-        # TODO; apply predefined compression settings
         Filters = tables.Filters()
         # ------ read compression options in dict
         for option in compression_opts:
@@ -3856,6 +3941,36 @@ class SampleData:
             elif (option == 'least_significant_digit'):
                 Filters.least_significant_digit = compression_opts[option]
         return Filters
+
+    @staticmethod
+    def _data_normalization(array, normalization):
+        """Apply normalization to data array to improve compression ratios"""
+        if normalization == 'standard':
+            mu = np.mean(array)
+            std= np.std(array)
+            array = (array - mu) / std
+            normalization_attributes = {'data_normalization':normalization,
+                                        'normalization_mean':mu,
+                                        'normalization_std':std}
+        if normalization == 'standard_per_component':
+            # Apply component per component
+            mu = np.zeros((array.shape[-1]))
+            std = np.zeros((array.shape[-1]))
+            mu_array = np.zeros((array.shape))
+            std_array = np.zeros((array.shape))
+            for comp in range(array.shape[-1]):
+                mu[comp] = np.mean(array[..., comp])
+                std[comp] = np.std(array[..., comp])
+                array[..., comp] = (array[..., comp] - mu[comp]) / std[comp]
+                mu_array[..., comp] = mu[comp]
+                std_array[..., comp] = std[comp]
+            # Create normalization attributes
+            normalization_attributes = {'data_normalization':normalization,
+                                        'normalization_mean':mu,
+                                        'normalization_std':std,
+                                        'norm_mean_array':mu_array,
+                                        'norm_std_array':std_array}
+        return array, normalization_attributes
 
     def _read_mesh_from_file(self, file=''):
         """Read a data array from a file, depending on the extension."""

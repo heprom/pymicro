@@ -133,6 +133,10 @@ class SampleData:
     :autodelete: `bool`, optional (False)
         set to `True` to remove HDF5/XDMF files when deleting SampleData
         instance
+    :autorepack: `bool`, optional (False)
+        if `True`, the HDF5 file is automatically repacked when deleting
+        the SampleData instance, to recover the memory space freed up by data
+        compression operations. See :func:`repack_h5file` for more details.
 
     .. rubric:: Examples
 
@@ -202,7 +206,7 @@ class SampleData:
 
     def __init__(self, filename='sample_data', sample_name='',
                  sample_description=' ', verbose=False, overwrite_hdf5=False,
-                 autodelete=False, **keywords):
+                 autodelete=False, autorepack=False):
         """Sample Data constructor."""
         # get file directory and file name
         path_file = Path(filename).absolute()
@@ -216,12 +220,13 @@ class SampleData:
         self.xdmf_path = os.path.join(self.file_dir,self.xdmf_file)
         self._verbose = verbose
         self.autodelete = autodelete
+        self.autorepack = autorepack
         if os.path.exists(self.h5_path) and overwrite_hdf5:
             self._verbose_print('-- File "{}" exists  and will be '
                                 'overwritten'.format(self.h5_path))
             os.remove(self.h5_path)
             os.remove(self.xdmf_path)
-        self._init_file_object(sample_name, sample_description, **keywords)
+        self._init_file_object(sample_name, sample_description)
         self.sync()
         return
 
@@ -234,7 +239,8 @@ class SampleData:
         """
         self._verbose_print('Deleting DataSample object ')
         self.sync()
-        # self.repack_h5file()
+        if self.autorepack:
+            self.repack_h5file()
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
         if self.autodelete:
@@ -403,7 +409,10 @@ class SampleData:
                 s += '\n************************************************'
                 if not(as_string):
                     print('\n************************************************')
-        return s
+        if as_string:
+            return s
+        else:
+            return
 
     def print_group_content(self, groupname, recursive=False, as_string=False,
                             max_depth=1000):
@@ -2480,12 +2489,10 @@ class SampleData:
 
         Manipulation to recover space leaved empty when removing data from
         the HDF5 tree or reducing a node space by changing its compression
-        settings. This method is called also by the class destructor.
+        settings. This method is called also by the class destructor if the
+        autorepack flag is `True`.
         """
-        # BUG: copy_file from tables returns exception with large mesh and lot
-        # of elsets. Use external utility ptrepack ? For now, taken out of
-        # class destructor
-        # TODO: improve this method --> add sync(), use Pathlib
+        self.sync()
         head, tail = os.path.split(self.h5_path)
         tmp_file = os.path.join(head, 'tmp_'+tail)
         self.h5_dataset.copy_file(tmp_file)

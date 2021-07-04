@@ -1053,6 +1053,78 @@ class SampleData:
                        description, replace, compression_options)
         return
 
+    def add_grid_time(self, gridname, time_list):
+        """Add a list of time values to a grid data group.
+
+        If the grid has no time value, an xdmf grid temporal collection is
+        created.
+
+        :param str gridname: Path, name or indexname of the grid Group where
+            to add time values.
+        :param list(float) time_list: List of times to add to the grid
+        """
+        # get xdmf node of main grid
+        xdmf_gridname = self.get_attribute('xdmf_gridname',gridname)
+        grid = self._find_xdmf_grid(xdmf_gridname)
+        # Find out if grid is a uniform grid
+        grid_type = grid.get('GridType')
+        if grid_type == 'Uniform':
+            grid0 = grid
+            # Default setting considers the already present grid node as the
+            # first time value of the time serie --> first grid of the
+            # collection. All attributes (fields) already added to this grid
+            # will be considered as attribute value at first time value.
+            grid0.set('Name', xdmf_gridname + '_T0')
+            # Remove old grid from xdmf tree
+            p = grid.getparent()
+            p.remove(grid)
+            # Create a new grid
+            grid = etree.Element(_tag='Grid', Name=xdmf_gridname,
+                                 GridType='Collection',
+                                 CollectionType='Temporal')
+            # Add time element to grid0
+            time0 = etree.Element(_tag='Time', Value=f'{time_list[0]}')
+            grid0.append(time0)
+            # Append old grid to new grid collection
+            grid.append(grid0)
+            # Append grid collection to Domain
+            p.append(grid)
+            # Create a time_list with only first time value
+            self.add_attributes({'time_list':[time_list.pop(0)]},gridname)
+        elif grid_type == 'Collection':
+            grid0 = grid.getchildren()[0]
+        else:
+            raise ValueError(f'Grid {gridname} type is not Uniform nor'
+                             ' Collection.')
+        # Get grid topology and Geometry nodes
+        for ch in grid0.iterchildren():
+            if ch.tag == 'Topology':
+                topo = ch
+            if ch.tag == 'Geometry':
+                geo = ch
+        # Get main grid time list
+        time_list0 = self.get_attribute('time_list', gridname)
+        if time_list0 is None:
+            time_list0 = []
+        index_count = len(time_list0)
+        for T in time_list:
+            if T not in time_list0:
+                time_list0.append(T)
+                # Create a new grid
+                gridT_name = xdmf_gridname + f'_T{index_count}'
+                gridT = etree.Element(_tag='Grid', Name=gridT_name,
+                                      GridType='Uniform')
+                # Add time element to grid
+                timeT = etree.Element(_tag='Time', Value=f'{T}')
+                gridT.append(timeT)
+                # Append topology and geometry to grid
+                gridT.append(topo.__copy__())
+                gridT.append(geo.__copy__())
+                index_count = index_count + 1
+                # Append grid to grid collection
+                grid.append(gridT)
+        return
+
     def add_group(self, groupname, location, indexname='', replace=False):
         """Create a standard HDF5 group at location with no grid properties.
 
@@ -1080,7 +1152,8 @@ class SampleData:
 
     def add_field(self, gridname, fieldname, array, location=None,
                   indexname=None, chunkshape=None, replace=False, empty=False,
-                  visualisation_type='Elt_mean', compression_options=dict()):
+                  visualisation_type='Elt_mean', compression_options=dict(),
+                  time=None):
         """Add a field to a grid (Mesh or 2D/3DImage) group from a numpy array.
 
         This methods checks the compatibility of the input field array with the
@@ -1116,7 +1189,9 @@ class SampleData:
         :param dict compression_options: Dictionary containing compression
             options items, see `set_chunkshape_and_compression` method for
             more details.
-
+        :param float time: Associate a time value for this field. IF a time
+            value is provided, the suffix '_T{time_index}' is appended to
+            the fieldname and indexname
         """
         self._verbose_print('Adding field `{}` into Grid `{}`'
                             ''.format(fieldname, gridname))
@@ -1153,33 +1228,75 @@ class SampleData:
                                        ' Field location must be a grid group'
                                        ' (Mesh or Image), or a grid group'
                                        ' children'.format(location))
-        # Add data array into HDF5 dataset
+
+        # Apply indices transposition to assure consistency of the data
+        # visualization in paraview with SampleData ordering and indexing
+        # conventions
         if self._is_image(gridname):
+            # indices transposition to ensure consistency between SampleData
+            # and geometrical interpretation of coordinates in Paraview
             array, transpose_indices = self._transpose_image_array(
                 dimensionality, array)
         if dimensionality in ['Tensor6','Tensor']:
+            # indices transposition to ensure consistency between SampleData
+            # components oredering convention and SampleData ordering
+            # convention
             array, transpose_components = self._transpose_field_comp(
                 dimensionality, array)
+
+        # get indexname or create one
         if indexname is None:
             grid_path = self._name_or_node_to_path(gridname)
             grid_indexname = self.get_indexname_from_path(grid_path)
             indexname = grid_indexname+'_'+fieldname
+
+        # If time value is provided, find out if a new temporal grid must be
+        # added to the xdmf file
+        time_gridname = None
+        time_suffix = ''
+        if time is not None:
+            time_list = self.get_attribute('time_list', gridname)
+            if (time_list is None):
+                time_list = [time]
+                self.add_grid_time(gridname, time_list)
+            else:
+                if time not in time_list:
+                    time_list = [time]
+                    self.add_grid_time(gridname, time_list)
+                    time_list = self.get_attribute('time_list', gridname)
+            time_gridname = self._get_xdmf_time_grid_name(gridname,time)
+            # get time suffix from gridname
+            import re
+            time_suffix = re.findall('_T\d+', time_gridname)[-1]
+            # keep suffixless fieldname as attribute name for the xdmf
+            # time grid collection (same field name for each grid associated
+            # to a different time step)
+            time_serie_name = fieldname
+            # Add time suffix to field indexname and name
+            fieldname = fieldname + time_suffix
+            indexname = indexname + time_suffix
+        # Add data array into HDF5 dataset
         node = self.add_data_array(array_location, fieldname, array, indexname,
                                    chunkshape, replace, empty,
                                    compression_options=compression_options)
-
+        # Create attributes of the field node
+        gridpath =  self._name_or_node_to_path(gridname)
+        xdmf_gname = self.get_attribute('xdmf_gridname',gridname)
+        if time_gridname is not None:
+            xdmf_gname = time_gridname
         Attribute_dic = {'field_type': field_type,
                          'field_dimensionality': dimensionality,
-                         'parent_grid_path': self._name_or_node_to_path(
-                             gridname),
-                         'xdmf_gridname': self.get_attribute('xdmf_gridname',
-                                                             gridname),
-                         'padding': padding
+                         'parent_grid_path': gridpath,
+                         'xdmf_gridname': xdmf_gname, 'padding': padding
                          }
+        if time is not None:
+            Attribute_dic['time'] = time
+            Attribute_dic['time_serie_name'] = time_serie_name
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
         if dimensionality in ['Tensor6','Tensor']:
             Attribute_dic['transpose_components'] = transpose_components
+        # Add field for visualization of Integration Points mesh fields
         if (field_type == 'IP_field') and not (visualisation_type=='None'):
             vis_array = self._IP_field_for_visualisation(vis_array,
                                                          visualisation_type)
@@ -3041,10 +3158,26 @@ class SampleData:
 
     def _find_xdmf_grid(self, gridname):
         name = self.get_attribute('xdmf_gridname', gridname)
+        if name is None:
+            # in case we are looking for a temporal grid collection subgrid,
+            # its name will be directly passed as argument to this method
+            # but no node in the dataset will have this name.
+            name = gridname
         for el in self.xdmf_tree.iterfind('.//Grid'):
             if el.get('Name') == name:
                 return el
         return None
+
+    def _get_xdmf_time_grid_name(self, gridname, time):
+        name = self.get_attribute('xdmf_gridname', gridname)
+        for el in self.xdmf_tree.iterfind('.//Grid'):
+            if el.get('Name') == name:
+                grid0 = el
+        for ch_grid in grid0.iterchildren():
+            for ch in ch_grid.iterchildren():
+                if ch.tag == 'Time':
+                    if float(ch.get('Value')) == time:
+                        return ch_grid.get('Name')
 
     def _find_xdmf_geometry(self, gridname):
         xdmf_grid = self._find_xdmf_grid(gridname)
@@ -3896,11 +4029,9 @@ class SampleData:
     def _add_field_to_xdmf(self, fieldname, field):
         """Write field data as Grid Attribute in xdmf tree/file."""
         Node = self.get_node(fieldname)
-        Grid_name = self.get_attribute('parent_grid_path', fieldname)
+        Grid_name = self.get_attribute('xdmf_gridname', fieldname)
         Xdmf_grid_node = self._find_xdmf_grid(Grid_name)
         field_type = self.get_attribute('field_type', fieldname)
-        mu = self.get_attribute('normalization_mean', fieldname)
-        std = self.get_attribute('normalization_std', fieldname)
         if field_type == 'Nodal_field':
             Center_type = 'Node'
         elif (field_type == 'Element_field') or (field_type == 'IP_field'):
@@ -3910,8 +4041,14 @@ class SampleData:
                              ' or `Element_field`.')
         field_dimensionality = self.get_attribute('field_dimensionality',
                                                   fieldname)
+        # Get the time_serie field name if it exists time_serie_name
+        time_serie_name = self.get_attribute('time_serie_name', fieldname)
+        if time_serie_name is None:
+            attr_name = Node._v_name
+        else:
+            attr_name = time_serie_name
         # create Attribute element
-        Attribute_xdmf = etree.Element(_tag='Attribute', Name=Node._v_name,
+        Attribute_xdmf = etree.Element(_tag='Attribute', Name=attr_name,
                                        AttributeType=field_dimensionality,
                                        Center=Center_type)
         # Create data item element
@@ -3935,6 +4072,8 @@ class SampleData:
         # to apply a linear function to the dataitem
         norm = self.get_attribute('data_normalization', fieldname)
         if norm == 'standard':
+            mu = self.get_attribute('normalization_mean', fieldname)
+            std = self.get_attribute('normalization_std', fieldname)
             Func = f'{std}*($0) + {mu}'
             Function_data = etree.Element(_tag='DataItem',
                                           ItemType='Function',
@@ -3960,7 +4099,7 @@ class SampleData:
                                                    Precision=Precision)
             Attribute_std.text = (self.h5_file + ':' + std_path)
             # Create dataitem for Function
-            Func = f'($2*$0) + $1'
+            Func = '($2*$0) + $1'
             Function_data = etree.Element(_tag='DataItem',
                                           ItemType='Function',
                                           Function=Func,

@@ -374,57 +374,81 @@ class SampleData:
 
         return
 
-    def print_dataset_content(self, as_string=False, max_depth=3):
+    def print_dataset_content(self, as_string=False, max_depth=3,
+                              to_file=None, short=False):
         """Print information on all nodes in the HDF5 file.
 
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
         :param int max_depth: Control the maximum depth of the node/groups
-            informations that are printed. Depth is the number of parents that
-            the node has to root group, including root group. For instance,
-            max_depth=2 will print info on the root group children and their
-            childrens.
+            informations that are printed. For instance, max_depth=2 will print
+            info on the root group children and their childrens.
+        :param str to_file: (optional) If not `None`, writes the dataset
+            information to the provided text file name `to_file`. In that case,
+            nothing is printed to the standard output.
+        :param bool short: If `True`, return a short description of the
+            dataset content, reduced to hdf5 tree structure and node memory
+            sizes.
         :return str s: string representation of HDF5 nodes information
         """
         size, unit = self.get_file_disk_size(print_flag=False)
-        s = ('\n****** DATA SET CONTENT ******\n -- File: {}\n '
-             '-- Size: {:9.3f} {}\n -- Data Model Class: {}\n'
-             ''.format(self.h5_file, size, unit, self.__class__.__name__))
-        if not(as_string):
-            print(s)
-        s += self.get_node_info('/', as_string)
-        s += '\n************************************************'
-        if not(as_string):
-            print('\n************************************************')
+        if short:
+            s = ''
+        else:
+            s = ('\n****** DATA SET CONTENT ******\n -- File: {}\n '
+                 '-- Size: {:9.3f} {}\n -- Data Model Class: {}\n'
+                 ''.format(self.h5_file, size, unit, self.__class__.__name__))
+            s += self.print_node_info('/', as_string=True)
+            s += '\n************************************************\n\n'
         for node in self.h5_dataset.root:
             if node._v_depth > max_depth:
                 continue
             if not(node._v_name == 'Index'):
-                s += self.get_node_info(node._v_pathname, as_string)
+                s += self.print_node_info(node._v_pathname, as_string=True,
+                                          short=short)
                 if self._is_group(node._v_pathname):
                     s += self.print_group_content(node._v_pathname,
                                                   recursive=True,
-                                                  as_string=as_string,
-                                                  max_depth=max_depth)
-                s += '\n************************************************'
-                if not(as_string):
-                    print('\n************************************************')
-        if as_string:
+                                                  as_string=True,
+                                                  max_depth=max_depth,
+                                                  short=short)
+                if not short:
+                    s += ('\n**********************************'
+                          '**************\n\n')
+        if to_file:
+            with open(to_file,'w') as f:
+                f.write(s)
+            return
+        elif as_string:
             return s
         else:
+            print(s)
             return
 
     def print_group_content(self, groupname, recursive=False, as_string=False,
-                            max_depth=1000):
+                            max_depth=1000,  to_file=None, short=False):
         """Print information on all nodes in a HDF5 group.
 
         :param str groupname: Name, Path, Index name or Alias of the HDF5 group
         :param bool recursive: If `True`, print content of children groups
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
+        :param int max_depth: Control the maximum depth of the node/groups
+            informations that are printed. For instance, max_depth=2 will
+            print info on the target group children and their childrens.
+            Only usefull if recursive flag is `True`.
+        :param str to_file: (optional) If not `None`, writes the group
+            contentto the provided text file name `to_file`. In that case,
+            nothing is printed to the standard output.
+        :param bool short: If `True`, return a short description of the
+            dataset content, reduced to hdf5 tree structure and node memory
+            sizes.
         :return str s: string representation of HDF5 nodes information
         """
-        s = '\n\n****** Group {} CONTENT ******'.format(groupname)
+        if short:
+            s=''
+        else:
+            s = '\n****** Group {} CONTENT ******\n'.format(groupname)
         group = self.get_node(groupname)
         if group._v_depth > max_depth:
             return ''
@@ -434,25 +458,159 @@ class SampleData:
             if not(as_string):
                 print(s)
         for node in group._f_iter_nodes():
-            s += self.get_node_info(node._v_pathname, as_string)
+            s += self.print_node_info(node._v_pathname, as_string=True,
+                                      short=short)
             if (self._is_group(node._v_pathname) and recursive):
+                if ((node._v_name == 'ElementsTags') or
+                   (node._v_name == 'NodeTags')):
+                    # skip mesh Element and Node Tags group content
+                    # that can be very large
+                    continue
                 s += self.print_group_content(node._v_pathname, recursive=True,
-                                              as_string=as_string,
-                                              max_depth=max_depth-1)
-        return s
+                                              as_string=True,
+                                              max_depth=max_depth-1,
+                                              short=short)
+        if to_file:
+            with open(to_file,'w') as f:
+                f.write(s)
+            return
+        elif as_string:
+            return s+'\n'
+        else:
+            print(s)
+            return
 
-    def print_data_arrays_info(self, as_string=False):
+    def print_node_info(self, name, as_string=False, short=False):
+        """Print information on a node in the HDF5 tree.
+
+        Prints node name, content, attributes, compression settings, path,
+        childrens list if it is a group.
+
+        :param str name: Name, Path, Index name or Alias of the HDF5 Node
+        :param bool as_string: If `True` solely returns string representation.
+            If `False`, prints the string representation.
+        :return str s: string representation of HDF5 Node information
+        """
+        s = ''
+        node_path = self._name_or_node_to_path(name)
+        if self._is_array(node_path):
+            s += self._get_array_node_info(name, as_string, short)
+        else:
+            s += self._get_group_info(name, as_string, short)
+        if as_string:
+            return s
+        else:
+            print(s)
+            return
+
+    def print_node_attributes(self, nodename, as_string=False):
+        """Print the hdf5 attributes (metadata) of an array node.
+
+        :param str name:Name, Path, Index name or Alias of the HDF5 Node
+        :param bool as_string: If `True` solely returns string representation.
+        If `False`, prints the string representation.
+        :return str s: string representation of HDF5 Node compression settings
+        """
+        s = ''
+        Node = self.get_node(nodename)
+        if Node is None:
+            return f'No group named {nodename}'
+        s += str(f' -- {Node._v_name} attributes : \n')
+        for attr in Node._v_attrs._v_attrnamesuser:
+            value = Node._v_attrs[attr]
+            s += str('\t * {} : {}\n'.format(attr, value))
+        if as_string:
+            return s+'\n'
+        else:
+            print(s)
+            return
+
+    def print_node_compression_info(self, name, as_string=False):
+        """Print the compression settings of an array node.
+
+        :param str name:Name, Path, Index name or Alias of the HDF5 Node
+        :param bool as_string: If `True` solely returns string representation.
+        If `False`, prints the string representation.
+        :return str s: string representation of HDF5 Node compression settings
+        """
+        s = ''
+        if not self.__contains__(name):
+            raise tables.NodeError('node `{}` not in {} instance'.format(
+                                   name, self.__class__.__name__))
+        node_path = self._name_or_node_to_path(name)
+        if self._is_array(node_path):
+            N = self.get_node(name)
+            s += 'Compression options for node `{}`:\n\t'.format(name)
+            s += repr(N.filters).strip('Filters(').strip(')')
+        else:
+            s += '{} is not a data array node'.format(name)
+        if not as_string:
+            print(s)
+            return
+        return s+'\n'
+
+    def print_data_arrays_info(self, as_string=False, to_file=None,
+                               short=False):
         """Print information on all data array nodes in hdf5 file.
+
+        Mesh node and element sets are excluded from the output due to
+        their possibly very high number.
 
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
+        :param str to_file: (optional) If not `None`, writes the dataset
+            information to the provided text file name `to_file`. In that case,
+            nothing is printed to the standard output.
+        :param bool short: If `True`, return a short description of the
+            dataset content, reduced to hdf5 tree structure and node memory
+            sizes.
         :return str s: string representation of HDF5 nodes information
         """
         s = ''
         for node in self.h5_dataset:
+            if node._v_name.startswith('ET_'):
+                continue
             if self._is_array(node._v_name):
-                s += self.get_node_info(node._v_name, as_string)
-        return s
+                s += self.print_node_info(node._v_name, as_string=True,
+                                          short=short)
+        if to_file:
+            with open(to_file,'w') as f:
+                f.write(s)
+            return
+        elif as_string:
+            return s
+        else:
+            print(s)
+            return
+
+    def print_grids_info(self, as_string=False, to_file=None,
+                               short=False):
+        """Print information on all grid groups in hdf5 file.
+
+        :param bool as_string: If `True` solely returns string representation.
+            If `False`, prints the string representation.
+        :param str to_file: (optional) If not `None`, writes the dataset
+            information to the provided text file name `to_file`. In that case,
+            nothing is printed to the standard output.
+        :param bool short: If `True`, return a short description of the
+            dataset content, reduced to hdf5 tree structure and node memory
+            sizes.
+        :return str s: string representation of HDF5 nodes information
+        """
+        s = ''
+        for group in self.h5_dataset.walk_groups():
+            if self._is_grid(group._v_name):
+                s += self.print_node_info(group._v_name, as_string=True,
+                                          short=short)
+        if to_file:
+            with open(to_file,'w') as f:
+                f.write(s)
+            return
+        elif as_string:
+            return s
+        else:
+            print(s)
+            return
 
     def print_index(self, as_string=False, max_depth=3, node_type=[],
                     local_root='/'):
@@ -1856,6 +2014,26 @@ class SampleData:
                 self._verbose_print(msg)
         return data
 
+    def get_grid_field_list(self, gridname):
+        """Return the list of fields stored on the grid.
+
+        :param str gridname: Path, name or indexname of the grid Group on which
+            the field will be added
+        :return str Field_list: List of the name of the fields dataset stored
+            in the hdf5 file and defined on the grid.
+        """
+        grid_group = self.get_node(gridname)
+        FIndex_path = os.path.join(grid_group._v_pathname,'Field_index')
+        Field_index = self.get_node(FIndex_path)
+        Field_list = []
+        if Field_index is None:
+            print(f'No Field_index node for grid {gridname}')
+            return None
+        for fieldname in Field_index:
+            name = fieldname.decode('utf-8')
+            Field_list.append(name)
+        return Field_list
+
     def get_field(self, fieldname, unpad_field=True,
                   get_visualisation_field=False):
         """Return a padded or unpadded field from a grid data group as array.
@@ -1946,48 +2124,6 @@ class SampleData:
                 if transpose_components is not None:
                     node = node[...,transpose_components]
         return node
-
-    def get_node_info(self, name, as_string=False):
-        """Print information on a node in the HDF5 tree.
-
-        Prints node name, content, attributes, compression settings, path,
-        childrens list if it is a group.
-
-        :param str name: Name, Path, Index name or Alias of the HDF5 Node
-        :param bool as_string: If `True` solely returns string representation.
-            If `False`, prints the string representation.
-        :return str s: string representation of HDF5 Node information
-        """
-        s = ''
-        node_path = self._name_or_node_to_path(name)
-        if self._is_array(node_path):
-            s += self._get_array_node_info(name, as_string)
-        else:
-            s += self._get_group_info(name, as_string)
-        return s
-
-    def get_node_compression_info(self, name, as_string=False):
-        """Print the compression settings of an array node.
-
-        :param str name:Name, Path, Index name or Alias of the HDF5 Node
-        :param bool as_string: If `True` solely returns string representation.
-        If `False`, prints the string representation.
-        :return str s: string representation of HDF5 Node compression settings
-        """
-        s = ''
-        if not self.__contains__(name):
-            raise tables.NodeError('node `{}` not in {} instance'.format(
-                                   name, self.__class__.__name__))
-        node_path = self._name_or_node_to_path(name)
-        if self._is_array(node_path):
-            N = self.get_node(name)
-            s += 'Compression options for node `{}`:\n\t'.format(name)
-            s += repr(N.filters).strip('Filters(').strip(')')
-        else:
-            s += '{} is not a data array node'.format(name)
-        if not as_string:
-            print(s)
-        return s+'\n'
 
     def get_dic_from_attributes(self, nodename):
         """Get all attributes from a HDF5 Node in the dataset as a dictionary.
@@ -2369,7 +2505,7 @@ class SampleData:
             self.add_alias(aliasname=alias, indexname=node_indexname)
         self.add_attributes(attributes, nodename)
         if self._verbose:
-            self._verbose_print(self.get_node_compression_info(
+            self._verbose_print(self.print_node_compression_info(
                 new_array._v_pathname))
         return
 
@@ -3879,21 +4015,26 @@ class SampleData:
         Group = Node._g_getparent()
         return Group._v_name
 
-    def _get_group_info(self, groupname, as_string=False):
+    def _get_group_info(self, groupname, as_string=False, short=False):
         """Print a human readable information on the Pytables Group object."""
         s = ''
         Group = self.get_node(groupname)
         if Group is None:
             return f'No group named {groupname}'
         gname = Group._v_name
-        s += str('\n Group {}\n'.format(gname))
+        if short:
+            s = ('  '*Group._v_depth)+'|--'
+            gtype = self.get_attribute('group_type', Group)
+            s += f'GROUP {gname}: {Group._v_pathname} ({gtype}) \n'
+            return s
+        s += str('\n GROUP {}\n'.format(gname))
         s += str('=====================\n')
         gparent_name = Group._v_parent._v_name
         s += str(' -- Parent Group : {}\n'.format(gparent_name))
         s += str(' -- Group attributes : \n')
         for attr in Group._v_attrs._v_attrnamesuser:
             value = Group._v_attrs[attr]
-            s += str('\t {} : {}\n'.format(attr, value))
+            s += str('\t * {} : {}\n'.format(attr, value))
         s += str(' -- Childrens : ')
         for child in Group._v_children:
             s += str('{}, '.format(child))
@@ -3903,28 +4044,31 @@ class SampleData:
             s = ''
         return s
 
-    def _get_array_node_info(self, nodename, as_string=False):
+    def _get_array_node_info(self, nodename, as_string=False, short=False):
         """Print a human readable information on the Pytables Group object."""
         Node = self.get_node(nodename)
+        if Node is None:
+            return f'No group named {nodename}'
+        size, unit = self.get_node_disk_size(nodename, print_flag=False)
+        if short:
+            s = ('  '*Node._v_depth)+' --'
+            s += f'NODE {Node._v_name}: {Node._v_pathname} ({size:9.3f} {unit})'
+            return s+'\n'
         s = ''
-        s += str('\n Node {}\n'.format(Node._v_pathname))
+        s += str('\n NODE: {}\n'.format(Node._v_pathname))
         s += str('====================\n')
         nparent_name = Node._v_parent._v_name
         s += str(' -- Parent Group : {}\n'.format(nparent_name))
         s += str(' -- Node name : {}\n'.format(Node._v_name))
-        s += str(' -- Node attributes : \n')
-        for attr in Node._v_attrs._v_attrnamesuser:
-            value = Node._v_attrs[attr]
-            s += str('\t {} : {}\n'.format(attr, value))
+        s += self.print_node_attributes(Node, as_string)
         s += str(' -- content : {}\n'.format(str(Node)))
         if self._is_table(nodename):
             s += ' -- table description : \n'
             s += repr(Node.description)+'\n'
         s += str(' -- ')
-        s += self.get_node_compression_info(nodename, as_string=True)
-        size, unit = self.get_node_disk_size(nodename, print_flag=False)
-        s += str(' -- Node size : {:9.3f} {}\n'.format(size, unit))
-        s += str('----------------')
+        s += self.print_node_compression_info(nodename, as_string=True)
+        s += str(' -- Node memory size : {:9.3f} {}\n'.format(size, unit))
+        s += str('----------------\n')
         if not(as_string):
             print(s)
             s = ''

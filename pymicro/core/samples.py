@@ -273,6 +273,31 @@ class SampleData:
         else:
             return self.h5_dataset.__contains__(path)
 
+    def __getitem__(self, key):
+        """Implement dictionnary like access to hdf5 dataset items."""
+        # Return the object under the appropriate form
+        if self._is_field(key):
+            return self.get_field(key)
+        elif self._is_array(key):
+            return self.get_node(key, as_numpy=True)
+        elif self._is_group(key):
+            return self.get_node(key, as_numpy=False)
+
+    def __getattribute__(self, name):
+        """Implement attribute like access to hdf5 dataset items."""
+        try:
+            return object.__getattribute__(self, name)
+        except AttributeError:
+            if self._is_field(name):
+                return self.get_field(name)
+            elif self._is_array(name):
+                return self.get_node(name, as_numpy=True)
+            elif self._is_group(name):
+                return self.get_node(name, as_numpy=False)
+            else:
+                raise AttributeError(f'{self.__class__} has no attribute'
+                                     f' {name}')
+
     def minimal_data_model(self):
         """Specify minimal data model to store in class instance.
 

@@ -2880,9 +2880,10 @@ class SampleData:
         if store:
             if fieldname is None:
                 fieldname = meshname+'_elset_ids'
+                c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
             self.add_field(gridname=meshname, fieldname=fieldname,
                            array=ID_field, replace=True,
-                           complib='zlib', complevel=1, shuffle=True)
+                           compression_options=c_opt)
         return ID_field
 
     # =========================================================================
@@ -3621,12 +3622,12 @@ class SampleData:
                 data = np.zeros((mesh_object.GetNumberOfNodes(),1),
                                 dtype=np.int8)
                 data[node_list] = 1;
+                c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
                 node = self.add_field(mesh_group._v_pathname,
                                       fieldname='field_'+name,
                                       array=data, replace=replace,
                                       location=Ntags_group._v_pathname,
-                                      complib='zlib', complevel=1,
-                                      shuffle=True)
+                                      compression_options=c_opt)
                 # remove from index : Elsets may be too numerous and
                 # overload content index --> actual choice is to remove
                 # them from index
@@ -3673,12 +3674,12 @@ class SampleData:
                     data = np.zeros((mesh_object.GetNumberOfElements(),1),
                                     dtype=np.int8)
                     data[elem_list_field] = 1;
+                    c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
                     node = self.add_field(mesh_group._v_pathname,
                                           fieldname='field_'+name,
                                           array=data, replace=replace,
                                           location=Etags_group._v_pathname,
-                                          complib='zlib', complevel=1,
-                                          shuffle=True)
+                                          compression_options=c_opt)
                     # remove from index : Elsets may be too numerous and
                     # overload content index --> actual choice is to remove
                     # them from index

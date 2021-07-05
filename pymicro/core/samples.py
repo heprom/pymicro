@@ -2798,7 +2798,6 @@ class SampleData:
         :param bool autodelete: remove copied dataset files when copied
             instance is destroyed.
         """
-        # TODO: improve method --> use Pathlib
         sample = SampleData(filename=src_sample_file)
         if new_sample_name is None:
             new_sample_name = sample.get_attribute('sample_name', '/')

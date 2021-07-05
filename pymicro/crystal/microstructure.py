@@ -1516,13 +1516,12 @@ class Microstructure(SampleData):
                             overwrite_hdf5, autodelete, **keywords)
         if not (self._file_exist):
             self.set_active_grain_map()
+            self.set_sample_name(name)
         else:
             self.active_grain_map = self.get_attribute('active_grain_map',
                                                        'CellData')
             if self.active_grain_map is None:
                 self.set_active_grain_map()
-        # TODO find a way not to overwrite the sample name when an existing file is read
-        #self.set_sample_name(name)
         self.grains = self.get_node('GrainDataTable')
         self._init_phase(phase)
         self.active_phase_id = 1
@@ -3652,10 +3651,6 @@ class Microstructure(SampleData):
         :type int_var_names: dict, optional
         """
         from pymicro.core.utils.SDAmitexUtils import SDAmitexIO
-        # TODO: implement XDMF time series in SampleData and create one here
-        # to store output fields
-        # TODO: Adapt to finite strain calculations
-        # TODO: Add loading of internal variables fields
         # Get std file result
         p_std = Path(results_basename).absolute().with_suffix('.std')
         # safety check
@@ -3664,8 +3659,6 @@ class Microstructure(SampleData):
                              ' not associated with Amitex_fftp simulation'
                              ' results.')
         # load .std results
-        # TODO: load vtk results and create a group per timestep in CellDAta
-        # then add results in Cell Data
         std_res = SDAmitexIO.load_std(p_std)
         # Store macro data in specific group
         self.add_group(groupname=f'{sim_prefix}_Results', location='/',

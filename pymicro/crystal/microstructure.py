@@ -3684,22 +3684,30 @@ class Microstructure(SampleData):
         ## Loop over time steps: create group to store results
         self.add_group(groupname=f'{sim_prefix}_output_fields', location='/CellData',
                         indexname='fft_fields', replace=True)
+        # Create CellData temporal subgrids for each time value with a vtk
+        # field output
+        time_values = std_res['time'][list(Stress.keys())].squeeze()
+        self.add_grid_time('CellData', time_values)
+        # Add fields to CellData grid collections
         for incr in Stress:
-            fieldname = f'{sim_prefix}_stress_{incr}'
+            Time = std_res['time'][incr]
+            fieldname = f'{sim_prefix}_stress'
             self.add_field(gridname='CellData', fieldname=fieldname,
-                            array=Stress[incr], location='fft_fields')
-            fieldname = f'{sim_prefix}_strain_{incr}'
+                            array=Stress[incr], location='fft_fields',
+                            time=Time)
+            fieldname = f'{sim_prefix}_strain'
             self.add_field(gridname='CellData', fieldname=fieldname,
-                            array=Strain[incr], location='fft_fields')
+                            array=Strain[incr], location='fft_fields',
+                            time=Time)
             for mat in VarInt:
                 for var in VarInt[mat][incr]:
                     varname = var
                     if int_var_names.__contains__(var):
                         varname = int_var_names[var]
-                    fieldname = f'{sim_prefix}_mat{mat}_{varname}_{incr}'
+                    fieldname = f'{sim_prefix}_mat{mat}_{varname}'
                     self.add_field(gridname='CellData', fieldname=fieldname,
-                                   array=VarInt[mat][incr][var],
-                                   location='fft_fields')
+                                    array=VarInt[mat][incr][var],
+                                    location='fft_fields', time=Time)
         return
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):

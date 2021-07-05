@@ -1061,8 +1061,12 @@ class SampleData:
 
         :param str gridname: Path, name or indexname of the grid Group where
             to add time values.
-        :param list(float) time_list: List of times to add to the grid
+        :param list(float) time_list: List of times to add to the grid. Can
+            also be passed as a numpy array.
         """
+        # if time_list is passed as a numpy array, transform it into a list
+        if isinstance(time_list, np.ndarray):
+            time_list = time_list.tolist()
         # get xdmf node of main grid
         xdmf_gridname = self.get_attribute('xdmf_gridname',gridname)
         grid = self._find_xdmf_grid(xdmf_gridname)
@@ -1123,6 +1127,7 @@ class SampleData:
                 index_count = index_count + 1
                 # Append grid to grid collection
                 grid.append(gridT)
+        self.add_attributes({'time_list':time_list0},gridname)
         return
 
     def add_group(self, groupname, location, indexname='', replace=False):

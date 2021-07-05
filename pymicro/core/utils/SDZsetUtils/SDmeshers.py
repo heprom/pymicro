@@ -729,7 +729,7 @@ class SDImageMesher():
                     * self.data.get_attribute('spacing',image_group) )
         Im_origin = self.data.get_attribute('origin',image_group)
         # get mesh nodes and rescale mesh
-        from pymicro.core.utils.SDMeshUtils import SDMeshTools
+        from pymicro.core.utils.SDGridUtils import SDMeshTools
         SDMeshTools.rescale_and_translate_mesh(
             data=self.data, meshname=meshname, mesh_new_origin=Im_origin,
             mesh_new_size=Im_range)
@@ -854,7 +854,7 @@ class SDImageMesher():
                     * self.data.get_attribute('spacing',image_group) )
         Im_origin = self.data.get_attribute('origin',image_group)
         # get mesh nodes and rescale mesh
-        from pymicro.core.utils.SDMeshUtils import SDMeshTools
+        from pymicro.core.utils.SDGridUtils import SDMeshTools
         SDMeshTools.rescale_and_translate_mesh(
             data=self.data, meshname=meshname, mesh_new_origin=Im_origin,
             mesh_new_size=Im_range)

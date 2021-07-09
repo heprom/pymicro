@@ -1463,13 +1463,7 @@ class SampleData:
         Filters = self._get_compression_opt(compression_options)
         self._verbose_print('-- Compression Options for dataset {}'
                             ''.format(name))
-        if (self.Filters.complevel > 0):
-            msg_list = str(self.Filters).strip('Filters(').strip(')').split()
-            for msg in msg_list:
-                self._verbose_print('\t * {}'.format(msg), line_break=False)
-        else:
-            self._verbose_print('\t * No Compression')
-
+        # create table
         table = self.h5_dataset.create_table(where=location_path, name=name,
                                              description=description,
                                              filters=Filters,
@@ -1477,7 +1471,6 @@ class SampleData:
         if data is not None:
             table.append(data)
             table.flush()
-
         # add to index
         if indexname is None:
             warn_msg = (' (add_table) indexname not provided, '
@@ -4229,7 +4222,7 @@ class SampleData:
         nparent_name = Node._v_parent._v_name
         s += str(' -- Parent Group : {}\n'.format(nparent_name))
         s += str(' -- Node name : {}\n'.format(Node._v_name))
-        s += self.print_node_attributes(Node, as_string)
+        s += self.print_node_attributes(Node, as_string=True)
         s += str(' -- content : {}\n'.format(str(Node)))
         if self._is_table(nodename):
             s += ' -- table description : \n'

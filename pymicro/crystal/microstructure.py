@@ -1522,11 +1522,14 @@ class Microstructure(SampleData):
                                                        'CellData')
             if self.active_grain_map is None:
                 self.set_active_grain_map()
-        self.grains = self.get_node('GrainDataTable')
         self._init_phase(phase)
         self.active_phase_id = 1
-        self.vtkmesh = None
         self.sync()
+        return
+
+    def _after_file_open(self):
+        """Initialization code to run after opening a Sample Data file."""
+        self.grains = self.get_node('GrainDataTable')
         return
 
     def __repr__(self):
@@ -2801,7 +2804,8 @@ class Microstructure(SampleData):
                     break
         return array
 
-    def dilate_grains(self, dilation_steps=1, dilation_ids=None):
+    def dilate_grains(self, dilation_steps=1, dilation_ids=None,
+                      new_map_name='dilated_grain_map'):
         """Dilate grains to fill the gap between them.
 
         This function calls `dilate_labels` with the grain map of the
@@ -2828,9 +2832,9 @@ class Microstructure(SampleData):
                                                      dilation_steps=dilation_steps,
                                                      dilation_ids=dilation_ids)
         # finally assign the dilated grain map to the microstructure
-        self.set_grain_map(grain_map, map_name='dilated_grain_map')
+        self.set_grain_map(grain_map, map_name=new_map_name)
 
-    def clean_grain_map(self):
+    def clean_grain_map(self,  new_map_name='grain_map_clean'):
         """Apply a morphological cleaning treatment to the active grain map.
 
 
@@ -2854,9 +2858,9 @@ class Microstructure(SampleData):
         Mesher = SDImageMesher(data=self)
         Mesher.morphological_image_cleaner(
             target_image_field=self.active_grain_map,
-            clean_fieldname='grain_map_clean', replace=True)
+            clean_fieldname=new_map_name, replace=True)
         del Mesher
-        self.set_active_grain_map('grain_map_clean')
+        self.set_active_grain_map(new_map_name)
         return
 
     def mesh_grain_map(self, mesher_opts=dict(), print_output=False):
@@ -2881,7 +2885,8 @@ class Microstructure(SampleData):
         Mesher.multi_phase_mesher(
             multiphase_image_name=self.active_grain_map,
             meshname='grains_mesh', location='/MeshData', replace=True,
-            mesher_opts=mesher_opts, print_output=print_output)
+            bin_fields_from_sets=False, mesher_opts=mesher_opts,
+            elset_id_field=True, print_output=print_output)
         del Mesher
         return
 
@@ -4553,31 +4558,3 @@ class Microstructure(SampleData):
             merged_micro.set_mask(mask_merged, voxel_size)
         merged_micro.sync()
         return merged_micro
-
-    def pause_for_visualization(self, Vitables=False, Paraview=False,
-                                **keywords):
-        """Flushes data, close files and pause interpreter for visualization.
-
-        This method pauses the interpreter until you press the <Enter> key.
-        During the pause, the HDF5 file object is closed, so that it can be
-        read by visualization softwares like Paraview or ViTables. Two
-        optional arguments allow to directly open the dataset with Paraview
-        and/or Vitables, as a subprocess of Python. In these cases, the Python
-        interpreter is paused until you close the visualization software.
-
-        Paraview allows to visualize the volumic data that is stored in the
-        SampleData dataset, *i.e.* Mesh and Images groups (geometry and
-        stored fields). Vitables allows to visualize the content of the HDF5
-        dataset in term of data tree, arrays content and nodes attributes. If
-        both are requested, Vitables is executed before Paraview.
-
-
-        :param bool Vitables: set to `True` to launch Vitables on the HDF5 file
-            of the instance HDF5 dataset.
-        :param bool Paraview: set to `True` to launch Paraview on the XDMF file
-            of the instance.
-        """
-        super(Microstructure, self).pause_for_visualization(Vitables, Paraview,
-                                                            **keywords)
-        self.grains = self.get_node('GrainDataTable')
-        return

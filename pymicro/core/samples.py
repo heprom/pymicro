@@ -227,7 +227,19 @@ class SampleData:
             os.remove(self.h5_path)
             os.remove(self.xdmf_path)
         self._init_file_object(sample_name, sample_description)
+        self._after_file_open()
         self.sync()
+        return
+
+    def _after_file_open(self):
+        """Initialization code to run after opening a Sample Data file.
+
+        Empty method for this class. Use it for SampleData inherited classes,
+        to create shortcut class attribute that are linked with hdf5 dataset
+        elements (for instance, class attribute pointing towards a dataset
+        structured table -- see `add_table` method and Microstructure class
+        `grains` attribute)
+        """
         return
 
     def __del__(self):
@@ -763,6 +775,7 @@ class SampleData:
                   ' Press <Enter> when you want to resume data management'
                   ''.format(self.h5_file, self.xdmf_file))
         self.h5_dataset = tables.File(self.h5_path, mode='r+')
+        self._after_file_open()
         print('File objects {} and {} are opened again.\n You may use this'
               ' SampleData instance normally.'.format(self.h5_file,
                                                       self.xdmf_file))
@@ -965,7 +978,7 @@ class SampleData:
         if len(image_nodes_dim) == 2:
             image_xdmf_dim = image_nodes_dim[[1,0]]
         elif len(image_nodes_dim) == 3:
-            image_xdmf_dim = image_nodes_dim[[1,0,2]]
+            image_xdmf_dim = image_nodes_dim[[2,1,0]]
         Attribute_dic = {'nodes_dimension': image_nodes_dim,
                          'nodes_dimension_xdmf': image_xdmf_dim,
                          'dimension': image_cell_dim,
@@ -2775,6 +2788,7 @@ class SampleData:
         self.h5_dataset.close()
         shutil.move(tmp_file, self.h5_path)
         self.h5_dataset = tables.File(self.h5_path, mode='r+')
+        self._after_file_open()
         return
 
     @staticmethod
@@ -2889,7 +2903,6 @@ class SampleData:
                                 line_break=False)
             self._file_exist = True
             self._init_xml_tree()
-            self.Filters = self.h5_dataset.filters
             self._init_data_model()
             self._verbose_print('**** FILE CONTENT ****')
             self._verbose_print(SampleData.__repr__(self))

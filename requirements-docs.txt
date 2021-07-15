@@ -1,2 +1,5 @@
 sphinx
 sphinxcontrib-bibtex
+pandoc
+nbsphinx
+ipykernel

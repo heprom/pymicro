@@ -180,7 +180,7 @@ def generate_dir_rst(dir, fhindex, example_dir, out_dir, plot_anim):
         print('***** found file', fname)
         if fname.endswith('data'):
             continue
-        if fname.endswith('Notebooks'):
+        if fname.endswith('SampleDataUserGuide'):
             continue
         if os.path.isdir(os.path.join(src_dir, fname)):
             print('***** this is a directory, going in...')

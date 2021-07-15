@@ -73,7 +73,8 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.autosummary',
               'sphinx.ext.mathjax',
               'sphinxcontrib.bibtex',
-              'gen_rst']
+              'gen_rst',
+              'nbsphinx']
 bibtex_bibfiles = ['bibliography.bib']
 mathjax_path = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
 

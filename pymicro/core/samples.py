@@ -133,6 +133,10 @@ class SampleData:
     :autodelete: `bool`, optional (False)
         set to `True` to remove HDF5/XDMF files when deleting SampleData
         instance
+    :autorepack: `bool`, optional (False)
+        if `True`, the HDF5 file is automatically repacked when deleting
+        the SampleData instance, to recover the memory space freed up by data
+        compression operations. See :func:`repack_h5file` for more details.
 
     .. rubric:: Examples
 
@@ -194,10 +198,6 @@ class SampleData:
             #. If needed, develop dedicated methods to offer a specific API to
                support the derived class practical application
 
-        When creating a derived Class from SampleData, users can defined their
-        own default compression settings by overwritting the method
-        :func:`set_default_compression`.
-
         | See documentation of :func:`minimal_data_model` for further details
         | To see examples of such derived classes see:
         | - the :py:class:`pymicro.crystal.microstructure`
@@ -206,7 +206,7 @@ class SampleData:
 
     def __init__(self, filename='sample_data', sample_name='',
                  sample_description=' ', verbose=False, overwrite_hdf5=False,
-                 autodelete=False, **keywords):
+                 autodelete=False, autorepack=False):
         """Sample Data constructor."""
         # get file directory and file name
         path_file = Path(filename).absolute()
@@ -220,13 +220,26 @@ class SampleData:
         self.xdmf_path = os.path.join(self.file_dir,self.xdmf_file)
         self._verbose = verbose
         self.autodelete = autodelete
+        self.autorepack = autorepack
         if os.path.exists(self.h5_path) and overwrite_hdf5:
             self._verbose_print('-- File "{}" exists  and will be '
                                 'overwritten'.format(self.h5_path))
             os.remove(self.h5_path)
             os.remove(self.xdmf_path)
-        self._init_file_object(sample_name, sample_description, **keywords)
+        self._init_file_object(sample_name, sample_description)
+        self._after_file_open()
         self.sync()
+        return
+
+    def _after_file_open(self):
+        """Initialization code to run after opening a Sample Data file.
+
+        Empty method for this class. Use it for SampleData inherited classes,
+        to create shortcut class attribute that are linked with hdf5 dataset
+        elements (for instance, class attribute pointing towards a dataset
+        structured table -- see `add_table` method and Microstructure class
+        `grains` attribute)
+        """
         return
 
     def __del__(self):
@@ -238,7 +251,8 @@ class SampleData:
         """
         self._verbose_print('Deleting DataSample object ')
         self.sync()
-        # self.repack_h5file()
+        if self.autorepack:
+            self.repack_h5file()
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
         if self.autodelete:
@@ -270,6 +284,31 @@ class SampleData:
             return False
         else:
             return self.h5_dataset.__contains__(path)
+
+    def __getitem__(self, key):
+        """Implement dictionnary like access to hdf5 dataset items."""
+        # Return the object under the appropriate form
+        if self._is_field(key):
+            return self.get_field(key)
+        elif self._is_array(key):
+            return self.get_node(key, as_numpy=True)
+        elif self._is_group(key):
+            return self.get_node(key, as_numpy=False)
+
+    def __getattribute__(self, name):
+        """Implement attribute like access to hdf5 dataset items."""
+        try:
+            return object.__getattribute__(self, name)
+        except AttributeError:
+            if self._is_field(name):
+                return self.get_field(name)
+            elif self._is_array(name):
+                return self.get_node(name, as_numpy=True)
+            elif self._is_group(name):
+                return self.get_node(name, as_numpy=False)
+            else:
+                raise AttributeError(f'{self.__class__} has no attribute'
+                                     f' {name}')
 
     def minimal_data_model(self):
         """Specify minimal data model to store in class instance.
@@ -372,54 +411,81 @@ class SampleData:
 
         return
 
-    def print_dataset_content(self, as_string=False, max_depth=3):
+    def print_dataset_content(self, as_string=False, max_depth=3,
+                              to_file=None, short=False):
         """Print information on all nodes in the HDF5 file.
 
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
         :param int max_depth: Control the maximum depth of the node/groups
-            informations that are printed. Depth is the number of parents that
-            the node has to root group, including root group. For instance,
-            max_depth=2 will print info on the root group children and their
-            childrens.
+            informations that are printed. For instance, max_depth=2 will print
+            info on the root group children and their childrens.
+        :param str to_file: (optional) If not `None`, writes the dataset
+            information to the provided text file name `to_file`. In that case,
+            nothing is printed to the standard output.
+        :param bool short: If `True`, return a short description of the
+            dataset content, reduced to hdf5 tree structure and node memory
+            sizes.
         :return str s: string representation of HDF5 nodes information
         """
         size, unit = self.get_file_disk_size(print_flag=False)
-        s = ('\n****** DATA SET CONTENT ******\n -- File: {}\n '
-             '-- Size: {:9.3f} {}\n -- Data Model Class: {}\n'
-             ''.format(self.h5_file, size, unit, self.__class__.__name__))
-        if not(as_string):
-            print(s)
-        s += self.get_node_info('/', as_string)
-        s += '\n************************************************'
-        if not(as_string):
-            print('\n************************************************')
+        if short:
+            s = ''
+        else:
+            s = ('\n****** DATA SET CONTENT ******\n -- File: {}\n '
+                 '-- Size: {:9.3f} {}\n -- Data Model Class: {}\n'
+                 ''.format(self.h5_file, size, unit, self.__class__.__name__))
+            s += self.print_node_info('/', as_string=True)
+            s += '\n************************************************\n\n'
         for node in self.h5_dataset.root:
             if node._v_depth > max_depth:
                 continue
             if not(node._v_name == 'Index'):
-                s += self.get_node_info(node._v_pathname, as_string)
+                s += self.print_node_info(node._v_pathname, as_string=True,
+                                          short=short)
                 if self._is_group(node._v_pathname):
                     s += self.print_group_content(node._v_pathname,
                                                   recursive=True,
-                                                  as_string=as_string,
-                                                  max_depth=max_depth)
-                s += '\n************************************************'
-                if not(as_string):
-                    print('\n************************************************')
-        return s
+                                                  as_string=True,
+                                                  max_depth=max_depth,
+                                                  short=short)
+                if not short:
+                    s += ('\n**********************************'
+                          '**************\n\n')
+        if to_file:
+            with open(to_file,'w') as f:
+                f.write(s)
+            return
+        elif as_string:
+            return s
+        else:
+            print(s)
+            return
 
     def print_group_content(self, groupname, recursive=False, as_string=False,
-                            max_depth=1000):
+                            max_depth=1000,  to_file=None, short=False):
         """Print information on all nodes in a HDF5 group.
 
         :param str groupname: Name, Path, Index name or Alias of the HDF5 group
         :param bool recursive: If `True`, print content of children groups
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
+        :param int max_depth: Control the maximum depth of the node/groups
+            informations that are printed. For instance, max_depth=2 will
+            print info on the target group children and their childrens.
+            Only usefull if recursive flag is `True`.
+        :param str to_file: (optional) If not `None`, writes the group
+            contentto the provided text file name `to_file`. In that case,
+            nothing is printed to the standard output.
+        :param bool short: If `True`, return a short description of the
+            dataset content, reduced to hdf5 tree structure and node memory
+            sizes.
         :return str s: string representation of HDF5 nodes information
         """
-        s = '\n\n****** Group {} CONTENT ******'.format(groupname)
+        if short:
+            s=''
+        else:
+            s = '\n****** Group {} CONTENT ******\n'.format(groupname)
         group = self.get_node(groupname)
         if group._v_depth > max_depth:
             return ''
@@ -429,25 +495,159 @@ class SampleData:
             if not(as_string):
                 print(s)
         for node in group._f_iter_nodes():
-            s += self.get_node_info(node._v_pathname, as_string)
+            s += self.print_node_info(node._v_pathname, as_string=True,
+                                      short=short)
             if (self._is_group(node._v_pathname) and recursive):
+                if ((node._v_name == 'ElementsTags') or
+                   (node._v_name == 'NodeTags')):
+                    # skip mesh Element and Node Tags group content
+                    # that can be very large
+                    continue
                 s += self.print_group_content(node._v_pathname, recursive=True,
-                                              as_string=as_string,
-                                              max_depth=max_depth-1)
-        return s
+                                              as_string=True,
+                                              max_depth=max_depth-1,
+                                              short=short)
+        if to_file:
+            with open(to_file,'w') as f:
+                f.write(s)
+            return
+        elif as_string:
+            return s+'\n'
+        else:
+            print(s)
+            return
 
-    def print_data_arrays_info(self, as_string=False):
+    def print_node_info(self, name, as_string=False, short=False):
+        """Print information on a node in the HDF5 tree.
+
+        Prints node name, content, attributes, compression settings, path,
+        childrens list if it is a group.
+
+        :param str name: Name, Path, Index name or Alias of the HDF5 Node
+        :param bool as_string: If `True` solely returns string representation.
+            If `False`, prints the string representation.
+        :return str s: string representation of HDF5 Node information
+        """
+        s = ''
+        node_path = self._name_or_node_to_path(name)
+        if self._is_array(node_path):
+            s += self._get_array_node_info(name, as_string, short)
+        else:
+            s += self._get_group_info(name, as_string, short)
+        if as_string:
+            return s
+        else:
+            print(s)
+            return
+
+    def print_node_attributes(self, nodename, as_string=False):
+        """Print the hdf5 attributes (metadata) of an array node.
+
+        :param str name:Name, Path, Index name or Alias of the HDF5 Node
+        :param bool as_string: If `True` solely returns string representation.
+        If `False`, prints the string representation.
+        :return str s: string representation of HDF5 Node compression settings
+        """
+        s = ''
+        Node = self.get_node(nodename)
+        if Node is None:
+            return f'No group named {nodename}'
+        s += str(f' -- {Node._v_name} attributes : \n')
+        for attr in Node._v_attrs._v_attrnamesuser:
+            value = Node._v_attrs[attr]
+            s += str('\t * {} : {}\n'.format(attr, value))
+        if as_string:
+            return s+'\n'
+        else:
+            print(s)
+            return
+
+    def print_node_compression_info(self, name, as_string=False):
+        """Print the compression settings of an array node.
+
+        :param str name:Name, Path, Index name or Alias of the HDF5 Node
+        :param bool as_string: If `True` solely returns string representation.
+        If `False`, prints the string representation.
+        :return str s: string representation of HDF5 Node compression settings
+        """
+        s = ''
+        if not self.__contains__(name):
+            raise tables.NodeError('node `{}` not in {} instance'.format(
+                                   name, self.__class__.__name__))
+        node_path = self._name_or_node_to_path(name)
+        if self._is_array(node_path):
+            N = self.get_node(name)
+            s += 'Compression options for node `{}`:\n\t'.format(name)
+            s += repr(N.filters).strip('Filters(').strip(')')
+        else:
+            s += '{} is not a data array node'.format(name)
+        if not as_string:
+            print(s)
+            return
+        return s+'\n'
+
+    def print_data_arrays_info(self, as_string=False, to_file=None,
+                               short=False):
         """Print information on all data array nodes in hdf5 file.
+
+        Mesh node and element sets are excluded from the output due to
+        their possibly very high number.
 
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
+        :param str to_file: (optional) If not `None`, writes the dataset
+            information to the provided text file name `to_file`. In that case,
+            nothing is printed to the standard output.
+        :param bool short: If `True`, return a short description of the
+            dataset content, reduced to hdf5 tree structure and node memory
+            sizes.
         :return str s: string representation of HDF5 nodes information
         """
         s = ''
         for node in self.h5_dataset:
+            if node._v_name.startswith('ET_'):
+                continue
             if self._is_array(node._v_name):
-                s += self.get_node_info(node._v_name, as_string)
-        return s
+                s += self.print_node_info(node._v_name, as_string=True,
+                                          short=short)
+        if to_file:
+            with open(to_file,'w') as f:
+                f.write(s)
+            return
+        elif as_string:
+            return s
+        else:
+            print(s)
+            return
+
+    def print_grids_info(self, as_string=False, to_file=None,
+                               short=False):
+        """Print information on all grid groups in hdf5 file.
+
+        :param bool as_string: If `True` solely returns string representation.
+            If `False`, prints the string representation.
+        :param str to_file: (optional) If not `None`, writes the dataset
+            information to the provided text file name `to_file`. In that case,
+            nothing is printed to the standard output.
+        :param bool short: If `True`, return a short description of the
+            dataset content, reduced to hdf5 tree structure and node memory
+            sizes.
+        :return str s: string representation of HDF5 nodes information
+        """
+        s = ''
+        for group in self.h5_dataset.walk_groups():
+            if self._is_grid(group._v_name):
+                s += self.print_node_info(group._v_name, as_string=True,
+                                          short=short)
+        if to_file:
+            with open(to_file,'w') as f:
+                f.write(s)
+            return
+        elif as_string:
+            return s
+        else:
+            print(s)
+            return
 
     def print_index(self, as_string=False, max_depth=3, node_type=[],
                     local_root='/'):
@@ -575,6 +775,7 @@ class SampleData:
                   ' Press <Enter> when you want to resume data management'
                   ''.format(self.h5_file, self.xdmf_file))
         self.h5_dataset = tables.File(self.h5_path, mode='r+')
+        self._after_file_open()
         print('File objects {} and {} are opened again.\n You may use this'
               ' SampleData instance normally.'.format(self.h5_file,
                                                       self.xdmf_file))
@@ -587,7 +788,8 @@ class SampleData:
 
     def add_mesh(self, mesh_object=None, meshname='', indexname='',
                  location='/', description=' ', replace=False,
-                 bin_fields_from_sets=True, file=None, **keywords):
+                 bin_fields_from_sets=True, file=None,
+                 compression_options=dict()):
         """Create a Mesh group in the dataset from a MeshObject.
 
         A Mesh group is a HDF5 Group that contains arrays describing mesh
@@ -619,6 +821,9 @@ class SampleData:
             name/location if `True` and such group exists
         :param bool bin_fields_from_sets: If `True`, stores all Node and
             Element Sets in mesh_object as binary fields (1 on Set, 0 else)
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
         """
         # Check if the input array is in an external file
         if file is not None:
@@ -649,17 +854,20 @@ class SampleData:
         for field_name, field in mesh_object.nodeFields.items():
             self.add_field(gridname=mesh_group._v_pathname,
                            fieldname=field_name, array=field,
-                           replace=replace, **keywords)
+                           replace=replace,
+                           compression_options=compression_options)
         for field_name, field in mesh_object.elemFields.items():
             self.add_field(gridname=mesh_group._v_pathname,
                            fieldname=field_name, array=field,
-                           replace=replace, **keywords)
+                           replace=replace,
+                           compression_options=compression_options)
         return mesh_object
 
     def add_mesh_from_image(self, imagename, with_fields=True, ofTetras=False,
                             meshname='', indexname='', location='/',
                             description=' ', replace=False,
-                            bin_fields_from_sets=True, **keywords):
+                            bin_fields_from_sets=True,
+                            compression_options=dict()):
         """Create a Mesh group in the dataset from an Image dataset.
 
         The mesh group created can represent a mesh of tetrahedra or a mesh of
@@ -682,6 +890,9 @@ class SampleData:
             name/location if `True` and such group exists
         :param bool bin_fields_from_sets: If `True`, stores all Node and
             Element Sets in mesh_object as binary fields
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
         """
 
         Mesh_o = self.get_mesh_from_image(imagename, with_fields, ofTetras)
@@ -693,12 +904,13 @@ class SampleData:
         for key in field_names:
             Mesh_o.elemFields[key+'_'+meshname] = Mesh_o.elemFields.pop(key)
         self.add_mesh(Mesh_o, meshname, indexname, location, description,
-                      replace, bin_fields_from_sets)
+                      replace, bin_fields_from_sets,
+                      compression_options=compression_options)
         return
 
     def add_image(self, image_object=None, imagename='', indexname='',
                   location='/', description=' ', replace=False,
-                  **keywords):
+                  compression_options=dict()):
         """Create a 2D/3D Image group in the dataset from an ImageObject.
 
         An Image group is a HDF5 Group that contains arrays describing fields
@@ -743,6 +955,9 @@ class SampleData:
         :param str description: Description metadata for this 3D image
         :param bool replace: remove Image group in the dataset with the same
             name/location if `True` and such group exists
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
         """
         ### Create or fetch image group
         image_group = self.add_group(imagename, location, indexname, replace)
@@ -763,7 +978,7 @@ class SampleData:
         if len(image_nodes_dim) == 2:
             image_xdmf_dim = image_nodes_dim[[1,0]]
         elif len(image_nodes_dim) == 3:
-            image_xdmf_dim = image_nodes_dim[[1,0,2]]
+            image_xdmf_dim = image_nodes_dim[[2,1,0]]
         Attribute_dic = {'nodes_dimension': image_nodes_dim,
                          'nodes_dimension_xdmf': image_xdmf_dim,
                          'dimension': image_cell_dim,
@@ -777,19 +992,19 @@ class SampleData:
         ### Add fields if some are stored in the image object
         for field_name, field in image_object.nodeFields.items():
             self.add_field(gridname=image_group._v_pathname,
-                           fieldname=field_name, array=field,
-                           replace=replace, **keywords)
+                           fieldname=field_name, array=field, replace=replace,
+                           compression_options=compression_options)
         for field_name, field in image_object.elemFields.items():
             self.add_field(gridname=image_group._v_pathname,
-                           fieldname=field_name, array=field,
-                           replace=replace, **keywords)
+                           fieldname=field_name, array=field, replace=replace,
+                           compression_options=compression_options)
         return image_object
 
     def add_image_from_field(self, field_array, fieldname, imagename='',
                              indexname='', location='/', description=' ',
                              replace=False, origin=None, spacing=None,
                              is_scalar=True, is_elemField=True,
-                             **keywords):
+                             compression_options=dict()):
         """Create a 2D/3M Image group in the dataset from a field data array.
 
         Construct an image object from the inputed field array. This array is
@@ -825,6 +1040,9 @@ class SampleData:
         :param bool is_elemField: If `True` (default value), the array is
             considered as a pixel/voxel wise field value array. If `False`, the
             field is considered as a nodal value array.
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
 
         """
         if is_scalar:
@@ -845,7 +1063,84 @@ class SampleData:
         image_object.SetSpacing(spacing)
         image_object.elemFields[fieldname] = field_array
         self.add_image(image_object, imagename, indexname, location,
-                       description, replace, **keywords)
+                       description, replace, compression_options)
+        return
+
+    def add_grid_time(self, gridname, time_list):
+        """Add a list of time values to a grid data group.
+
+        If the grid has no time value, an xdmf grid temporal collection is
+        created.
+
+        :param str gridname: Path, name or indexname of the grid Group where
+            to add time values.
+        :param list(float) time_list: List of times to add to the grid. Can
+            also be passed as a numpy array.
+        """
+        # if time_list is passed as a numpy array, transform it into a list
+        if isinstance(time_list, np.ndarray):
+            time_list = time_list.tolist()
+        # get xdmf node of main grid
+        xdmf_gridname = self.get_attribute('xdmf_gridname',gridname)
+        grid = self._find_xdmf_grid(xdmf_gridname)
+        # Find out if grid is a uniform grid
+        grid_type = grid.get('GridType')
+        if grid_type == 'Uniform':
+            grid0 = grid
+            # Default setting considers the already present grid node as the
+            # first time value of the time serie --> first grid of the
+            # collection. All attributes (fields) already added to this grid
+            # will be considered as attribute value at first time value.
+            grid0.set('Name', xdmf_gridname + '_T0')
+            # Remove old grid from xdmf tree
+            p = grid.getparent()
+            p.remove(grid)
+            # Create a new grid
+            grid = etree.Element(_tag='Grid', Name=xdmf_gridname,
+                                 GridType='Collection',
+                                 CollectionType='Temporal')
+            # Add time element to grid0
+            time0 = etree.Element(_tag='Time', Value=f'{time_list[0]}')
+            grid0.append(time0)
+            # Append old grid to new grid collection
+            grid.append(grid0)
+            # Append grid collection to Domain
+            p.append(grid)
+            # Create a time_list with only first time value
+            self.add_attributes({'time_list':[time_list.pop(0)]},gridname)
+        elif grid_type == 'Collection':
+            grid0 = grid.getchildren()[0]
+        else:
+            raise ValueError(f'Grid {gridname} type is not Uniform nor'
+                             ' Collection.')
+        # Get grid topology and Geometry nodes
+        for ch in grid0.iterchildren():
+            if ch.tag == 'Topology':
+                topo = ch
+            if ch.tag == 'Geometry':
+                geo = ch
+        # Get main grid time list
+        time_list0 = self.get_attribute('time_list', gridname)
+        if time_list0 is None:
+            time_list0 = []
+        index_count = len(time_list0)
+        for T in time_list:
+            if T not in time_list0:
+                time_list0.append(T)
+                # Create a new grid
+                gridT_name = xdmf_gridname + f'_T{index_count}'
+                gridT = etree.Element(_tag='Grid', Name=gridT_name,
+                                      GridType='Uniform')
+                # Add time element to grid
+                timeT = etree.Element(_tag='Time', Value=f'{T}')
+                gridT.append(timeT)
+                # Append topology and geometry to grid
+                gridT.append(topo.__copy__())
+                gridT.append(geo.__copy__())
+                index_count = index_count + 1
+                # Append grid to grid collection
+                grid.append(gridT)
+        self.add_attributes({'time_list':time_list0},gridname)
         return
 
     def add_group(self, groupname, location, indexname='', replace=False):
@@ -874,9 +1169,9 @@ class SampleData:
         return Group
 
     def add_field(self, gridname, fieldname, array, location=None,
-                  indexname=None, chunkshape=None, replace=False,
-                  filters=None, empty=False, visualisation_type='Elt_mean',
-                  **keywords):
+                  indexname=None, chunkshape=None, replace=False, empty=False,
+                  visualisation_type='Elt_mean', compression_options=dict(),
+                  time=None):
         """Add a field to a grid (Mesh or 2D/3DImage) group from a numpy array.
 
         This methods checks the compatibility of the input field array with the
@@ -909,11 +1204,12 @@ class SampleData:
             Possibilities are 'Elt_max' (maximum value per element), 'Elt_mean'
             (mean value per element), 'None' (no visualisation field).
             Default value is 'Elt_mean'
-        .. note:: additional keywords arguments can be passed to specify global
-                compression options, see :func:`set_chunkshape_and_compression`
-                documentation for their definition. If some are passed, they
-                are prioritised over the settings in the inputed Filter object.
-
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
+        :param float time: Associate a time value for this field. IF a time
+            value is provided, the suffix '_T{time_index}' is appended to
+            the fieldname and indexname
         """
         self._verbose_print('Adding field `{}` into Grid `{}`'
                             ''.format(fieldname, gridname))
@@ -928,6 +1224,13 @@ class SampleData:
         # and returns field dimension, xdmf Center attribute
         field_type, dimensionality = self._check_field_compatibility(
                                                         gridname,array.shape)
+        # Get storage location for field data array
+        if (location is None) and replace:
+            # if replace, try to get the parent node of the possibly
+            # existing node to replace
+            node_field = self.get_node(fieldname)
+            if node_field is not None:
+                location = node_field._v_parent._v_pathname
         if location is None:
             # FIELD STORAGE DEFAULT CONVENTION :
             # fields are stored directly into the HDF5 grid group
@@ -943,33 +1246,75 @@ class SampleData:
                                        ' Field location must be a grid group'
                                        ' (Mesh or Image), or a grid group'
                                        ' children'.format(location))
-        # Add data array into HDF5 dataset
+
+        # Apply indices transposition to assure consistency of the data
+        # visualization in paraview with SampleData ordering and indexing
+        # conventions
         if self._is_image(gridname):
+            # indices transposition to ensure consistency between SampleData
+            # and geometrical interpretation of coordinates in Paraview
             array, transpose_indices = self._transpose_image_array(
                 dimensionality, array)
         if dimensionality in ['Tensor6','Tensor']:
+            # indices transposition to ensure consistency between SampleData
+            # components oredering convention and SampleData ordering
+            # convention
             array, transpose_components = self._transpose_field_comp(
                 dimensionality, array)
+
+        # get indexname or create one
         if indexname is None:
             grid_path = self._name_or_node_to_path(gridname)
             grid_indexname = self.get_indexname_from_path(grid_path)
             indexname = grid_indexname+'_'+fieldname
-        node = self.add_data_array(array_location, fieldname, array, indexname,
-                                   chunkshape, replace, filters, empty,
-                                   **keywords)
 
+        # If time value is provided, find out if a new temporal grid must be
+        # added to the xdmf file
+        time_gridname = None
+        time_suffix = ''
+        if time is not None:
+            time_list = self.get_attribute('time_list', gridname)
+            if (time_list is None):
+                time_list = [time]
+                self.add_grid_time(gridname, time_list)
+            else:
+                if time not in time_list:
+                    time_list = [time]
+                    self.add_grid_time(gridname, time_list)
+                    time_list = self.get_attribute('time_list', gridname)
+            time_gridname = self._get_xdmf_time_grid_name(gridname,time)
+            # get time suffix from gridname
+            import re
+            time_suffix = re.findall('_T\d+', time_gridname)[-1]
+            # keep suffixless fieldname as attribute name for the xdmf
+            # time grid collection (same field name for each grid associated
+            # to a different time step)
+            time_serie_name = fieldname
+            # Add time suffix to field indexname and name
+            fieldname = fieldname + time_suffix
+            indexname = indexname + time_suffix
+        # Add data array into HDF5 dataset
+        node = self.add_data_array(array_location, fieldname, array, indexname,
+                                   chunkshape, replace, empty,
+                                   compression_options=compression_options)
+        # Create attributes of the field node
+        gridpath =  self._name_or_node_to_path(gridname)
+        xdmf_gname = self.get_attribute('xdmf_gridname',gridname)
+        if time_gridname is not None:
+            xdmf_gname = time_gridname
         Attribute_dic = {'field_type': field_type,
                          'field_dimensionality': dimensionality,
-                         'parent_grid_path': self._name_or_node_to_path(
-                             gridname),
-                         'xdmf_gridname': self.get_attribute('xdmf_gridname',
-                                                             gridname),
-                         'padding': padding
+                         'parent_grid_path': gridpath,
+                         'xdmf_gridname': xdmf_gname, 'padding': padding
                          }
+        if time is not None:
+            Attribute_dic['time'] = time
+            Attribute_dic['time_serie_name'] = time_serie_name
         if self._is_image(gridname):
             Attribute_dic['transpose_indices'] = transpose_indices
         if dimensionality in ['Tensor6','Tensor']:
             Attribute_dic['transpose_components'] = transpose_components
+        # Add field for visualization of Integration Points mesh fields
         if (field_type == 'IP_field') and not (visualisation_type=='None'):
             vis_array = self._IP_field_for_visualisation(vis_array,
                                                          visualisation_type)
@@ -978,9 +1323,9 @@ class SampleData:
             if dimensionality in ['Tensor6','Tensor']:
                 vis_array, _ = self._transpose_field_comp(
                     dimensionality, vis_array)
-            node_vis = self.add_data_array(array_location, visname, vis_array,
-                                           visindexname, chunkshape, replace,
-                                           filters, empty, **keywords)
+            node_vis = self.add_data_array(
+                array_location, visname, vis_array, visindexname, chunkshape,
+                replace, empty, compression_options=compression_options)
             Attribute_dic['visualisation_type'] = visualisation_type
             self.add_attributes(Attribute_dic, nodename=visindexname)
             Attribute_dic['visualisation_field_path'] = node_vis._v_pathname
@@ -995,8 +1340,8 @@ class SampleData:
         return node
 
     def add_data_array(self, location, name, array=None, indexname=None,
-                       chunkshape=None, replace=False, filters=None,
-                       empty=False, **keywords):
+                       chunkshape=None, replace=False, empty=False,
+                       compression_options=dict()):
         """Add a data array node at the given location in the HDF5 dataset.
 
         The method uses the :py:class:`CArray` and
@@ -1017,28 +1362,21 @@ class SampleData:
             specifying compression settings.
         :param bool empty: if `True` create the path, Index Name in dataset and
             store an empty array. Set the node attribute `empty` to True.
-        :param file:
-        :type str, optional:
-
-        .. note:: additional keywords arguments can be passed to specify global
-            compression options, see :func:`set_chunkshape_and_compression`
-            documentation for their definition. If some are passed, they are
-            prioritised over the settings in the inputed Filter object.
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
 
         """
         self._verbose_print('Adding array `{}` into Group `{}`'
                             ''.format(name, location))
         # Safety checks
         self._check_SD_array_init(name, location, replace)
-        # Check if the input array is in an external file
-        if 'file' in keywords:
-            array = self._read_array_from_file(**keywords)
         if array is None:
             raise ValueError('Received a `None` array. Cannot add data array.')
         # get location path
         location_path = self._name_or_node_to_path(location)
         # get compression options
-        Filters = self._get_compression_opt(filters, **keywords)
+        Filters = self._get_compression_opt(compression_options)
         # add to index
         if indexname is None:
             indexname = name
@@ -1050,16 +1388,32 @@ class SampleData:
                     title=indexname)
             self.add_attributes({'empty': True}, Node._v_pathname)
         else:
+            if 'normalization' in compression_options:
+                optn = compression_options['normalization']
+                array, norm_attributes = self._data_normalization(array, optn)
             Node = self.h5_dataset.create_carray(
                     where=location_path, name=name, filters=Filters,
                     obj=array, chunkshape=chunkshape,
                     title=indexname)
             self.add_attributes({'empty': False}, Node._v_pathname)
+            if 'normalization' in compression_options:
+                if optn == 'standard_per_component':
+                    mean_array = norm_attributes.pop('norm_mean_array')
+                    std_array = norm_attributes.pop('norm_std_array')
+                    Mean = self.h5_dataset.create_carray(
+                        where=location_path, name=name+'_norm_mean',
+                        filters=Filters, obj=mean_array, chunkshape=chunkshape)
+                    Std = self.h5_dataset.create_carray(
+                        where=location_path, name=name+'_norm_std',
+                        filters=Filters, obj=std_array, chunkshape=chunkshape)
+                    norm_attributes['norm_mean_array_path'] = Mean._v_pathname
+                    norm_attributes['norm_std_array_path'] = Std._v_pathname
+                self.add_attributes(norm_attributes, Node._v_pathname)
         return Node
 
     def add_table(self, location, name, description, indexname=None,
-                  chunkshape=None, replace=False, data=None, filters=None,
-                  **keywords):
+                  chunkshape=None, replace=False, data=None,
+                  compression_options=dict()):
         """Add a structured storage table in HDF5 dataset.
 
         :param str location: Path where the array will be added in the dataset
@@ -1080,11 +1434,9 @@ class SampleData:
             specifying compression settings.
         :param bool empty: if `True` create the path, Index Name in dataset and
             store an empty table. Set the table attribute `empty` to True.
-
-        .. note:: additional keywords arguments can be passed to specify global
-                compression options, see :func:`set_chunkshape_and_compression`
-                documentation for their definition. If some are passed, they
-                are prioritised over the settings in the inputed Filter object.
+        :param dict compression_options: Dictionary containing compression
+            options items, see `set_chunkshape_and_compression` method for
+            more details.
         """
         self._verbose_print('Adding table `{}` into Group `{}`'
                             ''.format(name, location))
@@ -1121,20 +1473,10 @@ class SampleData:
                     self._verbose_print(msg)
 
         # get compression options
-        # keywords compression options prioritized over input filters instances
-        if (filters is None) or bool(keywords):
-            Filters = self._get_compression_opt(**keywords)
-        else:
-            Filters = filters
+        Filters = self._get_compression_opt(compression_options)
         self._verbose_print('-- Compression Options for dataset {}'
                             ''.format(name))
-        if (self.Filters.complevel > 0):
-            msg_list = str(self.Filters).strip('Filters(').strip(')').split()
-            for msg in msg_list:
-                self._verbose_print('\t * {}'.format(msg), line_break=False)
-        else:
-            self._verbose_print('\t * No Compression')
-
+        # create table
         table = self.h5_dataset.create_table(where=location_path, name=name,
                                              description=description,
                                              filters=Filters,
@@ -1142,7 +1484,6 @@ class SampleData:
         if data is not None:
             table.append(data)
             table.flush()
-
         # add to index
         if indexname is None:
             warn_msg = (' (add_table) indexname not provided, '
@@ -1826,6 +2167,26 @@ class SampleData:
                 self._verbose_print(msg)
         return data
 
+    def get_grid_field_list(self, gridname):
+        """Return the list of fields stored on the grid.
+
+        :param str gridname: Path, name or indexname of the grid Group on which
+            the field will be added
+        :return str Field_list: List of the name of the fields dataset stored
+            in the hdf5 file and defined on the grid.
+        """
+        grid_group = self.get_node(gridname)
+        FIndex_path = os.path.join(grid_group._v_pathname,'Field_index')
+        Field_index = self.get_node(FIndex_path)
+        Field_list = []
+        if Field_index is None:
+            print(f'No Field_index node for grid {gridname}')
+            return None
+        for fieldname in Field_index:
+            name = fieldname.decode('utf-8')
+            Field_list.append(name)
+        return Field_list
+
     def get_field(self, fieldname, unpad_field=True,
                   get_visualisation_field=False):
         """Return a padded or unpadded field from a grid data group as array.
@@ -1889,9 +2250,26 @@ class SampleData:
             if as_numpy and self._is_array(name) and (colname is None):
                 # note : np.atleast_1d is used here to avoid returning a 0d
                 # array when squeezing a scalar node
+                node = np.atleast_1d(node.read())
+                # Reverse data normalization if it has been applied
+                # NOTE: it is very important to keep these lines before
+                # those aiming at reversing transpositions for ordering
+                # conventions as the arrays containing normalization parameters
+                # comply to the in-memory ordering conventions
+                norm = self.get_attribute('data_normalization', name)
+                if norm == 'standard':
+                    mu = self.get_attribute('normalization_mean', name)
+                    std = self.get_attribute('normalization_std', name)
+                    node = (node * std) + mu
+                elif norm == 'standard_per_component':
+                    mu = self.get_attribute('normalization_mean', name)
+                    std = self.get_attribute('normalization_std', name)
+                    for comp in range(node.shape[-1]):
+                        node[...,comp] = (node[..., comp]*std[comp]) + mu[comp]
+                # Reverse indices transpositions apply to ensure compatibility
+                # between SampleData and Paraview ordering conventions
                 transpose_indices = self.get_attribute('transpose_indices',
                                                        name)
-                node = np.atleast_1d(node.read())
                 if transpose_indices is not None:
                     node = node.transpose(transpose_indices)
                 transpose_components = self.get_attribute('transpose_components',
@@ -1899,48 +2277,6 @@ class SampleData:
                 if transpose_components is not None:
                     node = node[...,transpose_components]
         return node
-
-    def get_node_info(self, name, as_string=False):
-        """Print information on a node in the HDF5 tree.
-
-        Prints node name, content, attributes, compression settings, path,
-        childrens list if it is a group.
-
-        :param str name: Name, Path, Index name or Alias of the HDF5 Node
-        :param bool as_string: If `True` solely returns string representation.
-            If `False`, prints the string representation.
-        :return str s: string representation of HDF5 Node information
-        """
-        s = ''
-        node_path = self._name_or_node_to_path(name)
-        if self._is_array(node_path):
-            s += self._get_array_node_info(name, as_string)
-        else:
-            s += self._get_group_info(name, as_string)
-        return s
-
-    def get_node_compression_info(self, name, as_string=False):
-        """Print the compression settings of an array node.
-
-        :param str name:Name, Path, Index name or Alias of the HDF5 Node
-        :param bool as_string: If `True` solely returns string representation.
-        If `False`, prints the string representation.
-        :return str s: string representation of HDF5 Node compression settings
-        """
-        s = ''
-        if not self.__contains__(name):
-            raise tables.NodeError('node `{}` not in {} instance'.format(
-                                   name, self.__class__.__name__))
-        node_path = self._name_or_node_to_path(name)
-        if self._is_array(node_path):
-            N = self.get_node(name)
-            s += 'Compression options for node `{}`:\n\t'.format(name)
-            s += repr(N.filters).strip('Filters(').strip(')')
-        else:
-            s += '{} is not a data array node'.format(name)
-        if not as_string:
-            print(s)
-        return s+'\n'
 
     def get_dic_from_attributes(self, nodename):
         """Get all attributes from a HDF5 Node in the dataset as a dictionary.
@@ -2097,11 +2433,22 @@ class SampleData:
         :param np.array voxel_size: (dx, dy, dz) array of the voxel size in
             each dimension of the 3Dimage
         """
+        old_spacing = self.get_attribute('spacing', image_group)
+        if isinstance(voxel_size, float):
+            voxel_size = np.ones(shape=(len(old_spacing),))*voxel_size
+        if len(old_spacing) != len(voxel_size):
+            raise ValueError('Dimension mismatch between image group old'
+                             f' grid spacing {old_spacing} and inputed'
+                             f' new grid spacing {voxel_size}')
         self.add_attributes({'spacing': np.array(voxel_size)},
                             image_group)
         xdmf_geometry = self._find_xdmf_geometry(image_group)
         spacing_node = xdmf_geometry.getchildren()[1]
-        spacing_text = str(voxel_size).strip('[').strip(']').replace(',', ' ')
+        if len(voxel_size) == 2:
+            VoxSize = voxel_size[[1,0]]
+        elif len(voxel_size) == 3:
+            VoxSize = voxel_size[[2,1,0]]
+        spacing_text = str(VoxSize).strip('[').strip(']').replace(',', ' ')
         spacing_node.text = spacing_text
         self.sync()
         return
@@ -2118,10 +2465,19 @@ class SampleData:
         :param np.array voxel_size: (Ox, Oy, Oz) array of the coordinates in
             each dimension of the origin of the 3Dimage
         """
+        old_origin = self.get_attribute('origin', image_group)
+        if len(old_origin) != len(origin):
+            raise ValueError('Dimension mismatch between image group origin'
+                             f' {old_origin} and inputed new origin'
+                             f' {origin}')
         self.add_attributes({'origin': origin}, image_group)
         xdmf_geometry = self._find_xdmf_geometry(image_group)
+        if len(origin) == 2:
+            Or = origin[[1,0]]
+        elif len(origin) == 3:
+            Or = origin[[2,1,0]]
         origin_node = xdmf_geometry.getchildren()[0]
-        origin_text = str(origin).strip('[').strip(']').replace(',', ' ')
+        origin_text = str(Or).strip('[').strip(']').replace(',', ' ')
         origin_node.text = origin_text
         self.sync()
         return
@@ -2153,35 +2509,41 @@ class SampleData:
         return
 
     def set_nodes_compression_chunkshape(self, node_list=None, chunkshape=None,
-                                         filters=None, **keywords):
+                                         compression_options=dict()):
         """Set compression options for a list of nodes in the dataset.
+
+        This methods sets the same set of compression options for a
+        list of nodes in the dataset.
 
         :param list node_list: list of Name, Path, Index name or Alias of the
             HDF5 array nodes where to set the compression settings.
         :param tuple  chunkshape: The shape of the data chunk to be read or
             written in a single HDF5 I/O operation
-        :param Filters filters: instance of :py:class:`tables.Filters` class
-            specifying compression settings.
+        :param dict compression_options: Dictionary containing compression
+            options items (keys are options names, values are )
 
-        .. rubric:: Additional keyword arguments
+        .. rubric:: Compression Options
 
-        Compression settings can be passed as keyword arguments to this method.
-        They are the `Filters
+        Compression settings can be passed through the `compression_options`
+        dictionary as follows:
+            compression_options[option_name] = option_value
+        These options are the Pytables package `Filters
         <https://www.pytables.org/_modules/tables/filters.html#Filters>`_
         class constructor parameters (see `PyTables` documentation for details)
+        The list of available compression options is provided here:
 
-        :param str complevel: Compression level for data. Allowed range is 0-9.
+          * complevel: Compression level for data. Allowed range is 0-9.
             A value of 0 (the default) disables compression.
-        :param str complib: Compression library to use. Possibilities are:
+          * complib: Compression library to use. Possibilities are:
             zlib' (the default), 'lzo', 'bzip2' and 'blosc'.
-        :param bool shuffle:  Whether or not to use the *Shuffle* filter in the
+          * shuffle:  Whether or not to use the *Shuffle* filter in the
             HDF5 library (may improve compression ratio).
-        :param bool bitshuffle: Whether or not to use the *BitShuffle* filter
+          * bitshuffle: Whether or not to use the *BitShuffle* filter
             in the Blosc library (may improve compression ratio).
-        :param bool fletcher32: Whether or not to use the *Fletcher32* filter
+          * fletcher32: Whether or not to use the *Fletcher32* filter
             in the HDF5 library. This is used to add a checksum on each data
             chunk.
-        :param int least_significant_digit:
+          * least_significant_digit:
             If specified, data will be truncated using
             ``around(scale*data)/scale``, where
             ``scale = 2**least_significant_digit``.
@@ -2206,24 +2568,27 @@ class SampleData:
                 if self._is_array(node):
                     node_list.append(node)
         for nodename in node_list:
-            self.set_chunkshape_and_compression(nodename, chunkshape, filters,
-                                                **keywords)
+            self.set_chunkshape_and_compression(nodename, chunkshape,
+                                                compression_options)
         return
 
-    def set_chunkshape_and_compression(self, node, chunkshape=None,
-                                       filters=None, **keywords):
+    def set_chunkshape_and_compression(self, nodename, chunkshape=None,
+                                       compression_options=dict()):
         """Set the chunkshape and compression settings for a HDF5 array node.
 
         :param str node: Name, Path, Index name or Alias of the node
         :param tuple  chunkshape: The shape of the data chunk to be read or
             written in a single HDF5 I/O operation
-        :param Filters filters: instance of :py:class:`tables.Filters` class
-            specifying compression settings.
+        :param dict compression_options: Dictionary containing compression
+            options items (keys are options names, values are )
 
-        .. rubric:: Additional keyword arguments
+        .. rubric:: Compression options
 
-        Compression settings can be passed as keyword arguments to this method.
-        See :func:`set_nodes_compression_chunkshape`.
+        Compression settings can be passed through the `compression_options`
+        dictionary as follows:
+            compression_options[option_name] = option_value
+        See :func:`set_nodes_compression_chunkshape`, for the list of
+        available compression options.
 
         .. important:: If the new compression settings reduce the size of the
             node in the dataset, the file size will not be changed. This is a
@@ -2237,83 +2602,64 @@ class SampleData:
             arguments, they are prioritised over the settings in the inputed
             Filter object.
         """
-        if not self._is_array(node):
+        if not self._is_array(nodename):
             msg = ('(set_chunkshape) Cannot set chunkshape or compression'
                    ' settings for a non array node')
             raise tables.NodeError(msg)
-        node_tmp = self.get_node(node)
+        # Get HDF5 node whose compression and chunkshape settings are to
+        # be changed
+        # chunkshape cannot be changed for a Pytables dataset node, and
+        # changing compression settings can lead to errors or unexpected
+        # behaviors
+        # ==> New settings are set by reading rewriting data on the dataset
+        # First get the hdf5 attributes of the target node
+        attributes = self.get_dic_from_attributes(nodename)
+        node_tmp = self.get_node(nodename)
+        # Get node name, indexname and path
         nodename = node_tmp._v_name
         node_indexname = self.get_indexname_from_path(node_tmp._v_pathname)
         node_path = os.path.dirname(node_tmp._v_pathname)
+        # Set new chunkshape if provided or get old one
         node_chunkshape = node_tmp.chunkshape
         if chunkshape is not None:
             node_chunkshape = chunkshape
-        if filters is None:
-            node_filters = node_tmp.filters
-        else:
-            node_filters = filters
+        # Get node aliases
         if self.aliases.__contains__(node_indexname):
             node_aliases = self.aliases[node_indexname]
         else:
             node_aliases = []
-        array = node_tmp.read()
-        if self._is_table(node):
+        if self._is_table(nodename):
+            # get stored array values
+            array = node_tmp.read()
             description = node_tmp.description
-            new_array = self.add_table(location=node_path, name=nodename,
-                                       description=description,
-                                       indexname=node_indexname,
-                                       chunkshape=node_chunkshape,
-                                       replace=True, data=array,
-                                       filters=node_filters, **keywords)
+            new_array = self.add_table(
+                location=node_path, name=nodename, description=description,
+                indexname=node_indexname, chunkshape=node_chunkshape,
+                replace=True, data=array,
+                compression_options=compression_options)
+        elif self._is_field(nodename):
+            array = self.get_field(nodename)
+            parent_grid = self.get_attribute('parent_grid_path', nodename)
+            visu_type = self.get_attribute('visualisation_type', nodename)
+            if visu_type is None:
+                visu_type = 'None'
+            new_array = self.add_field(
+                gridname=parent_grid, fieldname=nodename, array=array,
+                chunkshape=node_chunkshape, replace=True,
+                visualisation_type=visu_type,
+                compression_options=compression_options)
         else:
-            new_array = self.add_data_array(location=node_path, name=nodename,
-                                            indexname=node_indexname,
-                                            array=array, filters=node_filters,
-                                            chunkshape=node_chunkshape,
-                                            replace=True, **keywords)
+            array = node_tmp.read()
+            new_array = self.add_data_array(
+                location=node_path, name=nodename, indexname=node_indexname,
+                array=array, chunkshape=node_chunkshape,
+                replace=True, compression_options=compression_options)
         for alias in node_aliases:
             self.add_alias(aliasname=alias, indexname=node_indexname)
+        self.add_attributes(attributes, nodename)
         if self._verbose:
-            self._verbose_print(self.get_node_compression_info(
+            self._verbose_print(self.print_node_compression_info(
                 new_array._v_pathname))
-        return
-
-    def set_default_compression(self):
-        """Return a Filter object with defaut compression parameters."""
-        Filters = tables.Filters(complib='zlib', complevel=0, shuffle=True)
-        return Filters
-
-    def set_global_compression_opt(self, **keywords):
-        """Set default compression settings for the dataset.
-
-        .. rubric:: Additional keyword arguments
-
-        Compression settings can be passed as keyword arguments to this method.
-        See :func:`set_nodes_compression_chunkshape`.
-        """
-        # initialize general compression Filters object (from PyTables)
-        # with no compression (default behavior)
-        default = False
-        # ------ check if default compression is required
-        if 'default_compression' in keywords:
-            default = True
-        self.Filters = self._get_compression_opt(default=default, **keywords)
-
-        # ----- message and Pytables Filter (comp option container) set up
-        self._verbose_print('-- General Compression Options for datasets'
-                            ' in {}'.format(self.h5_file))
-
-        self.h5_dataset.filters = self.Filters
-
-        if (self.Filters.complevel > 0):
-            if default:
-                self._verbose_print('\t Default Compression Parameters ')
-            msg_list = str(self.Filters).strip('Filters(').strip(')').split()
-            self._verbose_print(str(msg_list))
-            for msg in msg_list:
-                self._verbose_print('\t * {}'.format(msg), line_break=False)
-        else:
-            self._verbose_print('\t * No Compression')
         return
 
     def set_verbosity(self, verbosity=True):
@@ -2360,7 +2706,6 @@ class SampleData:
         self.sync()
         return
 
-
     def remove_node(self, name, recursive=False):
         """Remove a node from the dataset.
 
@@ -2397,6 +2742,16 @@ class SampleData:
             IP = self.get_node(IP_vis)
             self.remove_node(IP)
 
+        # Remove array used for per component data normalization.
+        mean_path = self.get_attribute('norm_mean_array_path', Node)
+        if mean_path is not None:
+            mean = self.get_node(mean_path)
+            self.remove_node(mean)
+        std_path = self.get_attribute('norm_std_array_path', Node)
+        if std_path is not None:
+            Std = self.get_node(std_path)
+            self.remove_node(Std)
+
         # Remove HDF5 node and its childrens
         self._verbose_print('Removing  node {} in content index....'
                             ''.format(Node._v_pathname))
@@ -2408,6 +2763,7 @@ class SampleData:
             self._remove_from_xdmf(Node)
             Node._f_remove(recursive=True)
         else:
+            print('')
             self._remove_from_index(node_path=Node._v_pathname)
             # remove node in xdmf tree
             self._remove_from_xdmf(Node)
@@ -2422,18 +2778,17 @@ class SampleData:
 
         Manipulation to recover space leaved empty when removing data from
         the HDF5 tree or reducing a node space by changing its compression
-        settings. This method is called also by the class destructor.
+        settings. This method is called also by the class destructor if the
+        autorepack flag is `True`.
         """
-        # BUG: copy_file from tables returns exception with large mesh and lot
-        # of elsets. Use external utility ptrepack ? For now, taken out of
-        # class destructor
-        # TODO: improve this method --> add sync(), use Pathlib
+        self.sync()
         head, tail = os.path.split(self.h5_path)
         tmp_file = os.path.join(head, 'tmp_'+tail)
         self.h5_dataset.copy_file(tmp_file)
         self.h5_dataset.close()
         shutil.move(tmp_file, self.h5_path)
         self.h5_dataset = tables.File(self.h5_path, mode='r+')
+        self._after_file_open()
         return
 
     @staticmethod
@@ -2450,7 +2805,6 @@ class SampleData:
         :param bool autodelete: remove copied dataset files when copied
             instance is destroyed.
         """
-        # TODO: improve method --> use Pathlib
         sample = SampleData(filename=src_sample_file)
         if new_sample_name is None:
             new_sample_name = sample.get_attribute('sample_name', '/')
@@ -2532,16 +2886,16 @@ class SampleData:
         if store:
             if fieldname is None:
                 fieldname = meshname+'_elset_ids'
+                c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
             self.add_field(gridname=meshname, fieldname=fieldname,
                            array=ID_field, replace=True,
-                           complib='zlib', complevel=1, shuffle=True)
+                           compression_options=c_opt)
         return ID_field
 
     # =========================================================================
     #  SampleData private methods
     # =========================================================================
-    def _init_file_object(self, sample_name='', sample_description='',
-                          **keywords):
+    def _init_file_object(self, sample_name='', sample_description=''):
         """Initiate or create PyTable HDF5 file object."""
         try:
             self.h5_dataset = tables.File(self.h5_path, mode='r+')
@@ -2549,7 +2903,6 @@ class SampleData:
                                 line_break=False)
             self._file_exist = True
             self._init_xml_tree()
-            self.Filters = self.h5_dataset.filters
             self._init_data_model()
             self._verbose_print('**** FILE CONTENT ****')
             self._verbose_print(SampleData.__repr__(self))
@@ -2563,10 +2916,6 @@ class SampleData:
             # add sample name and description
             self.h5_dataset.root._v_attrs.sample_name = sample_name
             self.h5_dataset.root._v_attrs.description = sample_description
-            # get compression options
-            Compression_keywords = {k: v for k, v in keywords.items() if k in
-                                    COMPRESSION_KEYS}
-            self.set_global_compression_opt(**Compression_keywords)
             # Generic Data Model initialization
             self._init_data_model()
         return
@@ -2820,10 +3169,26 @@ class SampleData:
 
     def _find_xdmf_grid(self, gridname):
         name = self.get_attribute('xdmf_gridname', gridname)
+        if name is None:
+            # in case we are looking for a temporal grid collection subgrid,
+            # its name will be directly passed as argument to this method
+            # but no node in the dataset will have this name.
+            name = gridname
         for el in self.xdmf_tree.iterfind('.//Grid'):
             if el.get('Name') == name:
                 return el
         return None
+
+    def _get_xdmf_time_grid_name(self, gridname, time):
+        name = self.get_attribute('xdmf_gridname', gridname)
+        for el in self.xdmf_tree.iterfind('.//Grid'):
+            if el.get('Name') == name:
+                grid0 = el
+        for ch_grid in grid0.iterchildren():
+            for ch in ch_grid.iterchildren():
+                if ch.tag == 'Time':
+                    if float(ch.get('Value')) == time:
+                        return ch_grid.get('Name')
 
     def _find_xdmf_geometry(self, gridname):
         xdmf_grid = self._find_xdmf_grid(gridname)
@@ -3168,19 +3533,6 @@ class SampleData:
                              ' "Elt_mean", "None"')
         return array
 
-    def _IP_field_for_visualisation(self, array, vis_type):
-        # here it is supposed that the field has shape
-        # [Nelem, Nip_per_elem, Ncomponent]
-        if vis_type == 'Elt_max':
-            array = np.max(array, axis=1)
-        elif vis_type == 'Elt_mean':
-            array = np.mean(array, axis=1)
-        else:
-            raise ValueError('Unkown integration point field visualisation'
-                             ' convention. Possibilities are "Elt_max",'
-                             ' "Elt_mean", "None"')
-        return array
-
     def _add_mesh_geometry(self, mesh_object, mesh_group, replace,
                            bin_fields_from_sets):
         """Add Geometry data items of a mesh object to mesh group/xdmf."""
@@ -3275,12 +3627,12 @@ class SampleData:
                 data = np.zeros((mesh_object.GetNumberOfNodes(),1),
                                 dtype=np.int8)
                 data[node_list] = 1;
+                c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
                 node = self.add_field(mesh_group._v_pathname,
                                       fieldname='field_'+name,
                                       array=data, replace=replace,
                                       location=Ntags_group._v_pathname,
-                                      complib='zlib', complevel=1,
-                                      shuffle=True)
+                                      compression_options=c_opt)
                 # remove from index : Elsets may be too numerous and
                 # overload content index --> actual choice is to remove
                 # them from index
@@ -3327,12 +3679,12 @@ class SampleData:
                     data = np.zeros((mesh_object.GetNumberOfElements(),1),
                                     dtype=np.int8)
                     data[elem_list_field] = 1;
+                    c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
                     node = self.add_field(mesh_group._v_pathname,
                                           fieldname='field_'+name,
                                           array=data, replace=replace,
                                           location=Etags_group._v_pathname,
-                                          complib='zlib', complevel=1,
-                                          shuffle=True)
+                                          compression_options=c_opt)
                     # remove from index : Elsets may be too numerous and
                     # overload content index --> actual choice is to remove
                     # them from index
@@ -3546,13 +3898,19 @@ class SampleData:
         # Get image dimension with reverted shape to compensate for Paraview
         # X,Y,Z indexing convention
         Dimension_tmp = image_object.GetDimensions()
+        Spacing_tmp = image_object.GetSpacing()
+        Origin_tmp = image_object.GetOrigin()
         if len(Dimension_tmp) == 2:
             Dimension_tmp = Dimension_tmp[[1,0]]
+            Spacing_tmp = Spacing_tmp[[1,0]]
+            Origin_tmp = Origin_tmp[[1,0]]
         elif len(Dimension_tmp) == 3:
             Dimension_tmp = Dimension_tmp[[2,1,0]]
+            Spacing_tmp = Spacing_tmp[[2,1,0]]
+            Origin_tmp = Origin_tmp[[2,1,0]]
         Dimension = self._np_to_xdmf_str(Dimension_tmp)
-        Spacing = self._np_to_xdmf_str(image_object.GetSpacing())
-        Origin = self._np_to_xdmf_str(image_object.GetOrigin())
+        Spacing = self._np_to_xdmf_str(Spacing_tmp)
+        Origin = self._np_to_xdmf_str(Origin_tmp)
         Dimensionality = str(image_object.GetDimensionality())
         self._verbose_print('Updating xdmf tree...', line_break=False)
         # Creatge Grid element
@@ -3647,26 +4005,13 @@ class SampleData:
         """Transpose fields components to comply with Paraview ordering."""
         # based on the conventions:
         # Tensor6 is passed as [xx,yy,zz,xy,yz,zx]
-        # Tensor is passed as [xx,yy,zz,xy,yx,yz,zy,xz,zx]
+        # Tensor is passed as [xx,yy,zz,xy,yz,zx,yx,zy,xz]
         if dimensionality == 'Tensor6':
             transpose_indices = [0,3,5,1,4,2]
             transpose_back = [0,3,5,1,4,2]
         if dimensionality == 'Tensor':
-            transpose_indices = [0,3,7,4,1,5,8,6,2]
-            transpose_back = [0,4,8,1,3,5,7,2,6]
-        return array[...,transpose_indices], transpose_back
-
-    def _transpose_field_comp(self, dimensionality, array):
-        """Transpose fields components to comply with Paraview ordering."""
-        # based on the conventions:
-        # Tensor6 is passed as [xx,yy,zz,xy,yz,zx]
-        # Tensor is passed as [xx,yy,zz,xy,yx,yz,zy,xz,zx]
-        if dimensionality == 'Tensor6':
-            transpose_indices = [0,3,5,1,4,2]
-            transpose_back = [0,3,5,1,4,2]
-        if dimensionality == 'Tensor':
-            transpose_indices = [0,3,7,4,1,5,8,6,2]
-            transpose_back = [0,4,8,1,3,5,7,2,6]
+            transpose_indices = [0,3,8,6,1,4,5,7,2]
+            transpose_back = [0,4,8,1,5,6,3,7,2]
         return array[...,transpose_indices], transpose_back
 
     def _transpose_image_array(self, dimensionality, array):
@@ -3695,7 +4040,7 @@ class SampleData:
     def _add_field_to_xdmf(self, fieldname, field):
         """Write field data as Grid Attribute in xdmf tree/file."""
         Node = self.get_node(fieldname)
-        Grid_name = self.get_attribute('parent_grid_path', fieldname)
+        Grid_name = self.get_attribute('xdmf_gridname', fieldname)
         Xdmf_grid_node = self._find_xdmf_grid(Grid_name)
         field_type = self.get_attribute('field_type', fieldname)
         if field_type == 'Nodal_field':
@@ -3707,8 +4052,14 @@ class SampleData:
                              ' or `Element_field`.')
         field_dimensionality = self.get_attribute('field_dimensionality',
                                                   fieldname)
+        # Get the time_serie field name if it exists time_serie_name
+        time_serie_name = self.get_attribute('time_serie_name', fieldname)
+        if time_serie_name is None:
+            attr_name = Node._v_name
+        else:
+            attr_name = time_serie_name
         # create Attribute element
-        Attribute_xdmf = etree.Element(_tag='Attribute', Name=Node._v_name,
+        Attribute_xdmf = etree.Element(_tag='Attribute', Name=attr_name,
                                        AttributeType=field_dimensionality,
                                        Center=Center_type)
         # Create data item element
@@ -3728,8 +4079,51 @@ class SampleData:
                                        Precision=Precision)
         Attribute_data.text = (self.h5_file + ':'
                                + self._name_or_node_to_path(fieldname))
-        # add data item to attribute
-        Attribute_xdmf.append(Attribute_data)
+        # if data normalization is used, a intermediate DataItem is created
+        # to apply a linear function to the dataitem
+        norm = self.get_attribute('data_normalization', fieldname)
+        if norm == 'standard':
+            mu = self.get_attribute('normalization_mean', fieldname)
+            std = self.get_attribute('normalization_std', fieldname)
+            Func = f'{std}*($0) + {mu}'
+            Function_data = etree.Element(_tag='DataItem',
+                                          ItemType='Function',
+                                          Function=Func,
+                                          Dimensions=Dimension)
+            # add data item to function data item
+            Function_data.append(Attribute_data)
+            # add data item to attribute
+            Attribute_xdmf.append(Function_data)
+        elif norm == 'standard_per_component':
+            # Create dataitem for per component mean
+            mean_path = self.get_attribute('norm_mean_array_path', fieldname)
+            Attribute_mean = etree.Element(_tag='DataItem', Format='HDF',
+                                                   Dimensions=Dimension,
+                                                   NumberType=NumberType,
+                                                   Precision=Precision)
+            Attribute_mean.text = (self.h5_file + ':' + mean_path)
+            # Create dataitem for per component std
+            std_path = self.get_attribute('norm_std_array_path', fieldname)
+            Attribute_std = etree.Element(_tag='DataItem', Format='HDF',
+                                                   Dimensions=Dimension,
+                                                   NumberType=NumberType,
+                                                   Precision=Precision)
+            Attribute_std.text = (self.h5_file + ':' + std_path)
+            # Create dataitem for Function
+            Func = '($2*$0) + $1'
+            Function_data = etree.Element(_tag='DataItem',
+                                          ItemType='Function',
+                                          Function=Func,
+                                          Dimensions=Dimension)
+            # add data items to function data item
+            Function_data.append(Attribute_data)
+            Function_data.append(Attribute_mean)
+            Function_data.append(Attribute_std)
+            # add function data item to attribute
+            Attribute_xdmf.append(Function_data)
+        else:
+            # add data item to attribute
+            Attribute_xdmf.append(Attribute_data)
         # add attribute to Grid
         Xdmf_grid_node.append(Attribute_xdmf)
         self.add_attributes({'xdmf_fieldname': Attribute_xdmf.get('Name')},
@@ -3796,21 +4190,26 @@ class SampleData:
         Group = Node._g_getparent()
         return Group._v_name
 
-    def _get_group_info(self, groupname, as_string=False):
+    def _get_group_info(self, groupname, as_string=False, short=False):
         """Print a human readable information on the Pytables Group object."""
         s = ''
         Group = self.get_node(groupname)
         if Group is None:
             return f'No group named {groupname}'
         gname = Group._v_name
-        s += str('\n Group {}\n'.format(gname))
+        if short:
+            s = ('  '*Group._v_depth)+'|--'
+            gtype = self.get_attribute('group_type', Group)
+            s += f'GROUP {gname}: {Group._v_pathname} ({gtype}) \n'
+            return s
+        s += str('\n GROUP {}\n'.format(gname))
         s += str('=====================\n')
         gparent_name = Group._v_parent._v_name
         s += str(' -- Parent Group : {}\n'.format(gparent_name))
         s += str(' -- Group attributes : \n')
         for attr in Group._v_attrs._v_attrnamesuser:
             value = Group._v_attrs[attr]
-            s += str('\t {} : {}\n'.format(attr, value))
+            s += str('\t * {} : {}\n'.format(attr, value))
         s += str(' -- Childrens : ')
         for child in Group._v_children:
             s += str('{}, '.format(child))
@@ -3820,70 +4219,84 @@ class SampleData:
             s = ''
         return s
 
-    def _get_array_node_info(self, nodename, as_string=False):
+    def _get_array_node_info(self, nodename, as_string=False, short=False):
         """Print a human readable information on the Pytables Group object."""
         Node = self.get_node(nodename)
+        if Node is None:
+            return f'No group named {nodename}'
+        size, unit = self.get_node_disk_size(nodename, print_flag=False)
+        if short:
+            s = ('  '*Node._v_depth)+' --'
+            s += f'NODE {Node._v_name}: {Node._v_pathname} ({size:9.3f} {unit})'
+            return s+'\n'
         s = ''
-        s += str('\n Node {}\n'.format(Node._v_pathname))
+        s += str('\n NODE: {}\n'.format(Node._v_pathname))
         s += str('====================\n')
         nparent_name = Node._v_parent._v_name
         s += str(' -- Parent Group : {}\n'.format(nparent_name))
         s += str(' -- Node name : {}\n'.format(Node._v_name))
-        s += str(' -- Node attributes : \n')
-        for attr in Node._v_attrs._v_attrnamesuser:
-            value = Node._v_attrs[attr]
-            s += str('\t {} : {}\n'.format(attr, value))
+        s += self.print_node_attributes(Node, as_string=True)
         s += str(' -- content : {}\n'.format(str(Node)))
         if self._is_table(nodename):
             s += ' -- table description : \n'
             s += repr(Node.description)+'\n'
         s += str(' -- ')
-        s += self.get_node_compression_info(nodename, as_string=True)
-        size, unit = self.get_node_disk_size(nodename, print_flag=False)
-        s += str(' -- Node size : {:9.3f} {}\n'.format(size, unit))
-        s += str('----------------')
+        s += self.print_node_compression_info(nodename, as_string=True)
+        s += str(' -- Node memory size : {:9.3f} {}\n'.format(size, unit))
+        s += str('----------------\n')
         if not(as_string):
             print(s)
             s = ''
         return s
 
-    def _get_compression_opt(self, filters=None, **keywords):
+    def _get_compression_opt(self, compression_opts=dict()):
         """Get inputed compression settings as `tables.Filters` instance."""
-        # get pre-defined compression settings
-        default_cp = False
-        global_cp = False
-        if 'default' in keywords:
-            default_cp = keywords['default']
-        else:
-            # use global Filters as base settings if defined
-            if hasattr(self, 'Filters'):
-                global_cp = True
-        # Apply pre-defined compression settings)
-        if default_cp:
-            Filters = self.set_default_compression()
-        elif filters is not None:
-            Filters = filters
-        elif global_cp:
-            Filters = self.Filters
-        else:
-            Filters = tables.Filters()
-        # ------ read specified values of compression options
-        #  These are prioritised over pre-defined settings when both are
-        #  specified
-        for word in keywords:
-            if (word == 'complib'):
-                Filters.complib = keywords[word]
-            elif (word == 'complevel'):
-                Filters.complevel = keywords[word]
-            elif (word == 'shuffle'):
-                Filters.shuffle = keywords[word]
-            elif (word == 'bitshuffle'):
-                Filters.bitshuffle = keywords[word]
-            elif (word == 'checksum'):
-                Filters.fletcher32 = keywords[word]
-            elif (word == 'least_significant_digit'):
-                Filters.least_significant_digit = keywords[word]
+        Filters = tables.Filters()
+        # ------ read compression options in dict
+        for option in compression_opts:
+            if (option == 'complib'):
+                Filters.complib = compression_opts[option]
+            elif (option == 'complevel'):
+                Filters.complevel = compression_opts[option]
+            elif (option == 'shuffle'):
+                Filters.shuffle = compression_opts[option]
+            elif (option == 'bitshuffle'):
+                Filters.bitshuffle = compression_opts[option]
+            elif (option == 'checksum'):
+                Filters.fletcher32 = compression_opts[option]
+            elif (option == 'least_significant_digit'):
+                Filters.least_significant_digit = compression_opts[option]
         return Filters
+
+    @staticmethod
+    def _data_normalization(array, normalization):
+        """Apply normalization to data array to improve compression ratios"""
+        if normalization == 'standard':
+            mu = np.mean(array)
+            std= np.std(array)
+            array = (array - mu) / std
+            normalization_attributes = {'data_normalization':normalization,
+                                        'normalization_mean':mu,
+                                        'normalization_std':std}
+        if normalization == 'standard_per_component':
+            # Apply component per component
+            mu = np.zeros((array.shape[-1]))
+            std = np.zeros((array.shape[-1]))
+            mu_array = np.zeros((array.shape))
+            std_array = np.zeros((array.shape))
+            for comp in range(array.shape[-1]):
+                mu[comp] = np.mean(array[..., comp])
+                std[comp] = np.std(array[..., comp])
+                array[..., comp] = (array[..., comp] - mu[comp]) / std[comp]
+                mu_array[..., comp] = mu[comp]
+                std_array[..., comp] = std[comp]
+            # Create normalization attributes
+            normalization_attributes = {'data_normalization':normalization,
+                                        'normalization_mean':mu,
+                                        'normalization_std':std,
+                                        'norm_mean_array':mu_array,
+                                        'norm_std_array':std_array}
+        return array, normalization_attributes
 
     def _read_mesh_from_file(self, file=''):
         """Read a data array from a file, depending on the extension."""
@@ -3895,19 +4308,6 @@ class SampleData:
             import BasicTools.IO.GeofReader as GR
             mesh_object = GR.ReadGeof(file)
         return mesh_object
-
-    def _read_array_from_file(self, file=None, **keywords):
-        """Read a data array from a file, depending on the extension."""
-        array = None
-        # Get file extension
-        _, tail = os.path.splitext(file)
-        # HDF5 files
-        if tail == '.h5':
-            with tables.File(file, mode='r') as f:
-                if 'h5_path' in keywords:
-                    h5_path = keywords['h5_path']
-                array = f.get_node(where=h5_path).read()
-        return array
 
     def _verbose_print(self, message, line_break=True):
         """Print message if verbose flag is `True`."""

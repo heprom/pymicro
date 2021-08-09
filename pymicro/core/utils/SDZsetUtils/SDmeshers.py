@@ -510,7 +510,7 @@ class SDImageMesher():
     def multi_phase_mesher(self, multiphase_image_name='', meshname='',
                            indexname='', location='', load_surface_mesh=False,
                            elset_id_field=True,
-                           bin_fields_from_sets=False, replace=False,
+                           bin_fields_from_sets=True, replace=False,
                            mesher_opts=dict(), print_output=False):
         """Create a conformal mesh from a multiphase image.
 
@@ -539,10 +539,12 @@ class SDImageMesher():
 
         .. Warning::
 
-            The meshing program imposes that no phase in the image should have
-            a phase identified by the value 0. In that case, the method adds
-            automatically 1 to all values in the image. The resulting mesh and
-            elsets numbers will be consistent with the values in the image + 1.
+            The meshing program systematically ignores the phase with an ID 0
+            in the multiphase image. The mesher option `MESH_ID0` (see below)
+            the method adds allows to get around this behavior. If it is set
+            to `true`, a +1 offset is added to all phase IDs and all phases
+            are meshed. The resulting mesh and elsets numbers will be
+            consistent in this case with the values in the image (+ 1 offset).
 
         :param str multiphase_image_name: Path, Name, Index Name or Alias of
             the multiphase image field to mesh in the SampleData instance.
@@ -573,6 +575,13 @@ class SDImageMesher():
                         meshing procedure, only for 2D meshes
                 * 'HMIN': Minimal size for the mesh edges, for both 2D and 3D
                 * 'HMAX': Maximal size for the mesh edges, for both 2D and 3D
+                * 'MESH_ID0': If `false`, the phase with ID0 in the multiphase
+                           image is not meshed. If `true`, and if the image
+                           contains a ID 0 phase, a +1 offset is added to all
+                           phase IDs and all phases are meshed.
+                           WARNING : this value is written in a Matlab script,
+                           it must be `true` or `false` and not `True` or
+                           `False` (Python boolean values)
         """
         # Find out image dimensionality
         ImName = self.data.get_attribute('parent_grid_path',
@@ -624,10 +633,12 @@ class SDImageMesher():
 
         .. Warning::
 
-            The meshing program imposes that no phase in the image should have
-            a phase identified by the value 0. In that case, the method adds
-            automatically 1 to all values in the image. The resulting mesh and
-            elsets numbers will be consistent with the values in the image + 1.
+            The meshing program systematically ignores the phase with an ID 0
+            in the multiphase image. The mesher option `MESH_ID0` (see below)
+            the method adds allows to get around this behavior. If it is set
+            to `true`, a +1 offset is added to all phase IDs and all phases
+            are meshed. The resulting mesh and elsets numbers will be
+            consistent in this case with the values in the image (+ 1 offset).
 
         :param str multiphase_image_name: Path, Name, Index Name or Alias of
             the multiphase image field to mesh in the SampleData instance.
@@ -653,10 +664,17 @@ class SDImageMesher():
                 * 'HAUSD': Hausdorff distance between the initially produced
                            surface mesh and the volume mesh created by
                            MeshGems from the surface mesh.
+                * 'MESH_ID0': If `false`, the phase with ID0 in the multiphase
+                           image is not meshed. If `true`, and if the image
+                           contains a ID 0 phase, a +1 offset is added to all
+                           phase IDs and all phases are meshed.
+                           WARNING : this value is written in a Matlab script,
+                           it must be `true` or `false` and not `True` or
+                           `False` (Python boolean values)
         """
         # Defaults mesh parameters
         default_params = {'MEM':50,'HGRAD':1.5,'HMIN':5,'HMAX':50, 'HAUSD':3,
-                          'ANG':50}
+                          'ANG':50, 'MESH_ID0':'false'}
         # Local Imports
         from pymicro.core.utils.SDUtilsGlobals import MATLAB, MATLAB_OPTS
         from pymicro.core.utils.SDUtilsGlobals import (MESHER3D_TEMPLATE,
@@ -707,22 +725,18 @@ class SDImageMesher():
         # Resize mesh to Image domain
         image_group = self.data.get_attribute('parent_grid_path',
                                               multiphase_image_name)
-        Im_range = (self.data.get_attribute('dimension',image_group)
-                    * self.data.get_attribute('spacing',image_group) )
+        Im_range = (self.data.get_attribute('dimension',image_group)[[2,1,0]]
+                    * self.data.get_attribute('spacing',image_group)[[2,1,0]])
         Im_origin = self.data.get_attribute('origin',image_group)
         # get mesh nodes and rescale mesh
-        nodes = self.data.get_mesh_nodes(meshname)
-        X_range = nodes[:,0].max() - nodes[:,0].min()
-        Y_range = nodes[:,1].max() - nodes[:,1].min()
-        Z_range = nodes[:,2].max() - nodes[:,2].min()
-        nodes[:,0] = (nodes[:,0]/X_range)*Im_range[0] + Im_origin[0]
-        nodes[:,1] = (nodes[:,1]/Y_range)*Im_range[1] + Im_origin[1]
-        nodes[:,2] = (nodes[:,2]/Z_range)*Im_range[2] + Im_origin[2]
+        from pymicro.core.utils.SDGridUtils import SDMeshTools
+        SDMeshTools.rescale_and_translate_mesh(
+            data=self.data, meshname=meshname, mesh_new_origin=Im_origin,
+            mesh_new_size=Im_range)
         if load_surface_mesh:
-            nodes = self.data.get_mesh_nodes(meshname+'_surface')
-            nodes[:,0] = (nodes[:,0]/X_range)*Im_range[0] + Im_origin[0]
-            nodes[:,1] = (nodes[:,1]/Y_range)*Im_range[1] + Im_origin[1]
-            nodes[:,2] = (nodes[:,2]/Z_range)*Im_range[2] + Im_origin[2]
+            SDMeshTools.rescale_and_translate_mesh(
+                data=self.Data, meshname=meshname+'_surface',
+                mesh_new_origin=Im_origin, mesh_new_size=Im_range)
         return
 
     def multi_phase_mesher2D(self, multiphase_image_name='', meshname='',
@@ -753,10 +767,12 @@ class SDImageMesher():
 
         .. Warning::
 
-            The meshing program imposes that no phase in the image should have
-            a phase identified by the value 0. In that case, the method adds
-            automatically 1 to all values in the image. The resulting mesh and
-            elsets numbers will be consistent with the values in the image + 1.
+            The meshing program systematically ignores the phase with an ID 0
+            in the multiphase image. The mesher option `MESH_ID0` (see below)
+            the method adds allows to get around this behavior. If it is set
+            to `true`, a +1 offset is added to all phase IDs and all phases
+            are meshed. The resulting mesh and elsets numbers will be
+            consistent in this case with the values in the image (+ 1 offset).
 
         :param str multiphase_image_name: Path, Name, Index Name or Alias of
             the multiphase image field to mesh in the SampleData instance.
@@ -777,6 +793,13 @@ class SDImageMesher():
                         meshing procedure.
                 * 'HMIN': Minimal size for the mesh edges
                 * 'HMAX': Maximal size for the mesh edges
+                * 'MESH_ID0': If `false`, the phase with ID0 in the multiphase
+                           image is not meshed. If `true`, and if the image
+                           contains a ID 0 phase, a +1 offset is added to all
+                           phase IDs and all phases are meshed.
+                           WARNING : this value is written in a Matlab script,
+                           it must be `true` or `false` and not `True` or
+                           `False` (Python boolean values)
         """
         # Local Imports
         from pymicro.core.utils.SDUtilsGlobals import MATLAB, MATLAB_OPTS
@@ -786,7 +809,7 @@ class SDImageMesher():
         # Set environnement variable
         os.environ["PRG_ZEB"] = MESHER2D_ENV
         # Defaults mesh parameters
-        default_params = {'LS':5,'HMIN':5,'HMAX':100}
+        default_params = {'LS':5,'HMIN':5,'HMAX':100, 'MESH_ID0':'false'}
         #
         # get data and output pathes
         DATA_PATH = self.data._name_or_node_to_path(multiphase_image_name)
@@ -824,6 +847,20 @@ class SDImageMesher():
             self.data.create_elset_ids_field(meshname=meshname)
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
+        # Resize mesh to Image domain
+        image_group = self.data.get_attribute('parent_grid_path',
+                                              multiphase_image_name)
+        Im_dim = self.data.get_attribute('dimension',image_group)[[1,0]]
+        Im_sp = self.data.get_attribute('spacing',image_group)[[1,0]]
+        Im_range =  Im_dim*Im_sp
+        Im_origin = self.data.get_attribute('origin',image_group)
+        print(f'Im dimension {Im_dim} spacing {Im_sp}')
+        print(f'Im range is {Im_range}')
+        # get mesh nodes and rescale mesh
+        from pymicro.core.utils.SDGridUtils import SDMeshTools
+        SDMeshTools.rescale_and_translate_mesh(
+            data=self.data, meshname=meshname, mesh_new_origin=Im_origin,
+            mesh_new_size=Im_range)
         return
 
     def morphological_image_cleaner(self, target_image_field='',

@@ -24,9 +24,10 @@ Contents:
 
 .. toctree::
    :maxdepth: 2
-
+    
    welcome
    auto_examples/index.rst
+   ../examples/SampleDataUserGuide/SampleDataUserGuide.rst
    cookbook
    pymicro
    changelog

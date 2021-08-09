@@ -438,7 +438,7 @@ class Symmetry(enum.Enum):
         return OrthoElas
 
 class Lattice:
-    '''
+    """
     The Lattice class to create one of the 14 Bravais lattices.
 
     This particular class has been partly inspired from the pymatgen
@@ -463,19 +463,22 @@ class Lattice:
       l = Lattice.face_centered_cubic(a)
       print(l.volume())
 
-    Addditionnally the point-basis can be controlled to address non
+    Additionnally the point-basis can be controlled to address non
     Bravais lattice cells. It is set to a single atoms at (0, 0, 0) by
     default so that each cell is a Bravais lattice but may be changed to
     something more complex to achieve HCP structure or Diamond structure
     for instance.
-    '''
+    """
 
     def __init__(self, matrix, centering='P', symmetry=None):
-        '''Create a crystal lattice (unit cell).
+        """Create a crystal lattice (unit cell).
 
-        Create a lattice from a 3x3 matrix.
-        Each row in the matrix represents one lattice vector.
-        '''
+        Create a lattice from a 3x3 matrix. Each row in the matrix represents
+        one lattice vector. The unit is nm.
+
+        :param ndarray matrix: the 3x3 matrix representing the crystal lattice.
+        :param str centering:
+        """
         m = np.array(matrix, dtype=np.float64).reshape((3, 3))
         lengths = np.sqrt(np.sum(m ** 2, axis=1))
         angles = np.zeros(3)
@@ -493,7 +496,11 @@ class Lattice:
     def __eq__(self, other):
         """Override the default Equals behavior.
 
-        The equality of two Lattice objects is based on the equality of their angles, lengths, and centering.
+        The equality of two Lattice objects is based on the equality of their
+        angles, lengths, centering, and symmetry.
+
+        :param other: the other `Lattice` instance to test.
+        :return: True if the two lattice are equals False if not.
         """
         if not isinstance(other, self.__class__):
             return False

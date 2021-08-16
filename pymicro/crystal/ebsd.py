@@ -349,6 +349,30 @@ class OimScan:
         print('\n%d grains were segmented' % len(np.unique(grain_ids)))
         return grain_ids
 
+    def change_orientation_reference_frame(self):
+        """Change the reference frame for orientation data.
+
+        In OIM, the reference frame for orientation data (euler angles) is
+        termed A1A2A3 and differs from the sample reference frame XYZ. This can
+        be set befor the acquisition but the default case is:
+
+        X = -A2, Y = -A1, Z = -A3.
+
+        This methods change the reference frame used for the euler angles.
+        """
+        # transformation matrix from A1A2A3 to XYZ
+        T = np.array([[0., -1., 0.],  # X is -A2
+                      [-1., 0., 0.],  # Y is -A1
+                      [0., 0., -1.]])  # Z is -A3
+        for j in range(self.rows):
+            for i in range(self.cols):
+                o_tsl = Orientation.from_euler(self.euler[i, j, :])
+                g_xyz = np.dot(o_tsl.orientation_matrix(), T.T)  # move to XYZ local frame
+                o_xyz = Orientation(g_xyz)
+                self.euler[i, j, :] = o_xyz.euler
+                progress = 100 * (j * self.rows + i) / (self.cols * self.rows)
+            print('changing orientation reference frame progress: {0:.2f} %'.format(progress), end='\r')
+
     def to_h5(self, file_name):
         """Write the EBSD scan as a hdf5 file compatible OIM software (in
         progress).

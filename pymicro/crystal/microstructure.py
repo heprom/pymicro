@@ -2381,7 +2381,7 @@ class Microstructure(SampleData):
 
     def view_slice(self, slice=None, color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,
-                   axis=[0., 0., 1]):
+                   axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None):
         """A simple utility method to show one microstructure slice.
 
         The microstructure can be colored using different fields such as a
@@ -2465,19 +2465,46 @@ class Microstructure(SampleData):
             from pymicro.view.vol_utils import alpha_cmap
             mask = self.get_mask()
             plt.imshow(mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
-        if show_grain_ids:
+
+        # compute the center of mass of each grain of interest in this slice
+        if show_grain_ids or show_slip_traces:
             centers = np.zeros((len(gids), 2))
             for i, gid in enumerate(gids):
                 if highlight_ids and gid not in highlight_ids:
                     continue
-                # compute the center of mass of each grain in this image
-                centers[i] = ndimage.measurements.center_of_mass(grains_slice == gid, grains_slice)
+                centers[i] = ndimage.measurements.center_of_mass(
+                    grains_slice == gid, grains_slice)
+
+        # grain id labels
+        if show_grain_ids:
+            for i, gid in enumerate(gids):
+                if highlight_ids and gid not in highlight_ids:
+                    continue
                 plt.annotate('%d' % gids[i], xycoords='data',
                              xy=(centers[i, 0], centers[i, 1]),
                              horizontalalignment='center',
                              verticalalignment='center',
                              color='k',
                              fontsize=12)
+        # slip traces on this slice for a set of lattice planes
+        if show_slip_traces and hkl_planes:
+            for i, gid in enumerate(gids):
+                if highlight_ids and gid not in highlight_ids:
+                    continue
+                g = self.get_grain(gid)
+                for hkl in hkl_planes:
+                    trace = hkl.slip_trace(g.orientation, [0, 0, 1], [0, -1, 0],
+                                           trace_size=10, verbose=False)
+                    color = 'k'
+                    x = centers[i][0] + np.array([-trace[0] / 2, trace[0] / 2])
+                    y = centers[i][1] + np.array([-trace[1] / 2, trace[1] / 2])
+                    plt.plot(centers[i][0], centers[i][1], 'o', color=color)
+                    plt.plot(x, y, '-', linewidth=1, color=color)
+            extent = (-self.get_voxel_size() * grains_slice.shape[0] / 2,
+                      self.get_voxel_size() * grains_slice.shape[0] / 2,
+                      self.get_voxel_size() * grains_slice.shape[1] / 2,
+                      -self.get_voxel_size() * grains_slice.shape[1] / 2)
+            plt.axis([0, grains_slice.shape[0], grains_slice.shape[1], 0])
         plt.show()
 
     @staticmethod
@@ -4199,6 +4226,8 @@ class Microstructure(SampleData):
             scan.iq = scan.iq[roi[0]:roi[1], roi[2]:roi[3]]
             scan.ci = scan.ci[roi[0]:roi[1], roi[2]:roi[3]]
             scan.euler = scan.euler[roi[0]:roi[1], roi[2]:roi[3], :]
+        # change the orientation reference frame to XYZ
+        scan.change_orientation_reference_frame()
         iq = scan.iq
         ci = scan.ci
         euler = scan.euler

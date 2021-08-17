@@ -3,17 +3,25 @@ Overview
 
 This page provides a quick overview of the pymicro code base.
 
-As of version 0.1 (august 2014), pymicro is organised around 4 packages:
+Pymicro is organised around 8 packages:
 
 1. :py:mod:`pymicro.apps` contains a simple application to visualise and interact 
    with 2D images and 3D volumes;
-2. :py:mod:`pymicro.crystal` contains various modules to handle crystal lattices, 
+2. :py:mod:`pymicro.core` gather the samples.py module at the root of the data
+   management in Pymicro and some related utilities.
+3. :py:mod:`pymicro.crystal` contains various modules to handle crystal lattices,
    crystallographic grains and to organise them into microstructures;
-3. :py:mod:`pymicro.file` contains many helpers methods to handle typical file 
+4. :py:mod:`pymicro.external` regroup external utilities used for instance to
+   read TIF or CIF files;
+5. :py:mod:`pymicro.fe` contains a module to manipulate files for finite-elements
+   analysis;
+6. :py:mod:`pymicro.file` contains many helpers methods to handle typical file
    reading and writting found at ESRF, ANKA and Soleil;
-4. :py:mod:`pymicro.view` contains the two principal modules for 3D visualisation: 
+7. :py:mod:`pymicro.view` contains the two principal modules for 3D visualisation:
    vtk_utils.py for rendering still 3D images and vtk_anim.py to create 
-   animations.
+   animations;
+8. :py:mod:`pymicro.xray` regroup modules to simulate and analyse xray experiments like tomography and
+   diffraction..
 
 Installation
 ============
@@ -41,15 +49,18 @@ If you want to use pymicro interactively and import all modules at ipython start
 Dependencies
 ============
 
-1. Python 2.6+ or 3.5+ required. Tested with 2.7 and 3.5, please report any problem.
+1. Python 3.7+ required. Tested with 3.7, please report any problem on
+the github page.
 2. numpy - For array, matrix and other numerical manipulations. Used extensively
    by all modules.
-3. scipy 0.10+, mainly used for ndimage filters.
+3. scipy, mainly used for ndimage filters.
 4. skimage for additional image analysis (http://scikit-image.org).
 5. matplotlib 1.1+ for plotting (e.g. pole figures or 3D image slices).
 6. VTK with Python bindings 5.8+ (http://www.vtk.org/) for visualization of
    3D data using the :py:mod:`pymicro.view` package.
-7. h5py to deal with HDF5 files.
+7. h5py and pytables to deal with HDF5 files.
+8. basictools. Starting with version 0.5, we rely on this library to support mesh data; basictools is open source and
+ can be installed from conda using `conda install -c conda-forge basictools`.
 
 External
 ========

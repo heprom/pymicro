@@ -2381,7 +2381,8 @@ class Microstructure(SampleData):
 
     def view_slice(self, slice=None, color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,
-                   axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None):
+                   axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None,
+                   display=True):
         """A simple utility method to show one microstructure slice.
 
         The microstructure can be colored using different fields such as a
@@ -2403,6 +2404,10 @@ class Microstructure(SampleData):
         SlipSystem to compute the Schmid factor.
         :param axis: the unit vector for the load direction to compute
         the Schmid factor or to display IPF coloring.
+        :param bool show_slip_traces: activate slip traces plot in each grain.
+        :param list hkl_planes: the list of planes to plot the slip traces.
+        :param bool display: if True, the show method is called, otherwise,
+        the figure is simply returned.
         """
         if self._is_empty('grain_map'):
             print('Microstructure instance mush have a grain_map field to use '
@@ -2413,10 +2418,7 @@ class Microstructure(SampleData):
             slice = grain_map.shape[2] // 2
             print('using slice value %d' % slice)
         grains_slice = grain_map[:, :, slice]
-        print(grains_slice.shape)
         gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
-        print(gids)
-        print(len(gids))
         fig, ax = plt.subplots()
         if color == 'random':
             grain_cmap = Microstructure.rand_cmap(first_is_black=True)
@@ -2442,7 +2444,6 @@ class Microstructure(SampleData):
         elif color == 'ipf':
             # build IPF image
             ipf_image = np.zeros((*grains_slice.shape, 3), dtype=float)
-            print(ipf_image.shape)
             for gid in gids:
                 o = self.get_grain(gid).orientation
                 try:
@@ -2451,8 +2452,6 @@ class Microstructure(SampleData):
                     print('problem moving to the fundamental zone for rodrigues vector {}'.format(o.rod))
                     c = np.array([0., 0., 0.])
                 ipf_image[grains_slice == gid] = c
-            print(ipf_image.ndim, ipf_image.shape[-1])
-            print(ipf_image[0, 0, :])
             plt.imshow(ipf_image.transpose(1, 0, 2), interpolation='nearest')
         else:
             print('unknown color scheme requested, please chose between {random, '
@@ -2469,9 +2468,11 @@ class Microstructure(SampleData):
         # compute the center of mass of each grain of interest in this slice
         if show_grain_ids or show_slip_traces:
             centers = np.zeros((len(gids), 2))
+            sizes = np.zeros(len(gids))
             for i, gid in enumerate(gids):
                 if highlight_ids and gid not in highlight_ids:
                     continue
+                sizes[i] = np.sum(grains_slice == gid)
                 centers[i] = ndimage.measurements.center_of_mass(
                     grains_slice == gid, grains_slice)
 
@@ -2493,19 +2494,24 @@ class Microstructure(SampleData):
                     continue
                 g = self.get_grain(gid)
                 for hkl in hkl_planes:
-                    trace = hkl.slip_trace(g.orientation, [0, 0, 1], [0, -1, 0],
-                                           trace_size=10, verbose=False)
+                    trace = hkl.slip_trace(g.orientation,
+                                           n_int=[0, 0, 1],
+                                           view_up=[0, -1, 0],
+                                           trace_size=0.8 * np.sqrt(sizes[i]),
+                                           verbose=False)
                     color = 'k'
                     x = centers[i][0] + np.array([-trace[0] / 2, trace[0] / 2])
                     y = centers[i][1] + np.array([-trace[1] / 2, trace[1] / 2])
-                    plt.plot(centers[i][0], centers[i][1], 'o', color=color)
+                    #plt.plot(centers[i][0], centers[i][1], 'o', color=color)
                     plt.plot(x, y, '-', linewidth=1, color=color)
             extent = (-self.get_voxel_size() * grains_slice.shape[0] / 2,
                       self.get_voxel_size() * grains_slice.shape[0] / 2,
                       self.get_voxel_size() * grains_slice.shape[1] / 2,
                       -self.get_voxel_size() * grains_slice.shape[1] / 2)
             plt.axis([0, grains_slice.shape[0], grains_slice.shape[1], 0])
-        plt.show()
+        if display:
+            plt.show()
+        return fig, ax
 
     @staticmethod
     def rand_cmap(n=4096, first_is_black=False, seed=13):

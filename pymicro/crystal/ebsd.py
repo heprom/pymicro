@@ -366,12 +366,13 @@ class OimScan:
                       [0., 0., -1.]])  # Z is -A3
         for j in range(self.rows):
             for i in range(self.cols):
-                o_tsl = Orientation.from_euler(self.euler[i, j, :])
+                o_tsl = Orientation.from_euler(np.degrees(self.euler[i, j, :]))
                 g_xyz = np.dot(o_tsl.orientation_matrix(), T.T)  # move to XYZ local frame
                 o_xyz = Orientation(g_xyz)
-                self.euler[i, j, :] = o_xyz.euler
-                progress = 100 * (j * self.rows + i) / (self.cols * self.rows)
+                self.euler[i, j, :] = np.radians(o_xyz.euler)
+                progress = 100 * (j * self.cols + i) / (self.cols * self.rows)
             print('changing orientation reference frame progress: {0:.2f} %'.format(progress), end='\r')
+        print('\n')
 
     def to_h5(self, file_name):
         """Write the EBSD scan as a hdf5 file compatible OIM software (in

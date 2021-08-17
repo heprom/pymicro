@@ -418,24 +418,25 @@ class Symmetry(enum.Enum):
         :param ndarray C: a numpy array of shape (6, 6) representing
             the stiffness matrix.
         :return dict OrthoElas: Dict of orthotropic elastic constants
-            corresponding to the inputed stiffness matrix. Keys are
+            corresponding to the input stiffness matrix. Keys are
             'E1','E2','E3','nu12','nu13','nu23','G12','G13','G23'
         """
-        # compute compliance matrix
+        # compute the compliance matrix
         S = np.linalg.inv(C)
-        # Compute orthotropic elastic constants
+        # compute orthotropic elastic constants
         OrthoElas = dict()
-        OrthoElas['E1'] = 1 / S[0,0]
-        OrthoElas['E2'] = 1 / S[1,1]
-        OrthoElas['E3'] = 1 / S[2,2]
-        OrthoElas['Nu12'] = -OrthoElas['E1']*S[1,0]
-        OrthoElas['Nu13'] = -OrthoElas['E1']*S[2,0]
-        OrthoElas['Nu23'] = -OrthoElas['E2']*S[2,1]
-        OrthoElas['G12'] = 1 / S[5,5]
-        OrthoElas['G13'] = 1 / S[4,4]
-        OrthoElas['G23'] = 1 / S[3,3]
-        # Return dict
+        OrthoElas['E1'] = 1 / S[0, 0]
+        OrthoElas['E2'] = 1 / S[1, 1]
+        OrthoElas['E3'] = 1 / S[2, 2]
+        OrthoElas['Nu12'] = -OrthoElas['E1'] * S[1, 0]
+        OrthoElas['Nu13'] = -OrthoElas['E1'] * S[2, 0]
+        OrthoElas['Nu23'] = -OrthoElas['E2'] * S[2, 1]
+        OrthoElas['G12'] = 1 / S[5, 5]
+        OrthoElas['G13'] = 1 / S[4, 4]
+        OrthoElas['G23'] = 1 / S[3, 3]
+        # return a dictionnay populated with the relevant values
         return OrthoElas
+
 
 class Lattice:
     """

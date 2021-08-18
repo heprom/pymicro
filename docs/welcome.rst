@@ -49,18 +49,23 @@ If you want to use pymicro interactively and import all modules at ipython start
 Dependencies
 ============
 
-1. Python 3.7+ required. Tested with 3.7, please report any problem on
-the github page.
+1. Python 3.7+ required, please report any problem on
+   the github page.
 2. numpy - For array, matrix and other numerical manipulations. Used extensively
    by all modules.
 3. scipy, mainly used for ndimage filters.
 4. skimage for additional image analysis (http://scikit-image.org).
 5. matplotlib 1.1+ for plotting (e.g. pole figures or 3D image slices).
-6. VTK with Python bindings 5.8+ (http://www.vtk.org/) for visualization of
-   3D data using the :py:mod:`pymicro.view` package.
+6. VTK with Python bindings (http://www.vtk.org/) for visualization of
+   3D data using the :py:mod:`pymicro.view` package. Version should be 
+   > 5.8.0, 9.0.1 recommended.
 7. h5py and pytables to deal with HDF5 files.
-8. basictools. Starting with version 0.5, we rely on this library to support mesh data; basictools is open source and
- can be installed from conda using `conda install -c conda-forge basictools`.
+8. basictools. Starting with version 0.5, we rely on this library to support mesh data; 
+   basictools is open source and can be installed from conda using:
+
+   ::
+
+      `conda install -c conda-forge basictools`.
 
 External
 ========

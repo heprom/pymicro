@@ -306,8 +306,9 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(sample.__contains__('Tmsh'))
         field1 = sample.get_node('test_field', as_numpy=True)
         self.assertEqual(field1.shape,(11,11,11))
-        field2 = sample.get_node('test_field_Tetra_mesh', as_numpy=True)
-        self.assertEqual(field2.shape,(11*11*11,1))
+        field2 = sample.get_node('Tmsh_Im3D_test_field_Tetra_mesh',
+                                 as_numpy=True)
+        self.assertEqual(field2.shape,(11*11*11,))
         self.assertEqual(field1.ravel()[37], field2.ravel()[37])
         del sample
 

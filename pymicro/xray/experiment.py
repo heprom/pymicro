@@ -383,7 +383,7 @@ class Experiment:
         if 'Microstructure' in dict_exp['Sample']:
             micro = Microstructure(name= dict_exp[
                                           'Sample']['Microstructure']['Name'],
-                                   file_path=os.path.dirname(file_path))
+                                   filename=os.path.dirname(file_path))
             # crystal lattice
             if 'Lattice' in dict_exp['Sample']['Microstructure']:
                 a, b, c = dict_exp['Sample']['Microstructure']['Lattice']['Lengths']

@@ -418,27 +418,28 @@ class Symmetry(enum.Enum):
         :param ndarray C: a numpy array of shape (6, 6) representing
             the stiffness matrix.
         :return dict OrthoElas: Dict of orthotropic elastic constants
-            corresponding to the inputed stiffness matrix. Keys are
+            corresponding to the input stiffness matrix. Keys are
             'E1','E2','E3','nu12','nu13','nu23','G12','G13','G23'
         """
-        # compute compliance matrix
+        # compute the compliance matrix
         S = np.linalg.inv(C)
-        # Compute orthotropic elastic constants
+        # compute orthotropic elastic constants
         OrthoElas = dict()
-        OrthoElas['E1'] = 1 / S[0,0]
-        OrthoElas['E2'] = 1 / S[1,1]
-        OrthoElas['E3'] = 1 / S[2,2]
-        OrthoElas['Nu12'] = -OrthoElas['E1']*S[1,0]
-        OrthoElas['Nu13'] = -OrthoElas['E1']*S[2,0]
-        OrthoElas['Nu23'] = -OrthoElas['E2']*S[2,1]
-        OrthoElas['G12'] = 1 / S[5,5]
-        OrthoElas['G13'] = 1 / S[4,4]
-        OrthoElas['G23'] = 1 / S[3,3]
-        # Return dict
+        OrthoElas['E1'] = 1 / S[0, 0]
+        OrthoElas['E2'] = 1 / S[1, 1]
+        OrthoElas['E3'] = 1 / S[2, 2]
+        OrthoElas['Nu12'] = -OrthoElas['E1'] * S[1, 0]
+        OrthoElas['Nu13'] = -OrthoElas['E1'] * S[2, 0]
+        OrthoElas['Nu23'] = -OrthoElas['E2'] * S[2, 1]
+        OrthoElas['G12'] = 1 / S[5, 5]
+        OrthoElas['G13'] = 1 / S[4, 4]
+        OrthoElas['G23'] = 1 / S[3, 3]
+        # return a dictionnay populated with the relevant values
         return OrthoElas
 
+
 class Lattice:
-    '''
+    """
     The Lattice class to create one of the 14 Bravais lattices.
 
     This particular class has been partly inspired from the pymatgen
@@ -463,19 +464,22 @@ class Lattice:
       l = Lattice.face_centered_cubic(a)
       print(l.volume())
 
-    Addditionnally the point-basis can be controlled to address non
+    Additionnally the point-basis can be controlled to address non
     Bravais lattice cells. It is set to a single atoms at (0, 0, 0) by
     default so that each cell is a Bravais lattice but may be changed to
     something more complex to achieve HCP structure or Diamond structure
     for instance.
-    '''
+    """
 
     def __init__(self, matrix, centering='P', symmetry=None):
-        '''Create a crystal lattice (unit cell).
+        """Create a crystal lattice (unit cell).
 
-        Create a lattice from a 3x3 matrix.
-        Each row in the matrix represents one lattice vector.
-        '''
+        Create a lattice from a 3x3 matrix. Each row in the matrix represents
+        one lattice vector. The unit is nm.
+
+        :param ndarray matrix: the 3x3 matrix representing the crystal lattice.
+        :param str centering:
+        """
         m = np.array(matrix, dtype=np.float64).reshape((3, 3))
         lengths = np.sqrt(np.sum(m ** 2, axis=1))
         angles = np.zeros(3)
@@ -493,7 +497,11 @@ class Lattice:
     def __eq__(self, other):
         """Override the default Equals behavior.
 
-        The equality of two Lattice objects is based on the equality of their angles, lengths, and centering.
+        The equality of two Lattice objects is based on the equality of their
+        angles, lengths, centering, and symmetry.
+
+        :param other: the other `Lattice` instance to test.
+        :return: True if the two lattice are equals False if not.
         """
         if not isinstance(other, self.__class__):
             return False

@@ -579,16 +579,14 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, mask=None, dark_factor=1.):
     # build the stack by combining individual images
     tt_rock = np.empty((infos['TOMO_N'], n_topo), dtype=float)
     for n in range(int(infos['TOMO_N'])):
-        print('computing rocking curve %d' % (n + 1))
+        print('computing rocking curve %d' % (n + 1), end='\r')
         offset = n_topo * n
         for i in range(n_topo):
             index = offset + i + 1
             frame_path = os.path.join(data_dir, scan_name, '%s%04d.edf' % (scan_name, index))
             im = edf_read(frame_path) - dark
             tt_rock[n, i] = np.sum(im * mask[:, :, n])
-            if n == 2:
-                print(frame_path, tt_rock[n, i])
-    print('done')
+    print('\ndone')
 
     return tt_rock
 
@@ -636,7 +634,7 @@ def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.)
     tt_stack = np.empty((infos['TOMO_N'], infos['Dim_1'], infos['Dim_2']))
     print(tt_stack[0].shape)
     for n in range(int(infos['TOMO_N'])):
-        print('building topograph %d' % (n + 1))
+        print('building topograph %d' % (n + 1), end='\r')
         topograph = np.zeros((infos['Dim_1'], infos['Dim_2']))
         offset = n_topo * n
         for i in range(n_topo):
@@ -646,7 +644,7 @@ def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.)
             topograph += im
         tt_stack[n] = topograph
     tt_stack = tt_stack.transpose((1, 2, 0))
-    print('done')
+    print('\ndone')
 
     # save the data as edf if needed
     if save_edf:

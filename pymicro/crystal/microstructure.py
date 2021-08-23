@@ -3539,11 +3539,19 @@ class Microstructure(SampleData):
                 mat.append(etree.Element(_tag='Coeff', Index='7', Type='Constant', Value=str(C[5, 5])))  # C66
                 mat.append(etree.Element(_tag='Coeff', Index='8', Type='Constant', Value=str(C[4, 4])))  # C55
                 mat.append(etree.Element(_tag='Coeff', Index='9', Type='Constant', Value=str(C[3, 3])))  # C44
+                fmt = "binary" if binary else "ascii"
+                mat.append(etree.Element(_tag='Coeff', Index="10", Type="Constant_Zone", File="N1X.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="11", Type="Constant_Zone", File="N1Y.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="12", Type="Constant_Zone", File="N1Z.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="13", Type="Constant_Zone", File="N2X.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="14", Type="Constant_Zone", File="N2Y.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="15", Type="Constant_Zone", File="N2Z.bin", Format=fmt))
+
                 root.append(mat)
             # add a material for top and bottom layers
             if add_grips:
                 grips = etree.Element('Material', numM=str(grip_id + 1),
-                                      Lib='libUmatAmitex.so',
+                                      Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
                                       Law='elasiso')
                 grips.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(grip_constants[0])))
                 grips.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(grip_constants[1])))
@@ -3551,7 +3559,7 @@ class Microstructure(SampleData):
             # add a material for external buffer
             if add_exterior or use_mask:
                 exterior = etree.Element('Material', numM=str(ext_id + 1),
-                                         Lib='libUmatAmitex.so',
+                                         Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
                                          Law='elasiso')
                 exterior.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value='0.'))
                 exterior.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value='0.'))

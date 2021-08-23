@@ -3417,10 +3417,10 @@ class Microstructure(SampleData):
         # TODO finish this...
         return grain_map
 
-    def to_amitex_fftp(self, binary=True, mat_file=True, add_grips=False,
-                       grip_size=10, grip_constants=(104100., 49440.),
-                       add_exterior=False, exterior_size=10,
-                       use_mask=False):
+    def to_amitex_fftp(self, binary=True, mat_file=True, elasaniso_path='',
+                       add_grips=False, grip_size=10,
+                       grip_constants=(104100., 49440.), add_exterior=False,
+                       exterior_size=10, use_mask=False):
         """Write orientation data to ascii files to prepare for FFT computation.
 
         AMITEX_FFTP can be used to compute the elastoplastic response of
@@ -3437,7 +3437,9 @@ class Microstructure(SampleData):
         The second region is around the sample (first and second axes).
 
         :param bool binary: flag to write the files in binary or ascii format.
-        :param bool mat_file: flag to write the materila file for Amitex.
+        :param bool mat_file: flag to write the material file for Amitex.
+        :param str elasaniso_path: path for the libUmatAmitex.so in
+            the Amitex_FFTP installation.
         :param bool add_grips: add a constant region at the beginning and the
             end of the third axis.
         :param int grip_size: thickness of the region.
@@ -3518,13 +3520,11 @@ class Microstructure(SampleData):
                                  '1 to n_phases): {}'.format(phase_ids))
             for phase_id in phase_ids:
                 mat = etree.Element('Material', numM=str(phase_id),
-                                    Lib='libUmatAmitex.so',
+                                    Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
                                     Law='elasaniso')
                 # get the C_IJ values
                 phase = self.get_phase(phase_id)
                 C = phase.get_symmetry().stiffness_matrix(phase.elastic_constants)
-                #C11, C12, C13, C22, C23, C33, C44, C55, C66 = 162000., 92000., 69000., 162000., 69000., 180000., \
-                #                                              46700., 46700., 35000.
                 '''
                 Note that Amitex uses a different reduced number:
                 (1, 2, 3, 4, 5, 6) = (11, 22, 33, 12, 13, 23)

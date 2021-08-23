@@ -39,16 +39,17 @@ from pymicro.core.global_variables import (COMPRESSION_KEYS)
 
 
 class SampleData:
-    """Base class to store organized multi-modal datasets for material science.
+    """Base class to store multi-modal datasets for material science.
 
-    SampleData is a high level API to add/modifiy/remove data into a HDF5 data
-    file accordingly to a user defined data model, including volumic data
-    (data organized on a geometrical grid) and classical data arrays. The class
-    ensures creation and synchronization of a XDMF file with the HDF5 dataset
-    to allow visualization of volumic data with the Paraview software.
-    The various types of data items that can be handled by SampleData, as well
-    as the SampleData constructor parameters and attributes are documented
-    below.
+    SampleData is a high level API designed to create and interact with
+    complex datasets collecting all the data generated for a material sample
+    by material scientists (from experiments, numerical simulation or data
+    processing).
+
+    Each dataset consist of a pair of files: one HDF5 file containing all
+    data and metadata, and one XDMF data gathering metadata for all spatially
+    origanized data (grids and fields). The class ensures creation and
+    synchronization of both XDMF and HDF5 files.
 
     The HDF5 and XDMF data tree structure and content in both files are
     accessible through the `h5_dataset` and `xdmf_tree` class attributes,
@@ -56,40 +57,7 @@ class SampleData:
     `Pytables <https://www.pytables.org/index.html>`_ and
     `lxml <https://lxml.de/>`_ packages.
 
-    .. note:: The SampleData class relies on the
-        `Pytables <https://www.pytables.org/index.html>`_ package, on the
-        **HDF5** and **XDMF** file formats. A priori knowledge of these
-        elements is not mandatory to use SampleData but is strongly
-        recommanded.
-
-    - **SampleData datasets can be composed of three types of HDF5 groups:**
-
-        :Group: Classical HDF5 Group node, used to organize data arrays.
-        :3DImage: A Group to store data arrays representing fields defined on
-            a 3D image (voxelized fields).
-        :2DImage: A Group to store data arrays representing fields defined on
-            a 2D image (pixelized fields).
-        :Mesh: A Group to store data arrays representing fields defined on
-            a mesh, and store mesh geometry.
-
-    .. seealso::
-        See :func:`add_group`, :func:`add_image` and :func:`add_mesh`.
-
-    `3DImage`, `2DImage` and `Mesh` group types are synchronized with the XDMF
-    file to allow visualization of their content with Paraview
-
-    - **SampleData datasets can be composed of three types of data items:**
-
-    :arrays: classical HDF5 node containing a data array.
-    :tables: structured array class, analogous to numpy.void data arrays,
-        imported from :py:class:`tables.Filters`.
-    :attributes: classical HDF5 attributes, to store metadata.
-
-    .. seealso::
-        See :func:`add_data_array`, :func:`add_table` and
-        :func:`add_attributes`.
-
-    .. rubric:: INDEX NAMES AND ALIASES
+    .. rubric:: SampleData Naming system
 
     An index of the dataset content is stored into a dictionary `content_index`
     as an attribute of the class. Additional names can be defined by users
@@ -106,108 +74,60 @@ class SampleData:
         :alias: an alias of it's indexname
         :name: its name as a HDF5 Node if it is unique
 
-    .. seealso::
-        | See :func:`get_node` for more details on this mechanism.
-        | See :func:`print_index` to visualize Index names and Aliases.
-
-    .. rubric:: DATA COMPRESSION
+    .. rubric:: Data Compression
 
     HDF5 compression algorithm are available through the
     `Pytables <https://www.pytables.org/index.html>`_ package. SampleData
     offers an interface to it with the :func:`set_chunkshape_and_compression`
     method.
 
-    .. rubric:: CONSTRUCTOR PARAMETERS
+    .. rubric:: Arguments of the Class constructor
 
     :filename: `str`
-        name of HDF5/XDMF files to create/read
+        basename of HDF5/XDMF files to create/read. A file pair is created if
+        the `filename` do not match any existing file.
     :sample_name: `str`, optional ('')
-        name of the sample associated to data
+        name of the sample associated to data (metadata, dataset "title"). If
+        the class is called to open a pre-existing `filename`, its sample name
+        is not overwritten.
     :sample_description: `str`, optional ('')
         short description of the mechanical sample (material, type of
-        tests....)
+        tests.... -- metadata). If the class is called to open a pre-existing
+        `filename`, its sample name is not overwritten.
     :verbose: `bool`, optional (False)
         set verbosity flag
     :overwrite_hdf5: `bool`, optional (False)
-        set to `True` to overwrite existing HDF5/XDMF couple of files
+        set to `True` to overwrite existing HDF5/XDMF couple of files with the
+        same `filename`.
     :autodelete: `bool`, optional (False)
         set to `True` to remove HDF5/XDMF files when deleting SampleData
-        instance
+        instance.
     :autorepack: `bool`, optional (False)
         if `True`, the HDF5 file is automatically repacked when deleting
         the SampleData instance, to recover the memory space freed up by data
         compression operations. See :func:`repack_h5file` for more details.
 
-    .. rubric:: Examples
+    .. rubric:: Class attributes
 
-    ::
-
-        # create 'my_dataset.h5' and 'my_dataset.xdmf' files to store data
-        sample = SampleData(filename='my_dataset',sample_name='my_sample_name')
-        # create a temporary dataset 'tmp_dataset.h5/xdmf', to be removed when
-        # sample instance is destroyed
-        sample = SampleData(filename='tmp_dataset.h5/xdmf', autodelete=True)
-        del sample # files are removed
-        # create a dataset and overwrites 'my_dataset.h5' and 'my_dataset.xdmf'
-        # files
-        sample = SampleData(filename='my_dataset', overwrite_hdf5=True)
-
-    .. note:: additional keywords arguments can be passed to specify global
-            compression options, see :func:`set_chunkshape_and_compression`
-            documentation for their definition
-
-    .. rubric:: CLASS ATTRIBUTES
-
-    :h5_file: name of HDF5 file containing dataset (`str`)
+    :h5_file: basename of HDF5 file containing dataset (`str`)
+    :h5_path: full path of the HDF5 dataset file
     :h5_dataset: :py:class:`tables.File` instance associated to the
         `h5_file`
     :xdmf_file: name of XDMF file associated with `h5_file` (`str`)
+    :xdmf_path: full path of XDMF file (`str`)
     :xdmf_tree: :py:class:`lxml.etree` XML tree associated with `xdmf_file`
     :autodelete: autodelete flag (`bool`)
-    :Filters: instance of :py:class:`tables.Filters` specifying
-        general compression options
+    :autodrepack: autorepack flag (`bool`)
     :content_index: Dictionnary of data items (nodes/groups)
         names and pathes in HDF5 dataset (`dic`)
     :aliases: Dictionnary of list of aliases for each item in
         content_index (`dic`)
-
-    .. important:: **Inheritance -- Data Platforms construction for specific
-        Applications**
-
-        SampleData provides a mechanism to derive classes with a specific data
-        model, by redefining the method :func:`minimal_data_model` in the
-        derived class. This method defines two dictionaris specifying a list of
-        data item/group names, pathes, and data item types constituting the
-        data model. Each instance of this derived class will automatically
-        create the data model elements in any new dataset, or ad them into a
-        pre-existing dataset. The data items created in this way are empty
-        until actual data are added at these locations.
-
-        This mechanisms ensures retro-compatibility. When the data model of a
-        class is enriched, any old dataset opened with the class will be
-        udpated with ne new elements of the data model.
-
-        This usage is the original purpose of the SampleData class. It allows
-        to implement data platforms dedicated to a specific usage by
-        subclassing SampleData. This process can be breakdown into the
-        following steps:
-
-            #. Create a `class` inherited from SampleData
-            #. Define the class data model and implement it in
-               `minimal_data_model` method
-            #. If needed, develop dedicated methods to offer a specific API to
-               support the derived class practical application
-
-        | See documentation of :func:`minimal_data_model` for further details
-        | To see examples of such derived classes see:
-        | - the :py:class:`pymicro.crystal.microstructure`
-        | - the :py:class:`Test_DerivedClass` used in the `samples` module
-    """
+"""
 
     def __init__(self, filename='sample_data', sample_name='',
                  sample_description=' ', verbose=False, overwrite_hdf5=False,
                  autodelete=False, autorepack=False):
-        """Sample Data constructor."""
+        """Sample Data constructor, see class documentation."""
         # get file directory and file name
         path_file = Path(filename).absolute()
         filename_tmp = path_file.stem
@@ -269,7 +189,9 @@ class SampleData:
         """Return a string representation of the dataset content."""
         s = ''
         s += self.print_index(as_string=True, max_depth=3)
-        s += self.print_dataset_content(as_string=True, max_depth=3)
+        s += '\n'
+        s += self.print_dataset_content(as_string=True, max_depth=3,
+                                        short=True)
         return s
 
     def __contains__(self, name):
@@ -408,7 +330,6 @@ class SampleData:
 
         with open(self.xdmf_path, 'w') as f:
             f.writelines(lines)
-
         return
 
     def print_dataset_content(self, as_string=False, max_depth=3,
@@ -417,9 +338,10 @@ class SampleData:
 
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
-        :param int max_depth: Control the maximum depth of the node/groups
-            informations that are printed. For instance, max_depth=2 will print
-            info on the root group children and their childrens.
+        :param int max_depth: Only prints data item whose depth is equal or
+            less than this value. The depth is the number of parents a data
+            item has. The root Group has thus a depth of 0, its children a
+            depth of 1, the children of its children a depth of 2...
         :param str to_file: (optional) If not `None`, writes the dataset
             information to the provided text file name `to_file`. In that case,
             nothing is printed to the standard output.
@@ -429,10 +351,9 @@ class SampleData:
         :return str s: string representation of HDF5 nodes information
         """
         size, unit = self.get_file_disk_size(print_flag=False)
-        if short:
-            s = ''
-        else:
-            s = ('\n****** DATA SET CONTENT ******\n -- File: {}\n '
+        s = f'Printing dataset content with max depth {max_depth}\n'
+        if not short:
+            s += ('\n****** DATA SET CONTENT ******\n -- File: {}\n '
                  '-- Size: {:9.3f} {}\n -- Data Model Class: {}\n'
                  ''.format(self.h5_file, size, unit, self.__class__.__name__))
             s += self.print_node_info('/', as_string=True)
@@ -470,10 +391,14 @@ class SampleData:
         :param bool recursive: If `True`, print content of children groups
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
-        :param int max_depth: Control the maximum depth of the node/groups
-            informations that are printed. For instance, max_depth=2 will
-            print info on the target group children and their childrens.
-            Only usefull if recursive flag is `True`.
+        :param int max_depth: Only prints data item whose depth is equal or
+            less than this value. The depth is the number of parents a data
+            item has. The root Group has thus a depth of 0, its children a
+            depth of 1, the children of its children a depth of 2...
+            Note that this depth is an absolute depth. Thus, if you want for
+            instance to print the content of a group with depth 3, with 2
+            levels of depth (its childrens and their childrens), you will need
+            to specify a depth of 5 for this method.
         :param str to_file: (optional) If not `None`, writes the group
             contentto the provided text file name `to_file`. In that case,
             nothing is printed to the standard output.
@@ -517,7 +442,7 @@ class SampleData:
             print(s)
             return
 
-    def print_node_info(self, name, as_string=False, short=False):
+    def print_node_info(self, nodename, as_string=False, short=False):
         """Print information on a node in the HDF5 tree.
 
         Prints node name, content, attributes, compression settings, path,
@@ -526,14 +451,17 @@ class SampleData:
         :param str name: Name, Path, Index name or Alias of the HDF5 Node
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
+        :param bool short: If `True`, return a short description of the
+            node content, reduced to name, hdf5 type and node memory
+            sizs.
         :return str s: string representation of HDF5 Node information
         """
         s = ''
-        node_path = self._name_or_node_to_path(name)
+        node_path = self._name_or_node_to_path(nodename)
         if self._is_array(node_path):
-            s += self._get_array_node_info(name, as_string, short)
+            s += self._get_array_node_info(nodename, as_string, short)
         else:
-            s += self._get_group_info(name, as_string, short)
+            s += self._get_group_info(nodename, as_string, short)
         if as_string:
             return s
         else:
@@ -649,13 +577,20 @@ class SampleData:
             print(s)
             return
 
-    def print_index(self, as_string=False, max_depth=3, node_type=[],
-                    local_root='/'):
-        """Print a list of the datasets in HDF5 and their Index names.
+    def print_index(self, as_string=False, max_depth=3, local_root='/'):
+        """Print a list of the data items in HDF5 file and their Index names.
 
         :param bool as_string: If `True` solely returns string representation.
             If `False`, prints the string representation.
-        :return str s: string representation of HDF5 nodes information
+        :param int max_depth: Only prints data item whose depth is equal or
+            less than this value. The depth is the number of parents a data
+            item has. The root Group has thus a depth of 0, its children a
+            depth of 1, the children of its children a depth of 2...
+        :param str local_root: prints only the Index for data items that are
+            children of the provided local_root. The Name, Path, Indexname,
+            or Alias of the local_root can be passed for this argument.
+        :return str s: string representation of HDF5 nodes information if
+            `as_string` is True.
         """
         s = ''
         s += str('Dataset Content Index :\n')
@@ -909,7 +844,7 @@ class SampleData:
         return
 
     def add_image(self, image_object=None, imagename='', indexname='',
-                  location='/', description=' ', replace=False,
+                  location='/', description='', replace=False,
                   compression_options=dict()):
         """Create a 2D/3D Image group in the dataset from an ImageObject.
 
@@ -959,6 +894,25 @@ class SampleData:
             options items, see `set_chunkshape_and_compression` method for
             more details.
         """
+        # Check if the image already exists as an empty image
+        empty = False
+        im_attrs = dict()
+        old_descr = None
+        try:
+            gtype = self.get_attribute('group_type',indexname)
+            if gtype == 'emptyImage':
+                # we get the empty image attributes to transfer its metadata
+                # to the new image group that will overwrite it
+                empty = True
+                im_attrs = self.get_dic_from_attributes(indexname)
+                # remove old arguments for empty groups
+                im_attrs.pop('empty')
+                im_attrs.pop('group_type')
+                old_descr = im_attrs.pop('description')
+        except:
+            pass
+        if empty and (image_object is not None):
+            replace=True
         ### Create or fetch image group
         image_group = self.add_group(imagename, location, indexname, replace)
         ### empty images creation
@@ -979,6 +933,9 @@ class SampleData:
             image_xdmf_dim = image_nodes_dim[[1,0]]
         elif len(image_nodes_dim) == 3:
             image_xdmf_dim = image_nodes_dim[[2,1,0]]
+        # Add image attributes
+        if (description == '') and (old_descr is not None):
+            description = im_attrs['description']
         Attribute_dic = {'nodes_dimension': image_nodes_dim,
                          'nodes_dimension_xdmf': image_xdmf_dim,
                          'dimension': image_cell_dim,
@@ -989,14 +946,15 @@ class SampleData:
                          'empty': False,
                          'xdmf_gridname': imagename}
         self.add_attributes(Attribute_dic, image_group._v_pathname)
+        self.add_attributes(im_attrs, image_group._v_pathname)
         ### Add fields if some are stored in the image object
         for field_name, field in image_object.nodeFields.items():
             self.add_field(gridname=image_group._v_pathname,
-                           fieldname=field_name, array=field, replace=replace,
+                           fieldname=field_name, array=field,
                            compression_options=compression_options)
         for field_name, field in image_object.elemFields.items():
             self.add_field(gridname=image_group._v_pathname,
-                           fieldname=field_name, array=field, replace=replace,
+                           fieldname=field_name, array=field,
                            compression_options=compression_options)
         return image_object
 
@@ -1143,7 +1101,7 @@ class SampleData:
         self.add_attributes({'time_list':time_list0},gridname)
         return
 
-    def add_group(self, groupname, location, indexname='', replace=False):
+    def add_group(self, groupname, location='/', indexname='', replace=False):
         """Create a standard HDF5 group at location with no grid properties.
 
         If the group parents in `location` do not exist, they are created.
@@ -1169,9 +1127,9 @@ class SampleData:
         return Group
 
     def add_field(self, gridname, fieldname, array, location=None,
-                  indexname=None, chunkshape=None, replace=False, empty=False,
+                  indexname=None, chunkshape=None, replace=False,
                   visualisation_type='Elt_mean', compression_options=dict(),
-                  time=None):
+                  time=None, bulk_padding=True):
         """Add a field to a grid (Mesh or 2D/3DImage) group from a numpy array.
 
         This methods checks the compatibility of the input field array with the
@@ -1197,8 +1155,6 @@ class SampleData:
             name/location if `True` and such group exists
         :param Filters filters: instance of :py:class:`tables.Filters` class
             specifying compression settings.
-        :param bool empty: if `True` create the path, Index Name in dataset and
-            store an empty array. Set the node attribute `empty` to True.
         :param str visualisation_type: Type of visualisation used to represent
             integration point fields with an element wise constant field.
             Possibilities are 'Elt_max' (maximum value per element), 'Elt_mean'
@@ -1210,6 +1166,9 @@ class SampleData:
         :param float time: Associate a time value for this field. IF a time
             value is provided, the suffix '_T{time_index}' is appended to
             the fieldname and indexname
+        :param bool bulk_padding: If adding a field on a mesh  that has as many
+            bulk as boundary elements, forces field padding to `bulk` if True,
+            or to `boundary` if false
         """
         self._verbose_print('Adding field `{}` into Grid `{}`'
                             ''.format(fieldname, gridname))
@@ -1219,7 +1178,8 @@ class SampleData:
                                    ' array in this group.'.format(gridname))
         # If needed, pad the field with 0s to comply with number of bulk and
         # boundary elements
-        array, padding, vis_array = self._mesh_field_padding(array, gridname)
+        array, padding, vis_array = self._mesh_field_padding(array, gridname,
+                                                             bulk_padding)
         # Check if the array shape is consistent with the grid geometry
         # and returns field dimension, xdmf Center attribute
         field_type, dimensionality = self._check_field_compatibility(
@@ -1253,6 +1213,9 @@ class SampleData:
         if self._is_image(gridname):
             # indices transposition to ensure consistency between SampleData
             # and geometrical interpretation of coordinates in Paraview
+            if self.get_attribute('group_type',gridname) == '2DImage':
+                if len(array.shape) == 3:
+                    array = np.squeeze(array)
             array, transpose_indices = self._transpose_image_array(
                 dimensionality, array)
         if dimensionality in ['Tensor6','Tensor']:
@@ -1295,7 +1258,7 @@ class SampleData:
             indexname = indexname + time_suffix
         # Add data array into HDF5 dataset
         node = self.add_data_array(array_location, fieldname, array, indexname,
-                                   chunkshape, replace, empty,
+                                   chunkshape, replace,
                                    compression_options=compression_options)
         # Create attributes of the field node
         gridpath =  self._name_or_node_to_path(gridname)
@@ -1305,7 +1268,8 @@ class SampleData:
         Attribute_dic = {'field_type': field_type,
                          'field_dimensionality': dimensionality,
                          'parent_grid_path': gridpath,
-                         'xdmf_gridname': xdmf_gname, 'padding': padding
+                         'xdmf_gridname': xdmf_gname, 'padding': padding,
+                         'node_type':'field_array'
                          }
         if time is not None:
             Attribute_dic['time'] = time
@@ -1325,7 +1289,7 @@ class SampleData:
                     dimensionality, vis_array)
             node_vis = self.add_data_array(
                 array_location, visname, vis_array, visindexname, chunkshape,
-                replace, empty, compression_options=compression_options)
+                replace, compression_options=compression_options)
             Attribute_dic['visualisation_type'] = visualisation_type
             self.add_attributes(Attribute_dic, nodename=visindexname)
             Attribute_dic['visualisation_field_path'] = node_vis._v_pathname
@@ -1336,11 +1300,11 @@ class SampleData:
         else:
             self._add_field_to_xdmf(indexname, array)
         # Add field path to grid node Field_list attribute
-        self._append_field_index(gridname, fieldname)
+        self._append_field_index(gridname, indexname)
         return node
 
     def add_data_array(self, location, name, array=None, indexname=None,
-                       chunkshape=None, replace=False, empty=False,
+                       chunkshape=None, replace=False,
                        compression_options=dict()):
         """Add a data array node at the given location in the HDF5 dataset.
 
@@ -1369,10 +1333,12 @@ class SampleData:
         """
         self._verbose_print('Adding array `{}` into Group `{}`'
                             ''.format(name, location))
-        # Safety checks
-        self._check_SD_array_init(name, location, replace)
         if array is None:
-            raise ValueError('Received a `None` array. Cannot add data array.')
+            empty = True
+        else:
+            empty=False
+        # Safety checks
+        saved_attrs = self._check_SD_array_init(name, location, replace, empty)
         # get location path
         location_path = self._name_or_node_to_path(location)
         # get compression options
@@ -1395,7 +1361,9 @@ class SampleData:
                     where=location_path, name=name, filters=Filters,
                     obj=array, chunkshape=chunkshape,
                     title=indexname)
-            self.add_attributes({'empty': False}, Node._v_pathname)
+            self.add_attributes(saved_attrs, Node._v_pathname)
+            self.add_attributes({'empty': False, 'node_type':'data_array'},
+                                 Node._v_pathname)
             if 'normalization' in compression_options:
                 if optn == 'standard_per_component':
                     mean_array = norm_attributes.pop('norm_mean_array')
@@ -1418,7 +1386,8 @@ class SampleData:
 
         :param str location: Path where the array will be added in the dataset
         :param str name: Name of the array to create
-        :param IsDescription description: Definition of the table rows
+        :param IsDescription description: Definition of the table rows, can be
+            a numpy dtype.
         :param str indexname: Index name used to reference the node
             composition as a sequence of named fields (analogous to Numpy
             structured arrays). It must be an instance of the
@@ -1432,8 +1401,6 @@ class SampleData:
             must be consistent with the table `description`.
         :param Filters filters: instance of :py:class:`tables.Filters` class
             specifying compression settings.
-        :param bool empty: if `True` create the path, Index Name in dataset and
-            store an empty table. Set the table attribute `empty` to True.
         :param dict compression_options: Dictionary containing compression
             options items, see `set_chunkshape_and_compression` method for
             more details.
@@ -1492,6 +1459,8 @@ class SampleData:
             self._verbose_print(warn_msg)
             indexname = name
         self.add_to_index(indexname, table._v_pathname)
+        self.add_attributes({'node_type':'structured array'},
+                            table._v_pathname)
         return table
 
     def add_tablecols(self, tablename, description, data=None):
@@ -1612,7 +1581,40 @@ class SampleData:
             self._verbose_print(warn_msg)
             indexname = name
         self.add_to_index(indexname, str_array._v_pathname)
+        self.add_attributes({'node_type':'string array'},
+                            str_array._v_pathname)
         return str_array
+
+    def append_string_array(self, name, data=[]):
+        """Append a list of strings to a string array node in the dataset.
+
+        :param str name: Path, Indexname, Name or Alias of the string array
+            to which append the list of strings.
+        :param list(str) data: List of strings to append to the string array.
+        """
+        Sarray = self.get_node(name)
+        if Sarray is None:
+            raise tables.NodeError(f'No string array named {name} in the'
+                                   ' dataset.')
+        for string in data:
+            a_str = bytes(string,'utf-8')
+            Sarray.append([a_str])
+        return
+
+    def append_table(self, name, data):
+        """Append a numpy structured array to a table in the dataset.
+
+        :param str name: Path, Indexname, Name or Alias of the string array
+            to which append the list of strings.
+        :param numpy.ndarray data: array to append to the table? Its `dtype`
+            must match de table description.
+        """
+        table = self.get_node(name)
+        current_dtype = table.dtype
+        table.append(data)
+        table.flush()
+        return
+
 
     def add_attributes(self, dic, nodename):
         """Add a dictionary entries as HDF5 Attributes to a Node or Group.
@@ -1736,7 +1738,7 @@ class SampleData:
             connectivity = self.get_mesh_elements(
                 meshname, with_tags=False, get_eltype_connectivity=element_tag)
         if element_tag in mesh_el_tags.keys():
-            connectivity = self.get_mesh_elem_tags_connectivity(
+            connectivity = self.get_mesh_elem_tag_connectivity(
                                     meshname, element_tag)
         element_IDs = self.get_mesh_elem_tag(meshname, element_tag)
 
@@ -1840,8 +1842,9 @@ class SampleData:
         mesh_object.SetElementsOriginalIDs(originalIds)
         # Get mesh fields
         mesh_group = self.get_node(meshname)
-        FIndex_path = os.path.join(mesh_group._v_pathname,'Field_index')
-        Field_index = self.get_node(FIndex_path)
+        mesh_indexname = self.get_indexname_from_path(mesh_group._v_pathname)
+        FIndex = mesh_indexname+'_Field_index'
+        Field_index = self.get_node(FIndex)
         if with_fields and (Field_index is not None):
             for fieldname in Field_index:
                 name = fieldname.decode('utf-8')
@@ -1908,7 +1911,41 @@ class SampleData:
             nodesID = np.arange(Nnodes)
         return nodesID
 
-    def get_mesh_xdmf_connectivity(self, meshname, as_numpy=False):
+    def get_mesh_node_tag(self, meshname, node_tag, as_numpy=True):
+        """Returns the node IDs of a node tag of the mesh group.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :param str node_tag: name of the node tag whose IDs must be returned.
+        :param bool as_numpy: if `True`, returns arrays in elements container
+            as numpy array
+        """
+        # Add prefix to node tag name if needed
+        if not node_tag.startswith('NT_'):
+            node_tag_nodename = 'NT_' + node_tag
+        # get mesh group
+        mesh_group = self.get_node(meshname)
+        # get path of Element tag
+        NT_path = os.path.join(mesh_group._v_pathname,'Geometry',
+                               'NodeTags', node_tag_nodename)
+        # get element tag type
+        tag = self.get_node(NT_path, as_numpy=as_numpy)
+        return tag
+
+    def get_mesh_node_tag_coordinates(self, meshname, node_tag):
+        """Returns the node coordinates of a node tag of the mesh group.
+
+        :param str meshname: Name, Path, Index name or Alias of the Mesh group
+            in dataset
+        :param str node_tag: name of the node tag whose IDs must be returned.
+        :param bool as_numpy: if `True`, returns arrays in elements container
+            as numpy array
+        """
+        tag = self.get_mesh_node_tag(meshname, node_tag, as_numpy=True)
+        Nodes = self.get_mesh_nodes(meshname, as_numpy=True)
+        return Nodes[tag,:]
+
+    def get_mesh_xdmf_connectivity(self, meshname, as_numpy=True):
         """Return the mesh elements connectivity as HDF5 node or Numpy array.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
@@ -1984,6 +2021,8 @@ class SampleData:
                 Elements.connectivity = connectivity.reshape((Nelems[i],
                                                               Nnode_per_el))
                 Elements.cpt = Nelems[i]
+                if get_eltype_connectivity == element_type[i]:
+                    return Elements.connectivity
         if with_tags:
             self._load_elements_tags(meshname, AElements, as_numpy)
         return AElements
@@ -2002,7 +2041,7 @@ class SampleData:
 
     def get_mesh_elem_tag(self, meshname, element_tag, as_numpy=True,
                           local_IDs=False):
-        """Returns the elements IDs of an element tag for the mesh group.
+        """Returns the elements IDs of an element tag of the mesh group.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
             in dataset
@@ -2055,16 +2094,17 @@ class SampleData:
             element type for each element tag.
         """
         mesh_group = self.get_node(meshname)
-        Etag_list_indexname = mesh_group._v_name+'_ElTagsList'
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
+        Etag_list_indexname = indexname +'_ElTagsList'
         Etag_list = self.get_node(Etag_list_indexname)
-        Etag_Etype_list_indexname = mesh_group._v_name+'_ElTagsTypeList'
+        Etag_Etype_list_indexname = indexname +'_ElTagsTypeList'
         Etag_Etype_list = self.get_node(Etag_Etype_list_indexname)
         Tags_dict = {
             Etag_list[i].decode('utf-8'):Etag_Etype_list[i].decode('utf-8')
                      for i in range(len(Etag_list))}
         return Tags_dict
 
-    def get_mesh_elem_tags_connectivity(self, meshname, element_tag):
+    def get_mesh_elem_tag_connectivity(self, meshname, element_tag):
         """Returns the list and types of elements tags defined on a mesh.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
@@ -2091,7 +2131,8 @@ class SampleData:
         :return list node_tags: list of node tag names defined on this mesh
         """
         mesh_group = self.get_node(meshname)
-        Ntag_list_indexname = mesh_group._v_name+'_NodeTagsList'
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
+        Ntag_list_indexname = indexname+'_NodeTagsList'
         NTags_list = self.get_node(Ntag_list_indexname).read()
         node_tags = []
         for tag in NTags_list:
@@ -2211,7 +2252,10 @@ class SampleData:
             field = self.get_node(fieldname, as_numpy=True)
         padding = self.get_attribute('padding', fieldname)
         parent_mesh =  self.get_attribute('parent_grid_path', fieldname)
-        if padding is not None:
+        pad_field = (padding != None) and (unpad_field)
+        if (field_type == 'IP_field') and not get_visualisation_field:
+            pad_field = False
+        if pad_field:
             return self._mesh_field_unpadding(field, parent_mesh, padding)
         else:
             return field
@@ -2219,6 +2263,10 @@ class SampleData:
 
     def get_node(self, name, as_numpy=False):
         """Return a HDF5 node in the dataset.
+
+        The node is returned as a :py:class:`tables.Node`,
+        :py:class:`tables.Group`  or a :py:class:`numpy.ndarray` depending
+        on its nature, and the value of the `as_numpy` argument.
 
         :param str name: Name, Path, Index name or Alias of the Node in dataset
         :param bool as_numpy: if `True`, returns the Node as a `numpy.array`.
@@ -2276,6 +2324,7 @@ class SampleData:
                                                        name)
                 if transpose_components is not None:
                     node = node[...,transpose_components]
+                node = np.atleast_1d(np.squeeze(node))
         return node
 
     def get_dic_from_attributes(self, nodename):
@@ -2307,8 +2356,8 @@ class SampleData:
                 attribute = self.h5_dataset.get_node_attr(where=data_path,
                                                           attrname=attrname)
             except AttributeError:
-                self._verbose_print(' (get_attribute) node {} has no attribute'
-                                    ' `{}`'.format(nodename,attrname))
+                # self._verbose_print(' (get_attribute) node {} has no attribute'
+                #                     ' `{}`'.format(nodename,attrname))
                 return None
             if isinstance(attribute, bytes):
                 attribute = attribute.decode()
@@ -2380,7 +2429,7 @@ class SampleData:
         """
         self.add_attributes({'sample_name': sample_name}, '/')
 
-    def get_description(self, node):
+    def get_description(self, node='/'):
         """Get the string describing this node.
 
         By defaut the sample description is returned, from the root HDF5 Group.
@@ -2442,14 +2491,24 @@ class SampleData:
                              f' new grid spacing {voxel_size}')
         self.add_attributes({'spacing': np.array(voxel_size)},
                             image_group)
-        xdmf_geometry = self._find_xdmf_geometry(image_group)
-        spacing_node = xdmf_geometry.getchildren()[1]
         if len(voxel_size) == 2:
             VoxSize = voxel_size[[1,0]]
         elif len(voxel_size) == 3:
             VoxSize = voxel_size[[2,1,0]]
-        spacing_text = str(VoxSize).strip('[').strip(']').replace(',', ' ')
-        spacing_node.text = spacing_text
+        xdmf_grid = self._find_xdmf_grid(image_group)
+        # find out if the grid has subgrids (temporal grid collection)
+        if xdmf_grid.getchildren()[0].tag == 'Grid':
+            # grid collection
+            for grid in xdmf_grid:
+                geo = self._find_xdmf_geometry(grid)
+                spacing_node = geo.getchildren()[1]
+                spacing_text = str(VoxSize).strip('[').strip(']').replace(',', ' ')
+                spacing_node.text = spacing_text
+        else:
+            geo = self._find_xdmf_geometry(xdmf_grid)
+            spacing_node = geo.getchildren()[1]
+            spacing_text = str(VoxSize).strip('[').strip(']').replace(',', ' ')
+            spacing_node.text = spacing_text
         self.sync()
         return
 
@@ -2471,14 +2530,24 @@ class SampleData:
                              f' {old_origin} and inputed new origin'
                              f' {origin}')
         self.add_attributes({'origin': origin}, image_group)
-        xdmf_geometry = self._find_xdmf_geometry(image_group)
         if len(origin) == 2:
             Or = origin[[1,0]]
         elif len(origin) == 3:
             Or = origin[[2,1,0]]
-        origin_node = xdmf_geometry.getchildren()[0]
-        origin_text = str(Or).strip('[').strip(']').replace(',', ' ')
-        origin_node.text = origin_text
+        xdmf_grid = self._find_xdmf_grid(image_group)
+        # find out if the grid has subgrids (temporal grid collection)
+        if xdmf_grid.getchildren()[0].tag == 'Grid':
+            # grid collection
+            for grid in xdmf_grid:
+                geo = self._find_xdmf_geometry(grid)
+                origin_node = geo.getchildren()[0]
+                origin_text = str(Or).strip('[').strip(']').replace(',', ' ')
+                origin_node.text = origin_text
+        else:
+            geo = self._find_xdmf_geometry(xdmf_grid)
+            origin_node = geo.getchildren()[0]
+            origin_text = str(Or).strip('[').strip(']').replace(',', ' ')
+            origin_node.text = origin_text
         self.sync()
         return
 
@@ -2913,11 +2982,11 @@ class SampleData:
                                 line_break=True)
             self.h5_dataset = tables.File(self.h5_path, mode='a')
             self._init_xml_tree()
-            # add sample name and description
-            self.h5_dataset.root._v_attrs.sample_name = sample_name
-            self.h5_dataset.root._v_attrs.description = sample_description
             # Generic Data Model initialization
             self._init_data_model()
+            # add sample name and description
+            self.set_sample_name(sample_name)
+            self.set_description(sample_description)
         return
 
     def _init_data_model(self):
@@ -2961,9 +3030,7 @@ class SampleData:
                     self.add_mesh(meshname=tail, indexname=key, location=head)
                 elif content_type[key] == 'Array':
                     msg = ('Adding empty Array  {}'.format(content_paths[key]))
-                    empty_array = np.array([0])
                     self.add_data_array(location=head, name=tail,
-                                        array=empty_array, empty=True,
                                         indexname=key)
                 elif (isinstance(content_type[key], tables.IsDescription)
                       or issubclass(content_type[key], tables.IsDescription)):
@@ -3015,7 +3082,8 @@ class SampleData:
             self.h5_dataset.create_group('/Index', name='Aliases')
         return
 
-    def _check_SD_array_init(self, arrayname='', location='/', replace=False):
+    def _check_SD_array_init(self, arrayname='', location='/', replace=False,
+                             empty_input=False):
         """Safety check to create data array into location in dataset."""
         location_path = self._name_or_node_to_path(location)
         if location_path is None:
@@ -3033,6 +3101,17 @@ class SampleData:
             array_path = os.path.join(location_path, arrayname)
             if self.__contains__(array_path):
                 empty = self.get_attribute('empty', array_path)
+                if empty and (not empty_input):
+                    # special case where we add data to a pre-existing
+                    # node --> need to save the attributes and remove the
+                    # empty array node
+                    msg = ('Existing node {} will be overwritten to recreate '
+                           'array/table'.format(array_path))
+                    if not(empty):
+                        self._verbose_print(msg)
+                    attrs = self.get_dic_from_attributes(array_path)
+                    self.remove_node(array_path, recursive=True)
+                    return attrs
                 if replace:
                     msg = ('Existing node {} will be overwritten to recreate '
                            'array/table'.format(array_path))
@@ -3044,6 +3123,7 @@ class SampleData:
                            'optional argument "replace=True"'
                            ''.format(array_path))
                     raise tables.NodeError(msg)
+        return dict()
 
     def _init_SD_group(self, groupname='', location='/',
                        group_type='Group', replace=False):
@@ -3071,11 +3151,12 @@ class SampleData:
                 self.remove_node(name=group_path,recursive=True)
             if not(fetch_group or replace):
                 msg = ('Group {} already exists. Set arg. `replace=True` to'
-                       'to replace it by a new Group.'.format(groupname))
+                       ' replace it by a new Group.'.format(groupname))
                 raise tables.NodeError(msg)
         # create or fetch group
         if fetch_group:
             Group = self.get_node(group_path)
+            self._remove_from_index(Group._v_pathname)
         else:
             self._verbose_print('Creating {} group `{}` in file {} at {}'
                                 ''.format(group_type, groupname,
@@ -3118,9 +3199,10 @@ class SampleData:
         tab_path = os.path.dirname(table._v_pathname)
         tab_chunkshape = table.chunkshape
         tab_filters = table.filters
+        tab_c_opts = self._get_compression_opt_from_filter(tab_filters)
         # Create a new array with modified dtype
         data = np.array(np.zeros((Nrows,)), dtype=new_dtype)
-        self._verbose_print('data is:',data)
+        self._verbose_print(f'data is: {data}')
         # Get data from old table
         for key in current_desc._v_names:
             data[key] = self.get_tablecol(tablename=tablename,
@@ -3131,15 +3213,17 @@ class SampleData:
         else:
             tab_aliases = []
         # remove old table
+        tab_attrs =  self.get_dic_from_attributes(tab_indexname)
         self.remove_node(tab_name)
         # create new table
         new_tab = self.add_table(location=tab_path, name=tab_name,
                                  description=new_descr,
                                  indexname=tab_indexname,
                                  chunkshape=tab_chunkshape, replace=True,
-                                 data=data, filters=tab_filters)
+                                 data=data, compression_options=tab_c_opts)
         for alias in tab_aliases:
             self.add_alias(aliasname=alias, indexname=new_tab._v_pathname)
+        self.add_attributes(tab_attrs, tab_indexname)
         return
 
     def _remove_from_index(self, node_path):
@@ -3190,8 +3274,7 @@ class SampleData:
                     if float(ch.get('Value')) == time:
                         return ch_grid.get('Name')
 
-    def _find_xdmf_geometry(self, gridname):
-        xdmf_grid = self._find_xdmf_grid(gridname)
+    def _find_xdmf_geometry(self, xdmf_grid):
         for el in xdmf_grid:
             if el.tag == 'Geometry':
                 return el
@@ -3363,7 +3446,7 @@ class SampleData:
         if self._is_empty(gridname):
             # method create_image from array
             raise ValueError('{} is an empty grid. Use add_image, add_mesh,'
-                             ' or add_imamge_from_field to initialize grid'
+                             ' or add_image_from_field to initialize grid'
                              ''.format(gridname))
         elif group_type in SD_IMAGE_GROUPS.values():
             field_type, dimensionality = self._compatibility_with_image(
@@ -3460,7 +3543,7 @@ class SampleData:
                              '3D grid.')
         return field_type, XDMF_FIELD_TYPE[dimension]
 
-    def _mesh_field_padding(self, field, meshname):
+    def _mesh_field_padding(self, field, meshname, bulk_padding):
         """Pad with zeros the mesh elem field to comply with size."""
         if self._is_image(meshname):
             return field, 'None', None
@@ -3468,10 +3551,20 @@ class SampleData:
                                                meshname))
         Nelem_boundary = np.sum(self.get_attribute(
                                 'Number_of_boundary_elements', meshname))
+        if Nelem_bulk == Nelem_boundary:
+            force_padding = True
+        else:
+            force_padding = False
         padding = 'None'
         vis_field = None
+        # reshape field if it is a 1D array
+        if len(field.shape) == 1:
+            field = field.reshape((len(field),1))
         if field.shape[0] == Nelem_bulk:
             padding = 'bulk'
+            if force_padding:
+                if not bulk_padding:
+                    padding = 'boundary'
         elif field.shape[0] == Nelem_boundary:
             padding = 'boundary'
         elif (field.shape[0] % Nelem_bulk) == 0:
@@ -3481,6 +3574,12 @@ class SampleData:
             # field[:,k] = [Val_elt1_IP1, Val_elt1_IP2, ...., Val_elt1_IPN,
             #               Val_elt2_IP1, ...., Val_eltN_IPN]
             padding = 'bulk_IP'
+            if force_padding:
+                if not bulk_padding:
+                    padding = 'boundary_IP'
+        elif Nelem_boundary != 0:
+            if (field.shape[0] % Nelem_boundary) == 0:
+                padding = 'boundary_IP'
         if padding == 'None':
             pass
         elif padding == 'bulk':
@@ -3501,6 +3600,14 @@ class SampleData:
                                 'Number_of_boundary_elements',meshname))
             pad_array = np.zeros(shape=(Nelem_boundary, *vis_field.shape[1:]))
             vis_field = np.concatenate((vis_field, pad_array), axis=0)
+        elif padding == 'boundary_IP':
+            Nip_elt = field.shape[0] // Nelem_boundary
+            new_shape = (Nelem_boundary,Nip_elt,*field.shape[1:])
+            vis_field = field.reshape(new_shape)
+            Nelem_bulk = np.sum(self.get_attribute(
+                                    'Number_of_bulk_elements',meshname))
+            pad_array = np.zeros(shape=(Nelem_bulk, *vis_field.shape[1:]))
+            vis_field = np.concatenate((pad_array, vis_field), axis=0)
         return field, padding, vis_field
 
     def _mesh_field_unpadding(self, field, parent_mesh, padding):
@@ -3509,16 +3616,19 @@ class SampleData:
                                                parent_mesh))
         Nelem_boundary = np.sum(self.get_attribute(
                                 'Number_of_boundary_elements', parent_mesh))
+        if len(field.shape) == 1:
+            L = field.shape[0]
+            field = field.reshape((L,1))
         if (padding == 'bulk') or (padding == 'bulk_IP'):
             field = field[:Nelem_bulk,:]
-        elif padding == 'boundary':
+        elif (padding == 'boundary') or (padding == 'boundary_IP'):
             field = field[Nelem_boundary,:]
         elif padding == 'None':
             pass
         else:
             raise Warning('Cannot unpad the field, unknown padding type `{}`'
                           ''.format(padding))
-        return field
+        return np.atleast_1d(np.squeeze(field))
 
     def _IP_field_for_visualisation(self, array, vis_type):
         # here it is supposed that the field has shape
@@ -3539,10 +3649,12 @@ class SampleData:
         self._verbose_print('Adding Geometry for mesh group {}'
                             ''.format(mesh_group._v_name))
         mesh_object.PrepareForOutput()
+        # Get mesh group indexname
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
         # create Geometry group
         geo_group = self.add_group(groupname='Geometry',
                                    location=mesh_group._v_pathname,
-                                   indexname=mesh_group._v_name+'_Geometry',
+                                   indexname=indexname+'_Geometry',
                                    replace=replace)
         # Add Nodes, NodesID and NodeTags
         self._add_mesh_nodes(mesh_object, mesh_group, geo_group, replace)
@@ -3555,7 +3667,9 @@ class SampleData:
         self._verbose_print('Creating Nodes data set in group {} in file {}'
                             ''.format(geo_group._v_pathname, self.h5_file))
         nodes_array = mesh_object.GetPosOfNodes()
-        indexname = mesh_group._v_name+'_Nodes'
+        # Get mesh group indexname
+        indexname_tmp = self.get_indexname_from_path(mesh_group._v_pathname)
+        indexname = indexname_tmp+'_Nodes'
         Nodes = self.add_data_array(location=geo_group._v_pathname,
                                     name='Nodes', array=nodes_array,
                                     indexname=indexname)
@@ -3570,7 +3684,7 @@ class SampleData:
             Nodes_ID = self.add_data_array(
                 location=geo_group._v_pathname, name='Nodes_ID',
                 array=mesh_object.originalIDNodes,
-                indexname=mesh_group._v_name+'_Nodes_ID')
+                indexname=indexname_tmp+'_Nodes_ID')
             Node_attributes = {'nodesID_path':Nodes_ID._v_pathname}
         self.add_attributes(Node_attributes, mesh_group._v_pathname)
         return
@@ -3591,7 +3705,8 @@ class SampleData:
     def _add_nodes_elements_tags(self,  mesh_object, mesh_group, replace,
                                  bin_fields_from_sets):
         """Add Node and ElemTags in mesh geometry group from mesh object."""
-        geo_group = self.get_node(mesh_group._v_name+'_Geometry')
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
+        geo_group = self.get_node(indexname+'_Geometry')
         # Add node tags
         self._add_mesh_nodes_tags(mesh_object, mesh_group, geo_group, replace,
                                   bin_fields_from_sets)
@@ -3604,9 +3719,10 @@ class SampleData:
                              replace, bin_fields_from_sets):
         """Add NodeTags arrays in mesh geometry group from mesh object."""
         # create Noe tags group
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
         Ntags_group = self.add_group(groupname='NodeTags',
                                      location=geo_group._v_pathname,
-                                     indexname=mesh_group._v_name+'_NodeTags',
+                                     indexname=indexname+'_NodeTags',
                                      replace=replace)
         Node_tags_list = []
         for tag in mesh_object.nodesTags:
@@ -3639,7 +3755,7 @@ class SampleData:
                 self._remove_from_index(node._v_pathname)
         self.add_string_array(
             name='Node_tags_list', location=geo_group._v_pathname,
-            indexname=mesh_group._v_name+'_NodeTagsList', data=Node_tags_list)
+            indexname=indexname+'_NodeTagsList', data=Node_tags_list)
         return
 
     def _add_mesh_elems_tags(self, mesh_object, mesh_group, geo_group,
@@ -3651,9 +3767,10 @@ class SampleData:
         offsets = self.get_attribute('Elements_offset', mesh_group._v_name)
         offset_dic = {element_type[i]:offsets[i] for i in range(len(offsets))}
         # create Noe tags group
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
         Etags_group = self.add_group(groupname='ElementsTags',
                                      location=geo_group._v_pathname,
-                                     indexname=mesh_group._v_name+'_ElemTags',
+                                     indexname=indexname+'_ElemTags',
                                      replace=replace)
         Elem_tags_list = []
         Elem_tag_type_list = []
@@ -3691,10 +3808,10 @@ class SampleData:
                     self._remove_from_index(node._v_pathname)
         self.add_string_array(
             name='Elem_tags_list', location=geo_group._v_pathname,
-            indexname=mesh_group._v_name+'_ElTagsList', data=Elem_tags_list)
+            indexname=indexname+'_ElTagsList', data=Elem_tags_list)
         self.add_string_array(
             name='Elem_tag_type_list', location=geo_group._v_pathname,
-            indexname=mesh_group._v_name+'_ElTagsTypeList',
+            indexname=indexname+'_ElTagsTypeList',
             data=Elem_tag_type_list)
 
     def _add_xdmf_node_element_set(self, subset_list_path, set_type='Cell',
@@ -3749,9 +3866,10 @@ class SampleData:
     def _load_nodes_tags(self, meshname, mesh_object, as_numpy=True):
         """Add Node and ElemTags in mesh object from mesh geometry."""
         mesh_group = self.get_node(meshname)
-        Ntags_group = self.get_node(mesh_group._v_name+'_NodeTags')
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
+        Ntags_group = self.get_node(indexname+'_NodeTags')
         if Ntags_group is not None:
-            Ntag_list_indexname = mesh_group._v_name+'_NodeTagsList'
+            Ntag_list_indexname = indexname+'_NodeTagsList'
             Ntag_list = self.get_node(Ntag_list_indexname)
             for name in Ntag_list:
                 tag_name = name.decode('utf-8')
@@ -3764,7 +3882,8 @@ class SampleData:
         """Add Node and ElemTags in mesh object from mesh group."""
         # get SD groups
         mesh_group = self.get_node(meshname)
-        Etags_group = self.get_node(mesh_group._v_name+'_ElemTags')
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
+        Etags_group = self.get_node(indexname+'_ElemTags')
         # create an dictionnary for the offset to apply to elem local Ids
         # for each element type
         element_type = self.get_attribute('element_type', mesh_group._v_name)
@@ -3772,9 +3891,10 @@ class SampleData:
         offset_dic = {element_type[i]:offsets[i] for i in range(len(offsets))}
         # load element tags
         if Etags_group is not None:
-            Etag_list_indexname = mesh_group._v_name+'_ElTagsList'
+            mesh_idname = self.get_indexname_from_path(mesh_group._v_pathname)
+            Etag_list_indexname = mesh_idname+'_ElTagsList'
             Etag_list = self.get_node(Etag_list_indexname)
-            Etag_Etype_list_indexname = mesh_group._v_name+'_ElTagsTypeList'
+            Etag_Etype_list_indexname = mesh_idname+'_ElTagsTypeList'
             Etag_Etype_list = self.get_node(Etag_Etype_list_indexname)
 
             for i in range(len(Etag_list)):
@@ -3863,6 +3983,8 @@ class SampleData:
         self._verbose_print('Creating Elements connectivity array in group {}'
                             ' in file {}'
                             ''.format(geo_group._v_pathname, self.h5_file))
+        # Get mesh group indexname
+        indexname_tmp = self.get_indexname_from_path(mesh_group._v_pathname)
         # Creating topology array
         data = np.empty((0,),dtype=np.int)
         for i in range(len(topology_attributes['element_type'])):
@@ -3882,7 +4004,7 @@ class SampleData:
                 data_tmp = np.concatenate((type_col, data_tmp),1)
             data = np.concatenate((data, data_tmp.ravel()))
         # Add data array to HDF5 data set in mesh geometry node
-        indexname = mesh_group._v_name+'_Elements'
+        indexname = indexname_tmp+'_Elements'
         Elems = self.add_data_array(location=geo_group._v_pathname,
                                     name='Elements', array=data,
                                     indexname=indexname)
@@ -3953,7 +4075,8 @@ class SampleData:
         elif mesh_type == '3DMesh':
             geometry_xdmf = etree.Element(_tag='Geometry', Type='XYZ')
         # Add geometry DataItem
-        nodes = self.get_node(mesh_group._v_name+'_Nodes', as_numpy=False)
+        mesh_indexname = self.get_indexname_from_path(mesh_group._v_pathname)
+        nodes = self.get_node(mesh_indexname+'_Nodes', as_numpy=False)
         Dim = self._np_to_xdmf_str(nodes.shape)
         geometry_data = etree.Element(_tag='DataItem', Format='HDF',
                                       Dimensions=Dim, NumberType='Float',
@@ -3972,7 +4095,8 @@ class SampleData:
         topology_xdmf = etree.Element(_tag='Topology', TopologyType=Topotype,
                                       NumberOfElements=NElements)
         # Create Topology DataItem
-        elems =  self.get_node(mesh_group._v_name+'_Elements', as_numpy=False)
+        indexname = self.get_indexname_from_path(mesh_group._v_pathname)
+        elems =  self.get_node(indexname+'_Elements', as_numpy=False)
         Dim = self._np_to_xdmf_str(elems.shape)
         topology_data = etree.Element(_tag='DataItem', Format='HDF',
                                       Dimensions=Dim, NumberType='Int',
@@ -3993,9 +4117,10 @@ class SampleData:
         index_path = os.path.join(grid._v_pathname,'Field_index')
         Field_index = self.get_node(index_path)
         if Field_index is None:
+            grid_indexname = self.get_indexname_from_path(grid._v_pathname)
             Field_index = self.add_string_array(
                 'Field_index', location=grid._v_pathname,
-                indexname=grid._v_name+'Field_index')
+                indexname=grid_indexname+'_Field_index')
         test_str = bytes(fieldname,'utf-8')
         if test_str not in Field_index:
             Field_index.append([fieldname])
@@ -4227,7 +4352,9 @@ class SampleData:
         size, unit = self.get_node_disk_size(nodename, print_flag=False)
         if short:
             s = ('  '*Node._v_depth)+' --'
-            s += f'NODE {Node._v_name}: {Node._v_pathname} ({size:9.3f} {unit})'
+            ntype = self.get_attribute('node_type', Node)
+            s += f'NODE {Node._v_name}: {Node._v_pathname}'
+            s += f' ({ntype}) ({size:9.3f} {unit})'
             return s+'\n'
         s = ''
         s += str('\n NODE: {}\n'.format(Node._v_pathname))
@@ -4268,6 +4395,17 @@ class SampleData:
                 Filters.least_significant_digit = compression_opts[option]
         return Filters
 
+    def _get_compression_opt_from_filter(self, Filters):
+        """Get inputed compression settings as `tables.Filters` instance."""
+        c_opts = {}
+        c_opts['complib'] = Filters.complib
+        c_opts['complevel'] = Filters.complevel
+        c_opts['shuffle'] = Filters.shuffle
+        c_opts['bitshuffle'] = Filters.bitshuffle
+        c_opts['least_significant_digit'] = Filters.least_significant_digit
+        c_opts['bitshuffle'] = Filters.bitshuffle
+        return c_opts
+
     @staticmethod
     def _data_normalization(array, normalization):
         """Apply normalization to data array to improve compression ratios"""
@@ -4301,12 +4439,8 @@ class SampleData:
     def _read_mesh_from_file(self, file=''):
         """Read a data array from a file, depending on the extension."""
         mesh_object = None
-        # Get file extension
-        _, tail = os.path.splitext(file)
-        # HDF5 files
-        if tail == '.geof':
-            import BasicTools.IO.GeofReader as GR
-            mesh_object = GR.ReadGeof(file)
+        from BasicTools.IO.UniversalReader import ReadMesh
+        mesh_object = ReadMesh(file)
         return mesh_object
 
     def _verbose_print(self, message, line_break=True):

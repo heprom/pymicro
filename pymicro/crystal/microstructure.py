@@ -3899,8 +3899,9 @@ class Microstructure(SampleData):
         print('creating microstructure from Neper tesselation %s' % neper_file)
         name, ext = os.path.splitext(neper_file)
         print(name, ext)
+        filename = os.path.join(neper_dir, name)
         assert ext == '.tesr'  # assuming raster tesselation
-        micro = Microstructure(name=name, file_path=neper_dir, overwrite_hdf5=True)
+        micro = Microstructure(name=name, filename=filename, overwrite_hdf5=True)
         with open(neper_file_path, 'r', encoding='latin-1') as f:
             line = f.readline()  # ***tesr
             # look for **general
@@ -4087,7 +4088,8 @@ class Microstructure(SampleData):
             data_dir = data_dir[:-1]
         scan = data_dir.split(os.sep)[-1]
         print('creating microstructure for DCT scan %s' % scan)
-        micro = Microstructure(name=scan, path=data_dir, overwrite_hdf5=True)
+        filename = os.path.join(data_dir,scan)
+        micro = Microstructure(filename=filename, overwrite_hdf5=True)
         micro.data_dir = data_dir
         if use_dct_path:
             index_path = os.path.join(data_dir, '4_grains', 'phase_01',

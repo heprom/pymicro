@@ -48,6 +48,11 @@ class SampleDataTests(unittest.TestCase):
     def setUp(self):
         print('testing the SampleData class')
         # Create data to store into SampleData instances
+        # dataset sample_name and description
+        self.sample_name = 'test_sample'
+        self.sample_description = """
+        This is a test dataset created by the SampleData class unit tests.
+        """
         # Create a mesh of an octahedron with 6 triangles
         self.mesh_nodes = np.array([[-1.,-1., 0.],
                                      [-1., 1., 0.],
@@ -66,6 +71,9 @@ class SampleDataTests(unittest.TestCase):
         # Create 2 fields 'shape functions' for the 2 nodes at z=+/-1
         self.mesh_shape_f1 = np.array([0., 0., 0., 0., 1., 0.])
         self.mesh_shape_f2 = np.array([0., 0., 0., 0., 0., 1.])
+        # Create 2 element wise fields
+        self.mesh_el_Id = np.array([0., 1., 2., 3., 4., 5., 6., 7.])
+        self.mesh_alternated = np.array([1., 1., -1., -1., 1., 1., -1., -1.])
         # Create a binary 3D Image
         self.image = np.zeros((10,10,10),dtype='int16')
         self.image[:,:,:5] = 1
@@ -83,16 +91,29 @@ class SampleDataTests(unittest.TestCase):
     def test_create_sample(self):
         """Test creation of a SampleData instance/file and  data storage."""
         sample = SampleData(filename=self.filename,
-                            sample_name='validation_test_sample',
-                            overwrite_hdf5=True, verbose=False)
+                            overwrite_hdf5=True, verbose=False,
+                            sample_name=self.sample_name,
+                            sample_description=self.sample_description)
         self.assertTrue(os.path.exists(self.filename+'.h5'))
         self.assertTrue(os.path.exists(self.filename+'.xdmf'))
+        self.assertEqual(sample.get_sample_name(), self.sample_name)
+        self.assertEqual(sample.get_description(), self.sample_description)
         # Add mesh data into SampleData dataset
         mesh = UMCT.CreateMeshOfTriangles(self.mesh_nodes, self.mesh_elements)
+        # Add mesh node tags
+        mesh.nodesTags.CreateTag('Z0_plane', False).SetIds([0,1,2,3])
+        mesh.nodesTags.CreateTag('out_of_plane', False).SetIds([4,5])
+        # Add element tags
+        mesh.GetElementsOfType('tri3').GetTag('Top').SetIds([0,2,4,6])
+        mesh.GetElementsOfType('tri3').GetTag('Bottom').SetIds([1,3,5,7])
+        # Add mesh node fields
         mesh.nodeFields['Test_field1'] = self.mesh_shape_f1
         mesh.nodeFields['Test_field2'] = self.mesh_shape_f2
+        # Add mesh element fields
+        mesh.elemFields['Test_field3'] = self.mesh_el_Id
+        mesh.elemFields['Test_field4'] = self.mesh_alternated
         sample.add_mesh(mesh, meshname='test_mesh',indexname='mesh',
-                        location='/', extended_data=False)
+                        location='/', bin_fields_from_sets=True)
         # Add image data into SampleData dataset
         image = ConstantRectilinearMesh(dim=len(self.image.shape))
         image.SetDimensions(self.image.shape)
@@ -117,11 +138,14 @@ class SampleDataTests(unittest.TestCase):
         mesh_elements = mesh_elements.reshape(self.mesh_elements.shape)
         self.assertTrue(np.all(mesh_elements==self.mesh_elements))
         # test mesh field recovery
-        shape_f1 = sample.get_node('Test_field1', as_numpy=True)
+        shape_f1 = sample.get_field('Test_field1')
         self.assertTrue(np.all(shape_f1==self.mesh_shape_f1))
-        # test image field recovery
-        image_field = sample.get_node('test_image_field', as_numpy=True)
+        # test image field recovery and dictionary like access
+        image_field = sample['test_image_field']
         self.assertTrue(np.all(image_field==self.image))
+        # test data array recovery and attribute like access
+        array = sample.test_array
+        self.assertTrue(np.all(array==self.data_array))
         # test sampledata instance and file autodelete function
         sample.autodelete = True
         del sample
@@ -144,8 +168,9 @@ class SampleDataTests(unittest.TestCase):
         data_array = sample.get_node('test_array')
         self.assertTrue(np.all(self.data_array==data_array))
         # compress image data
-        sample.set_chunkshape_and_compression(node='test_image_field',
-                                              complib='zlib',complevel=1)
+        c_opt = {'complib':'zlib', 'complevel':1}
+        sample.set_chunkshape_and_compression(nodename='test_image_field',
+                                              compression_options=c_opt)
         # assert that node size is smaller after compression
         new_size, _ = sample.get_node_disk_size('test_image_field',
                                                   print_flag=False,
@@ -197,7 +222,7 @@ class SampleDataTests(unittest.TestCase):
         derived_sample = Test_DerivedClass(filename=self.derived_filename,
                                            autodelete=True,
                                            overwrite_hdf5=False, verbose=True)
-        derived_sample.get_node_info('GrainDataTable')
+        derived_sample.print_node_info('GrainDataTable')
         tab = derived_sample.get_node('GrainDataTable')
         self.assertTrue('name' in tab.colnames)
         self.assertTrue('floats' in tab.colnames)
@@ -212,7 +237,7 @@ class SampleDataTests(unittest.TestCase):
         # get into a SampleData instance
         sample = SampleData(filename='square', verbose=False, autodelete=True)
         sample.add_mesh(mesh_object=myMesh, meshname='BT_mesh',indexname='BTM',
-                        replace=True, extended_data=True)
+                        replace=True, bin_fields_from_sets=False)
         # get mesh object from SampleData file/instance
         myMesh2 = sample.get_mesh('BTM')
         # delete SampleData object and test values
@@ -234,6 +259,25 @@ class SampleDataTests(unittest.TestCase):
         elements_in_tag2 = myMesh2.GetElementsInTag('2D')
         self.assertTrue(np.all(elements_in_tag == elements_in_tag2))
         del sample
+
+    def test_meshfile_formats(self):
+        # TODO: add more mesh formats to load in this test
+        from config import PYMICRO_EXAMPLES_DATA_DIR
+        sample = SampleData(filename='tmp_meshfiles_dataset',
+                          overwrite_hdf5=True, autodelete=True)
+        meshfile_name = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,
+                                     'cube_ref.geof')
+        sample.add_mesh(file=meshfile_name, meshname='geof_mesh',
+                        indexname='mesh', bin_fields_from_sets=True)
+        # check the number of elements of the mesh
+        n_elems = sample.get_attribute('Number_of_elements', 'mesh')
+        self.assertTrue(np.all(n_elems == [384, 384]))
+        # check the element types in the mesh
+        el_type = sample.get_attribute('element_type', 'mesh')
+        self.assertEqual(el_type[0], 'tet4')
+        self.assertEqual(el_type[1], 'tri3')
+        del sample
+
 
     def test_mesh_from_image(self):
         """Test BasicTools to SDimage to SDmesh."""
@@ -262,8 +306,9 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(sample.__contains__('Tmsh'))
         field1 = sample.get_node('test_field', as_numpy=True)
         self.assertEqual(field1.shape,(11,11,11))
-        field2 = sample.get_node('test_field_Tetra_mesh', as_numpy=True)
-        self.assertEqual(field2.shape,(11*11*11,1))
+        field2 = sample.get_node('Tmsh_Im3D_test_field_Tetra_mesh',
+                                 as_numpy=True)
+        self.assertEqual(field2.shape,(11*11*11,))
         self.assertEqual(field1.ravel()[37], field2.ravel()[37])
         del sample
 

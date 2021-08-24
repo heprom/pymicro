@@ -8,8 +8,10 @@ with open('README.rst', 'r') as f:
 
 try:
     from distutils.command.build_py import build_py2to3 as build_py
+    from distutils.command.build import build
 except ImportError:
     from distutils.command.build_py import build_py
+    from distutils.command.build import build 
 
 ## Load requirements.txt and format for setuptools.setup
 requirements = []
@@ -33,6 +35,9 @@ with open( os.path.join(here, "requirements.txt")) as fid:
 os.environ["BASICTOOLS_DISABLE_MKL"] = "1"
 os.environ["BASICTOOLS_DISABLE_OPENMP"] = "1"
 
+
+all_packages = setuptools.find_packages(".", exclude=("examples","examples.*")) + ["pymicro." + x for x in setuptools.find_packages(".", exclude=("pymicro", "pymicro.*"))]
+
 setuptools.setup(
     name="pymicro",
     version=pymicro.__version__,
@@ -42,8 +47,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
     url="https://github.com/heprom/pymicro",
-    include_package_data=True,
-    packages=setuptools.find_packages(),
+    packages=all_packages,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
@@ -53,6 +57,10 @@ setuptools.setup(
     python_requires='>=3.5',
     install_requires=requirements,
     dependency_links=dependency_links,
+    include_package_data=False,
+    package_dir={'pymicro.examples': 'examples'},
+    package_data = {'': ['*.png', '*.gif'],
+    'pymicro.examples': ['data/*']},
     license="MIT license",
-    cmdclass={'build_py':build_py}
+    cmdclass={'build':build}
 )

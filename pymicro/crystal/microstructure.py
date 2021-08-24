@@ -1601,7 +1601,7 @@ class Microstructure(SampleData):
             #print(d)
             phase = CrystallinePhase.from_dict(d)
             self._phases.append(phase)
-        print('%d phases found in the data set' % len(self._phases))
+        #print('%d phases found in the data set' % len(self._phases))
 
     def set_phase(self, phase):
         """Set a phase for the given `phase_id`.
@@ -4220,12 +4220,16 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None):
+    def from_ebsd(file_path, roi=None, tol=5., min_ci=0.2):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
         :param list roi: a list of 4 integers in the form [x1, x2, y1, y2]
         to crop the EBSD scan.
+        :param float tol: the misorientation angle tolerance to segment
+            the grains (default is 5 degrees).
+        :param float min_ci: minimum confidence index for a pixel to be a valid
+            EBSD measurement.
         :return: a new instance of `Microstructure`.
         """
         # Get name of file and create microstructure instance
@@ -4249,7 +4253,7 @@ class Microstructure(SampleData):
         euler = scan.euler
         mask = np.ones_like(iq)
         # segment the grains
-        grain_ids = scan.segment_grains()
+        grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
         voxel_size = np.array([scan.xStep, scan.yStep])
         micro.set_grain_map(grain_ids, voxel_size)
 
@@ -4270,8 +4274,8 @@ class Microstructure(SampleData):
             if gid == 0:
                 continue
             progress = 100 * (1 + grain_ids_list.index(gid)) / len(grain_ids_list)
-            print('addding grains: {0:.2f} %'.format(progress))#, end='\r')
-            print('adding grain %d' % gid)
+            print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
+                progress, gid), end='\r')
             # use the first pixel of the grain
             idx = np.where(grain_ids == gid)[0][0]
             idy = np.where(grain_ids == gid)[1][0]
@@ -4284,7 +4288,6 @@ class Microstructure(SampleData):
             local_euler = np.degrees(micro.get_node('euler')[idy, idx,:])
             o_tsl = Orientation.from_euler(local_euler)
             # TODO link OimScan lattice to pymicro
-            # o_fz = o_tsl.move_to_FZ(symmetry=Ti7Al._symmetry)
             grains['idnumber'] = gid
             grains['orientation'] = o_tsl.rod
             grains.append()

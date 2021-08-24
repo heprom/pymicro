@@ -76,6 +76,20 @@ class OimScan:
                              'convert your scan')
         return scan
 
+    @staticmethod(file_path):
+    def read_osc(file_path):
+    """Read a scan in binary OSC format.
+
+    Code inspired from the MTEX project.
+
+    :raise ValueError: if the grid type in not square.
+    :param str file_path: the path to the osc file to read.
+    :return: a new instance of OimScan populated with the data from the file.
+    """
+    scan = OimScan((0, 0))
+    with open(file_path, 'r') as f:
+        return scan
+
     @staticmethod
     def read_ang(file_path):
         """Read a scan in ang ascii format.
@@ -283,7 +297,7 @@ class OimScan:
             progress = 100 * (i + 1) / self.rows
             print('computing IPF maps: {0:.2f} %'.format(progress), end='\r')
 
-    def segment_grains(self, tol=5.):
+    def segment_grains(self, tol=5., min_ci=0.2):
         """Segment the grains based on the euler angle maps.
 
         The segmentation is carried out using a region growing algorithm based
@@ -298,16 +312,21 @@ class OimScan:
         neighbors added to the list of candidates. When no more candidates are
         present, the next pixel is evaluated and a new grain is created.
 
-        :param tol: misorientation tolerance in degrees
+        :param float tol: misorientation tolerance in degrees.
+        :param float min_ci: minimum confidence index for a pixel to be a valid
+            EBSD measurement.
         :return: a numpy array of the grain labels.
         """
         # segment the grains
+        print('grain segmentation for EBSD scan, misorientation tolerance={:.1f}, '
+              'minimum confidence index={:.1f}'.format(tol, min_ci))
         grain_ids = np.zeros_like(self.iq, dtype='int')
         grain_ids += -1  # mark all pixels as non assigned
         # start by assigning bad pixel to grain 0
-        grain_ids[self.ci <= 0.2] = 0
+        grain_ids[self.ci <= min_ci] = 0
 
         n_grains = 0
+        progress = 0
         for j in range(self.rows):
             for i in range(self.cols):
                 if grain_ids[i, j] >= 0:

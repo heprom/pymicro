@@ -24,10 +24,10 @@ def list_examples() -> List[str]:
     return all_example
 
 def run_example( name: str) -> None:
-    """[summary]
+    """Run an example.
 
     Args:
-        name (str): [description]
+        name (str): Name of the example to run
     """
 
     if not name in list_examples():

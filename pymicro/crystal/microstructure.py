@@ -978,6 +978,9 @@ class Orientation:
         q2 = np.sin(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
         q3 = np.sin(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
         q = Quaternion(np.array([q0, -P * q1, -P * q2, -P * q3]), convention=P)
+        if q0 < 0:
+            # the scalar part must be positive
+            q.quat = q.quat * -1
         return q
 
     @staticmethod

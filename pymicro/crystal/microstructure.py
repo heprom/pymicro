@@ -978,6 +978,9 @@ class Orientation:
         q2 = np.sin(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
         q3 = np.sin(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
         q = Quaternion(np.array([q0, -P * q1, -P * q2, -P * q3]), convention=P)
+        if q0 < 0:
+            # the scalar part must be positive
+            q.quat = q.quat * -1
         return q
 
     @staticmethod
@@ -1601,7 +1604,7 @@ class Microstructure(SampleData):
             #print(d)
             phase = CrystallinePhase.from_dict(d)
             self._phases.append(phase)
-        print('%d phases found in the data set' % len(self._phases))
+        #print('%d phases found in the data set' % len(self._phases))
 
     def set_phase(self, phase):
         """Set a phase for the given `phase_id`.
@@ -3417,10 +3420,10 @@ class Microstructure(SampleData):
         # TODO finish this...
         return grain_map
 
-    def to_amitex_fftp(self, binary=True, mat_file=True, add_grips=False,
-                       grip_size=10, grip_constants=(104100., 49440.),
-                       add_exterior=False, exterior_size=10,
-                       use_mask=False):
+    def to_amitex_fftp(self, binary=True, mat_file=True, elasaniso_path='',
+                       add_grips=False, grip_size=10,
+                       grip_constants=(104100., 49440.), add_exterior=False,
+                       exterior_size=10, use_mask=False):
         """Write orientation data to ascii files to prepare for FFT computation.
 
         AMITEX_FFTP can be used to compute the elastoplastic response of
@@ -3437,7 +3440,9 @@ class Microstructure(SampleData):
         The second region is around the sample (first and second axes).
 
         :param bool binary: flag to write the files in binary or ascii format.
-        :param bool mat_file: flag to write the materila file for Amitex.
+        :param bool mat_file: flag to write the material file for Amitex.
+        :param str elasaniso_path: path for the libUmatAmitex.so in
+            the Amitex_FFTP installation.
         :param bool add_grips: add a constant region at the beginning and the
             end of the third axis.
         :param int grip_size: thickness of the region.
@@ -3518,13 +3523,11 @@ class Microstructure(SampleData):
                                  '1 to n_phases): {}'.format(phase_ids))
             for phase_id in phase_ids:
                 mat = etree.Element('Material', numM=str(phase_id),
-                                    Lib='libUmatAmitex.so',
+                                    Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
                                     Law='elasaniso')
                 # get the C_IJ values
                 phase = self.get_phase(phase_id)
                 C = phase.get_symmetry().stiffness_matrix(phase.elastic_constants)
-                #C11, C12, C13, C22, C23, C33, C44, C55, C66 = 162000., 92000., 69000., 162000., 69000., 180000., \
-                #                                              46700., 46700., 35000.
                 '''
                 Note that Amitex uses a different reduced number:
                 (1, 2, 3, 4, 5, 6) = (11, 22, 33, 12, 13, 23)
@@ -3539,11 +3542,19 @@ class Microstructure(SampleData):
                 mat.append(etree.Element(_tag='Coeff', Index='7', Type='Constant', Value=str(C[5, 5])))  # C66
                 mat.append(etree.Element(_tag='Coeff', Index='8', Type='Constant', Value=str(C[4, 4])))  # C55
                 mat.append(etree.Element(_tag='Coeff', Index='9', Type='Constant', Value=str(C[3, 3])))  # C44
+                fmt = "binary" if binary else "ascii"
+                mat.append(etree.Element(_tag='Coeff', Index="10", Type="Constant_Zone", File="N1X.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="11", Type="Constant_Zone", File="N1Y.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="12", Type="Constant_Zone", File="N1Z.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="13", Type="Constant_Zone", File="N2X.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="14", Type="Constant_Zone", File="N2Y.bin", Format=fmt))
+                mat.append(etree.Element(_tag='Coeff', Index="15", Type="Constant_Zone", File="N2Z.bin", Format=fmt))
+
                 root.append(mat)
             # add a material for top and bottom layers
             if add_grips:
                 grips = etree.Element('Material', numM=str(grip_id + 1),
-                                      Lib='libUmatAmitex.so',
+                                      Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
                                       Law='elasiso')
                 grips.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(grip_constants[0])))
                 grips.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(grip_constants[1])))
@@ -3551,7 +3562,7 @@ class Microstructure(SampleData):
             # add a material for external buffer
             if add_exterior or use_mask:
                 exterior = etree.Element('Material', numM=str(ext_id + 1),
-                                         Lib='libUmatAmitex.so',
+                                         Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
                                          Law='elasiso')
                 exterior.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value='0.'))
                 exterior.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value='0.'))
@@ -4212,12 +4223,16 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None):
+    def from_ebsd(file_path, roi=None, tol=5., min_ci=0.2):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
         :param list roi: a list of 4 integers in the form [x1, x2, y1, y2]
         to crop the EBSD scan.
+        :param float tol: the misorientation angle tolerance to segment
+            the grains (default is 5 degrees).
+        :param float min_ci: minimum confidence index for a pixel to be a valid
+            EBSD measurement.
         :return: a new instance of `Microstructure`.
         """
         # Get name of file and create microstructure instance
@@ -4241,7 +4256,7 @@ class Microstructure(SampleData):
         euler = scan.euler
         mask = np.ones_like(iq)
         # segment the grains
-        grain_ids = scan.segment_grains()
+        grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
         voxel_size = np.array([scan.xStep, scan.yStep])
         micro.set_grain_map(grain_ids, voxel_size)
 
@@ -4262,8 +4277,8 @@ class Microstructure(SampleData):
             if gid == 0:
                 continue
             progress = 100 * (1 + grain_ids_list.index(gid)) / len(grain_ids_list)
-            print('addding grains: {0:.2f} %'.format(progress))#, end='\r')
-            print('adding grain %d' % gid)
+            print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
+                progress, gid), end='\r')
             # use the first pixel of the grain
             idx = np.where(grain_ids == gid)[0][0]
             idy = np.where(grain_ids == gid)[1][0]
@@ -4276,7 +4291,6 @@ class Microstructure(SampleData):
             local_euler = np.degrees(micro.get_node('euler')[idy, idx,:])
             o_tsl = Orientation.from_euler(local_euler)
             # TODO link OimScan lattice to pymicro
-            # o_fz = o_tsl.move_to_FZ(symmetry=Ti7Al._symmetry)
             grains['idnumber'] = gid
             grains['orientation'] = o_tsl.rod
             grains.append()

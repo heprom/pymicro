@@ -507,6 +507,7 @@ class SampleData:
             N = self.get_node(name)
             s += 'Compression options for node `{}`:\n\t'.format(name)
             s += repr(N.filters).strip('Filters(').strip(')')
+            s += f'\n --- Chunkshape: {N.chunkshape}'
         else:
             s += '{} is not a data array node'.format(name)
         if not as_string:
@@ -2714,6 +2715,7 @@ class SampleData:
                 visu_type = 'None'
             new_array = self.add_field(
                 gridname=parent_grid, fieldname=nodename, array=array,
+                indexname=node_indexname,
                 chunkshape=node_chunkshape, replace=True,
                 visualisation_type=visu_type,
                 compression_options=compression_options)
@@ -2734,6 +2736,30 @@ class SampleData:
     def set_verbosity(self, verbosity=True):
         """Set the verbosity of the instance methods to inputed boolean."""
         self._verbose = verbosity
+        return
+
+    def remove_attribute(self, attrname, nodename):
+        """Remove an attribute from a node in the dataset.
+
+        :param str attrname: name of the attribute to remove
+        :type attrname: str
+        :param nodename: Name, Path or Index name of the node to modify
+        :type nodename: str
+        """
+        node = self.get_node(nodename, as_numpy=False)
+        node._v_attrs.__delitem__(attrname)
+        return
+
+    def remove_attributes(self, attr_list, nodename):
+        """Remove an attribute from a node in the dataset.
+
+        :param str attr_list: list of the names of the attribute to remove
+        :type attr_list: list
+        :param nodename: Name, Path or Index name of the node to modify
+        :type nodename: str
+        """
+        for attr in attr_list:
+            self.remove_attribute(attr, nodename)
         return
 
     def rename_node(self, nodename, newname, replace=False,

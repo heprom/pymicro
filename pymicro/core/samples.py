@@ -1619,7 +1619,7 @@ class SampleData:
             a_str = bytes(string,'utf-8')
             Sarray.append([a_str])
         if len(Sarray) > 0 and self.get_attribute('empty', name):
-            self.add_attributes({'empty':True}, name)
+            self.add_attributes({'empty':False}, name)
         return
 
     def append_table(self, name, data):

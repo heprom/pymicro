@@ -244,8 +244,13 @@ class SampleDataTests(unittest.TestCase):
         tab = derived_sample.get_node('GrainDataTable')
         self.assertTrue('name' in tab.colnames)
         self.assertTrue('floats' in tab.colnames)
-        # append other table with numpy array
+        # append other table with numpy array and verify it is no more empty
         derived_sample.append_table('lattice_props', self.struct_array1)
+        self.assertFalse(derived_sample._is_empty('lattice_props'))
+        # append string array and verify that it is not empty
+        derived_sample.append_string_array('grain_names',
+                                           ['grain_1','grain_2', 'grain_3'])
+        self.assertFalse(derived_sample.get_attribute('empty', 'grain_names'))
         del derived_sample
         # reopen file and check that neqw columns have been added
         derived_sample = Test_DerivedClass(
@@ -255,6 +260,9 @@ class SampleDataTests(unittest.TestCase):
         tab = derived_sample.get_node('GrainDataTable')
         self.assertTrue('name' in tab.colnames)
         self.assertTrue('floats' in tab.colnames)
+        # check other table values
+        props = derived_sample['lattice_props']
+        self.assertTrue(np.all(props == self.struct_array1))
         del derived_sample
         self.assertTrue(not os.path.exists(self.derived_filename+'.h5'))
         self.assertTrue(not os.path.exists(self.derived_filename+'.xdmf'))

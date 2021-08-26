@@ -46,6 +46,12 @@ class OimScan:
         self.phase_list = []
         self.init_arrays()
 
+    def __repr__(self):
+        """Provide a string representation of the class."""
+        s = 'EBSD scan of size %d x %d' % (self.cols, self.rows)
+        s += '\nspatial resolution: xStep=%.1f, yStep=%.1f' % (self.xStep, self.yStep)
+        return s
+
     def init_arrays(self):
         """Memory allocation for all necessary arrays."""
         self.euler = np.zeros((self.cols, self.rows, 3))
@@ -69,25 +75,65 @@ class OimScan:
         print(base_name, ext)
         if ext in ['.h5', '.hdf5']:
             scan = OimScan.read_h5(file_path)
+        elif ext == '.osc':
+            scan = OimScan.read_osc(file_path)
         elif ext == '.ang':
             scan = OimScan.read_ang(file_path)
         else:
-            raise ValueError('only HDF5 or ANG formats are supported, please '
-                             'convert your scan')
+            raise ValueError('only HDF5, OSC or ANG formats are supported, '
+                             'please convert your scan')
         return scan
 
-    @staticmethod(file_path):
+    @staticmethod
     def read_osc(file_path):
-    """Read a scan in binary OSC format.
+        """Read a scan in binary OSC format.
 
-    Code inspired from the MTEX project.
+        Code inspired from the MTEX project loadEBSD_osc.m function.
 
-    :raise ValueError: if the grid type in not square.
-    :param str file_path: the path to the osc file to read.
-    :return: a new instance of OimScan populated with the data from the file.
-    """
-    scan = OimScan((0, 0))
-    with open(file_path, 'r') as f:
+        :param str file_path: the path to the osc file to read.
+        :param tuple size: the size of the ebsd scan in form (cols, rows).
+        :return: a new instance of OimScan populated with the data from the file.
+        """
+        scan = OimScan((0, 0))
+        # the data section is preceded by this pattern
+        start_hex = ['B9', '0B', 'EF', 'FF', '02', '00', '00', '00']
+        start_bytes = np.array([int(byte, 16) for byte in start_hex])
+        with open(file_path, 'r') as f:
+            print('reading EBSD scan from file %s' % file_path)
+            header = np.fromfile(f, dtype=np.uint32, count=8)
+            n = header[6]
+            print('%d data points in EBSD scan' % n)
+            f.seek(0)
+            buffer = np.fromfile(f, dtype=np.uint8, count=2**20)
+            # search for the start pattern
+            start = np.where(np.correlate(buffer, start_bytes, mode='valid')
+                             == np.dot(start_bytes, start_bytes))[0][0]
+            print('start sequence located at byte %d' % start)
+            f.seek(start + 8)
+            # data count
+            data_count = np.fromfile(f, dtype=np.uint32, count=1)[0]
+            if round(((data_count / 4 - 2) / 10) / n) != 1:
+                f.seek(start + 8)
+            # the next 8 bytes are float values for xStep and yStep
+            scan.xStep = np.fromfile(f, dtype=np.float32, count=1)[0]
+            scan.yStep = np.fromfile(f, dtype=np.float32, count=1)[0]
+            print('spatial resolution: xStep=%.1f, yStep=%.1f' % (scan.xStep, scan.yStep))
+            # now read the payload which contains 10 fields for the n measurements
+            data = np.fromfile(f, count=n*10, dtype=np.float32)
+            data = np.reshape(data, (n, 10))
+            scan.cols = int(max(data[:, 3]) / scan.xStep + 1)
+            scan.rows = int(max(data[:, 4]) / scan.yStep + 1)
+            print('size of scan is %d x %d' % (scan.cols, scan.rows))
+            assert n == scan.cols * scan.rows
+            scan.init_arrays()
+            scan.euler[:, :, 0] = np.reshape(data[:, 0], (scan.rows, scan.cols)).T
+            scan.euler[:, :, 1] = np.reshape(data[:, 1], (scan.rows, scan.cols)).T
+            scan.euler[:, :, 2] = np.reshape(data[:, 2], (scan.rows, scan.cols)).T
+            scan.x = np.reshape(data[:, 3], (scan.rows, scan.cols)).T
+            scan.y = np.reshape(data[:, 4], (scan.rows, scan.cols)).T
+            scan.iq = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
+            scan.ci = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
+            scan.phase = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
         return scan
 
     @staticmethod

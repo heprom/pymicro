@@ -1567,9 +1567,9 @@ class Microstructure(SampleData):
                                                         'GrainDataTable'),
                                      'Phase_data': '/PhaseData'}
         minimal_content_type_dic = {'Image_data': '3DImage',
-                                    'grain_map': 'Array',
-                                    'phase_map': 'Array',
-                                    'mask': 'Array',
+                                    'grain_map': 'field_array',
+                                    'phase_map': 'field_array',
+                                    'mask': 'field_array',
                                     'Mesh_data': 'Mesh',
                                     'Grain_data': 'Group',
                                     'GrainDataTable': GrainData,

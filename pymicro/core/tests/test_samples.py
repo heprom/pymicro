@@ -263,6 +263,11 @@ class SampleDataTests(unittest.TestCase):
         # check other table values
         props = derived_sample['lattice_props']
         self.assertTrue(np.all(props == self.struct_array1))
+        # check string array values
+        name1 = derived_sample['grain_names'][0].decode('utf-8')
+        name2 = derived_sample['grain_names'][1].decode('utf-8')
+        self.assertEqual(name1,'grain_1')
+        self.assertEqual(name2, 'grain_2')
         del derived_sample
         self.assertTrue(not os.path.exists(self.derived_filename+'.h5'))
         self.assertTrue(not os.path.exists(self.derived_filename+'.xdmf'))

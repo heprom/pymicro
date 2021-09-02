@@ -21,7 +21,7 @@ MOCK_MODULES = ['numpy', 'scipy', 'scipy.special', 'matplotlib',
                 'matplotlib.backends.backend_qt4agg', 'scipy.ndimage', 'wx',
                 'wx.Panel', 'vtk', 'vtk.util', 'vtk.util.colors', 'skimage',
                 'skimage.transform', '_tifffile', 'h5py', 'tables',
-                'lxml', 'lxml.builder', 'BasicTools', 
+                'lxml', 'lxml.builder', 'BasicTools',
                 'BasicTools.Containers',
                 'BasicTools.Containers.ConstantRectilinearMesh',
                 'BasicTools.Containers.UnstructuredMesh',
@@ -95,6 +95,10 @@ master_doc = 'index'
 project = u'pymicro'
 copyright = u'2013-2020, Henry Proudhon'
 
+nbsphinx_execute_arguments = [
+    "--InlineBackend.figure_formats={'svg', 'pdf'}",
+    "--InlineBackend.rc={'figure.dpi': 96}",
+]
 
 # The project version is extracted from the main __init__.py
 def extract_version():

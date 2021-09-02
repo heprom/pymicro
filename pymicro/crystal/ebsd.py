@@ -358,6 +358,11 @@ class OimScan:
         neighbors added to the list of candidates. When no more candidates are
         present, the next pixel is evaluated and a new grain is created.
 
+        .. warning::
+
+          This function does not account yet for multiple phases. Grains should
+          be created separately for each crystallographic phase.
+
         :param float tol: misorientation tolerance in degrees.
         :param float min_ci: minimum confidence index for a pixel to be a valid
             EBSD measurement.
@@ -385,6 +390,7 @@ class OimScan:
                 # apply region growing based on the angle misorientation (strong connectivity)
                 while len(candidates) > 0:
                     pixel = candidates.pop()
+                    sym = self.phase_list[self.phase[pixel]].get_symmetry()
                     # print('* pixel is {}, euler: {}'.format(pixel, np.degrees(euler[pixel])))
                     # get orientation of this pixel
                     o = Orientation.from_euler(np.degrees(self.euler[pixel]))
@@ -403,7 +409,7 @@ class OimScan:
                     for neighbor in neighbor_list:
                         # check misorientation
                         o_neighbor = Orientation.from_euler(np.degrees(self.euler[neighbor]))
-                        mis, _, _ = o.disorientation(o_neighbor, crystal_structure=Symmetry.hexagonal)
+                        mis, _, _ = o.disorientation(o_neighbor, crystal_structure=sym)
                         if mis * 180 / np.pi < tol:
                             # add to this grain
                             grain_ids[neighbor] = n_grains

@@ -1482,7 +1482,7 @@ class GrainData(tables.IsDescription):
     volume = tables.Float32Col()  # float
     # grain center of mass coordinates
     center = tables.Float32Col(shape=(3,))  # float  (double-precision)
-    # Rodriguez vector defining grain orientation
+    # Rodrigues vector defining grain orientation
     orientation = tables.Float32Col(shape=(3,))  # float  (double-precision)
     # Grain Bounding box
     bounding_box = tables.Int32Col(shape=(3, 2))  # Signed 64-bit integer
@@ -1510,13 +1510,14 @@ class Microstructure(SampleData):
     def __init__(self,
                  filename=None, name='micro', description='empty',
                  verbose=False, overwrite_hdf5=False, phase=None,
-                 autodelete=False, **keywords):
+                 autodelete=False):
         if filename is None:
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
 
         SampleData.__init__(self, filename, name, description, verbose,
-                            overwrite_hdf5, autodelete, **keywords)
+                            overwrite_hdf5, autodelete)
+        # TODO: move into after_file_open
         if not (self._file_exist):
             self.set_active_grain_map()
             self.set_sample_name(name)
@@ -1533,6 +1534,10 @@ class Microstructure(SampleData):
     def _after_file_open(self):
         """Initialization code to run after opening a Sample Data file."""
         self.grains = self.get_node('GrainDataTable')
+        # TODO: add here to active grain map
+        # TODO: adapt methods pause and repack to use init_file_obj
+        # and _after_file_open
+        # TODO: adapt documentation
         return
 
     def __repr__(self):
@@ -1978,13 +1983,14 @@ class Microstructure(SampleData):
         return
 
     def set_grain_map(self, grain_map, voxel_size=None,
-                      map_name='grain_map', **keywords):
+                      map_name='grain_map'):
         """Set the grain map for this microstructure.
 
         :param ndarray grain_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
+        # TODO: ad compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2006,24 +2012,25 @@ class Microstructure(SampleData):
                                       fieldname=map_name,
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True, **keywords)
+                                      replace=True)
         else:
             # Handle case of a 2D Microstrucutre: squeeze grain map to
             # ensure (Nx,Ny,1) array will be stored as (Nx,Ny)
             if self._get_group_type('CellData')  == '2DImage':
                 grain_map = grain_map.squeeze()
             self.add_field(gridname='CellData', fieldname=map_name,
-                           array=grain_map, replace=True, **keywords)
+                           array=grain_map, replace=True)
         self.set_active_grain_map(map_name)
         return
 
-    def set_phase_map(self, phase_map, voxel_size=None, **keywords):
+    def set_phase_map(self, phase_map, voxel_size=None):
         """Set the phase map for this microstructure.
 
         :param ndarray phase_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
+        # TODO: add compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2044,18 +2051,19 @@ class Microstructure(SampleData):
             self.add_image_from_field(phase_map, 'phase_map',
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True, **keywords)
+                                      replace=True)
         else:
             self.add_field(gridname='CellData', fieldname='phase_map',
-                           array=phase_map, replace=True, **keywords)
+                           array=phase_map, replace=True)
 
-    def set_mask(self, mask, voxel_size=None, **keywords):
+    def set_mask(self, mask, voxel_size=None):
         """Set the mask for this microstructure.
 
         :param ndarray mask: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
+        # TODO: add compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2076,10 +2084,10 @@ class Microstructure(SampleData):
             self.add_image_from_field(mask, 'mask',
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True, **keywords)
+                                      replace=True)
         else:
             self.add_field(gridname='CellData', fieldname='mask',
-                           array=mask, replace=True, **keywords)
+                           array=mask, replace=True)
         return
 
     def set_random_orientations(self):
@@ -2920,7 +2928,7 @@ class Microstructure(SampleData):
         Mesher = SDImageMesher(data=self)
         Mesher.multi_phase_mesher(
             multiphase_image_name=self.active_grain_map,
-            meshname='grains_mesh', location='/MeshData', replace=True,
+            meshname='MeshData', location='/', replace=True,
             bin_fields_from_sets=False, mesher_opts=mesher_opts,
             elset_id_field=True, print_output=print_output)
         del Mesher
@@ -2951,6 +2959,7 @@ class Microstructure(SampleData):
             computational cost of the grain geometry data update.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
+        # TODO: add phase transfer to new microstructure
         if self._is_empty('grain_map'):
             print('warning: needs a grain map to crop the microstructure')
             return

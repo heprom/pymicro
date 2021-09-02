@@ -123,6 +123,7 @@ class SampleData:
     :aliases: Dictionnary of list of aliases for each item in
         content_index (`dic`)
 """
+# TODO: Homogenize docstrings style
 
     def __init__(self, filename='sample_data', sample_name='',
                  sample_description=' ', verbose=False, overwrite_hdf5=False,
@@ -273,34 +274,6 @@ class SampleData:
             (:py:class:`tables.Filters` class) with the given Description.
             `Table_description` must be a subclass of
             :py:class:`tables.IsDescription` class.
-
-        .. rubric:: Example
-
-        ::
-
-            class MyDesc(IsDescription):
-                int_data    = Int32Col()
-                float_data  = Float32Col()
-                float_array = Float32Col(shape=(3,))
-
-            class MyDerivedClass(SampleData):
-                def _minimal_data_model(self):
-                # MyDerivedClass will handle datasets containing at least
-                # a set of data associated to a 3D image, one associated to
-                # a mesh, a classical group of data containing one Array, and a
-                # node containing a structured storage table whose lines are
-                # comprised of one scalar integer, one scalar float and one
-                # float vector (shape 3,)
-                    minimal_content_index_dic = {'3DImage':'/ImagePath',
-                                                 'DataGroup':'/GroupPath',
-                                                 'MeshGroup':'/MeshPath',
-                                                 'DataArray':'/GroupPath/Data',
-                                                 'DataTable':'/GroupPath/Tab'}
-                    minimal_content_type_dic = {'3DImage':'3DImage',
-                                                'DataGroup':'Group',
-                                                'MeshGroup':'Mesh',
-                                                'DataArray':'Array',
-                                                'DataTable':MyDesc}
         """
         index_dic = {}
         type_dic = {}
@@ -1736,6 +1709,7 @@ class SampleData:
         :raises ValueError: Can only process elements of bidimensional
             topology (surface elements, like triangles, quadrilaterals...)
         """
+        # TODO: move in Grid utils
         import BasicTools.Containers.ElementNames as EN
         if Normal_fieldname is None:
             Normal_fieldname = 'Normals_' + element_tag

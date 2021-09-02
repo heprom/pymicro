@@ -413,64 +413,7 @@ class OimScan:
             print('segmentation progress: {0:.2f} %'.format(progress), end='\r')
         print('\n%d grains were segmented' % len(np.unique(grain_ids)))
         return grain_ids
-
-    def segment_grains_traced(self, tol=5., min_ci=0.2):
-        from viztracer import get_tracer
-        
-        with get_tracer().log_event("preps"):
-
-            # segment the grains
-            print('grain segmentation for EBSD scan, misorientation tolerance={:.1f}, '
-                  'minimum confidence index={:.1f}'.format(tol, min_ci))
-            grain_ids = np.zeros_like(self.iq, dtype='int')
-            grain_ids += -1  # mark all pixels as non assigned
-            # start by assigning bad pixel to grain 0
-            grain_ids[self.ci <= min_ci] = 0
-
-        n_grains = 0
-        progress = 0
-        for j in range(self.rows):
-            for i in range(self.cols):
-                if grain_ids[i, j] >= 0:
-                    continue  # skip pixel
-                    
-                # create new grain with the pixel as seed
-                n_grains += 1
-                # print('segmenting grain %d' % n_grains)
-                grain_ids[i, j] = n_grains
-                candidates = [(i, j)]
-                # apply region growing based on the angle misorientation (strong connectivity)
-                while len(candidates) > 0:
-                    pixel = candidates.pop()
-                    # print('* pixel is {}, euler: {}'.format(pixel, np.degrees(euler[pixel])))
-                    # get orientation of this pixel
-                    o = Orientation.from_euler(np.degrees(self.euler[pixel]))
-                    # look around this pixel
-                    east = (pixel[0] - 1, pixel[1])
-                    north = (pixel[0], pixel[1] - 1)
-                    west = (pixel[0] + 1, pixel[1])
-                    south = (pixel[0], pixel[1] + 1)
-                    neighbors = [east, north, west, south]
-                    # look at unlabeled connected pixels
-                    neighbor_list = [n for n in neighbors if
-                                     0 <= n[0] < self.cols and
-                                     0 <= n[1] < self.rows and
-                                     grain_ids[n] == -1]
-                    # print(' * neighbors list is {}'.format([east, north, west, south]))
-                    for neighbor in neighbor_list:
-                        # check misorientation
-                        o_neighbor = Orientation.from_euler(np.degrees(self.euler[neighbor]))
-                        mis, _, _ = o.disorientation(o_neighbor, crystal_structure=Symmetry.hexagonal)
-                        if mis * 180 / np.pi < tol:
-                            # add to this grain
-                            grain_ids[neighbor] = n_grains
-                            # add to the list of candidates
-                            candidates.append(neighbor)
-                    progress = 100 * np.sum(grain_ids >= 0) / (self.cols * self.rows)
-            print('segmentation progress: {0:.2f} %'.format(progress), end='\r')
-        print('\n%d grains were segmented' % len(np.unique(grain_ids)))
-        return grain_ids
-
+    
     def change_orientation_reference_frame(self):
         """Change the reference frame for orientation data.
 

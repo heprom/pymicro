@@ -24,3 +24,6 @@ build/
 
 # pycharm stuff
 .idea
+
+# jupyter lab/notebook stuff
+**/.ipynb_checkpoints/

@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Quaternion:
     """Class to describe a Quaternion."""
 
@@ -9,20 +10,29 @@ class Quaternion:
         self.quat = array / np.sqrt(np.sum(array ** 2))
         self.convention = convention  # active by default
 
+    def __str__(self):
+        s = '({:.3f}, <{:.3f}, {:.3f}, {:.3f}>)'.format(
+            self.q0, self.q1, self.q2, self.q3)
+        return s
+
+    @property
     def q0(self):
         return self.quat[0]
 
+    @property
     def q1(self):
         return self.quat[1]
 
+    @property
     def q2(self):
         return self.quat[2]
 
+    @property
     def q3(self):
         return self.quat[3]
 
     def __repr__(self):
-        return str(self.quat)
+        return 'Quaternion ' + str(self)
 
     def norm(self):
         """Compute the norm of the quaternion (should be 1)."""

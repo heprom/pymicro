@@ -974,7 +974,7 @@ class Lattice:
         """Create a list of the slip systems of a given type for this lattice.
 
         :param str slip_type: a string describing the slip system type, should
-        be in (oct, 111, cube, 001, 112, basal, prism)
+            be in (oct, 111, cube, 001, 112, basal, prism)
         """
         return SlipSystem.get_slip_systems(slip_type, lattice=self)
 
@@ -1020,7 +1020,7 @@ class SlipSystem:
         :param Lattice lattice: the crystal lattice.
         :return: the new `SlipSystem` instance.
         :raise: ValueError if the 4 indices notation is used with a non
-        hexagonal crystal lattice.
+            hexagonal crystal lattice.
         """
         hexagonal = False
         if len(plane_indices) == 4:

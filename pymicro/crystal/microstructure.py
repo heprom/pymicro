@@ -388,8 +388,8 @@ class Orientation:
 
         :param orientation: an instance of
             :py:class:`~pymicro.crystal.microstructure.Orientation` class
-            describing
-        the other crystal orientation from which to compute the angle.
+            describing the other crystal orientation from which to compute the
+            angle.
         :param crystal_structure: an instance of the `Symmetry` class
             describing the crystal symmetry, triclinic (no symmetry) by
             default.
@@ -1109,7 +1109,7 @@ class Orientation:
         :param str data_type: 'euler' (default) or 'rodrigues'.
         :param dict kwargs: additional parameters passed to genfromtxt.
         :returns dict: a dictionary with the line number and the corresponding
-        orientation.
+            orientation.
         """
         data = np.genfromtxt(txt_path, **kwargs)
         size = len(data)
@@ -2368,7 +2368,7 @@ class Microstructure(SampleData):
         Note that this function assumes a single orientation per grain.
 
         :param axis: the unit vector for the load direction to compute IPF
-        colors.
+            colors.
         """
         dims = self.get_attribute('dimension', 'CellData')
         grain_ids = self.get_grain_ids()
@@ -2406,19 +2406,20 @@ class Microstructure(SampleData):
 
         :param int slice: the slice number
         :param str color: a string to chose the colormap from ('random',
-        'grain_ids', 'schmid', 'ipf')
+            'grain_ids', 'schmid', 'ipf')
         :param bool show_mask: a flag to show the mask by transparency.
-        :param bool show_grain_ids: a flag to annotate the plot with the grain ids.
+        :param bool show_grain_ids: a flag to annotate the plot with the grain
+            ids.
         :param list highlight_ids: a list of grain ids to restrict the
-        annotations (by default all grains are annotated).
+            annotations (by default all grains are annotated).
         :param slip_system: an instance (or a list of instances) of the class
-        SlipSystem to compute the Schmid factor.
+            SlipSystem to compute the Schmid factor.
         :param axis: the unit vector for the load direction to compute
-        the Schmid factor or to display IPF coloring.
+            the Schmid factor or to display IPF coloring.
         :param bool show_slip_traces: activate slip traces plot in each grain.
         :param list hkl_planes: the list of planes to plot the slip traces.
         :param bool display: if True, the show method is called, otherwise,
-        the figure is simply returned.
+            the figure is simply returned.
         """
         if self._is_empty('grain_map'):
             print('Microstructure instance mush have a grain_map field to use '
@@ -3172,7 +3173,7 @@ class Microstructure(SampleData):
         """Compute the equivalent diameter for a list of grains.
 
         :param list id_list: the list of the grain ids to include (compute
-        for all grains by default).
+            for all grains by default).
         :return: a 1D numpy array of the grain diameters.
         """
         grain_equivalent_diameters = 2 * (3 * self.get_grain_volumes(id_list) /
@@ -3191,7 +3192,7 @@ class Microstructure(SampleData):
           \psi = \dfrac{\pi^{1/3}(6V)^{2/3}}{A}
 
         :param list id_list: the list of the grain ids to include (compute
-        for all grains by default).
+            for all grains by default).
         :return: a 1D numpy array of the grain diameters.
         """
         volumes = self.get_grain_volumes(id_list)
@@ -3215,7 +3216,7 @@ class Microstructure(SampleData):
         axes of the equivalent ellipsoid of each grain.
 
         :param list id_list: the list of the grain ids to include (compute
-        for all grains by default).
+            for all grains by default).
         :return: a 1D numpy array of the grain aspect ratios.
         """
         from skimage.measure import regionprops
@@ -4016,7 +4017,7 @@ class Microstructure(SampleData):
         :param bool include_rodrigues_map: if True, the rodrigues map will be
             included in the microstructure fields.
         :return: a `Microstructure` instance created from the labDCT
-        reconstruction file.
+            reconstruction file.
         """
         file_path = os.path.join(data_dir, labdct_file)
         print('creating microstructure for labDCT scan %s' % file_path)
@@ -4237,7 +4238,7 @@ class Microstructure(SampleData):
 
         :param str file_path: the path to the file to read.
         :param list roi: a list of 4 integers in the form [x1, x2, y1, y2]
-        to crop the EBSD scan.
+            to crop the EBSD scan.
         :param float tol: the misorientation angle tolerance to segment
             the grains (default is 5 degrees).
         :param float min_ci: minimum confidence index for a pixel to be a valid
@@ -4331,7 +4332,7 @@ class Microstructure(SampleData):
         :param list translation_offset: a manual translation (in voxels) offset
             to add to the result.
         :param bool plot: a flag to plot some results.
-        :return: a new `Microstructure`instance containing the merged
+        :return: a new `Microstructure` instance containing the merged
                  microstructure.
         """
         from scipy import ndimage

@@ -67,10 +67,10 @@ class CrystallinePhase:
 
     def __repr__(self):
         """Generate a string representation of this instance."""
-        out = 'Phase %d (%s) ' % (self.phase_id, self.name)
+        out = 'Phase %d (%s) \n\t-- ' % (self.phase_id, self.name)
         out += self.get_lattice().__repr__()
         if self.elastic_constants:
-            out += 'elastic constants: %s' % self.elastic_constants
+            out += '\n\t-- elastic constants: %s' % self.elastic_constants
         return out
 
     def get_lattice(self):
@@ -974,7 +974,7 @@ class Lattice:
         """Create a list of the slip systems of a given type for this lattice.
 
         :param str slip_type: a string describing the slip system type, should
-        be in (oct, 111, cube, 001, 112, basal, prism)
+            be in (oct, 111, cube, 001, 112, basal, prism)
         """
         return SlipSystem.get_slip_systems(slip_type, lattice=self)
 
@@ -1020,19 +1020,20 @@ class SlipSystem:
         :param Lattice lattice: the crystal lattice.
         :return: the new `SlipSystem` instance.
         :raise: ValueError if the 4 indices notation is used with a non
-        hexagonal crystal lattice.
+            hexagonal crystal lattice.
         """
         hexagonal = False
         if len(plane_indices) == 4:
             # hexagonal case, compute the 3 indices representation
-            plane_indices = HklPlane.four_to_three_indices(plane_indices)
+            plane_indices = HklPlane.four_to_three_indices(*plane_indices)
             hexagonal = True
         if len(direction_indices) == 4:
-            direction_indices = HklDirection.four_to_three_indices(direction_indices)
+            direction_indices = HklDirection.four_to_three_indices(*direction_indices)
             hexagonal = True
         if hexagonal:
             # verify the lattice is hexagonal or create a default one
-            if lattice and lattice.get_symmetry() != 'hexagonal':
+            print(lattice.get_symmetry() == Symmetry.hexagonal)
+            if lattice and (lattice.get_symmetry() != Symmetry.hexagonal):
                 raise ValueError('4 indices notation can only be used with '
                                  'a hexagonal lattice')
             else:

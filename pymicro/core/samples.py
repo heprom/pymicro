@@ -123,6 +123,7 @@ class SampleData:
     :aliases: Dictionnary of list of aliases for each item in
         content_index (`dic`)
 """
+# TODO: Homogenize docstrings style
 
     def __init__(self, filename='sample_data', sample_name='',
                  sample_description=' ', verbose=False, overwrite_hdf5=False,
@@ -273,34 +274,6 @@ class SampleData:
             (:py:class:`tables.Filters` class) with the given Description.
             `Table_description` must be a subclass of
             :py:class:`tables.IsDescription` class.
-
-        .. rubric:: Example
-
-        ::
-
-            class MyDesc(IsDescription):
-                int_data    = Int32Col()
-                float_data  = Float32Col()
-                float_array = Float32Col(shape=(3,))
-
-            class MyDerivedClass(SampleData):
-                def _minimal_data_model(self):
-                # MyDerivedClass will handle datasets containing at least
-                # a set of data associated to a 3D image, one associated to
-                # a mesh, a classical group of data containing one Array, and a
-                # node containing a structured storage table whose lines are
-                # comprised of one scalar integer, one scalar float and one
-                # float vector (shape 3,)
-                    minimal_content_index_dic = {'3DImage':'/ImagePath',
-                                                 'DataGroup':'/GroupPath',
-                                                 'MeshGroup':'/MeshPath',
-                                                 'DataArray':'/GroupPath/Data',
-                                                 'DataTable':'/GroupPath/Tab'}
-                    minimal_content_type_dic = {'3DImage':'3DImage',
-                                                'DataGroup':'Group',
-                                                'MeshGroup':'Mesh',
-                                                'DataArray':'Array',
-                                                'DataTable':MyDesc}
         """
         index_dic = {}
         type_dic = {}
@@ -1127,7 +1100,7 @@ class SampleData:
         self.add_to_index(indexname, Group._v_pathname)
         return Group
 
-    def add_field(self, gridname, fieldname, array, location=None,
+    def add_field(self, gridname, fieldname, array=None, location=None,
                   indexname=None, chunkshape=None, replace=False,
                   visualisation_type='Elt_mean', compression_options=dict(),
                   time=None, bulk_padding=True):
@@ -1177,14 +1150,6 @@ class SampleData:
         if not(self._is_grid(gridname)):
             raise tables.NodeError('{} is not a grid, cannot add a field data'
                                    ' array in this group.'.format(gridname))
-        # If needed, pad the field with 0s to comply with number of bulk and
-        # boundary elements
-        array, padding, vis_array = self._mesh_field_padding(array, gridname,
-                                                             bulk_padding)
-        # Check if the array shape is consistent with the grid geometry
-        # and returns field dimension, xdmf Center attribute
-        field_type, dimensionality = self._check_field_compatibility(
-                                                        gridname,array.shape)
         # Get storage location for field data array
         if (location is None) and replace:
             # if replace, try to get the parent node of the possibly
@@ -1207,6 +1172,26 @@ class SampleData:
                                        ' Field location must be a grid group'
                                        ' (Mesh or Image), or a grid group'
                                        ' children'.format(location))
+        # Handle empty fields
+        if array is None:
+            node = self.add_data_array(array_location, fieldname, array,
+                                       indexname, replace)
+            # Add field path to grid node Field_list attribute
+            self._append_field_index(gridname, indexname)
+            gridpath =  self._name_or_node_to_path(gridname)
+            Attribute_dic = {'parent_grid_path': gridpath,
+                             'node_type':'field_array'
+                             }
+            self.add_attributes(Attribute_dic, nodename=indexname)
+            return node
+        # If needed, pad the field with 0s to comply with number of bulk and
+        # boundary elements
+        array, padding, vis_array = self._mesh_field_padding(array, gridname,
+                                                             bulk_padding)
+        # Check if the array shape is consistent with the grid geometry
+        # and returns field dimension, xdmf Center attribute
+        field_type, dimensionality = self._check_field_compatibility(
+                                                        gridname,array.shape)
 
         # Apply indices transposition to assure consistency of the data
         # visualization in paraview with SampleData ordering and indexing
@@ -1353,7 +1338,8 @@ class SampleData:
             Node = self.h5_dataset.create_carray(
                     where=location_path, name=name, obj=np.array([0]),
                     title=indexname)
-            self.add_attributes({'empty': True}, Node._v_pathname)
+            self.add_attributes({'empty': True, 'node_type':'data_array'},
+                                Node._v_pathname)
         else:
             if 'normalization' in compression_options:
                 optn = compression_options['normalization']
@@ -1460,7 +1446,7 @@ class SampleData:
             self._verbose_print(warn_msg)
             indexname = name
         self.add_to_index(indexname, table._v_pathname)
-        self.add_attributes({'node_type':'structured array'},
+        self.add_attributes({'node_type':'structured_array'},
                             table._v_pathname)
         return table
 
@@ -1574,6 +1560,11 @@ class SampleData:
         # Append input string list
         if data is not None:
             str_array.append(data)
+        # Determine if array is created empty
+        if len(data) == 0:
+            empty = True
+        else:
+            empty = False
             # add to index
         if indexname is None:
             warn_msg = (' (add_string_array) indexname not provided, '
@@ -1582,7 +1573,7 @@ class SampleData:
             self._verbose_print(warn_msg)
             indexname = name
         self.add_to_index(indexname, str_array._v_pathname)
-        self.add_attributes({'node_type':'string array'},
+        self.add_attributes({'node_type':'string_array', 'empty':empty},
                             str_array._v_pathname)
         return str_array
 
@@ -1600,6 +1591,8 @@ class SampleData:
         for string in data:
             a_str = bytes(string,'utf-8')
             Sarray.append([a_str])
+        if len(Sarray) > 0 and self.get_attribute('empty', name):
+            self.add_attributes({'empty':False}, name)
         return
 
     def append_table(self, name, data):
@@ -1716,6 +1709,7 @@ class SampleData:
         :raises ValueError: Can only process elements of bidimensional
             topology (surface elements, like triangles, quadrilaterals...)
         """
+        # TODO: move in Grid utils
         import BasicTools.Containers.ElementNames as EN
         if Normal_fieldname is None:
             Normal_fieldname = 'Normals_' + element_tag
@@ -2208,6 +2202,12 @@ class SampleData:
                 msg = ('(get_tablecol) Data is not an table node.')
                 self._verbose_print(msg)
         return data
+
+    def get_table_description(self, tablename, as_dtype=False):
+        """Get the description of the table as a description or Numpy dtype."""
+        if as_dtype:
+            return self[tablename].dtype
+        return self.get_node(tablename).description
 
     def get_grid_field_list(self, gridname):
         """Return the list of fields stored on the grid.
@@ -3025,11 +3025,14 @@ class SampleData:
         max_path_level = 0
         for key, value in content_paths.items():
             max_path_level = max(value.count('/'), max_path_level)
-        for level in range(max_path_level+1):
+        for level in range(max_path_level):
+            self._verbose_print(f'Initializing level {level+1} of data model')
             for key, value in content_paths.items():
-                if value.count('/') != level:
+                if value.count('/') != level+1:
                     continue
                 head, tail = os.path.split(value)
+                # Find out if object is a description object
+                is_descr = self._is_table_descr(content_type[key])
                 if self.h5_dataset.__contains__(content_paths[key]):
                     if self._is_table(content_paths[key]):
                         msg = ('Updating table {}'.format(content_paths[key]))
@@ -3043,26 +3046,33 @@ class SampleData:
                                             ' is empty'
                                             ''.format(content_paths[key]))
                     continue
-                elif content_type[key] == 'Group':
-                    msg = ('Adding empty Group {}'.format(content_paths[key]))
-                    self.add_group(groupname=tail, location=head,
-                                   indexname=key, replace=False)
-                elif content_type[key] == '3DImage':
-                    msg = ('Adding empty 3DImage {}'
-                           ''.format(content_paths[key]))
-                    self.add_image(imagename=tail, indexname=key, location=head)
-                elif content_type[key] == 'Mesh':
-                    msg = ('Adding empty Mesh  {}'.format(content_paths[key]))
-                    self.add_mesh(meshname=tail, indexname=key, location=head)
-                elif content_type[key] == 'Array':
-                    msg = ('Adding empty Array  {}'.format(content_paths[key]))
-                    self.add_data_array(location=head, name=tail,
-                                        indexname=key)
-                elif (isinstance(content_type[key], tables.IsDescription)
-                      or issubclass(content_type[key], tables.IsDescription)):
+                elif is_descr:
                     msg = ('Adding empty Table  {}'.format(content_paths[key]))
                     self.add_table(location=head, name=tail, indexname=key,
                                    description=content_type[key])
+                elif content_type[key] == 'Group':
+                    msg = f'Adding empty Group {content_paths[key]}'
+                    self.add_group(groupname=tail, location=head,
+                                   indexname=key, replace=False)
+                elif content_type[key] in SD_IMAGE_GROUPS.values():
+                    msg = f'Adding empty Image Group {content_paths[key]}'
+                    self.add_image(imagename=tail, indexname=key, location=head)
+                elif content_type[key] in SD_MESH_GROUPS.values():
+                    msg = f'Adding empty Mesh Group {content_paths[key]}'
+                    self.add_mesh(meshname=tail, indexname=key, location=head)
+                elif content_type[key] == 'data_array':
+                    msg = f'Adding empty data array  {content_paths[key]}'
+                    self.add_data_array(location=head, name=tail,
+                                        indexname=key)
+                elif content_type[key] == 'field_array':
+                    msg = (f'Adding empty field {content_paths[key]} to'
+                           f' mesh group {head}')
+                    self.add_field(gridname=head, fieldname=tail,
+                                   indexname=key)
+                elif content_type[key] == 'string_array':
+                    msg = f'Adding empty string array {content_paths[key]}'
+                    self.add_string_array(name=tail, location=head,
+                                          indexname=key)
         self._verbose_print('Minimal data model initialization done\n')
         return
 
@@ -3208,7 +3218,10 @@ class SampleData:
         table = self.get_node(tablename)
         current_desc = table.description
         current_dtype = tables.dtype_from_descr(table.description)
-        desc_dtype = tables.dtype_from_descr(Description)
+        if isinstance(Description, np.dtype):
+            desc_dtype = Description
+        else:
+            desc_dtype = tables.dtype_from_descr(Description)
         new_dtype = SampleData._merge_dtypes(current_dtype, desc_dtype)
         new_descr = tables.descr_from_dtype(new_dtype)[0]
         if current_dtype == new_dtype:
@@ -3396,6 +3409,22 @@ class SampleData:
     def _is_table(self, name):
         """Find out if name or path references an array dataset."""
         return self._get_node_class(name) == 'TABLE'
+
+    def _is_table_descr(self, obj):
+        """Find out if name or path references an array dataset."""
+        is_descr=False
+        try:
+            is_descr = issubclass(obj, tables.IsDescription)
+        except TypeError:
+            is_descr=False
+        if is_descr:
+            return is_descr
+        try:
+            is_descr = (isinstance(obj, tables.IsDescription)
+                        or isinstance(obj, np.dtype))
+        except TypeError:
+            is_descr=False
+        return is_descr
 
     def _is_group(self, name):
         """Find out if name or path references a HDF5 Group."""
@@ -4379,8 +4408,12 @@ class SampleData:
         if short:
             s = ('  '*Node._v_depth)+' --'
             ntype = self.get_attribute('node_type', Node)
+            if self._is_empty(Node):
+                empty_s = ' - empty'
+            else:
+                empty_s= ''
             s += f'NODE {Node._v_name}: {Node._v_pathname}'
-            s += f' ({ntype}) ({size:9.3f} {unit})'
+            s += f' ({ntype}{empty_s}) ({size:9.3f} {unit})'
             return s+'\n'
         s = ''
         s += str('\n NODE: {}\n'.format(Node._v_pathname))

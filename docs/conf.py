@@ -95,9 +95,6 @@ master_doc = 'index'
 project = u'pymicro'
 copyright = u'2013-2020, Henry Proudhon'
 
-# nb_sphinx configuration
-nbsphinx_kernel_name = 'latest'
-
 # The project version is extracted from the main __init__.py
 def extract_version():
     """

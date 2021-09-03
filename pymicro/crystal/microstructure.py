@@ -15,7 +15,6 @@ import numpy as np
 import os
 import vtk
 import h5py
-import math
 from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
@@ -23,7 +22,7 @@ from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
-from math import atan2, pi
+from math import atan2, pi, sqrt
 
 
 class Orientation:
@@ -243,12 +242,13 @@ class Orientation:
                 break
         return uvw
 
+    @staticmethod
     def fzDihedral(rod, n):
         """check if the given Rodrigues vector is in the fundamental zone.
 
         After book from Morawiecz.
         """
-        # top and bottom face at +/-tan(pi/2n)
+        # vertical component must lie between top and bottom faces at +/-tan(pi/2n)
         t = np.tan(np.pi / (2 * n))
         if abs(rod[2]) > t:
             return False
@@ -258,13 +258,16 @@ class Orientation:
         y, x = sorted([abs(rod[0]), abs(rod[1])])
         if x > 1:
             return False
-
-        return {
-            2: True,
-            3: y / (1 + math.sqrt(2)) + (1 - math.sqrt(2 / 3)) * x < 1 - 1 / math.sqrt(3),
-            4: y + x < math.sqrt(2),
-            6: y / (1 + math.sqrt(2)) + (1 - 2 * math.sqrt(2) + math.sqrt(6)) * x < math.sqrt(3) - 1
-        }[n]
+        if n == 2:
+            return True
+        elif n == 3:
+            return y / (1 + sqrt(2)) + (1 - sqrt(2 / 3)) * x < 1 - 1 / sqrt(3)
+        elif n == 4:
+            return y + x < sqrt(2)
+        elif n == 6:
+            return y / (1 + sqrt(2)) + (1 - 2 * sqrt(2) + sqrt(6)) * x < sqrt(3) - 1
+        else:
+            return False
 
     def inFZ(self, symmetry=Symmetry.cubic):
         """Check if the given Orientation lies within the fundamental zone.
@@ -278,6 +281,8 @@ class Orientation:
             inFZT23 = np.abs(r).sum() <= 1.0
             # in the cubic symmetry, each component must be < 2 ** 0.5 - 1
             inFZ = inFZT23 and np.abs(r).max() <= 2 ** 0.5 - 1
+        elif symmetry == Symmetry.hexagonal:
+            inFZ = Orientation.fzDihedral(r, 6)
         else:
             raise (ValueError('unsupported crystal symmetry: %s' % symmetry))
         return inFZ
@@ -310,15 +315,20 @@ class Orientation:
         elif 45 < psidg <= 60:
             p = 2. / 15 * (3 * (sqrt(2) - 1) * sin(psi) - 2 * (1 - cos(psi)))
         elif 60 < psidg <= 60.72:
-            p = 2. / 15 * ((3 * (sqrt(2) - 1) + 4. / sqrt(3)) * sin(psi) - 6. * (1 - cos(psi)))
+            p = 2. / 15 * ((3 * (sqrt(2) - 1) + 4. / sqrt(3)) * sin(psi)
+                           - 6. * (1 - cos(psi)))
         elif 60.72 < psidg <= 62.8:
-            X = (sqrt(2) - 1) / (1 - (sqrt(2) - 1) ** 2 / tan(0.5 * psi) ** 2) ** 0.5
+            X = (sqrt(2) - 1) / (1 - (sqrt(2) - 1) ** 2 /
+                                 tan(0.5 * psi) ** 2) ** 0.5
             Y = (sqrt(2) - 1) ** 2 / ((3 - 1 / tan(0.5 * psi) ** 2) ** 0.5)
-            p = (2. / 15) * ((3 * (sqrt(2) - 1) + 4 / sqrt(3)) * sin(psi) - 6 * (1 - cos(psi))) \
+            p = (2. / 15) * ((3 * (sqrt(2) - 1) + 4 / sqrt(3)) * sin(psi)
+                             - 6 * (1 - cos(psi))) \
                 - 8. / (5 * pi) * (2 * (sqrt(2) - 1) * acos(X / tan(0.5 * psi))
                                    + 1. / sqrt(3) * acos(Y / tan(0.5 * psi))) \
                 * sin(psi) + 8. / (5 * pi) * (2 *acos((sqrt(2) + 1) * X / sqrt(2))
-                                              + acos((sqrt(2) + 1) * Y / sqrt(2))) * (1 - cos(psi))
+                                              + acos((sqrt(2) + 1)
+                                                     * Y / sqrt(2))) \
+                * (1 - cos(psi))
         else:
             p = 0.
         return p
@@ -984,19 +994,29 @@ class Orientation:
         return q
 
     @staticmethod
-    def Euler2Rodrigues(euler):
-        """Compute the rodrigues vector from the 3 euler angles (in degrees).
+    def Euler_rad2Rodrigues(euler):
+        """Compute the rodrigues vector from the 3 euler angles (in radians).
 
-        :param euler: the 3 Euler angles (in degrees).
+        :param euler: the 3 Euler angles (in radians).
         :return: the roodrigues vector as a 3 components numpy array.
         """
-        (phi1, Phi, phi2) = np.radians(euler)
+        phi1, Phi, phi2 = euler
         a = 0.5 * (phi1 - phi2)
         b = 0.5 * (phi1 + phi2)
         r1 = np.tan(0.5 * Phi) * np.cos(a) / np.cos(b)
         r2 = np.tan(0.5 * Phi) * np.sin(a) / np.cos(b)
         r3 = np.tan(b)
         return np.array([r1, r2, r3])
+
+    @staticmethod
+    def Euler2Rodrigues(euler):
+        """Compute the rodrigues vector from the 3 euler angles (in degrees).
+
+        :param euler: the 3 Euler angles (in degrees).
+        :return: the roodrigues vector as a 3 components numpy array.
+        """
+        euler_rad = np.radians(euler)
+        return Euler_rad2Rodrigues(euler_rad)
 
     @staticmethod
     def Euler2OrientationMatrix(euler):

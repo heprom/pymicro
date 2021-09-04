@@ -686,6 +686,7 @@ class SampleData:
                   ' Press <Enter> when you want to resume data management'
                   ''.format(self.h5_file, self.xdmf_file))
         self.h5_dataset = tables.File(self.h5_path, mode='r+')
+        self._file_exist = True
         self._after_file_open()
         print('File objects {} and {} are opened again.\n You may use this'
               ' SampleData instance normally.'.format(self.h5_file,
@@ -2893,6 +2894,7 @@ class SampleData:
         self.h5_dataset.close()
         shutil.move(tmp_file, self.h5_path)
         self.h5_dataset = tables.File(self.h5_path, mode='r+')
+        self._file_exist = True
         self._after_file_open()
         return
 

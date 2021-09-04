@@ -3346,8 +3346,13 @@ class SampleData:
         fieldname = self.get_attribute('xdmf_fieldname', fieldnodename)
         xdmf_grid = self._find_xdmf_grid(gridname)
         for el in xdmf_grid:
-            if el.get('Name') == fieldname:
-                return el, xdmf_grid
+            if el.tag == 'Grid':
+                for eel in el:
+                    if eel.get('Name') == fieldname:
+                        return eel, el
+            else:
+                if el.get('Name') == fieldname:
+                    return el, xdmf_grid
         return None
 
     def _name_or_node_to_path(self, name_or_node):

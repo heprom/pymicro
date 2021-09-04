@@ -117,7 +117,8 @@ class SampleData:
     :xdmf_path: full path of XDMF file (`str`)
     :xdmf_tree: :py:class:`lxml.etree` XML tree associated with `xdmf_file`
     :autodelete: autodelete flag (`bool`)
-    :autodrepack: autorepack flag (`bool`)
+    :autorepack: autorepack flag (`bool`)
+    :after_file_open_args: command arguments for `after_file_open` (dict)
     :content_index: Dictionnary of data items (nodes/groups)
         names and pathes in HDF5 dataset (`dic`)
     :aliases: Dictionnary of list of aliases for each item in
@@ -127,7 +128,8 @@ class SampleData:
 
     def __init__(self, filename='sample_data', sample_name='',
                  sample_description=' ', verbose=False, overwrite_hdf5=False,
-                 autodelete=False, autorepack=False):
+                 autodelete=False, autorepack=False,
+                 after_file_open_args=dict()):
         """Sample Data constructor, see class documentation."""
         # get file directory and file name
         path_file = Path(filename).absolute()
@@ -148,11 +150,11 @@ class SampleData:
             os.remove(self.h5_path)
             os.remove(self.xdmf_path)
         self._init_file_object(sample_name, sample_description)
-        self._after_file_open()
+        self._after_file_open(**after_file_open_args)
         self.sync()
         return
 
-    def _after_file_open(self):
+    def _after_file_open(self, **kwargs):
         """Initialization code to run after opening a Sample Data file.
 
         Empty method for this class. Use it for SampleData inherited classes,
@@ -925,10 +927,12 @@ class SampleData:
         for field_name, field in image_object.nodeFields.items():
             self.add_field(gridname=image_group._v_pathname,
                            fieldname=field_name, array=field,
+                           indexname=field_name,
                            compression_options=compression_options)
         for field_name, field in image_object.elemFields.items():
             self.add_field(gridname=image_group._v_pathname,
                            fieldname=field_name, array=field,
+                           indexname=field_name,
                            compression_options=compression_options)
         return image_object
 
@@ -1012,6 +1016,10 @@ class SampleData:
         # if time_list is passed as a numpy array, transform it into a list
         if isinstance(time_list, np.ndarray):
             time_list = time_list.tolist()
+        if isinstance(time_list, float):
+            time_list = [time_list]
+        if isinstance(time_list, int):
+            time_list = [time_list]
         # get xdmf node of main grid
         xdmf_gridname = self.get_attribute('xdmf_gridname',gridname)
         grid = self._find_xdmf_grid(xdmf_gridname)
@@ -1436,7 +1444,9 @@ class SampleData:
                                              filters=Filters,
                                              chunkshape=chunkshape)
         if data is not None:
+            print(data.shape)
             table.append(data)
+            print(table)
             table.flush()
         # add to index
         if indexname is None:
@@ -3207,7 +3217,10 @@ class SampleData:
     @staticmethod
     def _merge_dtypes(dtype1, dtype2):
         """Merge 2 numpy.void dtypes to creates a new one."""
-        descr = dtype1.descr
+        descr = []
+        for item in dtype1.descr:
+            if not(item in descr) and not(item[0]==''):
+                descr.append(item)
         for item in dtype2.descr:
             if not(item in descr) and not(item[0]==''):
                 descr.append(item)

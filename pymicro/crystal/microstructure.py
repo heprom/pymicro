@@ -1514,30 +1514,31 @@ class Microstructure(SampleData):
         if filename is None:
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
+        # prepare arguments for after file open
+        after_file_open_args = {'phase':phase}
+        # call SampleData constructor
+        SampleData.__init__(self, filename=filename, sample_name=name,
+                            sample_description=description, verbose=verbose,
+                            overwrite_hdf5=overwrite_hdf5,
+                            autodelete=autodelete,
+                            after_file_open_args=after_file_open_args)
+        return
 
-        SampleData.__init__(self, filename, name, description, verbose,
-                            overwrite_hdf5, autodelete)
-        # TODO: move into after_file_open
-        if not (self._file_exist):
-            self.set_active_grain_map()
-            self.set_sample_name(name)
-        else:
+    def _after_file_open(self, phase=None, **kwargs):
+        """Initialization code to run after opening a Sample Data file."""
+        self.grains = self.get_node('GrainDataTable')
+        if self._file_exist:
             self.active_grain_map = self.get_attribute('active_grain_map',
                                                        'CellData')
             if self.active_grain_map is None:
                 self.set_active_grain_map()
-        self._init_phase(phase)
-        self.active_phase_id = 1
-        self.sync()
-        return
-
-    def _after_file_open(self):
-        """Initialization code to run after opening a Sample Data file."""
-        self.grains = self.get_node('GrainDataTable')
-        # TODO: add here to active grain map
-        # TODO: adapt methods pause and repack to use init_file_obj
-        # and _after_file_open
-        # TODO: adapt documentation
+            self._init_phase(phase)
+            if not hasattr(self, 'active_phase_id'):
+                self.active_phase_id = 1
+        else:
+            self.set_active_grain_map()
+            self._init_phase(phase)
+            self.active_phase_id = 1
         return
 
     def __repr__(self):
@@ -2018,8 +2019,10 @@ class Microstructure(SampleData):
             # ensure (Nx,Ny,1) array will be stored as (Nx,Ny)
             if self._get_group_type('CellData')  == '2DImage':
                 grain_map = grain_map.squeeze()
+            print('coucou')
             self.add_field(gridname='CellData', fieldname=map_name,
-                           array=grain_map, replace=True)
+                           array=grain_map, replace=True,
+                           indexname='grain_map')
         self.set_active_grain_map(map_name)
         return
 
@@ -2054,7 +2057,8 @@ class Microstructure(SampleData):
                                       replace=True)
         else:
             self.add_field(gridname='CellData', fieldname='phase_map',
-                           array=phase_map, replace=True)
+                           array=phase_map, replace=True,
+                           indexname='phase_map')
 
     def set_mask(self, mask, voxel_size=None):
         """Set the mask for this microstructure.
@@ -2087,7 +2091,7 @@ class Microstructure(SampleData):
                                       replace=True)
         else:
             self.add_field(gridname='CellData', fieldname='mask',
-                           array=mask, replace=True)
+                           array=mask, replace=True, indexname='mask')
         return
 
     def set_random_orientations(self):
@@ -3711,14 +3715,20 @@ class Microstructure(SampleData):
         """
         from pymicro.core.utils.SDAmitexUtils import SDAmitexIO
         # Get std file result
-        p_std = Path(results_basename).absolute().with_suffix('.std')
+        p_mstd = Path(results_basename).absolute().with_suffix('.mstd')
         # safety check
-        if not p_std.exists():
+        if not p_mstd.exists():
             raise ValueError('results not found, "results_basename" argument'
                              ' not associated with Amitex_fftp simulation'
                              ' results.')
-        # load .std results
-        std_res = SDAmitexIO.load_std(p_std)
+        # load .mstd results --> only lines of microstructure material mean
+        # values
+        step = 1
+        if grip_size > 0:
+            step += 1
+        if ext_size >0:
+            step += 1
+        std_res = SDAmitexIO.load_std(p_mstd, step=step)
         # Store macro data in specific group
         self.add_group(groupname=f'{sim_prefix}_Results', location='/',
                        indexname='fft_sim', replace=True)
@@ -3726,9 +3736,12 @@ class Microstructure(SampleData):
         # the type of output (finite strain ou infinitesimal strain sim.)
         # ==> we iterate over dtype fields to fill the dataset with
         #     output data
-        for field in std_res.dtype.fields:
-            self.add_data_array(location='fft_sim', name=f'{field}',
-                                array=std_res[field])
+        self.add_table(location='fft_sim', name='Standard_output',
+                       indexname=f'{sim_prefix}_std',
+                       description=std_res.dtype, data=std_res)
+        # for field in std_res.dtype.fields:
+        #     self.add_data_array(location='fft_sim', name=f'{field}',
+        #                         array=std_res[field])
         # Get vtk files results
         Stress, Strain, VarInt = SDAmitexIO.load_amitex_output_fields(
             results_basename, grip_size=grip_size, ext_size=ext_size,

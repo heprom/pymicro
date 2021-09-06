@@ -1,6 +1,9 @@
 from pymicro.crystal.microstructure import *
 from pymicro.crystal.texture import *
+from pymicro.examples import PYMICRO_EXAMPLES_DATA_DIR
+
 from matplotlib import pyplot as plt, colors, colorbar, cm
+import pathlib as pl 
 
 '''This example demonstrate how a field can be used to color each symbol on
 the pole figure with the :py:meth:~`pymicro.crystal.texture.set_map_field`
@@ -9,12 +12,12 @@ method.
 #orientations = Orientation.read_euler_txt('../data/orientation_set.inp')
 #for i in range(600):
 #    micro.grains.append(Grain(i, orientations[i + 1]))
-euler_list = np.genfromtxt('../data/orientation_set.inp').tolist()
+euler_list = np.genfromtxt(PYMICRO_EXAMPLES_DATA_DIR / 'orientation_set.inp').tolist()
 micro = Microstructure(name='field', autodelete=True)
 micro.add_grains(euler_list)
 
 # load strain from dat files
-strain_field = np.genfromtxt('../data/strain_avg_per_grain.dat')[19, ::2]
+strain_field = np.genfromtxt(PYMICRO_EXAMPLES_DATA_DIR / 'strain_avg_per_grain.dat')[19, ::2]
 
 # build custom pole figures
 pf = PoleFigure(microstructure=micro)

@@ -26,7 +26,7 @@ plt.plot(psis_dg, misorientations_MacKenzie, 'k--', linewidth=2, label='MacKenzi
 plt.ylim(0, 0.05)
 plt.legend(loc='upper left')
 image_name = os.path.splitext(__file__)[0] + '.png'
-print 'writting %s' % image_name
+print('writting %s' % image_name)
 plt.savefig(image_name, format='png')
 
 from matplotlib import image

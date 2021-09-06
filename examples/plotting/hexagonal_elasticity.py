@@ -2,7 +2,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import pyplot as plt, cm
 import os, numpy as np
 
-print 'plotting hexagonal elasticity...'
+print('plotting hexagonal elasticity...')
 fig = plt.figure(figsize=(8, 8))
 plt.subplots_adjust(top=1, bottom=0, left=0, right=1)
 ax = fig.gca(projection='3d')
@@ -20,12 +20,12 @@ s13 = c13 / (2 * c13 ** 2 - (c11 + c12) * c33)
 s33 = (c11 + c12) / (-2 * c13 ** 2 + (c11 + c12) * c33)
 s44 = 1. / c44
 s66 = 2 * (s11 - s12)
-print 'elastic stiffness s11 =', s11
-print 'elastic stiffness s12 =', s12
-print 'elastic stiffness s13 =', s13
-print 'elastic stiffness s33 =', s33
-print 'elastic stiffness s44 =', s44
-print 'elastic stiffness s66 =', s66
+print('elastic stiffness s11 =', s11)
+print('elastic stiffness s12 =', s12)
+print('elastic stiffness s13 =', s13)
+print('elastic stiffness s33 =', s33)
+print('elastic stiffness s44 =', s44)
+print('elastic stiffness s66 =', s66)
 
 # theta = np.linspace(0, np.pi*2, 46)
 # phi = np.linspace(-np.pi*2, np.pi/2, 91)
@@ -54,4 +54,4 @@ ax.set_ylim(-150, 150)
 ax.set_zlim(-150, 150)
 image_name = os.path.splitext(__file__)[0] + '.png'
 plt.savefig(image_name, format='png')
-print 'done'
+print('done')

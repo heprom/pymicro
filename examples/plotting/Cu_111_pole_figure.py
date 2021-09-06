@@ -3,27 +3,26 @@ import os, numpy as np
 from pymicro.crystal.microstructure import Microstructure
 from pymicro.crystal.texture import PoleFigure
 
-if __name__ == '__main__':
-    """
-    111 Pole figure of a copper sample containing 10000 grains with a fibre
-    texture.
-    """
-    euler_list = np.genfromtxt('../data/Cu_111.dat', usecols=(0, 1, 2), max_rows=1000)
-    micro = Microstructure(name='Cu_111', autodelete=True)
-    micro.add_grains(euler_list)
+"""
+111 Pole figure of a copper sample containing 10000 grains with a fibre
+texture.
+"""
+euler_list = np.genfromtxt('../data/Cu_111.dat', usecols=(0, 1, 2), max_rows=1000)
+micro = Microstructure(name='Cu_111', autodelete=True)
+micro.add_grains(euler_list)
 
-    # create pole figure (both direct and inverse)
-    pf = PoleFigure(hkl='111', proj='stereo', microstructure=micro)
-    pf.color_by_grain_id = False
-    pf.mksize = 5
-    pf.pflegend = False
-    pf.plot_pole_figures(plot_sst=True, display=False, save_as='png')
-    del pf
-    del micro
+# create pole figure (both direct and inverse)
+pf = PoleFigure(hkl='111', proj='stereo', microstructure=micro)
+pf.color_by_grain_id = False
+pf.mksize = 5
+pf.pflegend = False
+pf.plot_pole_figures(plot_sst=True, display=False, save_as='png')
+del pf
+del micro
 
-    image_name = os.path.splitext(__file__)[0] + '.png'
-    print('writing %s' % image_name)
+image_name = os.path.splitext(__file__)[0] + '.png'
+print('writing %s' % image_name)
 
-    from matplotlib import image
+from matplotlib import image
 
-    image.thumbnail(image_name, 'thumb_' + image_name, 0.2)
+image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

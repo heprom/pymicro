@@ -91,48 +91,47 @@ def create_mesh_outline_3d_with_planes(lattice, orientation, nld):
     return assembly
 
 
-if __name__ == '__main__':
-    '''
-    Create a 3d scene with the mesh outline.
-    Two planes are used to figure out the crack.
-    Both hkl planes are added at the crack tip and displayed.
-    '''
+'''
+Create a 3d scene with the mesh outline.
+Two planes are used to figure out the crack.
+Both hkl planes are added at the crack tip and displayed.
+'''
 
-    # Create the 3D scene
-    base_name = os.path.splitext(__file__)[0]
-    s3d = Scene3D(display=False, ren_size=(800, 800), name=base_name)
+# Create the 3D scene
+base_name = os.path.splitext(__file__)[0]
+s3d = Scene3D(display=False, ren_size=(800, 800), name=base_name)
 
-    # specify the grain orientation
-    o1 = Orientation.from_euler(numpy.array([45., 0., 0.]))  # grain 1
+# specify the grain orientation
+o1 = Orientation.from_euler(numpy.array([45., 0., 0.]))  # grain 1
 
-    # choose slip plane normals and directions to display in grain
-    n1 = numpy.array([1.0, 1.0, -1.0])
-    l1 = numpy.array([1.0, 1.0, 2.0])
-    d1 = '[112]'
-    n2 = numpy.array([1.0, 1.0, 1.0])
-    l2 = numpy.array([1.0, 1.0, -2.0])
-    d2 = '[11-2]'
-    nld = [[n1, l1, d1], [n2, l2, d2]]
+# choose slip plane normals and directions to display in grain
+n1 = numpy.array([1.0, 1.0, -1.0])
+l1 = numpy.array([1.0, 1.0, 2.0])
+d1 = '[112]'
+n2 = numpy.array([1.0, 1.0, 1.0])
+l2 = numpy.array([1.0, 1.0, -2.0])
+d2 = '[11-2]'
+nld = [[n1, l1, d1], [n2, l2, d2]]
 
-    # we use a unit lattice cell to represent the mesh
-    l_xyz = Lattice.face_centered_cubic(1.0)
-    g1 = create_mesh_outline_3d_with_planes(l_xyz, o1, nld)
-    s3d.add(g1)
+# we use a unit lattice cell to represent the mesh
+l_xyz = Lattice.face_centered_cubic(1.0)
+g1 = create_mesh_outline_3d_with_planes(l_xyz, o1, nld)
+s3d.add(g1)
 
-    # add axes actor
-    axes = axes_actor(0.5, fontSize=40)
-    s3d.add(axes)
+# add axes actor
+axes = axes_actor(0.5, fontSize=40)
+s3d.add(axes)
 
-    # set up camera
-    cam = vtk.vtkCamera()
-    cam.SetViewUp(0, 0, 1)
-    cam.SetPosition(4.0, -1.5, 1.8)
-    cam.SetFocalPoint(0.5, 0.5, 0.6)
-    s3d.set_camera(cam)
-    s3d.render()
+# set up camera
+cam = vtk.vtkCamera()
+cam.SetViewUp(0, 0, 1)
+cam.SetPosition(4.0, -1.5, 1.8)
+cam.SetFocalPoint(0.5, 0.5, 0.6)
+s3d.set_camera(cam)
+s3d.render()
 
-    # thumbnail for the image gallery
-    from matplotlib import image
+# thumbnail for the image gallery
+from matplotlib import image
 
-    image_name = base_name + '.png'
-    image.thumbnail(image_name, 'thumb_' + image_name, 0.2)
+image_name = base_name + '.png'
+image.thumbnail(image_name, 'thumb_' + image_name, 0.2)

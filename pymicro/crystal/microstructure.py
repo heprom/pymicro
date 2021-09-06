@@ -388,8 +388,8 @@ class Orientation:
 
         :param orientation: an instance of
             :py:class:`~pymicro.crystal.microstructure.Orientation` class
-            describing
-        the other crystal orientation from which to compute the angle.
+            describing the other crystal orientation from which to compute the
+            angle.
         :param crystal_structure: an instance of the `Symmetry` class
             describing the crystal symmetry, triclinic (no symmetry) by
             default.
@@ -978,6 +978,9 @@ class Orientation:
         q2 = np.sin(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
         q3 = np.sin(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
         q = Quaternion(np.array([q0, -P * q1, -P * q2, -P * q3]), convention=P)
+        if q0 < 0:
+            # the scalar part must be positive
+            q.quat = q.quat * -1
         return q
 
     @staticmethod
@@ -1106,7 +1109,7 @@ class Orientation:
         :param str data_type: 'euler' (default) or 'rodrigues'.
         :param dict kwargs: additional parameters passed to genfromtxt.
         :returns dict: a dictionary with the line number and the corresponding
-        orientation.
+            orientation.
         """
         data = np.genfromtxt(txt_path, **kwargs)
         size = len(data)
@@ -1479,7 +1482,7 @@ class GrainData(tables.IsDescription):
     volume = tables.Float32Col()  # float
     # grain center of mass coordinates
     center = tables.Float32Col(shape=(3,))  # float  (double-precision)
-    # Rodriguez vector defining grain orientation
+    # Rodrigues vector defining grain orientation
     orientation = tables.Float32Col(shape=(3,))  # float  (double-precision)
     # Grain Bounding box
     bounding_box = tables.Int32Col(shape=(3, 2))  # Signed 64-bit integer
@@ -1507,29 +1510,35 @@ class Microstructure(SampleData):
     def __init__(self,
                  filename=None, name='micro', description='empty',
                  verbose=False, overwrite_hdf5=False, phase=None,
-                 autodelete=False, **keywords):
+                 autodelete=False):
         if filename is None:
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
+        # prepare arguments for after file open
+        after_file_open_args = {'phase':phase}
+        # call SampleData constructor
+        SampleData.__init__(self, filename=filename, sample_name=name,
+                            sample_description=description, verbose=verbose,
+                            overwrite_hdf5=overwrite_hdf5,
+                            autodelete=autodelete,
+                            after_file_open_args=after_file_open_args)
+        return
 
-        SampleData.__init__(self, filename, name, description, verbose,
-                            overwrite_hdf5, autodelete, **keywords)
-        if not (self._file_exist):
-            self.set_active_grain_map()
-            self.set_sample_name(name)
-        else:
+    def _after_file_open(self, phase=None, **kwargs):
+        """Initialization code to run after opening a Sample Data file."""
+        self.grains = self.get_node('GrainDataTable')
+        if self._file_exist:
             self.active_grain_map = self.get_attribute('active_grain_map',
                                                        'CellData')
             if self.active_grain_map is None:
                 self.set_active_grain_map()
-        self._init_phase(phase)
-        self.active_phase_id = 1
-        self.sync()
-        return
-
-    def _after_file_open(self):
-        """Initialization code to run after opening a Sample Data file."""
-        self.grains = self.get_node('GrainDataTable')
+            self._init_phase(phase)
+            if not hasattr(self, 'active_phase_id'):
+                self.active_phase_id = 1
+        else:
+            self.set_active_grain_map()
+            self._init_phase(phase)
+            self.active_phase_id = 1
         return
 
     def __repr__(self):
@@ -1564,9 +1573,9 @@ class Microstructure(SampleData):
                                                         'GrainDataTable'),
                                      'Phase_data': '/PhaseData'}
         minimal_content_type_dic = {'Image_data': '3DImage',
-                                    'grain_map': 'Array',
-                                    'phase_map': 'Array',
-                                    'mask': 'Array',
+                                    'grain_map': 'field_array',
+                                    'phase_map': 'field_array',
+                                    'mask': 'field_array',
                                     'Mesh_data': 'Mesh',
                                     'Grain_data': 'Group',
                                     'GrainDataTable': GrainData,
@@ -1975,13 +1984,14 @@ class Microstructure(SampleData):
         return
 
     def set_grain_map(self, grain_map, voxel_size=None,
-                      map_name='grain_map', **keywords):
+                      map_name='grain_map'):
         """Set the grain map for this microstructure.
 
         :param ndarray grain_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
+        # TODO: ad compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2003,24 +2013,27 @@ class Microstructure(SampleData):
                                       fieldname=map_name,
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True, **keywords)
+                                      replace=True)
         else:
             # Handle case of a 2D Microstrucutre: squeeze grain map to
             # ensure (Nx,Ny,1) array will be stored as (Nx,Ny)
             if self._get_group_type('CellData')  == '2DImage':
                 grain_map = grain_map.squeeze()
+            print('coucou')
             self.add_field(gridname='CellData', fieldname=map_name,
-                           array=grain_map, replace=True, **keywords)
+                           array=grain_map, replace=True,
+                           indexname='grain_map')
         self.set_active_grain_map(map_name)
         return
 
-    def set_phase_map(self, phase_map, voxel_size=None, **keywords):
+    def set_phase_map(self, phase_map, voxel_size=None):
         """Set the phase map for this microstructure.
 
         :param ndarray phase_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
+        # TODO: add compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2041,18 +2054,20 @@ class Microstructure(SampleData):
             self.add_image_from_field(phase_map, 'phase_map',
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True, **keywords)
+                                      replace=True)
         else:
             self.add_field(gridname='CellData', fieldname='phase_map',
-                           array=phase_map, replace=True, **keywords)
+                           array=phase_map, replace=True,
+                           indexname='phase_map')
 
-    def set_mask(self, mask, voxel_size=None, **keywords):
+    def set_mask(self, mask, voxel_size=None):
         """Set the mask for this microstructure.
 
         :param ndarray mask: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
+        # TODO: add compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2073,10 +2088,10 @@ class Microstructure(SampleData):
             self.add_image_from_field(mask, 'mask',
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True, **keywords)
+                                      replace=True)
         else:
             self.add_field(gridname='CellData', fieldname='mask',
-                           array=mask, replace=True, **keywords)
+                           array=mask, replace=True, indexname='mask')
         return
 
     def set_random_orientations(self):
@@ -2357,7 +2372,7 @@ class Microstructure(SampleData):
         Note that this function assumes a single orientation per grain.
 
         :param axis: the unit vector for the load direction to compute IPF
-        colors.
+            colors.
         """
         dims = self.get_attribute('dimension', 'CellData')
         grain_ids = self.get_grain_ids()
@@ -2395,19 +2410,20 @@ class Microstructure(SampleData):
 
         :param int slice: the slice number
         :param str color: a string to chose the colormap from ('random',
-        'grain_ids', 'schmid', 'ipf')
+            'grain_ids', 'schmid', 'ipf')
         :param bool show_mask: a flag to show the mask by transparency.
-        :param bool show_grain_ids: a flag to annotate the plot with the grain ids.
+        :param bool show_grain_ids: a flag to annotate the plot with the grain
+            ids.
         :param list highlight_ids: a list of grain ids to restrict the
-        annotations (by default all grains are annotated).
+            annotations (by default all grains are annotated).
         :param slip_system: an instance (or a list of instances) of the class
-        SlipSystem to compute the Schmid factor.
+            SlipSystem to compute the Schmid factor.
         :param axis: the unit vector for the load direction to compute
-        the Schmid factor or to display IPF coloring.
+            the Schmid factor or to display IPF coloring.
         :param bool show_slip_traces: activate slip traces plot in each grain.
         :param list hkl_planes: the list of planes to plot the slip traces.
         :param bool display: if True, the show method is called, otherwise,
-        the figure is simply returned.
+            the figure is simply returned.
         """
         if self._is_empty('grain_map'):
             print('Microstructure instance mush have a grain_map field to use '
@@ -2917,7 +2933,7 @@ class Microstructure(SampleData):
         Mesher = SDImageMesher(data=self)
         Mesher.multi_phase_mesher(
             multiphase_image_name=self.active_grain_map,
-            meshname='grains_mesh', location='/MeshData', replace=True,
+            meshname='MeshData', location='/', replace=True,
             bin_fields_from_sets=False, mesher_opts=mesher_opts,
             elset_id_field=True, print_output=print_output)
         del Mesher
@@ -2948,6 +2964,7 @@ class Microstructure(SampleData):
             computational cost of the grain geometry data update.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
+        # TODO: add phase transfer to new microstructure
         if self._is_empty('grain_map'):
             print('warning: needs a grain map to crop the microstructure')
             return
@@ -3160,7 +3177,7 @@ class Microstructure(SampleData):
         """Compute the equivalent diameter for a list of grains.
 
         :param list id_list: the list of the grain ids to include (compute
-        for all grains by default).
+            for all grains by default).
         :return: a 1D numpy array of the grain diameters.
         """
         grain_equivalent_diameters = 2 * (3 * self.get_grain_volumes(id_list) /
@@ -3179,7 +3196,7 @@ class Microstructure(SampleData):
           \psi = \dfrac{\pi^{1/3}(6V)^{2/3}}{A}
 
         :param list id_list: the list of the grain ids to include (compute
-        for all grains by default).
+            for all grains by default).
         :return: a 1D numpy array of the grain diameters.
         """
         volumes = self.get_grain_volumes(id_list)
@@ -3203,7 +3220,7 @@ class Microstructure(SampleData):
         axes of the equivalent ellipsoid of each grain.
 
         :param list id_list: the list of the grain ids to include (compute
-        for all grains by default).
+            for all grains by default).
         :return: a 1D numpy array of the grain aspect ratios.
         """
         from skimage.measure import regionprops
@@ -3698,14 +3715,20 @@ class Microstructure(SampleData):
         """
         from pymicro.core.utils.SDAmitexUtils import SDAmitexIO
         # Get std file result
-        p_std = Path(results_basename).absolute().with_suffix('.std')
+        p_mstd = Path(results_basename).absolute().with_suffix('.mstd')
         # safety check
-        if not p_std.exists():
+        if not p_mstd.exists():
             raise ValueError('results not found, "results_basename" argument'
                              ' not associated with Amitex_fftp simulation'
                              ' results.')
-        # load .std results
-        std_res = SDAmitexIO.load_std(p_std)
+        # load .mstd results --> only lines of microstructure material mean
+        # values
+        step = 1
+        if grip_size > 0:
+            step += 1
+        if ext_size >0:
+            step += 1
+        std_res = SDAmitexIO.load_std(p_mstd, step=step)
         # Store macro data in specific group
         self.add_group(groupname=f'{sim_prefix}_Results', location='/',
                        indexname='fft_sim', replace=True)
@@ -3713,9 +3736,12 @@ class Microstructure(SampleData):
         # the type of output (finite strain ou infinitesimal strain sim.)
         # ==> we iterate over dtype fields to fill the dataset with
         #     output data
-        for field in std_res.dtype.fields:
-            self.add_data_array(location='fft_sim', name=f'{field}',
-                                array=std_res[field])
+        self.add_table(location='fft_sim', name='Standard_output',
+                       indexname=f'{sim_prefix}_std',
+                       description=std_res.dtype, data=std_res)
+        # for field in std_res.dtype.fields:
+        #     self.add_data_array(location='fft_sim', name=f'{field}',
+        #                         array=std_res[field])
         # Get vtk files results
         Stress, Strain, VarInt = SDAmitexIO.load_amitex_output_fields(
             results_basename, grip_size=grip_size, ext_size=ext_size,
@@ -4004,7 +4030,7 @@ class Microstructure(SampleData):
         :param bool include_rodrigues_map: if True, the rodrigues map will be
             included in the microstructure fields.
         :return: a `Microstructure` instance created from the labDCT
-        reconstruction file.
+            reconstruction file.
         """
         file_path = os.path.join(data_dir, labdct_file)
         print('creating microstructure for labDCT scan %s' % file_path)
@@ -4225,7 +4251,7 @@ class Microstructure(SampleData):
 
         :param str file_path: the path to the file to read.
         :param list roi: a list of 4 integers in the form [x1, x2, y1, y2]
-        to crop the EBSD scan.
+            to crop the EBSD scan.
         :param float tol: the misorientation angle tolerance to segment
             the grains (default is 5 degrees).
         :param float min_ci: minimum confidence index for a pixel to be a valid
@@ -4319,7 +4345,7 @@ class Microstructure(SampleData):
         :param list translation_offset: a manual translation (in voxels) offset
             to add to the result.
         :param bool plot: a flag to plot some results.
-        :return: a new `Microstructure`instance containing the merged
+        :return: a new `Microstructure` instance containing the merged
                  microstructure.
         """
         from scipy import ndimage

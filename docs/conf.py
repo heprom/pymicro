@@ -21,7 +21,7 @@ MOCK_MODULES = ['numpy', 'scipy', 'scipy.special', 'matplotlib',
                 'matplotlib.backends.backend_qt4agg', 'scipy.ndimage', 'wx',
                 'wx.Panel', 'vtk', 'vtk.util', 'vtk.util.colors', 'skimage',
                 'skimage.transform', '_tifffile', 'h5py', 'tables',
-                'lxml', 'lxml.builder', 'BasicTools', 
+                'lxml', 'lxml.builder', 'BasicTools',
                 'BasicTools.Containers',
                 'BasicTools.Containers.ConstantRectilinearMesh',
                 'BasicTools.Containers.UnstructuredMesh',
@@ -95,7 +95,6 @@ master_doc = 'index'
 project = u'pymicro'
 copyright = u'2013-2020, Henry Proudhon'
 
-
 # The project version is extracted from the main __init__.py
 def extract_version():
     """
@@ -126,7 +125,7 @@ today_fmt = '%B %d, %Y'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 # default_role = None

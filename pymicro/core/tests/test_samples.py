@@ -27,6 +27,10 @@ class Test_DerivedClass(SampleData):
             group types) in the form of a dictionary {content:Location}
             Extends SampleData Class _minimal_data_model class
         """
+        # create a dtype to create a structured array
+        Descr = np.dtype([('density', np.float32),('melting_Pt', np.float32),
+                          ('Chemical_comp','S', 30)])
+        # create data model description dictionaries
         minimal_content_index_dic = {'Image_data':'/CellData',
                                      'grain_map':'/CellData/grain_map',
                                      'Grain_data':'/GrainData',
@@ -34,13 +38,21 @@ class Test_DerivedClass(SampleData):
                                                        'GrainDataTable'),
                                      'Crystal_data':'/CrystalStructure',
                                      'lattice_params':('/CrystalStructure'
-                                                       '/LatticeParameters'),}
+                                                       '/LatticeParameters'),
+                                     'lattice_props':('/CrystalStructure'
+                                                       '/LatticeProps'),
+                                     'grain_names':'/GrainData/GrainNames',
+                                     'Mesh_data':'/MeshData'}
         minimal_content_type_dic = {'Image_data':'3DImage',
-                                    'grain_map':'Array',
+                                    'grain_map':'field_array',
                                     'Grain_data':'Group',
                                     'GrainDataTable':Test_GrainData,
                                     'Crystal_data':'Group',
-                                    'lattice_params':'Array',}
+                                    'lattice_params':'data_array',
+                                    'lattice_props':Descr,
+                                    'grain_names':'string_array',
+                                    'Mesh_data':'Mesh'
+                                    }
         return minimal_content_index_dic, minimal_content_type_dic
 
 class SampleDataTests(unittest.TestCase):
@@ -82,6 +94,15 @@ class SampleDataTests(unittest.TestCase):
         # Create a data array
         self.data_array = np.array([ math.tan(x) for x in
                                        np.linspace(-math.pi/4,math.pi/4,51)])
+        # Create numpy dtype and structure array
+        # WARNING: Pytables transforms all strings into bytes
+        #          --> use only bytes in dtypes
+        self.dtype1 = np.dtype([('density', np.float32),
+                                ('melting_Pt', np.float32),
+                                ('Chemical_comp', 'S', 30)])
+        self.struct_array1 = np.array([(6.0,1232,'Cu2O'), (5.85,2608,'ZrO2')],
+                                      dtype=self.dtype1)
+        # Test file pathes
         self.filename = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,
                                      'test_sampledata')
         self.derived_filename = self.filename+'_derived'
@@ -202,30 +223,51 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(derived_sample.__contains__('GrainDataTable'))
         self.assertTrue(derived_sample.__contains__('Crystal_data'))
         self.assertTrue(derived_sample.__contains__('lattice_params'))
-        # assert data array nodes created are empty
-        self.assertTrue(derived_sample._is_empty('grain_map'))
+        self.assertTrue(derived_sample.__contains__('lattice_props'))
+        self.assertTrue(derived_sample.__contains__('grain_names'))
+        self.assertTrue(derived_sample.__contains__('Mesh_data'))
+        # # assert data items created are empty, except for Groups
         self.assertTrue(derived_sample._is_empty('Image_data'))
+        self.assertTrue(derived_sample._is_empty('grain_map'))
         self.assertTrue(derived_sample._is_empty('GrainDataTable'))
         self.assertTrue(derived_sample._is_empty('lattice_params'))
+        self.assertTrue(derived_sample._is_empty('lattice_props'))
+        self.assertTrue(derived_sample._is_empty('grain_names'))
+        self.assertTrue(derived_sample._is_empty('Mesh_data'))
         # get table node and assert description
-        tab = derived_sample.get_node('GrainDataTable')
+        descr = derived_sample.get_table_description('GrainDataTable')
         self.assertEqual(Test_GrainData.columns,
-                         tab.description._v_colobjects)
+                          descr._v_colobjects)
         # add columns to the table
         dtype = np.dtype([('name', np.str_, 16),('floats', np.float64, (2,))])
         derived_sample.add_tablecols('GrainDataTable', description=dtype)
         tab = derived_sample.get_node('GrainDataTable')
         self.assertTrue('name' in tab.colnames)
         self.assertTrue('floats' in tab.colnames)
+        # append other table with numpy array and verify it is no more empty
+        derived_sample.append_table('lattice_props', self.struct_array1)
+        self.assertFalse(derived_sample._is_empty('lattice_props'))
+        # append string array and verify that it is not empty
+        derived_sample.append_string_array('grain_names',
+                                           ['grain_1','grain_2', 'grain_3'])
+        self.assertFalse(derived_sample.get_attribute('empty', 'grain_names'))
         del derived_sample
         # reopen file and check that neqw columns have been added
-        derived_sample = Test_DerivedClass(filename=self.derived_filename,
-                                           autodelete=True,
-                                           overwrite_hdf5=False, verbose=True)
+        derived_sample = Test_DerivedClass(
+            filename=self.derived_filename, autodelete=True,
+            overwrite_hdf5=False, verbose=False)
         derived_sample.print_node_info('GrainDataTable')
         tab = derived_sample.get_node('GrainDataTable')
         self.assertTrue('name' in tab.colnames)
         self.assertTrue('floats' in tab.colnames)
+        # check other table values
+        props = derived_sample['lattice_props']
+        self.assertTrue(np.all(props == self.struct_array1))
+        # check string array values
+        name1 = derived_sample['grain_names'][0].decode('utf-8')
+        name2 = derived_sample['grain_names'][1].decode('utf-8')
+        self.assertEqual(name1,'grain_1')
+        self.assertEqual(name2, 'grain_2')
         del derived_sample
         self.assertTrue(not os.path.exists(self.derived_filename+'.h5'))
         self.assertTrue(not os.path.exists(self.derived_filename+'.xdmf'))
@@ -306,7 +348,7 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(sample.__contains__('Tmsh'))
         field1 = sample.get_node('test_field', as_numpy=True)
         self.assertEqual(field1.shape,(11,11,11))
-        field2 = sample.get_node('Tmsh_Im3D_test_field_Tetra_mesh',
+        field2 = sample.get_node('Tmsh_test_field_Tetra_mesh',
                                  as_numpy=True)
         self.assertEqual(field2.shape,(11*11*11,))
         self.assertEqual(field1.ravel()[37], field2.ravel()[37])

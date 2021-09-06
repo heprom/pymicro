@@ -26,8 +26,8 @@ Contents:
    :maxdepth: 2
     
    welcome
-   auto_examples/index.rst
    ../examples/SampleDataUserGuide/SampleDataUserGuide.rst
+   auto_examples/index.rst
    cookbook
    pymicro
    changelog

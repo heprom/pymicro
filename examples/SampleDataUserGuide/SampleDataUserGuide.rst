@@ -1,5 +1,5 @@
-Pymicro Data Platform: The Sample Data Class User Guide
-========================================================
+Pymicro Data Platform: The Sample Data and Microstructure Classes User Guide
+============================================================================
 
 The *pymicro* package is based on a data format designed
 to create, organize and manage efficiently complex multi-modal datasets, 
@@ -25,6 +25,9 @@ The first documentation page/notebook is an introduction, and does not
 contain Python code. It is dedicated to the presentation of the
 challenges that motivated the implementation of this data platform, and
 of its main features. 
+
+**The introduction is not yet part of the documentation, it will be
+as soons as the presenting publication of the code will be released.**
 
 The other pages/notebooks are tutorials that will introduce you to the
 various functionnalites of the platform, the different data item types
@@ -59,6 +62,5 @@ guide !**
    3_SampleData_Image_groups.ipynb
    4_SampleData_Mesh_groups.ipynb
    5_SampleData_data_compression.ipynb
-   6_SampleData_inheritance.ipynb
-   7_SampleData_Interfaces.ipynb
-   8_SampleData_Quick_Reference_Sheet.ipynb
+   6_SampleData_inheritance_and_Microstructure_class.ipynb
+   SampleData_Quick_Reference_Sheet.ipynb

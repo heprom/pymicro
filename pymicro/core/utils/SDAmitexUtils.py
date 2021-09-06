@@ -23,11 +23,21 @@ class SDAmitexIO():
     """
 
     @staticmethod
-    def load_std(std_path):
-        """Read content of a .std file and returns as Numpy structured array.
+    def load_std(std_path, start=None, step=None, stop=None):
+        """Return content of a .m/z/std file  as Numpy structured array.
+
+        Allow to read a standard output file of Amitex_fftp: .std, .mstd
+        or .zstd. The file can be read with a specific start, step and stop
+        slicing.
 
         :param std_path: name/path of the .std file.
         :type std_path: Path(pathlib) object or string
+        :param start: starting row index to read output
+        :type start: int
+        :param step: spacing between rows to read
+        :type step: int
+        :param stop: index of the last row to read
+        :type stop: int
         :return: Results, Numpy structured array containing the output values
             in .std file: the array fields are 'time', 'sigma' (Cauchy stress),
             'epsilon' (small strains tensor), 'sigma_rms' and 'epsilon_rms'
@@ -71,10 +81,10 @@ class SDAmitexIO():
                            ('epsilon_rms', np.double, (6,)),
                            ('N_iterations', np.double, (1,))])
         # fill results array for each time step
-        N_times = len(std_lines)
-        Results = np.empty(shape=(N_times,), dtype=dt)
+        N_rows = len(std_lines)
+        Results = np.empty(shape=(N_rows,), dtype=dt)
         if finite_strain:
-            for t in range(N_times):
+            for t in range(N_rows):
                 Results[t]['time'] = std_lines[t][0]
                 Results[t]['sigma'] = std_lines[t][[1,2,3,4,6,5]]
                 Results[t]['boussinesq'] = std_lines[t][[7,8,9,10,14,13,11,15,
@@ -90,14 +100,24 @@ class SDAmitexIO():
                                                          60,57]]
                 Results[t]['N_iterations'] = std_lines[t][-1]
         else:
-            for t in range(N_times):
+            for t in range(N_rows):
                 Results[t]['time'] = std_lines[t][0]
-                Results[t]['sigma'] = std_lines[t][[1,2,3,4,6,5]]
-                Results[t]['epsilon'] = std_lines[t][[7,8,9,10,12,11]]
-                Results[t]['sigma_rms'] = std_lines[t][[13,14,15,16,18,17]]
-                Results[t]['epsilon_rms'] = std_lines[t][[19,20,21,22,24,23]]
+                Results[t]['sigma'][0:3] = std_lines[t][[1,2,3]]
+                Results[t]['sigma'][3:6] = 0.5*std_lines[t][[4,6,5]]
+                Results[t]['epsilon'][0:3] = std_lines[t][[7,8,9]]
+                Results[t]['epsilon'][3:6] = 0.5*std_lines[t][[10,12,11]]
+                Results[t]['sigma_rms'][0:3] = std_lines[t][[13,14,15]]
+                Results[t]['sigma_rms'][3:6] = 0.5*std_lines[t][[16,18,17]]
+                Results[t]['epsilon_rms'][0:3] = std_lines[t][[19,20,21]]
+                Results[t]['epsilon_rms'][3:6] = 0.5*std_lines[t][[22,24,23]]
                 Results[t]['N_iterations'] = std_lines[t][-1]
-        return Results
+        if start is None:
+            start = 0
+        if stop is None:
+            stop = N_rows
+        if step is None:
+            step = 1
+        return Results[start:stop:step]
 
     @staticmethod
     def load_amitex_output_fields(vtk_basename, grip_size=0, ext_size=0,

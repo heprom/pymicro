@@ -243,10 +243,18 @@ class Orientation:
                 break
         return uvw
 
+    @staticmethod
     def fzDihedral(rod, n):
         """check if the given Rodrigues vector is in the fundamental zone.
 
-        After book from Morawiecz.
+        After book from Morawiec :cite`Morawiec_2004`:
+
+        .. pull_quote::
+
+          The asymmetric domain is a prism with 2n-sided polygons (at the
+          distance $h_n$ from 0) as prism bases, and $2n$ square prism faces at
+          the distance $h_2 = 1$. The bases are perpendicular to the n-fold axis
+          and the faces are perpendicular to the twofold axes.
         """
         # top and bottom face at +/-tan(pi/2n)
         t = np.tan(np.pi / (2 * n))
@@ -271,13 +279,20 @@ class Orientation:
 
         For a given crystal symmetry, several rotations can describe the same
         physcial crystllographic arangement. The Rodrigues fundamental zone
-        restrict the orientation space accordingly.
+        (also called the asymmetric domain) restricts the orientation space
+        accordingly.
+
+        :param symmetry: the `Symmetry` to use.
+        :return bool: True if this orientation is in the fundamental zone,
+        False otherwise.
         """
         r = self.rod
         if symmetry == Symmetry.cubic:
             inFZT23 = np.abs(r).sum() <= 1.0
             # in the cubic symmetry, each component must be < 2 ** 0.5 - 1
             inFZ = inFZT23 and np.abs(r).max() <= 2 ** 0.5 - 1
+        elif symmetry == Symmetry.hexagonal:
+            inFZ = Orientation.fzDihedral(r, 6)
         else:
             raise (ValueError('unsupported crystal symmetry: %s' % symmetry))
         return inFZ
@@ -2751,7 +2766,7 @@ class Microstructure(SampleData):
         :param int grain_id: the grain id to dilate.
         :param int dilation_steps: the number of dilation steps to apply.
         :param bool use_mask: if True and that this microstructure has a mask,
-            the dilation will be limite by it.
+            the dilation will be limited by it.
         """
         grain_map = self.get_grain_map(as_numpy=True)
         grain_volume_init = (grain_map == grain_id).sum()

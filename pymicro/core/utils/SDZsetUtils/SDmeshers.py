@@ -725,8 +725,8 @@ class SDImageMesher():
         # Resize mesh to Image domain
         image_group = self.data.get_attribute('parent_grid_path',
                                               multiphase_image_name)
-        Im_range = (self.data.get_attribute('dimension',image_group)[[2,1,0]]
-                    * self.data.get_attribute('spacing',image_group)[[2,1,0]])
+        Im_range = (self.data.get_attribute('dimension',image_group)
+                    * self.data.get_attribute('spacing',image_group))
         Im_origin = self.data.get_attribute('origin',image_group)
         # get mesh nodes and rescale mesh
         from pymicro.core.utils.SDGridUtils import SDMeshTools
@@ -854,8 +854,6 @@ class SDImageMesher():
         Im_sp = self.data.get_attribute('spacing',image_group)[[1,0]]
         Im_range =  Im_dim*Im_sp
         Im_origin = self.data.get_attribute('origin',image_group)
-        print(f'Im dimension {Im_dim} spacing {Im_sp}')
-        print(f'Im range is {Im_range}')
         # get mesh nodes and rescale mesh
         from pymicro.core.utils.SDGridUtils import SDMeshTools
         SDMeshTools.rescale_and_translate_mesh(

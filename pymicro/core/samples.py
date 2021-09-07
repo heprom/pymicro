@@ -999,9 +999,11 @@ class SampleData:
         image_object.SetOrigin(origin)
         image_object.SetSpacing(spacing)
         image_object.elemFields[fieldname] = field_array
-        self.add_image(image_object, imagename, indexname, location,
-                       description, replace, compression_options,
-                       field_indexprefix=imagename+'_')
+        self.add_image(image_object, imagename=imagename,
+                       indexname=indexname, location=location,
+                       description=description, replace=replace,
+                       compression_options=compression_options,
+                       field_indexprefix=(imagename+'_'))
         return
 
     def add_grid_time(self, gridname, time_list):

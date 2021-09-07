@@ -1719,7 +1719,12 @@ class Microstructure(SampleData):
         elif grain_map.ndim == 2:
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
-            grain_map = grain_map.reshape((new_dim))
+            if len(new_dim) == 3:
+                grain_map = grain_map.reshape((new_dim))
+            else:
+                grain_map = grain_map.reshape((grain_map.shape[0],
+                                               grain_map.shape[1],
+                                               1))
         return grain_map
 
     def get_phase_map(self, as_numpy=True):
@@ -1729,7 +1734,12 @@ class Microstructure(SampleData):
         elif phase_map.ndim == 2:
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
-            phase_map = phase_map.reshape((new_dim))
+            if len(new_dim) == 3:
+                phase_map = phase_map.reshape((new_dim))
+            else:
+                phase_map = phase_map.reshape((phase_map.shape[0],
+                                               phase_map.shape[1],
+                                               1))
         return phase_map
 
     def get_mask(self, as_numpy=False):
@@ -1739,7 +1749,12 @@ class Microstructure(SampleData):
         elif mask.ndim == 2:
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
-            mask = mask.reshape((new_dim))
+            if len(new_dim) == 3:
+                mask = mask.reshape((new_dim))
+            else:
+                mask = mask.reshape((mask.shape[0],
+                                     mask.shape[1],
+                                               1))
         return mask
 
     def get_ids_from_grain_map(self):

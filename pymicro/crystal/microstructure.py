@@ -2357,7 +2357,8 @@ class Microstructure(SampleData):
             omap_Z[slc] = grain_orientations[i, 2]
         if store:
             self.add_field(gridname='CellData', fieldname='orientation_map',
-                           array=orientation_map, replace=True)
+                           array=orientation_map, replace=True,
+                           location='CellData')
         return orientation_map
 
     def add_IPF_maps(self):

@@ -1718,8 +1718,8 @@ class Microstructure(SampleData):
             grain_map = None
         elif grain_map.ndim == 2:
             # reshape to 3D
-            grain_map = grain_map.reshape((grain_map.shape[0],
-                                           grain_map.shape[1], 1))
+            new_dim = self.get_attribute('dimension', 'CellData')
+            grain_map = grain_map.reshape((new_dim))
         return grain_map
 
     def get_phase_map(self, as_numpy=True):
@@ -1728,8 +1728,8 @@ class Microstructure(SampleData):
             phase_map = None
         elif phase_map.ndim == 2:
             # reshape to 3D
-            phase_map = phase_map.reshape((phase_map.shape[0],
-                                           phase_map.shape[1], 1))
+            new_dim = self.get_attribute('dimension', 'CellData')
+            phase_map = phase_map.reshape((new_dim))
         return phase_map
 
     def get_mask(self, as_numpy=False):
@@ -1738,8 +1738,8 @@ class Microstructure(SampleData):
             mask = None
         elif mask.ndim == 2:
             # reshape to 3D
-            mask = mask.reshape((mask.shape[0],
-                                 mask.shape[1], 1))
+            new_dim = self.get_attribute('dimension', 'CellData')
+            mask = mask.reshape((new_dim))
         return mask
 
     def get_ids_from_grain_map(self):
@@ -2019,10 +2019,8 @@ class Microstructure(SampleData):
             # ensure (Nx,Ny,1) array will be stored as (Nx,Ny)
             if self._get_group_type('CellData')  == '2DImage':
                 grain_map = grain_map.squeeze()
-            print('coucou')
             self.add_field(gridname='CellData', fieldname=map_name,
-                           array=grain_map, replace=True,
-                           indexname='grain_map')
+                           array=grain_map, replace=True)
         self.set_active_grain_map(map_name)
         return
 
@@ -2374,7 +2372,7 @@ class Microstructure(SampleData):
         :param axis: the unit vector for the load direction to compute IPF
             colors.
         """
-        dims = self.get_attribute('dimension', 'CellData')
+        dims = list(self.get_grain_map().shape)
         grain_ids = self.get_grain_ids()
         shape_ipf_map = list(dims) + [3]
         ipf_map = np.zeros(shape=shape_ipf_map, dtype=float)
@@ -2392,7 +2390,7 @@ class Microstructure(SampleData):
             ).get_symmetry(), saturate=True)
             progress = 100 * (1 + i) / len(grain_ids)
             print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
-        return ipf_map
+        return ipf_map.squeeze()
 
     def view_slice(self, slice=None, color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,

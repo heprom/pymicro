@@ -2993,7 +2993,7 @@ class SampleData:
         if store:
             if fieldname is None:
                 fieldname = meshname+'_elset_ids'
-                c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
+            c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
             self.add_field(gridname=meshname, fieldname=fieldname,
                            array=ID_field, replace=True,
                            compression_options=c_opt)

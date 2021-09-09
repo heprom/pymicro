@@ -2749,10 +2749,13 @@ class Microstructure(SampleData):
             is 1 voxel).
         :return: a list (possibly empty) of the neighboring grain ids.
         """
-        grain_map = self.get_grain_map(as_numpy=True)
+        # get the bounding box around the grain
+        bb = self.grains.read_where('idnumber == %d' % grain_id)['bounding_box'][0]
+        grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                         bb[1][0]:bb[1][1],
+                                         bb[2][0]:bb[2][1]]
         if grain_map is None:
             return []
-        # TODO: use the grain bounding box to speed this up
         grain_data = (grain_map == grain_id)
         grain_data_dil = ndimage.binary_dilation(grain_data,
                                                  iterations=distance).astype(

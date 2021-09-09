@@ -1761,9 +1761,9 @@ class HklPlane(HklObject):
         return trace
 
     @staticmethod
-    def plot_slip_traces(orientation, hkl='111', n_int=np.array([0, 0, 1]), \
-                         view_up=np.array([0, 1, 0]), verbose=False, title=True, legend=True, \
-                         trans=False, str_plane=None):
+    def plot_slip_traces(orientation, hkl='111', n_int=np.array([0, 0, 1]),
+                         view_up=np.array([0, 1, 0]), verbose=False, title=True,
+                         legend=True, trans=False, str_plane=None):
         """
         A method to plot the slip planes intersection with a particular plane
         (known as slip traces if the plane correspond to the surface).
@@ -1771,7 +1771,8 @@ class HklPlane(HklObject):
         Thank to Jia Li for starting this code.
 
         :param orientation: The crystal orientation.
-        :param hkl: the slip plane family (eg. 111 or 110)
+        :param hkl: a string representing the slip plane family (eg. 111 or 110)
+        or the list of HklPlane instances.
         :param n_int: normal to the plane of intersection.
         :param view_up: vector to place upwards on the plot.
         :param verbose: activate verbose mode.
@@ -1781,7 +1782,16 @@ class HklPlane(HklObject):
         :param str_plane: particular string to use to represent the plane in the image name.
         """
         plt.figure()
-        hkl_planes = HklPlane.get_family(hkl)
+        if type(hkl) == list:
+            hkl_planes = hkl
+        else:
+            hkl_planes = HklPlane.get_family(hkl)
+        if not len(hkl_planes) > 0:
+            raise ValueError('no item found in the list of lattice planes to '
+                             'display, please check your parameters')
+        elif not isinstance(hkl_planes[0], HklPlane):
+            raise ValueError('items the list of lattice planes must be '
+                             'instances of the HklPlane class')
         colors = 'rgykcmbw'
         for i, hkl_plane in enumerate(hkl_planes):
             trace = hkl_plane.slip_trace(orientation, n_int=n_int, view_up=view_up, trace_size=1, verbose=verbose)

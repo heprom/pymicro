@@ -1294,6 +1294,29 @@ class Orientation:
             schmid_factor_list.append(sf)
         return schmid_factor_list
 
+    @staticmethod
+    def compute_m_factor(o1, ss1, o2, ss2):
+        """Compute the m factor with another slip system.
+
+        :param Orientation o1: the orientation the first grain.
+        :param SlipSystem ss1: the slip system in the first grain.
+        :param Orientation o2: the orientation the second grain.
+        :param SlipSystem ss2: the slip system in the second grain.
+        :returns: the m factor as a float number < 1
+        """
+        # orientation matrices
+        gt1 = o1.orientation_matrix().T
+        gt2 = o2.orientation_matrix().T
+        # slip plane normal in sample local frame
+        n1 = np.dot(gt1, ss1.get_slip_plane().normal())
+        n2 = np.dot(gt2, ss2.get_slip_plane().normal())
+        # slip direction in sample local frame
+        l1 = np.dot(gt1, ss1.get_slip_direction().direction())
+        l2 = np.dot(gt2, ss2.get_slip_direction().direction())
+        # m factor calculation
+        m = np.dot(n1, n2) * np.dot(l1, l2)
+        return m
+
 
 class Grain:
     """

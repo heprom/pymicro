@@ -1314,7 +1314,7 @@ class Orientation:
         l1 = np.dot(gt1, ss1.get_slip_direction().direction())
         l2 = np.dot(gt2, ss2.get_slip_direction().direction())
         # m factor calculation
-        m = np.dot(n1, n2) * np.dot(l1, l2)
+        m = abs(np.dot(n1, n2) * np.dot(l1, l2))
         return m
 
 

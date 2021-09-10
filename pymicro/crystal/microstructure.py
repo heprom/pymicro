@@ -244,6 +244,30 @@ class Orientation:
         return uvw
 
     @staticmethod
+    def compute_mean_orientation(rods, symmetry=Symmetry.cubic):
+        """Compute the mean orientation.
+
+        This function computes a mean orientation from several data points
+        representing orientations. Each orientation is first moved to the
+        fundamental zone, then the corresponding Rodrigues vectors can be
+        averaged to compute the mean orientation.
+
+        :param ndarray rods: a (n, 3) shaped array containing the Rodrigues
+        vectors of the orientations.
+        :param `Symmetry` symmetry: the symmetry used to move orientations
+        to their fundamental zone (cubic by default)
+        :returns: the mean orientation as an `Orientation` instance.
+        """
+        rods_fz = np.empty_like(rods)
+        for i in range(len(rods)):
+            g = Orientation.from_rodrigues(rods[i]).orientation_matrix()
+            g_fz = symmetry.move_rotation_to_FZ(g, verbose=False)
+            o_fz = Orientation(g_fz)
+            rods_fz[i] = o_fz.rod
+        mean_orientation = Orientation.from_rodrigues(np.mean(rods_fz, axis=0))
+        return mean_orientation
+
+    @staticmethod
     def fzDihedral(rod, n):
         """check if the given Rodrigues vector is in the fundamental zone.
 

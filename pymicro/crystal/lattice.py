@@ -980,17 +980,17 @@ class Lattice:
 
 
 class SlipSystem:
-    '''A class to represent a crystallographic slip system.
+    """A class to represent a crystallographic slip system.
 
     A slip system is composed of a slip plane (most widely spaced planes
     in the crystal) and a slip direction (highest linear density of atoms
     in the crystal).
-    '''
+    """
 
     def __init__(self, plane, direction):
-        '''Create a new slip system object with the given slip plane and
+        """Create a new slip system object with the given slip plane and
         slip direction.
-        '''
+        """
         self._plane = plane
         self._direction = direction
 
@@ -1128,10 +1128,13 @@ class SlipSystem:
 
 
 class HklObject:
+    """An abstract class to represent an object related to a crystal lattice
+    and which can be described by Miller indices."""
+
     def __init__(self, h, k, l, lattice=None):
-        '''Create a new hkl object with the given Miller indices and
+        """Create a new hkl object with the given Miller indices and
            crystal lattice.
-        '''
+        """
         if lattice == None:
             lattice = Lattice.cubic(1.0)
         self._lattice = lattice
@@ -1163,9 +1166,7 @@ class HklObject:
         return self._l
 
     def miller_indices(self):
-        '''
-        Returns an immutable tuple of the plane Miller indices.
-        '''
+        """Returns an immutable tuple of the plane Miller indices."""
         return (self._h, self._k, self._l)
 
     @staticmethod

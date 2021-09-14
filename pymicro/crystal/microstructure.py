@@ -1027,7 +1027,7 @@ class Orientation:
         """Compute the rodrigues vector from the 3 euler angles (in degrees).
 
         :param euler: the 3 Euler angles (in degrees).
-        :return: the roodrigues vector as a 3 components numpy array.
+        :return: the rodrigues vector as a 3 components numpy array.
         """
         (phi1, Phi, phi2) = np.radians(euler)
         a = 0.5 * (phi1 - phi2)
@@ -1036,6 +1036,23 @@ class Orientation:
         r2 = np.tan(0.5 * Phi) * np.sin(a) / np.cos(b)
         r3 = np.tan(b)
         return np.array([r1, r2, r3])
+
+    @staticmethod
+    def eu2ro(euler):
+        """Transform a series of euler angles into rodrigues vectors.
+
+        :param ndarray euler: the (n, 3) shaped array of Euler angles (radians).
+        :returns: a (n, 3) array with the rodrigues vectors.
+        """
+        if euler.ndim != 2 or euler.shape[1] != 3:
+            raise ValueError('Wrong shape for the euler array: %s -> should be (n, 3)' % euler.shape)
+        phi1, Phi, phi2 = np.squeeze(np.split(euler, 3, axis=1))
+        a = 0.5 * (phi1 - phi2)
+        b = 0.5 * (phi1 + phi2)
+        r1 = np.tan(0.5 * Phi) * np.cos(a) / np.cos(b)
+        r2 = np.tan(0.5 * Phi) * np.sin(a) / np.cos(b)
+        r3 = np.tan(b)
+        return np.array([r1, r2, r3]).T
 
     @staticmethod
     def Euler2OrientationMatrix(euler):
@@ -2187,18 +2204,19 @@ class Microstructure(SampleData):
             with removed grain with this new name. If not, overright  the
             current active grain map
         """
-        if sync_table:
+        if sync_table and not self._is_empty('grain_map'):
             self.sync_grain_table_with_grain_map(sync_geometry=True)
         condition = f"(volume <= {min_volume})"
         id_list = self.grains.read_where(condition)['idnumber']
-        # Remove grains from grain map
-        grain_map = self.get_grain_map()
-        grain_map[np.where(np.isin(grain_map,id_list))] = 0
-        if new_grain_map_name is not None:
-            map_name = new_grain_map_name
-        else:
-            map_name = self.active_grain_map
-        self.set_grain_map(grain_map.squeeze(), map_name=map_name)
+        if not self._is_empty('grain_map'):
+            # Remove grains from grain map
+            grain_map = self.get_grain_map()
+            grain_map[np.where(np.isin(grain_map,id_list))] = 0
+            if new_grain_map_name is not None:
+                map_name = new_grain_map_name
+            else:
+                map_name = self.active_grain_map
+            self.set_grain_map(grain_map.squeeze(), map_name=map_name)
         # Remove grains from table
         self.remove_grains_from_table(id_list)
         return
@@ -4367,18 +4385,19 @@ class Microstructure(SampleData):
             progress = 100 * (1 + grain_ids_list.index(gid)) / len(grain_ids_list)
             print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
                 progress, gid), end='\r')
-            # use the first pixel of the grain
-            idx = np.where(grain_ids == gid)[0][0]
-            idy = np.where(grain_ids == gid)[1][0]
-            # TODO compute mean grain orientation
-            # IMPORTANT: indexes idx and idy are inverted because 'get_node' is
-            # without option 'as_numpy=True', to leverage HDF5 lazy access to
-            # data. As Image fields are stored with their dimension transposed
-            # (to be consistent with ordering convention of both SampleData and
-            # Paraview/XDMF) indexes must be inverted here.
-            local_euler = np.degrees(micro.get_node('euler')[idy, idx,:])
-            o_tsl = Orientation.from_euler(local_euler)
-            # TODO link OimScan lattice to pymicro
+            # get the symmetry for this grain
+            phase_grain = scan.phase[np.where(grain_ids == 1)]
+            assert len(np.unique(phase_grain)) == 1  # all pixel of this grain must have the same phase id by
+            # construction
+            grain_phase_id = phase_grain[0]
+            sym = scan.phase_list[grain_phase_id].get_symmetry()
+            # compute the mean orientation for this grain
+            euler_grain = scan.euler[np.where(grain_ids == gid)]
+            #euler_grain = np.atleast_2d(euler_grain)  # for one pixel grains
+            euler_grain = euler_grain
+            rods = Orientation.eu2ro(euler_grain)
+            rods = np.atleast_2d(rods)  # for one pixel grains
+            o_tsl = Orientation.compute_mean_orientation(rods, symmetry=sym)
             grains['idnumber'] = gid
             grains['orientation'] = o_tsl.rod
             grains.append()

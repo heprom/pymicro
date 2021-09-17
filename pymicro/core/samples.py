@@ -34,8 +34,6 @@ from pymicro.core.global_variables import (XDMF_FIELD_TYPE,
 # Import variables for SampleData data model
 from pymicro.core.global_variables import (SD_GROUP_TYPES, SD_GRID_GROUPS,
                                            SD_IMAGE_GROUPS, SD_MESH_GROUPS)
-# Import variables for SampleData utilities
-from pymicro.core.global_variables import (COMPRESSION_KEYS)
 
 
 class SampleData:
@@ -1622,7 +1620,6 @@ class SampleData:
             must match de table description.
         """
         table = self.get_node(name)
-        current_dtype = table.dtype
         table.append(data)
         table.flush()
         return

@@ -1017,6 +1017,9 @@ class SampleData:
         :param list(float) time_list: List of times to add to the grid. Can
             also be passed as a numpy array.
         """
+        # WARNING : BUG, XDMF grids must be in increasing time order
+        # not ensured
+        # TODO: Create a method sort xdmf grids with time
         # if time_list is passed as a numpy array, transform it into a list
         if isinstance(time_list, np.ndarray):
             time_list = time_list.tolist()
@@ -1024,6 +1027,7 @@ class SampleData:
             time_list = [time_list]
         if isinstance(time_list, int):
             time_list = [time_list]
+        time_list = sorted(time_list)
         # get xdmf node of main grid
         xdmf_gridname = self.get_attribute('xdmf_gridname',gridname)
         grid = self._find_xdmf_grid(xdmf_gridname)

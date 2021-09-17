@@ -3678,7 +3678,8 @@ class Microstructure(SampleData):
 
     def from_amitex_fftp(self, results_basename, grip_size=0, ext_size=0,
                          grip_dim=2, sim_prefix='Amitex', int_var_names=dict(),
-                         finite_strain=False):
+                         finite_strain=False, load_fields=True,
+                         compression_options=dict()):
         """Read output of a Amitex_fftp simulation and stores in dataset.
 
         Read a Amitex_fftp result directory containing a mechanical simulation
@@ -3727,9 +3728,10 @@ class Microstructure(SampleData):
             these variables in the dataset.
         :type int_var_names: dict, optional
         """
+        # TODO: add grain map to all time steps
         from pymicro.core.utils.SDAmitexUtils import SDAmitexIO
         # Get std file result
-        p_mstd = Path(results_basename).absolute().with_suffix('.mstd')
+        p_mstd = Path(str(results_basename)).absolute().with_suffix('.mstd')
         # safety check
         if not p_mstd.exists():
             raise ValueError('results not found, "results_basename" argument'
@@ -3740,45 +3742,74 @@ class Microstructure(SampleData):
         step = 1
         if grip_size > 0:
             step += 1
-        if ext_size >0:
+        if ext_size >0 :
             step += 1
+        elif not self._is_empty('mask'):
+            # if mask used as exterior in computation but exterior size = 0
+            # still eed to add 1 to step as .mstd will have three lines per
+            # increment
+            if np.any(self['mask'] == 0):
+                step += 1
         std_res = SDAmitexIO.load_std(p_mstd, step=step)
+        # load .zstd results
+        p_zstd = Path(str(results_basename)+'_1').with_suffix('.zstd')
+        if p_zstd.exists():
+            zstd_res = SDAmitexIO.load_std(p_zstd, Int_var_names=int_var_names)
         # Store macro data in specific group
         self.add_group(groupname=f'{sim_prefix}_Results', location='/',
                        indexname='fft_sim', replace=True)
         # std_res is a numpy structured array whose fields depend on
         # the type of output (finite strain ou infinitesimal strain sim.)
-        # ==> we iterate over dtype fields to fill the dataset with
-        #     output data
+        # ==> we load it into the dataset as a structured table data item.
         self.add_table(location='fft_sim', name='Standard_output',
                        indexname=f'{sim_prefix}_std',
                        description=std_res.dtype, data=std_res)
-        # for field in std_res.dtype.fields:
-        #     self.add_data_array(location='fft_sim', name=f'{field}',
-        #                         array=std_res[field])
+        # idem for zstd --> Add as Mechanical Grain Data Table
+        if p_zstd.exists():
+            self.add_table(location='GrainData',
+                           name='MechanicalGrainDataTable',
+                           indexname='Mech_Grain_Data',
+                           description=zstd_res.dtype, data=zstd_res)
+            grainIDs = self.get_grain_ids()
+            N_zone_times = int(zstd_res.shape[0]/ len(grainIDs))
+            dtype_col = np.dtype([('grain_ID', np.int)])
+            IDs = np.tile(grainIDs, N_zone_times).astype(dtype_col)
+            self.add_tablecols(tablename='MechanicalGrainDataTable',
+                               description=IDs.dtype, data=IDs)
+        # End of macroscopic data loading. Check if field data must be loaded.
+        if not load_fields:
+            return
         # Get vtk files results
-        Stress, Strain, VarInt = SDAmitexIO.load_amitex_output_fields(
+        Stress, Strain, VarInt, Incr_list = SDAmitexIO.load_amitex_output_fields(
             results_basename, grip_size=grip_size, ext_size=ext_size,
             grip_dim=2)
         ## Loop over time steps: create group to store results
-        self.add_group(groupname=f'{sim_prefix}_output_fields', location='/CellData',
-                        indexname='fft_fields', replace=True)
+        self.add_group(groupname=f'{sim_prefix}_fields',
+                       location='/CellData', indexname='fft_fields',
+                       replace=True)
         # Create CellData temporal subgrids for each time value with a vtk
         # field output
-        time_values = std_res['time'][list(Stress.keys())].squeeze()
+        time_values = std_res['time'][Incr_list].squeeze()
+        if len(time_values) == 0:
+            time_values = [0.]
         self.add_grid_time('CellData', time_values)
+
         # Add fields to CellData grid collections
         for incr in Stress:
-            Time = std_res['time'][incr]
+            Time = std_res['time'][incr].squeeze()
             fieldname = f'{sim_prefix}_stress'
             self.add_field(gridname='CellData', fieldname=fieldname,
                             array=Stress[incr], location='fft_fields',
-                            time=Time)
+                            time=Time, compression_options=compression_options)
+        for incr in Strain:
+            Time = std_res['time'][incr].squeeze()
             fieldname = f'{sim_prefix}_strain'
             self.add_field(gridname='CellData', fieldname=fieldname,
                             array=Strain[incr], location='fft_fields',
-                            time=Time)
-            for mat in VarInt:
+                            time=Time, compression_options=compression_options)
+        for mat in VarInt:
+            for incr in VarInt[mat]:
+                Time = std_res['time'][incr].squeeze()
                 for var in VarInt[mat][incr]:
                     varname = var
                     if int_var_names.__contains__(var):
@@ -3786,7 +3817,8 @@ class Microstructure(SampleData):
                     fieldname = f'{sim_prefix}_mat{mat}_{varname}'
                     self.add_field(gridname='CellData', fieldname=fieldname,
                                     array=VarInt[mat][incr][var],
-                                    location='fft_fields', time=Time)
+                                    location='fft_fields', time=Time,
+                                     compression_options=compression_options)
         return
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):

@@ -8,8 +8,27 @@
 import os
 import numpy as np
 import vtk
+import re
 
 from pathlib import Path
+
+# Lists of fields for Numpy dtypes mapping Amitex standard output files content
+Amitex_std_finite_strain = [('time', np.double ),
+                           ('sigma', np.double, (6,)),
+                           ('grad_u', np.double, (9,)),
+                           ('sigma_rms', np.double, (6,)),
+                           ('grad_u_rms', np.double, (9,))]
+
+                           # ('boussinesq', np.double, (9,)),
+                           # ('GL_strain', np.double, (6,)),
+                           # ('boussinesq_rms', np.double, (9,)),
+                           # ('GL_strain_rms', np.double, (6,)),
+
+Amitex_std_hpp = [('time', np.double),
+                  ('sigma', np.double, (6,)),
+                  ('epsilon', np.double, (6,)),
+                  ('sigma_rms', np.double, (6,)),
+                  ('epsilon_rms', np.double, (6,))]
 
 # SD Amitex interface class
 class SDAmitexIO():
@@ -23,7 +42,8 @@ class SDAmitexIO():
     """
 
     @staticmethod
-    def load_std(std_path, start=None, step=None, stop=None):
+    def load_std(std_path, start=None, step=None, stop=None,
+                 Int_var_names=dict()):
         """Return content of a .m/z/std file  as Numpy structured array.
 
         Allow to read a standard output file of Amitex_fftp: .std, .mstd
@@ -46,11 +66,15 @@ class SDAmitexIO():
             each increment.
         :rtype:
         """
-        # TODO: implement reading results with start:step:stop
         finite_strain=False
         std_lines = []
         p = Path(std_path).absolute()
-        # read txt content of .std file
+        # get pattern to find out which internal variables values are outputed
+        # (for .zstd only)
+        pattern = re.compile('variable interne \d+')
+        idx_pattern = re.compile('\d+e')
+        varInt_names = dict()
+        # read txt content of .std or .mstd or .zstd file
         with open(p,'r') as f:
             l = f.readline()
             while l:
@@ -60,45 +84,48 @@ class SDAmitexIO():
                 else:
                     if 'xx,yy,zz,xy,xz,yz,yx,zx,zy' in l:
                         finite_strain = True
+                    if 'variable interne' in l:
+                        suffix = ''
+                        if 'ecart type' in l:
+                            suffix = '_std'
+                        varInt_number = int(pattern.findall(l)[0].split()[2])
+                        varInt_index = int(idx_pattern.findall(l)[0][:-1])
+                        if varInt_number in Int_var_names:
+                            name = f'{Int_var_names[varInt_number]}'+suffix
+                            varInt_names[name] = varInt_index - 1
+                        else:
+                            name = f'varInt_{varInt_number}'+suffix
+                            varInt_names[name] = varInt_index - 1
                 l = f.readline()
         # create Numpy structured array
         if finite_strain:
-            dt = np.dtype([('time', np.double, (1,)),
-                           ('sigma', np.double, (6,)),
-                           ('boussinesq', np.double, (9,)),
-                           ('GL_strain', np.double, (6,)),
-                           ('grad_u', np.double, (9,)),
-                           ('sigma_rms', np.double, (6,)),
-                           ('boussinesq_rms', np.double, (9,)),
-                           ('GL_strain_rms', np.double, (6,)),
-                           ('grad_u_rms', np.double, (9,)),
-                           ('N_iterations', np.double, (1,))])
+            dtype_description = Amitex_std_finite_strain
         else:
-            dt = np.dtype([('time', np.double, (1,)),
-                           ('sigma', np.double, (6,)),
-                           ('epsilon', np.double, (6,)),
-                           ('sigma_rms', np.double, (6,)),
-                           ('epsilon_rms', np.double, (6,)),
-                           ('N_iterations', np.double, (1,))])
+            dtype_description = Amitex_std_hpp
+        for key in varInt_names:
+            dtype_description.append((key, np.double, (1,)))
+        dt = np.dtype(dtype_description)
         # fill results array for each time step
         N_rows = len(std_lines)
         Results = np.empty(shape=(N_rows,), dtype=dt)
         if finite_strain:
             for t in range(N_rows):
+                # load standard outputs
                 Results[t]['time'] = std_lines[t][0]
                 Results[t]['sigma'] = std_lines[t][[1,2,3,4,6,5]]
-                Results[t]['boussinesq'] = std_lines[t][[7,8,9,10,14,13,11,15,
-                                                         12]]
-                Results[t]['GL_strain'] = std_lines[t][[16,17,18,19,21,20]]
+                # Results[t]['boussinesq'] = std_lines[t][[7,8,9,10,14,13,11,15,
+                #                                          12]]
+                # Results[t]['GL_strain'] = std_lines[t][[16,17,18,19,21,20]]
                 Results[t]['grad_u'] = std_lines[t][[22,23,24,25,29,28,26,30,
                                                      27]]
                 Results[t]['sigma_rms'] = std_lines[t][[31,32,33,34,36,35]]
-                Results[t]['boussinesq_rms'] = std_lines[t][[37,38,39,40,44,43,
-                                                             41,45,42]]
-                Results[t]['GL_strain_rms'] = std_lines[t][[46,47,48,49,51,50]]
+                # Results[t]['boussinesq_rms'] = std_lines[t][[37,38,39,40,44,43,
+                #                                              41,45,42]]
+                # Results[t]['GL_strain_rms'] = std_lines[t][[46,47,48,49,51,50]]
                 Results[t]['grad_u_rms'] = std_lines[t][[52,53,54,55,59,58,56,
                                                          60,57]]
-                Results[t]['N_iterations'] = std_lines[t][-1]
+                for key, value in varInt_names.items():
+                    Results[t][key] = std_lines[t][value]
         else:
             for t in range(N_rows):
                 Results[t]['time'] = std_lines[t][0]
@@ -110,7 +137,9 @@ class SDAmitexIO():
                 Results[t]['sigma_rms'][3:6] = 0.5*std_lines[t][[16,18,17]]
                 Results[t]['epsilon_rms'][0:3] = std_lines[t][[19,20,21]]
                 Results[t]['epsilon_rms'][3:6] = 0.5*std_lines[t][[22,24,23]]
-                Results[t]['N_iterations'] = std_lines[t][-1]
+                for key, value in varInt_names.items():
+                    Results[t][key] = std_lines[t][value]
+
         if start is None:
             start = 0
         if stop is None:
@@ -121,7 +150,8 @@ class SDAmitexIO():
 
     @staticmethod
     def load_amitex_output_fields(vtk_basename, grip_size=0, ext_size=0,
-                                   grip_dim=2, Boussinesq_stress=False):
+                                   grip_dim=2, Boussinesq_stress=False,
+                                   Int_var_names=dict()):
         """Return stress/strain fields as numpy tensors from Amitex vtk output.
 
         This method loads stress, strain and internal variables output fields
@@ -160,8 +190,6 @@ class SDAmitexIO():
         :rtype: Dict of Numpy arrays for each increment
             {material(int):{Incr(int):{VarInt_number(int):[Nx,Ny,Nz,1]}}}
         """
-        # local imports
-        import re
         # initialize finite strain flag to False
         finite_strain = False
         # Check if strain outputs exist
@@ -186,24 +214,25 @@ class SDAmitexIO():
                 if len(fs_list) > 0:
                     finite_strain = True
                 eps_incr.append(incr)
-        # Get first value shape to initialize Strain output and
+        # Get first value shape to initialize output and
         # find output_slice
-        eps_tmp = SDAmitexIO.read_vtk_legacy(eps_files[0])
-        Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
-            init_shape=eps_tmp.shape, grip_size=grip_size, grip_dim=grip_dim,
-            ext_size=ext_size)
-        if finite_strain:
-            eps_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
-                         Sl[2,1] - Sl[2,0], 9)
-        else:
-            eps_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
-                         Sl[2,1] - Sl[2,0], 6)
-        Increments = np.unique(np.array(eps_incr))
-        # Initialize stress dict
+        if len(eps_files) > 0:
+            eps_tmp = SDAmitexIO.read_vtk_legacy(eps_files[0])
+            Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
+                init_shape=eps_tmp.shape, grip_size=grip_size, grip_dim=grip_dim,
+                ext_size=ext_size)
+            if finite_strain:
+                eps_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
+                             Sl[2,1] - Sl[2,0], 9)
+            else:
+                eps_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
+                             Sl[2,1] - Sl[2,0], 6)
+        Increments_eps = np.unique(np.array(eps_incr))
+        # Initialize strain dict
         Strain_dict = {}
-        for incr in Increments:
+        for incr in Increments_eps:
             Strain_dict[incr] = np.zeros(shape=eps_shape, dtype=np.double)
-        # Fill Stress dict with output
+        # Fill strain dict with output
         for file in eps_files:
             eps_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
             increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
@@ -238,16 +267,23 @@ class SDAmitexIO():
                                      'the directory has no increment number in'
                                      ' its name.')
                 sig_incr.append(incr)
-        Increments = np.unique(np.array(sig_incr))
+        # Get first value shape to initialize output and
+        # find output_slice
+        if len(sig_files) > 0:
+            sig_tmp = SDAmitexIO.read_vtk_legacy(sig_files[0])
+            Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
+                init_shape=sig_tmp.shape, grip_size=grip_size, grip_dim=grip_dim,
+                ext_size=ext_size)
+            if finite_strain and Boussinesq_stress:
+                sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
+                             Sl[2,1] - Sl[2,0], 9)
+            else:
+                sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
+                             Sl[2,1] - Sl[2,0], 6)
+        Increments_sig = np.unique(np.array(sig_incr))
         # Initialize stress dict
-        if finite_strain and Boussinesq_stress:
-            sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
-                         Sl[2,1] - Sl[2,0], 9)
-        else:
-            sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
-                         Sl[2,1] - Sl[2,0], 6)
         Stress_dict = {}
-        for incr in Increments:
+        for incr in Increments_sig:
             Stress_dict[incr] = np.zeros(shape=sig_shape, dtype=np.double)
         # Fill Stress dict with output
         for file in sig_files:
@@ -288,7 +324,14 @@ class SDAmitexIO():
                 varI_incr.append(incr)
                 if not varI_mat.__contains__(mat):
                     varI_mat.append(mat)
-        Increments = np.unique(np.array(varI_incr))
+        # Get first value shape to initialize output and
+        # find output_slice
+        if len(varI_files) > 0:
+            varI_tmp = SDAmitexIO.read_vtk_legacy(varI_files[0])
+            Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
+                init_shape=varI_tmp.shape, grip_size=grip_size,
+                grip_dim=grip_dim, ext_size=ext_size)
+        Increments_vI = np.unique(np.array(varI_incr))
         # Initialize internal variables dict
         VarInt_dict = {}
         for mat in varI_mat:
@@ -299,12 +342,21 @@ class SDAmitexIO():
             increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
             comp_list = comp_pattern.findall(file)
             component = int(comp_list[0].strip('varInt'))
-            mat = int(material_pattern.findall(filepath)[0].strip('_M'))
-            # TODO : dict[mat] = dict[incr] = dict[varint] --> triple dict
+            mat = int(material_pattern.findall(file)[0].strip('_M'))
             if not VarInt_dict[mat].__contains__(increment):
                 VarInt_dict[mat][increment] = {}
             VarInt_dict[mat][increment][component] = varInt_tmp
-        return Stress_dict, Strain_dict, VarInt_dict
+        # return non empty increment list
+        if len(Increments_eps) > 0:
+            Increments = Increments_eps
+        elif len(Increments_sig) > 0:
+            Increments = Increments_sig
+        elif len(Increments_vI) > 0:
+            Increments = Increments_vI
+        else:
+            Increments = []
+        Increments = sorted(Increments)
+        return Stress_dict, Strain_dict, VarInt_dict, Increments
 
     @staticmethod
     def read_vtk_legacy(vtk_path, output_slice=None):

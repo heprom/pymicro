@@ -163,6 +163,34 @@ class Symmetry(enum.Enum):
             return None
 
     @staticmethod
+    def from_space_group(space_group_number):
+        """Create an instance of the `Symmetry` class from a TSL symmetry
+        number.
+
+        :raise ValueError: if the space_group_number is not between 1 and 230.
+        :param int space_group_number: the number asociated with the
+        space group (between 1 and 230).
+        :return: an instance of the `Symmetry` class
+        """
+        if space_group_number < 1 or space_group_number > 230:
+          raise ValueError('space_group_number must be between 1 and 230')
+          return None
+        if space_group_number <= 2:
+            return Symmetry.triclinic
+        elif space_group_number <= 15:
+            return Symmetry.monoclinic
+        elif space_group_number <= 74:
+            return Symmetry.orthorhombic
+        elif space_group_number <= 142:
+            return Symmetry.tetragonal
+        elif space_group_number <= 167:
+            return Symmetry.trigonal
+        elif space_group_number <= 194:
+            return Symmetry.hexagonal
+        else:
+            return Symmetry.cubic
+
+    @staticmethod
     def from_tsl(tsl_number):
         """Create an instance of the `Symmetry` class from a TSL symmetry
         number.

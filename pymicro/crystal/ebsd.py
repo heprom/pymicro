@@ -79,9 +79,11 @@ class OimScan:
             scan = OimScan.read_osc(file_path)
         elif ext == '.ang':
             scan = OimScan.read_ang(file_path)
+        elif ext == '.ctf':
+            scan = OimScan.read_ctf(file_path)
         else:
-            raise ValueError('only HDF5, OSC or ANG formats are supported, '
-                             'please convert your scan')
+            raise ValueError('only HDF5, OSC, ANG or CTF formats are '
+                             'supported, please convert your scan')
         return scan
 
     @staticmethod
@@ -221,6 +223,78 @@ class OimScan:
             scan.iq = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
             scan.ci = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
             scan.phase = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
+        return scan
+
+    def read_ctf(file_path):
+        """Read a scan in Channel Text File format.
+
+        :raise ValueError: if the job mode is not grid.
+        :param str file_path: the path to the ctf file to read.
+        :return: a new instance of OimScan populated with the data from the file.
+        """
+        scan = OimScan((0, 0))
+        with open(file_path, 'r') as f:
+            # start by parsing the header
+            line = f.readline().strip()
+            while not line.startswith('Phases'):
+                tokens = line.split()
+                if tokens[0] == 'JobMode':
+                    scan.grid_type = tokens[1]
+                    if scan.grid_type != 'Grid':
+                        raise ValueError('only square grid is supported, please convert your scan')
+                elif tokens[0] == 'XCells':
+                    scan.cols = int(tokens[1])
+                elif tokens[0] == 'YCells':
+                    scan.rows = int(tokens[1])
+                elif tokens[0] == 'XStep':
+                    scan.xStep = float(tokens[1])
+                elif tokens[0] == 'YStep':
+                    scan.yStep = float(tokens[1])
+                line = f.readline().strip()
+            # read the phases
+            tokens = line.split()
+            n_phases = int(tokens[1])
+            for i in range(n_phases):
+                # read this phase (lengths, angles, name, ?, space group, description)
+                line = f.readline().strip()
+                tokens = line.split()
+                phase = CrystallinePhase(i + 1)
+                phase.name = tokens[2]
+                phase.name = tokens[5]
+
+                sym = Symmetry.from_space_group(int(tokens[4]))
+                lattice_lengths = tokens[0].split(';')
+                lattice_angles = tokens[1].split(';')
+                # convert lattice constants to nm
+                lattice = Lattice.from_parameters(float(lattice_lengths[0]) / 10,
+                                                  float(lattice_lengths[1]) / 10,
+                                                  float(lattice_lengths[2]) / 10,
+                                                  float(lattice_angles[0]),
+                                                  float(lattice_angles[1]),
+                                                  float(lattice_angles[2]),
+                                                  symmetry=sym)
+                phase.set_lattice(lattice)
+                print('adding phase %s' % phase)
+                scan.phase_list.append(phase)
+            # read the line before the data
+            line = f.readline().strip()
+            # Phase   X       Y       Bands   Error   Euler1  Euler2  Euler3  MAD     BC      BS
+            # now read the payload
+            data = np.zeros((scan.cols * scan.rows, len(line.split())))
+            i = 0
+            for line in f:
+                data[i] = np.fromstring(line, sep=' ')
+                i += 1
+            # we have read all the data, now repack everything into the different arrays
+            scan.init_arrays()
+            scan.euler[:, :, 0] = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
+            scan.euler[:, :, 1] = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
+            scan.euler[:, :, 2] = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
+            scan.x = np.reshape(data[:, 1], (scan.rows, scan.cols)).T
+            scan.y = np.reshape(data[:, 2], (scan.rows, scan.cols)).T
+            scan.iq = np.reshape(data[:, 9], (scan.rows, scan.cols)).T
+            scan.ci = np.reshape(data[:, 10], (scan.rows, scan.cols)).T
+            scan.phase = np.reshape(data[:, 0], (scan.rows, scan.cols)).T
         return scan
 
     def read_header(self, header):

@@ -449,8 +449,12 @@ class OimScan:
         :param float tol: misorientation tolerance in degrees.
         :param float min_ci: minimum confidence index for a pixel to be a valid
             EBSD measurement.
+        :raise ValueError: if no phase is present in the scan.
         :return: a numpy array of the grain labels.
         """
+        if not len(self.phase_list) > 0:
+            raise ValueError('at least one phase must be present in this EBSD '
+                             'scan to segment the grains')
         # segment the grains
         print('grain segmentation for EBSD scan, misorientation tolerance={:.1f}, '
               'minimum confidence index={:.1f}'.format(tol, min_ci))

@@ -381,6 +381,19 @@ class OimScan:
                                     (scan.rows, scan.cols)).transpose(1, 0)
         return scan
 
+    def get_phase(self, phase_id=1):
+        """Look for a phase with the given id in the list.
+
+        :raise ValueError: if the phase_id cannot be found.
+        :param int phase_id: the id of the phase.
+        :return: the phase instance with the corresponding id
+        """
+        try:
+            phase_index = [phase.phase_id for phase in self.phase_list].index(phase_id)
+        except ValueError:
+            raise(ValueError('phase %d not in list' % phase_id))            
+        return self.phase_list[phase_index]
+        
     def compute_ipf_maps(self):
         """Compute the IPF maps for the 3 cartesian directions.
 
@@ -395,24 +408,20 @@ class OimScan:
         for i in range(self.rows):
             for j in range(self.cols):
                 o = Orientation.from_euler(np.degrees(self.euler[j, i]))
-                sym = self.phase_list[int(self.phase[j, i])].get_symmetry()
-                # compute IPF-Z
                 try:
+                    sym = self.get_phase(int(self.phase[j, i])).get_symmetry()
+                    # compute IPF-Z
                     self.ipf001[j, i] = o.ipf_color(axis=np.array([0., 0., 1.]),
                                                     symmetry=sym)
-                except ValueError:
-                    self.ipf001[j, i] = [0., 0., 0.]
-                # compute IPF-Y
-                try:
+                    # compute IPF-Y
                     self.ipf010[j, i] = o.ipf_color(axis=np.array([0., 1., 0.]),
                                                     symmetry=sym)
-                except ValueError:
-                    self.ipf010[j, i] = [0., 0., 0.]
-                # compute IPF-X
-                try:
+                    # compute IPF-X
                     self.ipf100[j, i] = o.ipf_color(axis=np.array([1., 0., 0.]),
                                                     symmetry=sym)
                 except ValueError:
+                    self.ipf001[j, i] = [0., 0., 0.]
+                    self.ipf010[j, i] = [0., 0., 0.]
                     self.ipf100[j, i] = [0., 0., 0.]
             progress = 100 * (i + 1) / self.rows
             print('computing IPF maps: {0:.2f} %'.format(progress), end='\r')

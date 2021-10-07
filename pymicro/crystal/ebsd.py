@@ -170,7 +170,10 @@ class OimScan:
                     line = f.readline().strip()
                     phase.name = line.split()[2]
                     line = f.readline().strip()
-                    phase.formula = line.split()[2]
+                    try:
+                        phase.formula = line.split()[2]
+                    except IndexError:
+                        phase.formula = ''
                     line = f.readline().strip()
                     line = f.readline().strip()
                     sym = Symmetry.from_tsl(int(line.split()[2]))

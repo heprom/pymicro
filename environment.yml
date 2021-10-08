@@ -1,0 +1,27 @@
+name: pymicro
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Needed to run pymicro and examples
+  - python=3.8
+  - numpy 
+  - scipy
+  - scikit-image 
+  - pooch 
+  - tifffile
+  - matplotlib
+  - vtk
+  - h5py
+  - lxml
+  - pytables
+  - basictools
+  # Code quality
+  - pylint
+  - nose
+  # Documentation
+  - sphinx
+  - sphinxcontrib-bibtex
+  - nbsphinx
+  - ipykernel 
+  - pandoc 

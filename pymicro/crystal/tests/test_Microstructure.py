@@ -243,6 +243,15 @@ class OrientationTests(unittest.TestCase):
         oct_ss = SlipSystem.get_slip_systems(slip_type='111')
         self.assertAlmostEqual(max(o.compute_all_schmid_factors(oct_ss, verbose=True)), 0.4082, 4)
 
+    def test_m_factor(self):
+        l = Lattice.hexagonal(0.2931, 0.4694)  # nm
+        o1 = Orientation.from_rodrigues([-0.50828348, -0.15280906, -0.13490053])
+        o2 = Orientation.from_rodrigues([0.71092185, -0.12723828, 0.26661451])
+        ss1 = SlipSystem.from_indices([0, 0, 1], [0, 1, 0], lattice=l)
+        ss2 = SlipSystem.from_indices([-1, 0, 0], [0, 1, 0], lattice=l)
+        m = Orientation.compute_m_factor(o1, ss1, o2, ss2)
+        self.assertAlmostEqual(m, 0.137475, 6)
+
     def test_misorientation_matrix(self):
         for test_euler in self.test_eulers:
             o = Orientation.from_euler(test_euler)

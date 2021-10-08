@@ -15,6 +15,7 @@ import numpy as np
 import os
 import vtk
 import h5py
+import math
 from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
@@ -22,7 +23,7 @@ from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
-from math import atan2, pi, sqrt
+from math import atan2, pi
 
 
 class Orientation:
@@ -243,12 +244,43 @@ class Orientation:
         return uvw
 
     @staticmethod
+    def compute_mean_orientation(rods, symmetry=Symmetry.cubic):
+        """Compute the mean orientation.
+
+        This function computes a mean orientation from several data points
+        representing orientations. Each orientation is first moved to the
+        fundamental zone, then the corresponding Rodrigues vectors can be
+        averaged to compute the mean orientation.
+
+        :param ndarray rods: a (n, 3) shaped array containing the Rodrigues
+        vectors of the orientations.
+        :param `Symmetry` symmetry: the symmetry used to move orientations
+        to their fundamental zone (cubic by default)
+        :returns: the mean orientation as an `Orientation` instance.
+        """
+        rods_fz = np.empty_like(rods)
+        for i in range(len(rods)):
+            g = Orientation.from_rodrigues(rods[i]).orientation_matrix()
+            g_fz = symmetry.move_rotation_to_FZ(g, verbose=False)
+            o_fz = Orientation(g_fz)
+            rods_fz[i] = o_fz.rod
+        mean_orientation = Orientation.from_rodrigues(np.mean(rods_fz, axis=0))
+        return mean_orientation
+
+    @staticmethod
     def fzDihedral(rod, n):
         """check if the given Rodrigues vector is in the fundamental zone.
 
-        After book from Morawiecz.
+        After book from Morawiec :cite`Morawiec_2004`:
+
+        .. pull_quote::
+
+          The asymmetric domain is a prism with 2n-sided polygons (at the
+          distance $h_n$ from 0) as prism bases, and $2n$ square prism faces at
+          the distance $h_2 = 1$. The bases are perpendicular to the n-fold axis
+          and the faces are perpendicular to the twofold axes.
         """
-        # vertical component must lie between top and bottom faces at +/-tan(pi/2n)
+        # top and bottom face at +/-tan(pi/2n)
         t = np.tan(np.pi / (2 * n))
         if abs(rod[2]) > t:
             return False
@@ -258,23 +290,25 @@ class Orientation:
         y, x = sorted([abs(rod[0]), abs(rod[1])])
         if x > 1:
             return False
-        if n == 2:
-            return True
-        elif n == 3:
-            return y / (1 + sqrt(2)) + (1 - sqrt(2 / 3)) * x < 1 - 1 / sqrt(3)
-        elif n == 4:
-            return y + x < sqrt(2)
-        elif n == 6:
-            return y / (1 + sqrt(2)) + (1 - 2 * sqrt(2) + sqrt(6)) * x < sqrt(3) - 1
-        else:
-            return False
+
+        return {
+            2: True,
+            3: y / (1 + math.sqrt(2)) + (1 - math.sqrt(2 / 3)) * x < 1 - 1 / math.sqrt(3),
+            4: y + x < math.sqrt(2),
+            6: y / (1 + math.sqrt(2)) + (1 - 2 * math.sqrt(2) + math.sqrt(6)) * x < math.sqrt(3) - 1
+        }[n]
 
     def inFZ(self, symmetry=Symmetry.cubic):
         """Check if the given Orientation lies within the fundamental zone.
 
         For a given crystal symmetry, several rotations can describe the same
         physcial crystllographic arangement. The Rodrigues fundamental zone
-        restrict the orientation space accordingly.
+        (also called the asymmetric domain) restricts the orientation space
+        accordingly.
+
+        :param symmetry: the `Symmetry` to use.
+        :return bool: True if this orientation is in the fundamental zone,
+        False otherwise.
         """
         r = self.rod
         if symmetry == Symmetry.cubic:
@@ -315,20 +349,15 @@ class Orientation:
         elif 45 < psidg <= 60:
             p = 2. / 15 * (3 * (sqrt(2) - 1) * sin(psi) - 2 * (1 - cos(psi)))
         elif 60 < psidg <= 60.72:
-            p = 2. / 15 * ((3 * (sqrt(2) - 1) + 4. / sqrt(3)) * sin(psi)
-                           - 6. * (1 - cos(psi)))
+            p = 2. / 15 * ((3 * (sqrt(2) - 1) + 4. / sqrt(3)) * sin(psi) - 6. * (1 - cos(psi)))
         elif 60.72 < psidg <= 62.8:
-            X = (sqrt(2) - 1) / (1 - (sqrt(2) - 1) ** 2 /
-                                 tan(0.5 * psi) ** 2) ** 0.5
+            X = (sqrt(2) - 1) / (1 - (sqrt(2) - 1) ** 2 / tan(0.5 * psi) ** 2) ** 0.5
             Y = (sqrt(2) - 1) ** 2 / ((3 - 1 / tan(0.5 * psi) ** 2) ** 0.5)
-            p = (2. / 15) * ((3 * (sqrt(2) - 1) + 4 / sqrt(3)) * sin(psi)
-                             - 6 * (1 - cos(psi))) \
+            p = (2. / 15) * ((3 * (sqrt(2) - 1) + 4 / sqrt(3)) * sin(psi) - 6 * (1 - cos(psi))) \
                 - 8. / (5 * pi) * (2 * (sqrt(2) - 1) * acos(X / tan(0.5 * psi))
                                    + 1. / sqrt(3) * acos(Y / tan(0.5 * psi))) \
                 * sin(psi) + 8. / (5 * pi) * (2 *acos((sqrt(2) + 1) * X / sqrt(2))
-                                              + acos((sqrt(2) + 1)
-                                                     * Y / sqrt(2))) \
-                * (1 - cos(psi))
+                                              + acos((sqrt(2) + 1) * Y / sqrt(2))) * (1 - cos(psi))
         else:
             p = 0.
         return p
@@ -994,13 +1023,13 @@ class Orientation:
         return q
 
     @staticmethod
-    def Euler_rad2Rodrigues(euler):
-        """Compute the rodrigues vector from the 3 euler angles (in radians).
+    def Euler2Rodrigues(euler):
+        """Compute the rodrigues vector from the 3 euler angles (in degrees).
 
-        :param euler: the 3 Euler angles (in radians).
-        :return: the roodrigues vector as a 3 components numpy array.
+        :param euler: the 3 Euler angles (in degrees).
+        :return: the rodrigues vector as a 3 components numpy array.
         """
-        phi1, Phi, phi2 = euler
+        (phi1, Phi, phi2) = np.radians(euler)
         a = 0.5 * (phi1 - phi2)
         b = 0.5 * (phi1 + phi2)
         r1 = np.tan(0.5 * Phi) * np.cos(a) / np.cos(b)
@@ -1009,14 +1038,21 @@ class Orientation:
         return np.array([r1, r2, r3])
 
     @staticmethod
-    def Euler2Rodrigues(euler):
-        """Compute the rodrigues vector from the 3 euler angles (in degrees).
+    def eu2ro(euler):
+        """Transform a series of euler angles into rodrigues vectors.
 
-        :param euler: the 3 Euler angles (in degrees).
-        :return: the roodrigues vector as a 3 components numpy array.
+        :param ndarray euler: the (n, 3) shaped array of Euler angles (radians).
+        :returns: a (n, 3) array with the rodrigues vectors.
         """
-        euler_rad = np.radians(euler)
-        return Euler_rad2Rodrigues(euler_rad)
+        if euler.ndim != 2 or euler.shape[1] != 3:
+            raise ValueError('Wrong shape for the euler array: %s -> should be (n, 3)' % euler.shape)
+        phi1, Phi, phi2 = np.squeeze(np.split(euler, 3, axis=1))
+        a = 0.5 * (phi1 - phi2)
+        b = 0.5 * (phi1 + phi2)
+        r1 = np.tan(0.5 * Phi) * np.cos(a) / np.cos(b)
+        r2 = np.tan(0.5 * Phi) * np.sin(a) / np.cos(b)
+        r3 = np.tan(b)
+        return np.array([r1, r2, r3]).T
 
     @staticmethod
     def Euler2OrientationMatrix(euler):
@@ -1298,6 +1334,29 @@ class Orientation:
                 print('Slip system: %s, Schmid factor is %.3f' % (ss, sf))
             schmid_factor_list.append(sf)
         return schmid_factor_list
+
+    @staticmethod
+    def compute_m_factor(o1, ss1, o2, ss2):
+        """Compute the m factor with another slip system.
+
+        :param Orientation o1: the orientation the first grain.
+        :param SlipSystem ss1: the slip system in the first grain.
+        :param Orientation o2: the orientation the second grain.
+        :param SlipSystem ss2: the slip system in the second grain.
+        :returns: the m factor as a float number < 1
+        """
+        # orientation matrices
+        gt1 = o1.orientation_matrix().T
+        gt2 = o2.orientation_matrix().T
+        # slip plane normal in sample local frame
+        n1 = np.dot(gt1, ss1.get_slip_plane().normal())
+        n2 = np.dot(gt2, ss2.get_slip_plane().normal())
+        # slip direction in sample local frame
+        l1 = np.dot(gt1, ss1.get_slip_direction().direction())
+        l2 = np.dot(gt2, ss2.get_slip_direction().direction())
+        # m factor calculation
+        m = abs(np.dot(n1, n2) * np.dot(l1, l2))
+        return m
 
 
 class Grain:
@@ -2158,18 +2217,19 @@ class Microstructure(SampleData):
             with removed grain with this new name. If not, overright  the
             current active grain map
         """
-        if sync_table:
+        if sync_table and not self._is_empty('grain_map'):
             self.sync_grain_table_with_grain_map(sync_geometry=True)
         condition = f"(volume <= {min_volume})"
         id_list = self.grains.read_where(condition)['idnumber']
-        # Remove grains from grain map
-        grain_map = self.get_grain_map()
-        grain_map[np.where(np.isin(grain_map,id_list))] = 0
-        if new_grain_map_name is not None:
-            map_name = new_grain_map_name
-        else:
-            map_name = self.active_grain_map
-        self.set_grain_map(grain_map.squeeze(), map_name=map_name)
+        if not self._is_empty('grain_map'):
+            # Remove grains from grain map
+            grain_map = self.get_grain_map()
+            grain_map[np.where(np.isin(grain_map,id_list))] = 0
+            if new_grain_map_name is not None:
+                map_name = new_grain_map_name
+            else:
+                map_name = self.active_grain_map
+            self.set_grain_map(grain_map.squeeze(), map_name=map_name)
         # Remove grains from table
         self.remove_grains_from_table(id_list)
         return
@@ -2768,10 +2828,13 @@ class Microstructure(SampleData):
             is 1 voxel).
         :return: a list (possibly empty) of the neighboring grain ids.
         """
-        grain_map = self.get_grain_map(as_numpy=True)
+        # get the bounding box around the grain
+        bb = self.grains.read_where('idnumber == %d' % grain_id)['bounding_box'][0]
+        grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                         bb[1][0]:bb[1][1],
+                                         bb[2][0]:bb[2][1]]
         if grain_map is None:
             return []
-        # TODO: use the grain bounding box to speed this up
         grain_data = (grain_map == grain_id)
         grain_data_dil = ndimage.binary_dilation(grain_data,
                                                  iterations=distance).astype(
@@ -2785,7 +2848,7 @@ class Microstructure(SampleData):
         :param int grain_id: the grain id to dilate.
         :param int dilation_steps: the number of dilation steps to apply.
         :param bool use_mask: if True and that this microstructure has a mask,
-            the dilation will be limite by it.
+            the dilation will be limited by it.
         """
         grain_map = self.get_grain_map(as_numpy=True)
         grain_volume_init = (grain_map == grain_id).sum()
@@ -4368,18 +4431,19 @@ class Microstructure(SampleData):
             progress = 100 * (1 + grain_ids_list.index(gid)) / len(grain_ids_list)
             print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
                 progress, gid), end='\r')
-            # use the first pixel of the grain
-            idx = np.where(grain_ids == gid)[0][0]
-            idy = np.where(grain_ids == gid)[1][0]
-            # TODO compute mean grain orientation
-            # IMPORTANT: indexes idx and idy are inverted because 'get_node' is
-            # without option 'as_numpy=True', to leverage HDF5 lazy access to
-            # data. As Image fields are stored with their dimension transposed
-            # (to be consistent with ordering convention of both SampleData and
-            # Paraview/XDMF) indexes must be inverted here.
-            local_euler = np.degrees(micro.get_node('euler')[idy, idx,:])
-            o_tsl = Orientation.from_euler(local_euler)
-            # TODO link OimScan lattice to pymicro
+            # get the symmetry for this grain
+            phase_grain = scan.phase[np.where(grain_ids == 1)]
+            assert len(np.unique(phase_grain)) == 1  # all pixel of this grain must have the same phase id by
+            # construction
+            grain_phase_id = phase_grain[0]
+            sym = scan.phase_list[grain_phase_id].get_symmetry()
+            # compute the mean orientation for this grain
+            euler_grain = scan.euler[np.where(grain_ids == gid)]
+            #euler_grain = np.atleast_2d(euler_grain)  # for one pixel grains
+            euler_grain = euler_grain
+            rods = Orientation.eu2ro(euler_grain)
+            rods = np.atleast_2d(rods)  # for one pixel grains
+            o_tsl = Orientation.compute_mean_orientation(rods, symmetry=sym)
             grains['idnumber'] = gid
             grains['orientation'] = o_tsl.rod
             grains.append()

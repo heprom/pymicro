@@ -79,9 +79,11 @@ class OimScan:
             scan = OimScan.read_osc(file_path)
         elif ext == '.ang':
             scan = OimScan.read_ang(file_path)
+        elif ext == '.ctf':
+            scan = OimScan.read_ctf(file_path)
         else:
-            raise ValueError('only HDF5, OSC or ANG formats are supported, '
-                             'please convert your scan')
+            raise ValueError('only HDF5, OSC, ANG or CTF formats are '
+                             'supported, please convert your scan')
         return scan
 
     @staticmethod
@@ -168,7 +170,10 @@ class OimScan:
                     line = f.readline().strip()
                     phase.name = line.split()[2]
                     line = f.readline().strip()
-                    phase.formula = line.split()[2]
+                    try:
+                        phase.formula = line.split()[2]
+                    except IndexError:
+                        phase.formula = ''
                     line = f.readline().strip()
                     line = f.readline().strip()
                     sym = Symmetry.from_tsl(int(line.split()[2]))
@@ -221,6 +226,78 @@ class OimScan:
             scan.iq = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
             scan.ci = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
             scan.phase = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
+        return scan
+
+    def read_ctf(file_path):
+        """Read a scan in Channel Text File format.
+
+        :raise ValueError: if the job mode is not grid.
+        :param str file_path: the path to the ctf file to read.
+        :return: a new instance of OimScan populated with the data from the file.
+        """
+        scan = OimScan((0, 0))
+        with open(file_path, 'r') as f:
+            # start by parsing the header
+            line = f.readline().strip()
+            while not line.startswith('Phases'):
+                tokens = line.split()
+                if tokens[0] == 'JobMode':
+                    scan.grid_type = tokens[1]
+                    if scan.grid_type != 'Grid':
+                        raise ValueError('only square grid is supported, please convert your scan')
+                elif tokens[0] == 'XCells':
+                    scan.cols = int(tokens[1])
+                elif tokens[0] == 'YCells':
+                    scan.rows = int(tokens[1])
+                elif tokens[0] == 'XStep':
+                    scan.xStep = float(tokens[1])
+                elif tokens[0] == 'YStep':
+                    scan.yStep = float(tokens[1])
+                line = f.readline().strip()
+            # read the phases
+            tokens = line.split()
+            n_phases = int(tokens[1])
+            for i in range(n_phases):
+                # read this phase (lengths, angles, name, ?, space group, description)
+                line = f.readline().strip()
+                tokens = line.split()
+                phase = CrystallinePhase(i + 1)
+                phase.name = tokens[2]
+                phase.name = tokens[5]
+
+                sym = Symmetry.from_space_group(int(tokens[4]))
+                lattice_lengths = tokens[0].split(';')
+                lattice_angles = tokens[1].split(';')
+                # convert lattice constants to nm
+                lattice = Lattice.from_parameters(float(lattice_lengths[0]) / 10,
+                                                  float(lattice_lengths[1]) / 10,
+                                                  float(lattice_lengths[2]) / 10,
+                                                  float(lattice_angles[0]),
+                                                  float(lattice_angles[1]),
+                                                  float(lattice_angles[2]),
+                                                  symmetry=sym)
+                phase.set_lattice(lattice)
+                print('adding phase %s' % phase)
+                scan.phase_list.append(phase)
+            # read the line before the data
+            line = f.readline().strip()
+            # Phase   X       Y       Bands   Error   Euler1  Euler2  Euler3  MAD     BC      BS
+            # now read the payload
+            data = np.zeros((scan.cols * scan.rows, len(line.split())))
+            i = 0
+            for line in f:
+                data[i] = np.fromstring(line, sep=' ')
+                i += 1
+            # we have read all the data, now repack everything into the different arrays
+            scan.init_arrays()
+            scan.euler[:, :, 0] = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
+            scan.euler[:, :, 1] = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
+            scan.euler[:, :, 2] = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
+            scan.x = np.reshape(data[:, 1], (scan.rows, scan.cols)).T
+            scan.y = np.reshape(data[:, 2], (scan.rows, scan.cols)).T
+            scan.iq = np.reshape(data[:, 9], (scan.rows, scan.cols)).T
+            scan.ci = np.reshape(data[:, 10], (scan.rows, scan.cols)).T
+            scan.phase = np.reshape(data[:, 0], (scan.rows, scan.cols)).T
         return scan
 
     def read_header(self, header):
@@ -307,6 +384,19 @@ class OimScan:
                                     (scan.rows, scan.cols)).transpose(1, 0)
         return scan
 
+    def get_phase(self, phase_id=1):
+        """Look for a phase with the given id in the list.
+
+        :raise ValueError: if the phase_id cannot be found.
+        :param int phase_id: the id of the phase.
+        :return: the phase instance with the corresponding id
+        """
+        try:
+            phase_index = [phase.phase_id for phase in self.phase_list].index(phase_id)
+        except ValueError:
+            raise(ValueError('phase %d not in list' % phase_id))            
+        return self.phase_list[phase_index]
+        
     def compute_ipf_maps(self):
         """Compute the IPF maps for the 3 cartesian directions.
 
@@ -321,24 +411,20 @@ class OimScan:
         for i in range(self.rows):
             for j in range(self.cols):
                 o = Orientation.from_euler(np.degrees(self.euler[j, i]))
-                sym = self.phase_list[int(self.phase[j, i])].get_symmetry()
-                # compute IPF-Z
                 try:
+                    sym = self.get_phase(int(self.phase[j, i])).get_symmetry()
+                    # compute IPF-Z
                     self.ipf001[j, i] = o.ipf_color(axis=np.array([0., 0., 1.]),
                                                     symmetry=sym)
-                except ValueError:
-                    self.ipf001[j, i] = [0., 0., 0.]
-                # compute IPF-Y
-                try:
+                    # compute IPF-Y
                     self.ipf010[j, i] = o.ipf_color(axis=np.array([0., 1., 0.]),
                                                     symmetry=sym)
-                except ValueError:
-                    self.ipf010[j, i] = [0., 0., 0.]
-                # compute IPF-X
-                try:
+                    # compute IPF-X
                     self.ipf100[j, i] = o.ipf_color(axis=np.array([1., 0., 0.]),
                                                     symmetry=sym)
                 except ValueError:
+                    self.ipf001[j, i] = [0., 0., 0.]
+                    self.ipf010[j, i] = [0., 0., 0.]
                     self.ipf100[j, i] = [0., 0., 0.]
             progress = 100 * (i + 1) / self.rows
             print('computing IPF maps: {0:.2f} %'.format(progress), end='\r')
@@ -366,8 +452,12 @@ class OimScan:
         :param float tol: misorientation tolerance in degrees.
         :param float min_ci: minimum confidence index for a pixel to be a valid
             EBSD measurement.
+        :raise ValueError: if no phase is present in the scan.
         :return: a numpy array of the grain labels.
         """
+        if not len(self.phase_list) > 0:
+            raise ValueError('at least one phase must be present in this EBSD '
+                             'scan to segment the grains')
         # segment the grains
         print('grain segmentation for EBSD scan, misorientation tolerance={:.1f}, '
               'minimum confidence index={:.1f}'.format(tol, min_ci))

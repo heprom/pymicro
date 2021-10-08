@@ -4,7 +4,7 @@ from math import cos, sin
 from pymicro.crystal.microstructure import Orientation
 
 
-class LatticeTests(unittest.TestCase):
+class QuaternionTests(unittest.TestCase):
 
     def setUp(self):
         print('testing the Quaternion class')

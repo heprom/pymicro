@@ -1738,8 +1738,13 @@ class Microstructure(SampleData):
             grain_map = None
         elif grain_map.ndim == 2:
             # reshape to 3D
-            grain_map = grain_map.reshape((grain_map.shape[0],
-                                           grain_map.shape[1], 1))
+            new_dim = self.get_attribute('dimension', 'CellData')
+            if len(new_dim) == 3:
+                grain_map = grain_map.reshape((new_dim))
+            else:
+                grain_map = grain_map.reshape((grain_map.shape[0],
+                                               grain_map.shape[1],
+                                               1))
         return grain_map
 
     def get_phase_map(self, as_numpy=True):
@@ -1748,8 +1753,13 @@ class Microstructure(SampleData):
             phase_map = None
         elif phase_map.ndim == 2:
             # reshape to 3D
-            phase_map = phase_map.reshape((phase_map.shape[0],
-                                           phase_map.shape[1], 1))
+            new_dim = self.get_attribute('dimension', 'CellData')
+            if len(new_dim) == 3:
+                phase_map = phase_map.reshape((new_dim))
+            else:
+                phase_map = phase_map.reshape((phase_map.shape[0],
+                                               phase_map.shape[1],
+                                               1))
         return phase_map
 
     def get_mask(self, as_numpy=False):
@@ -1758,8 +1768,13 @@ class Microstructure(SampleData):
             mask = None
         elif mask.ndim == 2:
             # reshape to 3D
-            mask = mask.reshape((mask.shape[0],
-                                 mask.shape[1], 1))
+            new_dim = self.get_attribute('dimension', 'CellData')
+            if len(new_dim) == 3:
+                mask = mask.reshape((new_dim))
+            else:
+                mask = mask.reshape((mask.shape[0],
+                                     mask.shape[1],
+                                               1))
         return mask
 
     def get_ids_from_grain_map(self):
@@ -2039,10 +2054,8 @@ class Microstructure(SampleData):
             # ensure (Nx,Ny,1) array will be stored as (Nx,Ny)
             if self._get_group_type('CellData')  == '2DImage':
                 grain_map = grain_map.squeeze()
-            print('coucou')
             self.add_field(gridname='CellData', fieldname=map_name,
-                           array=grain_map, replace=True,
-                           indexname='grain_map')
+                           array=grain_map, replace=True)
         self.set_active_grain_map(map_name)
         return
 
@@ -2364,7 +2377,8 @@ class Microstructure(SampleData):
             omap_Z[slc] = grain_orientations[i, 2]
         if store:
             self.add_field(gridname='CellData', fieldname='orientation_map',
-                           array=orientation_map, replace=True)
+                           array=orientation_map, replace=True,
+                           location='CellData')
         return orientation_map
 
     def add_IPF_maps(self):
@@ -2394,7 +2408,7 @@ class Microstructure(SampleData):
         :param axis: the unit vector for the load direction to compute IPF
             colors.
         """
-        dims = self.get_attribute('dimension', 'CellData')
+        dims = list(self.get_grain_map().shape)
         grain_ids = self.get_grain_ids()
         shape_ipf_map = list(dims) + [3]
         ipf_map = np.zeros(shape=shape_ipf_map, dtype=float)
@@ -2412,7 +2426,7 @@ class Microstructure(SampleData):
             ).get_symmetry(), saturate=True)
             progress = 100 * (1 + i) / len(grain_ids)
             print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
-        return ipf_map
+        return ipf_map.squeeze()
 
     def view_slice(self, slice=None, color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,
@@ -3684,7 +3698,8 @@ class Microstructure(SampleData):
 
     def from_amitex_fftp(self, results_basename, grip_size=0, ext_size=0,
                          grip_dim=2, sim_prefix='Amitex', int_var_names=dict(),
-                         finite_strain=False):
+                         finite_strain=False, load_fields=True,
+                         compression_options=dict()):
         """Read output of a Amitex_fftp simulation and stores in dataset.
 
         Read a Amitex_fftp result directory containing a mechanical simulation
@@ -3733,9 +3748,10 @@ class Microstructure(SampleData):
             these variables in the dataset.
         :type int_var_names: dict, optional
         """
+        # TODO: add grain map to all time steps
         from pymicro.core.utils.SDAmitexUtils import SDAmitexIO
         # Get std file result
-        p_mstd = Path(results_basename).absolute().with_suffix('.mstd')
+        p_mstd = Path(str(results_basename)).absolute().with_suffix('.mstd')
         # safety check
         if not p_mstd.exists():
             raise ValueError('results not found, "results_basename" argument'
@@ -3746,45 +3762,74 @@ class Microstructure(SampleData):
         step = 1
         if grip_size > 0:
             step += 1
-        if ext_size >0:
+        if ext_size >0 :
             step += 1
+        elif not self._is_empty('mask'):
+            # if mask used as exterior in computation but exterior size = 0
+            # still eed to add 1 to step as .mstd will have three lines per
+            # increment
+            if np.any(self['mask'] == 0):
+                step += 1
         std_res = SDAmitexIO.load_std(p_mstd, step=step)
+        # load .zstd results
+        p_zstd = Path(str(results_basename)+'_1').with_suffix('.zstd')
+        if p_zstd.exists():
+            zstd_res = SDAmitexIO.load_std(p_zstd, Int_var_names=int_var_names)
         # Store macro data in specific group
         self.add_group(groupname=f'{sim_prefix}_Results', location='/',
                        indexname='fft_sim', replace=True)
         # std_res is a numpy structured array whose fields depend on
         # the type of output (finite strain ou infinitesimal strain sim.)
-        # ==> we iterate over dtype fields to fill the dataset with
-        #     output data
+        # ==> we load it into the dataset as a structured table data item.
         self.add_table(location='fft_sim', name='Standard_output',
                        indexname=f'{sim_prefix}_std',
                        description=std_res.dtype, data=std_res)
-        # for field in std_res.dtype.fields:
-        #     self.add_data_array(location='fft_sim', name=f'{field}',
-        #                         array=std_res[field])
+        # idem for zstd --> Add as Mechanical Grain Data Table
+        if p_zstd.exists():
+            self.add_table(location='GrainData',
+                           name='MechanicalGrainDataTable',
+                           indexname='Mech_Grain_Data',
+                           description=zstd_res.dtype, data=zstd_res)
+            grainIDs = self.get_grain_ids()
+            N_zone_times = int(zstd_res.shape[0]/ len(grainIDs))
+            dtype_col = np.dtype([('grain_ID', np.int)])
+            IDs = np.tile(grainIDs, N_zone_times).astype(dtype_col)
+            self.add_tablecols(tablename='MechanicalGrainDataTable',
+                               description=IDs.dtype, data=IDs)
+        # End of macroscopic data loading. Check if field data must be loaded.
+        if not load_fields:
+            return
         # Get vtk files results
-        Stress, Strain, VarInt = SDAmitexIO.load_amitex_output_fields(
+        Stress, Strain, VarInt, Incr_list = SDAmitexIO.load_amitex_output_fields(
             results_basename, grip_size=grip_size, ext_size=ext_size,
             grip_dim=2)
         ## Loop over time steps: create group to store results
-        self.add_group(groupname=f'{sim_prefix}_output_fields', location='/CellData',
-                        indexname='fft_fields', replace=True)
+        self.add_group(groupname=f'{sim_prefix}_fields',
+                       location='/CellData', indexname='fft_fields',
+                       replace=True)
         # Create CellData temporal subgrids for each time value with a vtk
         # field output
-        time_values = std_res['time'][list(Stress.keys())].squeeze()
+        time_values = std_res['time'][Incr_list].squeeze()
+        if len(time_values) == 0:
+            time_values = [0.]
         self.add_grid_time('CellData', time_values)
+
         # Add fields to CellData grid collections
         for incr in Stress:
-            Time = std_res['time'][incr]
+            Time = std_res['time'][incr].squeeze()
             fieldname = f'{sim_prefix}_stress'
             self.add_field(gridname='CellData', fieldname=fieldname,
                             array=Stress[incr], location='fft_fields',
-                            time=Time)
+                            time=Time, compression_options=compression_options)
+        for incr in Strain:
+            Time = std_res['time'][incr].squeeze()
             fieldname = f'{sim_prefix}_strain'
             self.add_field(gridname='CellData', fieldname=fieldname,
                             array=Strain[incr], location='fft_fields',
-                            time=Time)
-            for mat in VarInt:
+                            time=Time, compression_options=compression_options)
+        for mat in VarInt:
+            for incr in VarInt[mat]:
+                Time = std_res['time'][incr].squeeze()
                 for var in VarInt[mat][incr]:
                     varname = var
                     if int_var_names.__contains__(var):
@@ -3792,7 +3837,8 @@ class Microstructure(SampleData):
                     fieldname = f'{sim_prefix}_mat{mat}_{varname}'
                     self.add_field(gridname='CellData', fieldname=fieldname,
                                     array=VarInt[mat][incr][var],
-                                    location='fft_fields', time=Time)
+                                    location='fft_fields', time=Time,
+                                     compression_options=compression_options)
         return
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):

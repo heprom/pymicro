@@ -34,8 +34,6 @@ from pymicro.core.global_variables import (XDMF_FIELD_TYPE,
 # Import variables for SampleData data model
 from pymicro.core.global_variables import (SD_GROUP_TYPES, SD_GRID_GROUPS,
                                            SD_IMAGE_GROUPS, SD_MESH_GROUPS)
-# Import variables for SampleData utilities
-from pymicro.core.global_variables import (COMPRESSION_KEYS)
 
 
 class SampleData:
@@ -822,7 +820,7 @@ class SampleData:
 
     def add_image(self, image_object=None, imagename='', indexname='',
                   location='/', description='', replace=False,
-                  compression_options=dict()):
+                  field_indexprefix='', compression_options=dict()):
         """Create a 2D/3D Image group in the dataset from an ImageObject.
 
         An Image group is a HDF5 Group that contains arrays describing fields
@@ -928,12 +926,12 @@ class SampleData:
         for field_name, field in image_object.nodeFields.items():
             self.add_field(gridname=image_group._v_pathname,
                            fieldname=field_name, array=field,
-                           indexname=field_name,
+                           indexname=field_indexprefix+field_name,
                            compression_options=compression_options)
         for field_name, field in image_object.elemFields.items():
             self.add_field(gridname=image_group._v_pathname,
                            fieldname=field_name, array=field,
-                           indexname=field_name,
+                           indexname=field_indexprefix+field_name,
                            compression_options=compression_options)
         return image_object
 
@@ -999,8 +997,11 @@ class SampleData:
         image_object.SetOrigin(origin)
         image_object.SetSpacing(spacing)
         image_object.elemFields[fieldname] = field_array
-        self.add_image(image_object, imagename, indexname, location,
-                       description, replace, compression_options)
+        self.add_image(image_object, imagename=imagename,
+                       indexname=indexname, location=location,
+                       description=description, replace=replace,
+                       compression_options=compression_options,
+                       field_indexprefix=(imagename+'_'))
         return
 
     def add_grid_time(self, gridname, time_list):
@@ -1014,6 +1015,9 @@ class SampleData:
         :param list(float) time_list: List of times to add to the grid. Can
             also be passed as a numpy array.
         """
+        # WARNING : BUG, XDMF grids must be in increasing time order
+        # not ensured
+        # TODO: Create a method sort xdmf grids with time
         # if time_list is passed as a numpy array, transform it into a list
         if isinstance(time_list, np.ndarray):
             time_list = time_list.tolist()
@@ -1021,6 +1025,7 @@ class SampleData:
             time_list = [time_list]
         if isinstance(time_list, int):
             time_list = [time_list]
+        time_list = sorted(time_list)
         # get xdmf node of main grid
         xdmf_gridname = self.get_attribute('xdmf_gridname',gridname)
         grid = self._find_xdmf_grid(xdmf_gridname)
@@ -1615,7 +1620,6 @@ class SampleData:
             must match de table description.
         """
         table = self.get_node(name)
-        current_dtype = table.dtype
         table.append(data)
         table.flush()
         return
@@ -2268,10 +2272,16 @@ class SampleData:
         if (field_type == 'IP_field') and not get_visualisation_field:
             pad_field = False
         if pad_field:
-            return self._mesh_field_unpadding(field, parent_mesh, padding)
-        else:
-            return field
-
+            field = self._mesh_field_unpadding(field, parent_mesh, padding)
+        if self._is_image(parent_mesh):
+            dim = self.get_attribute('dimension', parent_mesh)
+            field_dim = self.get_attribute('field_dimensionality', fieldname)
+            if field_dim == 'Scalar':
+                field = field.reshape(dim)
+            elif ((field_dim == 'Vector') or (field_dim == 'Tensor6')
+                  or (field_dim == 'Tensor')):
+                field = field.reshape(*dim, field.shape[-1])
+        return field
 
     def get_node(self, name, as_numpy=False):
         """Return a HDF5 node in the dataset.
@@ -2336,7 +2346,7 @@ class SampleData:
                                                        name)
                 if transpose_components is not None:
                     node = node[...,transpose_components]
-                node = np.atleast_1d(np.squeeze(node))
+                node = np.atleast_1d(node)
         return node
 
     def get_dic_from_attributes(self, nodename):
@@ -2993,7 +3003,7 @@ class SampleData:
         if store:
             if fieldname is None:
                 fieldname = meshname+'_elset_ids'
-                c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
+            c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
             self.add_field(gridname=meshname, fieldname=fieldname,
                            array=ID_field, replace=True,
                            compression_options=c_opt)
@@ -3703,7 +3713,7 @@ class SampleData:
         else:
             raise Warning('Cannot unpad the field, unknown padding type `{}`'
                           ''.format(padding))
-        return np.atleast_1d(np.squeeze(field))
+        return np.atleast_1d(field)
 
     def _IP_field_for_visualisation(self, array, vis_type):
         # here it is supposed that the field has shape

@@ -1,10 +1,10 @@
 import unittest
 import os
 import numpy as np
-from pymicro.crystal.microstructure import Orientation, Grain, Microstructure
+from pymicro.crystal.microstructure import Orientation, Microstructure
 from pymicro.crystal.lattice import Symmetry, Lattice, CrystallinePhase, HklPlane, HklDirection, SlipSystem
-from pymicro.xray.xray_utils import lambda_keV_to_nm
 from config import PYMICRO_EXAMPLES_DATA_DIR
+
 
 class MicrostructureTests(unittest.TestCase):
 
@@ -76,8 +76,8 @@ class MicrostructureTests(unittest.TestCase):
         # m.recompute_grain_volumes()
         m_ref = Microstructure(filename=filename)
         for i in range(m_ref.grains.nrows):
-            print(' n°1 :',m.grains[i])
-            print(' n°2 :',m_ref.grains[i])
+            print(' n°1 :', m.grains[i])
+            print(' n°2 :', m_ref.grains[i])
             self.assertEqual(m.grains[i], m_ref.grains[i])
         volume = np.sum(m.get_mask(as_numpy=True))
         self.assertEqual(volume, 194025)
@@ -228,10 +228,8 @@ class OrientationTests(unittest.TestCase):
             o = Orientation.from_euler(test_euler)
             g = o.orientation_matrix()
             calc_euler = Orientation.OrientationMatrix2Euler(g)
-            calc_euler2 = Orientation.OrientationMatrix2EulerSF(g)
             for i in range(3):
                 self.assertAlmostEquals(calc_euler[i], test_euler[i])
-                #self.assertAlmostEquals(calc_euler2[i], test_euler[i])
 
     def test_SchimdFactor(self):
         o = Orientation.from_euler([0., 0., 0.])
@@ -244,11 +242,11 @@ class OrientationTests(unittest.TestCase):
         self.assertAlmostEqual(max(o.compute_all_schmid_factors(oct_ss, verbose=True)), 0.4082, 4)
 
     def test_m_factor(self):
-        l = Lattice.hexagonal(0.2931, 0.4694)  # nm
+        ti = Lattice.hexagonal(0.2931, 0.4694)  # nm
         o1 = Orientation.from_rodrigues([-0.50828348, -0.15280906, -0.13490053])
         o2 = Orientation.from_rodrigues([0.71092185, -0.12723828, 0.26661451])
-        ss1 = SlipSystem.from_indices([0, 0, 1], [0, 1, 0], lattice=l)
-        ss2 = SlipSystem.from_indices([-1, 0, 0], [0, 1, 0], lattice=l)
+        ss1 = SlipSystem.from_indices((0, 0, 1), (0, 1, 0), lattice=ti)
+        ss2 = SlipSystem.from_indices((-1, 0, 0), (0, 1, 0), lattice=ti)
         m = Orientation.compute_m_factor(o1, ss1, o2, ss2)
         self.assertAlmostEqual(m, 0.137475, 6)
 
@@ -278,7 +276,6 @@ class OrientationTests(unittest.TestCase):
         al = Lattice.from_symbol('Al')
         p = HklPlane(0, 0, 2, lattice=al)
         lambda_keV = 42
-        lambda_nm = lambda_keV_to_nm(lambda_keV)
         rod = [0.1449, -0.0281, 0.0616]
         o = Orientation.from_rodrigues(rod)
         (w1, w2) = o.dct_omega_angles(p, lambda_keV, verbose=False)
@@ -334,7 +331,6 @@ class OrientationTests(unittest.TestCase):
         self.assertAlmostEqual(w1, 109.2, 1)
         self.assertAlmostEqual(w2, 296.9, 1)
 
-
     def test_topotomo_tilts(self):
         # tests cases from ma2285 experiment on id11, omega offset = -90
         T = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
@@ -361,7 +357,6 @@ class OrientationTests(unittest.TestCase):
         (ut, lt) = o.topotomo_tilts(p, T)
         self.assertAlmostEqual(180 / np.pi * ut, 11.275, 2)
         self.assertAlmostEqual(180 / np.pi * lt, -4.437, 2)
-
 
     def test_IPF_color(self):
         o1 = Orientation.cube()  # 001 // Z
@@ -407,9 +402,11 @@ class OrientationTests(unittest.TestCase):
         self.assertAlmostEqual(angle * 180 / np.pi, 7.24, 2)
         o_ref_fz = o_ref.move_to_FZ(symmetry=Symmetry.cubic, verbose=False)
         o_12_fz = o_12.move_to_FZ(symmetry=Symmetry.cubic, verbose=False)
-        delta = np.dot(o_ref_fz.orientation_matrix(), o_12_fz.orientation_matrix().T)
+        delta = np.dot(o_ref_fz.orientation_matrix(),
+                       o_12_fz.orientation_matrix().T)
         mis_angle = Orientation.misorientation_angle_from_delta(delta)
         self.assertAlmostEqual(mis_angle * 180 / np.pi, 7.24, 2)
+
 
 if __name__ == '__main__':
     unittest.main()

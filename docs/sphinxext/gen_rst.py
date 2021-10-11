@@ -178,7 +178,7 @@ def generate_dir_rst(dir, fhindex, example_dir, out_dir, plot_anim):
 
     for fname in sorted(os.listdir(src_dir)):
         print('***** found file', fname)
-        if fname.endswith('data'):
+        if fname == '__init__.py' or fname.endswith('data'):
             continue
         if fname.endswith('SampleDataUserGuide'):
             continue

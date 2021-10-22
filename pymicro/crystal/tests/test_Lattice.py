@@ -121,6 +121,10 @@ class HklDirectionTests(unittest.TestCase):
         self.assertEqual(u, 2)
         self.assertEqual(v, 1)
         self.assertEqual(w, 1)
+        u, v, w = HklDirection.four_to_three_indices(-1, 2, -1, 3)
+        self.assertEqual(u, 0)
+        self.assertEqual(v, 1)
+        self.assertEqual(w, 1)
         U, V, T, W = HklDirection.three_to_four_indices(1, 1, 1)
         self.assertEqual(U, 1)
         self.assertEqual(V, 1)
@@ -131,6 +135,11 @@ class HklDirectionTests(unittest.TestCase):
         self.assertEqual(V, 0)
         self.assertEqual(T, -1)
         self.assertEqual(W, 0)
+        U, V, T, W = HklDirection.three_to_four_indices(1, 1, 2)
+        self.assertEqual(U, 1)
+        self.assertEqual(V, 1)
+        self.assertEqual(T, -2)
+        self.assertEqual(W, 6)
 
 
 class HklPlaneTests(unittest.TestCase):

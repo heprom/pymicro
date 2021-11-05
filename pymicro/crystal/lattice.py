@@ -11,17 +11,17 @@ from matplotlib import pyplot as plt
 
 
 class Crystal:
-    '''
+    """
     The Crystal class to create any particular crystal structure.
 
     A crystal instance is composed by:
 
      * one of the 14 Bravais lattice
      * a point basis (or motif)
-    '''
+    """
 
     def __init__(self, lattice, basis=None, basis_labels=None, basis_sizes=None, basis_colors=None):
-        '''
+        """
         Create a Crystal instance with the given lattice and basis.
 
         This create a new instance of a Crystal object. The given lattice
@@ -33,7 +33,7 @@ class Crystal:
         :param list basis_labels: A list of strings containing the description of the atoms in the motif.
         :param list basis_labels: A list of float between 0. and 1. (default 0.1) to sale the atoms in the motif.
         :param list basis_colors: A list of vtk colors of the atoms in the motif.
-        '''
+        """
         self._lattice = lattice
         if basis == None:
             # default to one atom at (0, 0, 0)
@@ -1269,46 +1269,48 @@ class HklDirection(HklObject):
         return '\n'.join(out)
 
     def direction(self):
-        '''Returns a normalized vector, expressed in the cartesian
+        """Returns a normalized vector, expressed in the cartesian
         coordinate system, corresponding to this crystallographic direction.
-        '''
+        """
         (h, k, l) = self.miller_indices()
         M = self._lattice.matrix.T  # the columns of M are the a, b, c vector in the cartesian coordinate system
         l_vect = M.dot(np.array([h, k, l]))
         return l_vect / np.linalg.norm(l_vect)
 
     def angle_with_direction(self, hkl):
-        '''Computes the angle between this crystallographic direction and
-        the given direction (in radian).'''
+        """Computes the angle between this crystallographic direction and
+        the given direction (in radian)."""
         return np.arccos(np.dot(self.direction(), hkl.direction()))
 
     @staticmethod
     def angle_between_directions(hkl1, hkl2, lattice=None):
-        '''Computes the angle between two crystallographic directions (in radian).
+        """Computes the angle between two crystallographic directions (in radian).
 
         :param tuple hkl1: The triplet of the miller indices of the first direction.
         :param tuple hkl2: The triplet of the miller indices of the second direction.
         :param Lattice lattice: The crystal lattice, will default to cubic if not specified.
 
         :returns float: The angle in radian.
-        '''
+        """
         d1 = HklDirection(*hkl1, lattice=lattice)
         d2 = HklDirection(*hkl2, lattice=lattice)
         return d1.angle_with_direction(d2)
 
     @staticmethod
     def three_to_four_indices(u, v, w):
-        """Convert from Miller indices to Miller-Bravais indices. this is used for hexagonal crystal lattice."""
+        """Convert from Miller indices to Miller-Bravais indices.
+        this is used for hexagonal crystal lattice."""
         U, V, T, W = 2 * u - v, 2 * v - u, -(u + v), 3 * w
-        gcd = functools.reduce(gcd, (U, V, T, W))
-        return U / gcd, V / gcd, T / gcd, W / gcd
+        divisor = functools.reduce(gcd, (U, V, T, W))
+        return U / divisor, V / divisor, T / divisor, W / divisor
 
     @staticmethod
     def four_to_three_indices(U, V, T, W):
-        """Convert from Miller-Bravais indices to Miller indices. this is used for hexagonal crystal lattice."""
+        """Convert from Miller-Bravais indices to Miller indices.
+        this is used for hexagonal crystal lattice."""
         u, v, w = U - T, V - T, W
-        gcd = functools.reduce(gcd, (u, v, w))
-        return u / gcd, v / gcd, w / gcd
+        divisor = functools.reduce(gcd, (u, v, w))
+        return u / divisor, v / divisor, w / divisor
 
     @staticmethod
     def angle_between_4indices_directions(hkil1, hkil2, ac):
@@ -1332,7 +1334,7 @@ class HklDirection(HklObject):
         return np.arccos(value)
 
     def find_planes_in_zone(self, max_miller=5):
-        '''
+        """
         This method finds the hkl planes in zone with the crystallographic
         direction. If (u,v,w) denotes the zone axis, this means finding all
         hkl planes which verify :math:`h.u + k.v + l.w = 0`.
@@ -1340,7 +1342,7 @@ class HklDirection(HklObject):
         :param max_miller: The maximum miller index to limt the search`
         :returns list: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` objects \
         describing all the planes in zone with the direction.
-        '''
+        """
         (u, v, w) = self.miller_indices()
         indices = range(-max_miller, max_miller + 1)
         hklplanes_in_zone = []
@@ -1355,7 +1357,7 @@ class HklDirection(HklObject):
 
 
 class HklPlane(HklObject):
-    '''
+    """
     This class define crystallographic planes using Miller indices.
 
     A plane can be create by speficying its Miller indices and the
@@ -1374,7 +1376,7 @@ class HklPlane(HklObject):
 
       Miller indices are defined in terms of the inverse of the intercept
       of the plane on the three crystal axes a, b, and c.
-    '''
+    """
 
     def __eq__(self, other):
         """Override the default Equals behavior.
@@ -1391,16 +1393,16 @@ class HklPlane(HklObject):
         return not self.__eq__(other)
 
     def normal(self):
-        '''Returns the unit vector normal to the plane.
+        """Returns the unit vector normal to the plane.
 
         We use of the repiprocal lattice to compute the normal to the plane
         and return a normalised vector.
-        '''
+        """
         n = self.scattering_vector()
         return n / np.linalg.norm(n)
 
     def scattering_vector(self):
-        '''Calculate the scattering vector of this `HklPlane`.
+        """Calculate the scattering vector of this `HklPlane`.
 
         The scattering vector (or reciprocal lattice vector) is normal to
         this `HklPlane` and its length is equal to the inverse of the
@@ -1412,7 +1414,7 @@ class HklPlane(HklObject):
           G_c = h.a^* + k.b^* + l.c^*
 
         :returns: a numpy vector expressed in the cartesian coordinate system of the crystal.
-        '''
+        """
         [astar, bstar, cstar] = self._lattice.reciprocal_lattice()
         (h, k, l) = self.miller_indices()
         # express (h, k, l) in the cartesian crystal CS
@@ -1437,7 +1439,7 @@ class HklPlane(HklObject):
         return pair
 
     def interplanar_spacing(self):
-        '''
+        """
         Compute the interplanar spacing.
         For cubic lattice, it is:
 
@@ -1447,7 +1449,7 @@ class HklPlane(HklObject):
 
         The general formula comes from 'Introduction to Crystallography'
         p. 68 by Donald E. Sands.
-        '''
+        """
         (a, b, c) = self._lattice._lengths
         (h, k, l) = self.miller_indices()
         (alpha, beta, gamma) = radians(self._lattice._angles)
@@ -1462,13 +1464,13 @@ class HklPlane(HklObject):
         return d
 
     def bragg_angle(self, lambda_keV, verbose=False):
-        '''Compute the Bragg angle for this `HklPlane` at the given energy.
+        """Compute the Bragg angle for this `HklPlane` at the given energy.
 
         .. note::
 
           For this calculation to work properly, the lattice spacing needs
           to be in nm units.
-        '''
+        """
         d = self.interplanar_spacing()
         lambda_nm = 1.2398 / lambda_keV
         theta = np.arcsin(lambda_nm / (2 * d))
@@ -1481,7 +1483,6 @@ class HklPlane(HklObject):
     @staticmethod
     def four_to_three_indices(U, V, T, W):
         """Convert four to three index representation of a slip plane (used for hexagonal crystal lattice)."""
-        #return (6 * h / 5. - 3 * k / 5., 3 * h / 5. + 6 * k / 5., l)
         return U, V, W
 
     @staticmethod

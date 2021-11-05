@@ -4,7 +4,7 @@ import os
 from pymicro.external import CifFile_module as CifFile
 import enum
 import functools
-import math
+from math import sin, cos, gcd
 import numpy as np
 from numpy import pi, dot, transpose, radians
 from matplotlib import pyplot as plt
@@ -267,7 +267,7 @@ class Symmetry(enum.Enum):
               sym[11] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, -1]])
             else:
               sym = np.zeros((12, 3, 3), dtype=np.float)
-              s60 = np.sin(60 * np.pi / 180)
+              s60 = sin(60 * np.pi / 180)
               sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
               sym[1] = np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]])
               sym[2] = np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]])
@@ -618,6 +618,16 @@ class Lattice:
             parameters = [a, b, c, alpha, beta, gamma]
         return parameters
 
+    def metric_tensor(self):
+        """Compute the metric tensor for this lattice."""
+        a, b, c = self._lengths
+        alpha, beta, gamma = np.radians(self._angles)
+
+        g = np.array([[a ** 2, a * b * cos(gamma), a * c * cos(beta)],
+                      [a * b * cos(gamma), b ** 2, b * c * cos(alpha)],
+                      [a * c * cos(beta), b * c * cos(alpha), c ** 2]])
+        return g
+
     def guess_symmetry(self):
         """Guess the lattice symmetry from the geometry."""
         (a, b, c) = self._lengths
@@ -966,15 +976,15 @@ class Lattice:
         gamma_r = radians(gamma)
         if x_aligned_with_a:  # first lattice vector (a) is aligned with X
             vector_a = a * np.array([1, 0, 0])
-            vector_b = b * np.array([np.cos(gamma_r), np.sin(gamma_r), 0])
-            c1 = c * np.cos(beta_r)
-            c2 = c * (np.cos(alpha_r) - np.cos(gamma_r) * np.cos(beta_r)) / np.sin(gamma_r)
+            vector_b = b * np.array([cos(gamma_r), sin(gamma_r), 0])
+            c1 = c * cos(beta_r)
+            c2 = c * (cos(alpha_r) - cos(gamma_r) * cos(beta_r)) / sin(gamma_r)
             vector_c = np.array([c1, c2, np.sqrt(c ** 2 - c1 ** 2 - c2 ** 2)])
         else:  # third lattice vector (c) is aligned with Z
-            cos_gamma_star = (np.cos(alpha_r) * np.cos(beta_r) - np.cos(gamma_r)) / (np.sin(alpha_r) * np.sin(beta_r))
+            cos_gamma_star = (cos(alpha_r) * cos(beta_r) - cos(gamma_r)) / (sin(alpha_r) * sin(beta_r))
             sin_gamma_star = np.sqrt(1 - cos_gamma_star ** 2)
-            vector_a = [a * np.sin(beta_r), 0.0, a * np.cos(beta_r)]
-            vector_b = [-b * np.sin(alpha_r) * cos_gamma_star, b * np.sin(alpha_r) * sin_gamma_star, b * np.cos(alpha_r)]
+            vector_a = [a * sin(beta_r), 0.0, a * cos(beta_r)]
+            vector_b = [-b * sin(alpha_r) * cos_gamma_star, b * sin(alpha_r) * sin_gamma_star, b * cos(alpha_r)]
             vector_c = [0.0, 0.0, float(c)]
         return Lattice([vector_a, vector_b, vector_c], centering=centering, symmetry=symmetry)
 
@@ -1290,14 +1300,14 @@ class HklDirection(HklObject):
     def three_to_four_indices(u, v, w):
         """Convert from Miller indices to Miller-Bravais indices. this is used for hexagonal crystal lattice."""
         U, V, T, W = 2 * u - v, 2 * v - u, -(u + v), 3 * w
-        gcd = functools.reduce(math.gcd, (U, V, T, W))
+        gcd = functools.reduce(gcd, (U, V, T, W))
         return U / gcd, V / gcd, T / gcd, W / gcd
 
     @staticmethod
     def four_to_three_indices(U, V, T, W):
         """Convert from Miller-Bravais indices to Miller indices. this is used for hexagonal crystal lattice."""
         u, v, w = U - T, V - T, W
-        gcd = functools.reduce(math.gcd, (u, v, w))
+        gcd = functools.reduce(gcd, (u, v, w))
         return u / gcd, v / gcd, w / gcd
 
     @staticmethod
@@ -1442,15 +1452,13 @@ class HklPlane(HklObject):
         (h, k, l) = self.miller_indices()
         (alpha, beta, gamma) = radians(self._lattice._angles)
         # d = a / np.sqrt(h**2 + k**2 + l**2) # for cubic structure only
-        d = self._lattice.volume() / np.sqrt(h ** 2 * b ** 2 * c ** 2 * np.sin(alpha) ** 2 + \
-                                             k ** 2 * a ** 2 * c ** 2 * np.sin(
-                                                 beta) ** 2 + l ** 2 * a ** 2 * b ** 2 * np.sin(gamma) ** 2 + \
-                                             2 * h * l * a * b ** 2 * c * (
-                                                 np.cos(alpha) * np.cos(gamma) - np.cos(beta)) + \
-                                             2 * h * k * a * b * c ** 2 * (
-                                                 np.cos(alpha) * np.cos(beta) - np.cos(gamma)) + \
-                                             2 * k * l * a ** 2 * b * c * (
-                                                 np.cos(beta) * np.cos(gamma) - np.cos(alpha)))
+        v = self._lattice.volume()
+        d = v / np.sqrt(h ** 2 * b ** 2 * c ** 2 * sin(alpha) ** 2 +
+                        k ** 2 * a ** 2 * c ** 2 * sin(beta) ** 2 +
+                        l ** 2 * a ** 2 * b ** 2 * sin(gamma) ** 2 +
+                        2 * h * l * a * b ** 2 * c * (cos(alpha) * cos(gamma) - cos(beta)) +
+                        2 * h * k * a * b * c ** 2 * (cos(alpha) * cos(beta) - cos(gamma)) +
+                        2 * k * l * a ** 2 * b * c * (cos(beta) * cos(gamma) - cos(alpha)))
         return d
 
     def bragg_angle(self, lambda_keV, verbose=False):

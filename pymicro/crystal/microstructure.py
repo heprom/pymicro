@@ -2245,14 +2245,16 @@ class Microstructure(SampleData):
             self.grains.remove_row(int(where))
         return
 
-    def add_grains(self, euler_list, grain_ids=None):
+    def add_grains(self, orientation_list, orientation_type='euler', grain_ids=None):
         """A a list of grains to this microstructure.
 
         This function adds a list of grains represented by a list of Euler
         angles triplets, to the microstructure. If provided, the `grain_ids`
         list will be used for the grain ids.
 
-        :param list euler_list: the list of euler angles (Bunge passive convention).
+        :param list orientation_list: a list of values representing the orientations.
+        :param str orientation_type: euler or rod for Euler angles (Bunge passive convention) or
+        Rodrigues vectors.
         :param list grain_ids: an optional list for the ids of the new grains.
         """
         grain = self.grains.row
@@ -2262,11 +2264,16 @@ class Microstructure(SampleData):
                 min_id = max(self.get_grain_ids())
             else:
                 min_id = 0
-            grain_ids = range(min_id, min_id + len(euler_list))
+            grain_ids = range(min_id, min_id + len(orientation_list))
         print('adding %d grains to the microstructure' % len(grain_ids))
-        for gid, euler in zip(grain_ids, euler_list):
+        for gid, orientation in zip(grain_ids, orientation_list):
             grain['idnumber'] = gid
-            grain['orientation'] = Orientation.Euler2Rodrigues(euler)
+            if orientation_type == 'euler':
+                grain['orientation'] = Orientation.Euler2Rodrigues(orientation)
+            elif orientation_type in ['rod', 'rodrigues']:
+                grain['orientation'] = orientation
+            else:
+                raise ValueError('unknowned type of orientation: %s' % orientation_type)
             grain.append()
         self.grains.flush()
 

@@ -48,6 +48,19 @@ class LatticeTests(unittest.TestCase):
         self.assertAlmostEqual(cstar[1], 0., 3)
         self.assertAlmostEqual(cstar[2], 1.464, 3)
 
+    def test_metric_tensor(self):
+        l = Lattice.from_parameters(0.3, 0.4, 0.6, 90, 120, 90)
+        g = l.metric_tensor()
+        self.assertAlmostEqual(g[0, 0], 0.09)
+        self.assertAlmostEqual(g[0, 1], 0.0)
+        self.assertAlmostEqual(g[0, 2], -0.09)
+        self.assertAlmostEqual(g[1, 0], 0.0)
+        self.assertAlmostEqual(g[1, 1], 0.16)
+        self.assertAlmostEqual(g[1, 2], 0.0)
+        self.assertAlmostEqual(g[2, 0], -0.09)
+        self.assertAlmostEqual(g[2, 1], 0.0)
+        self.assertAlmostEqual(g[2, 2], 0.36)
+
 
 class CrystallinePhaseTests(unittest.TestCase):
     def setUp(self):

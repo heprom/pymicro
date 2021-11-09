@@ -3057,15 +3057,16 @@ class Microstructure(SampleData):
         :param int y_end: end value for slicing the second axis.
         :param int z_start: start value for slicing the third axis.
         :param int z_end: end value for slicing the third axis.
-        :param str crop name: the name for the cropped microstructure
+        :param str crop_name: the name for the cropped microstructure
             (the default is to append '_crop' to the initial name).
         :param bool autodelete: a flag to delete the microstructure files
             on the disk when it is not needed anymore.
-        :param bool recompute_geometry: If `True` (defaults), recompute the
+        :param bool recompute_geometry: if `True` (default), recompute the
             grain centers, volumes, and bounding boxes in the croped micro.
             Use `False` when using a crop that do not cut grains, for instance
             when cropping a microstructure within the mask, to avoid the heavy
             computational cost of the grain geometry data update.
+        :param bool verbose: activate verbose mode.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
         # TODO: add phase transfer to new microstructure
@@ -4137,10 +4138,8 @@ class Microstructure(SampleData):
             assert np.prod(dims) == data.shape[0]
             micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0),
                                 voxel_size=voxel_size[0])  # swap X/Z axes
-            print('updating grain geometry')
-            micro.recompute_grain_bounding_boxes()
-            micro.recompute_grain_centers()
-            micro.recompute_grain_volumes()
+            print('updating grain data table and grain geometry')
+            micro.sync_grain_table_with_grain_map(sync_geometry=True)
             # if necessary set the phase_map
             if phase_ids:
                 grain_map = micro.get_grain_map(as_numpy=True)

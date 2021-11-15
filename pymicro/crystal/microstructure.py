@@ -2314,8 +2314,8 @@ class Microstructure(SampleData):
     def set_mesh(self, mesh_object=None, file=None, meshname='micro_mesh'):
         """Add a mesh of the microstructure to the dataset.
 
-        Mesh can be inputed as a BasicTools mesh object or as a mesh file.
-        Handled file format for now only include .geof (Zset software fmt).
+        Mesh can be input as a BasicTools mesh object or as a mesh file.
+        Handled file format for now only include .geof (Zset software format).
         """
         self.add_mesh(mesh_object=mesh_object, meshname=meshname,
                       location='/MeshData', replace=True, file=file)
@@ -2325,11 +2325,11 @@ class Microstructure(SampleData):
         """Create a grain Id field of grain orientations on the input mesh.
 
         Creates a element wise field from the microsctructure mesh provided,
-        adding to each element the value of the Rodrigues vector
-        of the local grain element set, as it is and if it is referenced in the
-        `GrainDataTable` node.
+        adding to each element the value of the grain id of the local grain
+        element set, as it is and if it is referenced in the `GrainDataTable`
+        node.
 
-        :param str mesh: Name, Path or index name of the mesh on which an
+        :param str meshname: Name, Path or index name of the mesh on which an
             orientation map element field must be constructed
         :param bool store: If `True`, store the orientation map in `CellData`
             image group, with name `orientation_map`
@@ -2340,21 +2340,20 @@ class Microstructure(SampleData):
         # check if mesh is provided
         if meshname is None:
                 raise ValueError('meshname do not refer to an existing mesh')
-        if not(self._is_mesh(meshname)) or  self._is_empty(meshname):
-                raise ValueError('meshname do not refer to a non empty mesh'
-                                 'group')
+        if not self._is_mesh(meshname) or self._is_empty(meshname):
+            raise ValueError('meshname do not refer to a non empty mesh group')
         # create empty element vector field
-        Nelements = int(self.get_attribute('Number_of_elements',meshname))
+        n_elements = int(self.get_attribute('Number_of_elements', meshname))
         mesh = self.get_node(meshname)
-        El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
-        ID_field = np.zeros((Nelements,1),dtype=float)
-        grainIds = self.get_grain_ids()
+        el_tag_path = os.path.join(mesh._v_pathname, 'Geometry', 'ElementsTags')
+        ID_field = np.zeros((n_elements, 1), dtype=float)
+        grain_ids = self.get_grain_ids()
         # if mesh is provided
-        for i in range(len(grainIds)):
-            set_name = 'ET_grain_'+str(grainIds[i]).strip()
-            elset_path = os.path.join(El_tag_path, set_name)
+        for i in range(len(grain_ids)):
+            set_name = 'ET_grain_' + str(grain_ids[i]).strip()
+            elset_path = os.path.join(el_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
-            ID_field[element_ids] = grainIds[i]
+            ID_field[element_ids] = grain_ids[i]
         if store:
             self.add_field(gridname=meshname, fieldname='grain_ids',
                            array=ID_field)
@@ -2487,10 +2486,10 @@ class Microstructure(SampleData):
                                              bb[1][0]:bb[1][1],
                                              bb[2][0]:bb[2][1]]
             o = self.get_grain(gid).orientation
+            rgb = o.ipf_color(axis, symmetry=self.get_lattice().get_symmetry(), saturate=True)
             ipf_map[bb[0][0]:bb[0][1],
                     bb[1][0]:bb[1][1],
-                    bb[2][0]:bb[2][1]][grain_map == gid] = o.ipf_color(axis, symmetry=self.get_lattice(
-            ).get_symmetry(), saturate=True)
+                    bb[2][0]:bb[2][1]][grain_map == gid] = rgb
             progress = 100 * (1 + i) / len(grain_ids)
             print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
         return ipf_map.squeeze()
@@ -4184,7 +4183,7 @@ class Microstructure(SampleData):
             lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
             phase = CrystallinePhase(phase_id=1, name=phase_name, lattice=lattice)
         # create the microstructure with the phase infos
-        micro = Microstructure(name=name, path=data_dir, overwrite_hdf5=True, phase=phase)
+        micro = Microstructure(name=name, overwrite_hdf5=True, phase=phase)
 
         # load cell data
         with h5py.File(file_path, 'r') as f:
@@ -4197,16 +4196,6 @@ class Microstructure(SampleData):
             micro.set_mask(mask, voxel_size=spacing)
             phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
             micro.set_phase_map(phase_map, voxel_size=spacing)
-            if include_IPF_map:
-                IPF001_map = f['LabDCT']['Data']['IPF001'][()].transpose(2, 1, 0, 3)
-                micro.add_field(gridname='CellData', fieldname='IPF001_map',
-                                array=IPF001_map)
-                IPF010_map = f['LabDCT']['Data']['IPF010'][()].transpose(2, 1, 0, 3)
-                micro.add_field(gridname='CellData', fieldname='IPF010_map',
-                                array=IPF010_map)
-                IPF100_map = f['LabDCT']['Data']['IPF100'][()].transpose(2, 1, 0, 3)
-                micro.add_field(gridname='CellData', fieldname='IPF100_map',
-                                array=IPF100_map)
             if include_rodrigues_map:
                 micro.add_field(gridname='CellData', fieldname='rodrigues_map',
                                 array=rodrigues_map)
@@ -4218,14 +4207,46 @@ class Microstructure(SampleData):
         # now get each grain orientation from the rodrigues map
         for i, g in enumerate(micro.grains):
             gid = g['idnumber']
-            progress = (1 + i) / len(micro.grains)
+            progress = 100 * (1 + i) / len(micro.grains)
             print('adding grains: {0:.2f} %'.format(progress), end='\r')
-            x, y, z = np.where(micro.get_grain_map() == gid)
-            orientation = rodrigues_map[x[0], y[0], z[0]]
+            # use the grain bounding box
+            bb = micro.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
+            grain_map = micro.get_grain_map()[bb[0][0]:bb[0][1],
+                                              bb[1][0]:bb[1][1],
+                                              bb[2][0]:bb[2][1]]
+            x, y, z = np.where(grain_map == gid)
+            orientation = rodrigues_map[bb[0][0] + x[0], bb[1][0] + y[0], bb[2][0] + z[0]]
             # assign orientation to this grain
+            if i < 10:
+                print(bb[0][0] + x[0], bb[1][0] + y[0], bb[2][0] + z[0])
+                x, y, z = np.where(micro.get_grain_map() == gid)
+                print(x[0], y[0], z[0])
             g['orientation'] = orientation
             g.update()
         micro.grains.flush()
+
+        if include_IPF_map:
+            print('adding IPF maps')
+            with h5py.File(file_path, 'r') as f:
+                if 'IPF001' in f['LabDCT/Data']:
+                    IPF001_map = f['LabDCT/Data/IPF001'][()].transpose(2, 1, 0, 3)
+                else:
+                    IPF001_map = micro.create_IPF_map(axis=np.array([0., 0., 1.]))
+                micro.add_field(gridname='CellData', fieldname='IPF001_map',
+                                array=IPF001_map)
+                if 'IPF010' in f['LabDCT/Data']:
+                    IPF010_map = f['LabDCT/Data/IPF010'][()].transpose(2, 1, 0, 3)
+                else:
+                    IPF010_map = micro.create_IPF_map(axis=np.array([0., 1., 0.]))
+                micro.add_field(gridname='CellData', fieldname='IPF010_map',
+                                array=IPF010_map)
+                if 'IPF100' in f['LabDCT/Data']:
+                    IPF100_map = f['LabDCT/Data/IPF100'][()].transpose(2, 1, 0, 3)
+                else:
+                    IPF100_map = micro.create_IPF_map(axis=np.array([1., 0., 0.]))
+                micro.add_field(gridname='CellData', fieldname='IPF100_map',
+                                array=IPF100_map)
+                del IPF001_map, IPF010_map, IPF100_map
         return micro
 
     @staticmethod

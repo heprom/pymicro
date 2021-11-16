@@ -4136,7 +4136,7 @@ class Microstructure(SampleData):
             print(data.shape)
             assert np.prod(dims) == data.shape[0]
             micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0),
-                                voxel_size=voxel_size[0])  # swap X/Z axes
+                                voxel_size=voxel_size)  # swap X/Z axes
             print('updating grain data table and grain geometry')
             micro.sync_grain_table_with_grain_map(sync_geometry=True)
             # if necessary set the phase_map

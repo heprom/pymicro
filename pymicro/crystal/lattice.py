@@ -163,6 +163,25 @@ class Symmetry(enum.Enum):
             return None
 
     @staticmethod
+    def from_dream3d(n):
+        if n in [1, 3]:
+            return Symmetry.cubic
+        elif n in[0, 2]:
+            return Symmetry.hexagonal
+        elif n == 6:
+            return Symmetry.orthorhombic
+        elif n in [7, 8]:
+            return Symmetry.tetragonal
+        elif n in [9, 10]:
+            return Symmetry.trigonal
+        elif n == 5:
+            return Symmetry.monoclinic
+        elif n == 4:
+            return Symmetry.triclinic
+        else:
+            return None
+
+    @staticmethod
     def from_space_group(space_group_number):
         """Create an instance of the `Symmetry` class from a TSL symmetry
         number.
@@ -622,10 +641,10 @@ class Lattice:
         """Compute the metric tensor for this lattice."""
         a, b, c = self._lengths
         alpha, beta, gamma = np.radians(self._angles)
-
         g = np.array([[a ** 2, a * b * cos(gamma), a * c * cos(beta)],
                       [a * b * cos(gamma), b ** 2, b * c * cos(alpha)],
                       [a * c * cos(beta), b * c * cos(alpha), c ** 2]])
+        #g = self.matrix.dot(self.matrix.T)
         return g
 
     def guess_symmetry(self):

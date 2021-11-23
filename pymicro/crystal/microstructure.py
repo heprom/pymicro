@@ -1582,8 +1582,8 @@ class Microstructure(SampleData):
     attributes such as id, orientations (in form of rodrigues vectors), volume
     and bounding box.
 
-    A crystal `Lattice` is also associated to the microstructure and used in
-    all crystallography calculations.
+    A list of `CrystallinePhase` instances (each on with its `Lattice`) is also
+    associated to the microstructure and used for all crystallography calculations.
     """
 
     def __init__(self,
@@ -1594,7 +1594,7 @@ class Microstructure(SampleData):
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
         # prepare arguments for after file open
-        after_file_open_args = {'phase':phase}
+        after_file_open_args = {'phase': phase}
         # call SampleData constructor
         SampleData.__init__(self, filename=filename, sample_name=name,
                             sample_description=description, verbose=verbose,
@@ -1673,7 +1673,7 @@ class Microstructure(SampleData):
             self.sync_phases()
             # if no phase is there, create one
             if len(self.get_phase_ids_list()) == 0:
-                print('no phase was found in this dataset, adding a defualt one')
+                print('no phase was found in this dataset, adding a default one')
                 self.add_phase(phase)
         return
 
@@ -2340,15 +2340,11 @@ class Microstructure(SampleData):
             orientation map element field must be constructed
         :param str elset_prefix: prefix to define the element sets representing
             the grains.
-        :param bool store: If `True`, store the orientation map in `MeshData`
-            image group, with name `grain_ids`
+        :param bool store: If `True`, store the grain ids field in `MeshData`
+            group, with name `grain_ids`
         """
-        # TODO : adapt data model to include microstructure mesh and adapt
-        # routine arugments and code to the new data model
-        # input a mesh_object or a mesh group ?
-        # check if mesh is provided
         if meshname is None:
-                raise ValueError('meshname do not refer to an existing mesh')
+            raise ValueError('meshname do not refer to an existing mesh')
         if not self._is_mesh(meshname) or self._is_empty(meshname):
             raise ValueError('meshname do not refer to a non empty mesh group')
         # create empty element vector field
@@ -2369,7 +2365,8 @@ class Microstructure(SampleData):
                            array=grain_id_field, replace=True)
         return grain_id_field
 
-    def create_orientation_field(self, meshname=None, store=True):
+    def create_orientation_field(self, meshname=None, elset_prefix='grain_',
+                                 store=True):
         """Create a vector field of grain orientations on the input mesh.
 
         Creates a element wise field from the microsctructure mesh provided,
@@ -2379,29 +2376,26 @@ class Microstructure(SampleData):
 
         :param str mesh: Name, Path or index name of the mesh on which an
             orientation map element field must be constructed
+        :param str elset_prefix: prefix to define the element sets representing
+            the grains.
         :param bool store: If `True`, store the orientation map in `CellData`
             image group, with name `orientation_map`
         """
-        # TODO : adapt data model to include microstructure mesh and adapt
-        # routine arugments and code to the new data model
-        # input a mesh_object or a mesh group ?
-        # check if mesh is provided
         if meshname is None:
-                raise ValueError('meshname do not refer to an existing mesh')
-        if not(self._is_mesh(meshname)) or  self._is_empty(meshname):
-                raise ValueError('meshname do not refer to a non empty mesh'
-                                 'group')
+            raise ValueError('meshname do not refer to an existing mesh')
+        if not(self._is_mesh(meshname)) or self._is_empty(meshname):
+            raise ValueError('meshname do not refer to a non empty mesh group')
         # create empty element vector field
-        Nelements = int(self.get_attribute('Number_of_elements',meshname))
+        n_elements = int(self.get_attribute('Number_of_elements', meshname))
         mesh = self.get_node(meshname)
-        El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
-        orientation_field = np.zeros((Nelements,3),dtype=float)
-        grainIds = self.get_grain_ids()
+        el_tag_path = os.path.join(mesh._v_pathname, 'Geometry', 'ElementsTags')
+        orientation_field = np.zeros((n_elements, 3), dtype=float)
+        grain_ids = self.get_grain_ids()
         grain_orientations = self.get_grain_rodrigues()
         # if mesh is provided
-        for i in range(len(grainIds)):
-            set_name = 'ET_grain_'+str(grainIds[i]).strip()
-            elset_path = os.path.join(El_tag_path, set_name)
+        for i in range(len(grain_ids)):
+            set_name = '%s%d' % (elset_prefix, grain_ids[i])
+            elset_path = os.path.join(el_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
             orientation_field[element_ids,:] = grain_orientations[i,:]
         if store:
@@ -4001,15 +3995,25 @@ class Microstructure(SampleData):
 
     @staticmethod
     def from_dream3d(file_path, main_key='DataContainers',
-                     data_container='DataContainer', grain_data='FeatureData',
+                     data_container='DataContainer',
+                     ensemble_data='EnsembleData',
+                     grain_data='FeatureData',
                      grain_orientations='AvgEulerAngles',
-                     orientation_type='euler', grain_centroid='Centroids'):
-        """Read a microstructure from a hdf5 file.
+                     orientation_type='euler',
+                     grain_centroid='Centroids',
+                     cell_data='CellData',
+                     grain_ids='FeatureIds',
+                     mask='Mask',
+                     phases='Phases',
+                     ):
+        """Read a microstructure from a Dream3d hdf5 file.
 
         :param str file_path: the path to the hdf5 file to read.
         :param str main_key: the string describing the root key.
         :param str data_container: the string describing the data container
-            group in the hdf5 file.
+            group in the file.
+        :param str ensemble_data: the string describing the ensemble data group
+            in the file.
         :param str grain_data: the string describing the grain data group in the
             hdf5 file.
         :param str grain_orientations: the string describing the average grain
@@ -4018,36 +4022,56 @@ class Microstructure(SampleData):
             for orientation data.
         :param str grain_centroid: the string describing the grain centroid in
             the hdf5 file.
-        :return: a `Microstructure` instance created from the hdf5 file.
+        :return: a `Microstructure` instance created from the dream3d file.
         """
         head, tail = os.path.split(file_path)
-        micro = Microstructure(name=tail, file_path=head, overwrite_hdf5=True)
         with h5py.File(file_path, 'r') as f:
+            # get information on the material phases
+            phases_data_path = '%s/%s/%s' % (main_key, data_container, ensemble_data)
+            phase_names = f[phases_data_path]['MaterialName'][()]
+            n_phases = len(phase_names) - 1  # skip background
+            phase_list = []
+            for i_phase in range(n_phases):
+                phase_id = i_phase + 1
+                n = int(f[phases_data_path]['CrystalStructures'][()][phase_id])
+                lattice_constants = f[phases_data_path]['LatticeConstants'][()][phase_id]
+                for i in range(3):
+                    lattice_constants[i] = lattice_constants[i] / 10  # use nm unit
+                print('found phase with crystal structure %d' % n)
+                l = Lattice.from_parameters(*lattice_constants, symmetry=Symmetry.from_dream3d(n))
+                phase = CrystallinePhase(phase_id=phase_id, name=phase_names[phase_id], lattice=l)
+                phase_list.append(phase)
+            # initialize our microstructure
+            micro = Microstructure(name=tail, phase=phase_list[0], overwrite_hdf5=True)
+            if n_phases > 1:
+                micro.set_phases(phase_list)
+            # now get grain data informations
             grain_data_path = '%s/%s/%s' % (main_key, data_container, grain_data)
-            orientations = f[grain_data_path][grain_orientations].value
-            if grain_centroid:
-                centroids = f[grain_data_path][grain_centroid].value
-                offset = 0
-                if len(centroids) < len(orientations):
-                    offset = 1  # if grain 0 has not a centroid
-            grain = micro.grains.row
-            for i in range(len(orientations)):
-                grain['idnumber'] = i
-                if orientations[i, 0] == 0. and orientations[i, 1] == 0. and \
-                        orientations[i, 2] == 0.:
-                    # skip grain 0 which is always (0., 0., 0.)
-                    print('skipping (0., 0., 0.)')
-                    continue
-                if orientation_type == 'euler':
-                    grain['orientation'] = Orientation.from_euler(
-                        orientations[i] * 180 / np.pi).rod
-                elif orientation_type == 'rodrigues':
-                    grain['orientation'] = Orientation.from_rodrigues(
-                        orientations[i]).rod
-                if grain_centroid:
-                    grain['center'] = centroids[i - offset]
-                grain.append()
-            micro.grains.flush()
+            orientations = f[grain_data_path][grain_orientations][()]
+            centroids = f[grain_data_path][grain_centroid][()]
+            print(orientations[0])
+            if np.array_equal(orientations[0], [0., 0., 0.]):
+                # skip the background
+                orientations = orientations[1:]
+                centroids = centroids[1:]
+            micro.add_grains(orientations, orientation_type=orientation_type)
+            micro.set_centers(centroids)
+            print('%d grains in the data set' % micro.get_number_of_grains())
+            # read voxel size and origin
+            geom_path = '%s/%s/_SIMPL_GEOMETRY' % (main_key, data_container)
+            voxel_size = f[geom_path]['SPACING'][()]
+            origin = f[geom_path]['ORIGIN'][()]
+            print(voxel_size)
+            # now read cell data
+            cell_data_path = '%s/%s/%s' % (main_key, data_container, cell_data)
+            grain_ids = f[cell_data_path][grain_ids][:, :, :, 0]
+            print(grain_ids.shape)
+            mask = f[cell_data_path][mask][:, :, :, 0]
+            phases = f[cell_data_path][phases][:, :, :, 0]
+            micro.set_grain_map(grain_ids, voxel_size=voxel_size)
+            micro.set_origin('CellData', origin)
+            micro.set_mask(mask)
+            micro.set_phase_map(phases)
         return micro
 
     @staticmethod

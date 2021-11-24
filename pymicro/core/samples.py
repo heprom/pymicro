@@ -137,8 +137,8 @@ class SampleData:
         self.h5_file = filename_tmp + '.h5'
         self.xdmf_file = filename_tmp + '.xdmf'
         self.file_dir = file_dir
-        self.h5_path = os.path.join(self.file_dir,self.h5_file)
-        self.xdmf_path = os.path.join(self.file_dir,self.xdmf_file)
+        self.h5_path = os.path.join(self.file_dir, self.h5_file)
+        self.xdmf_path = os.path.join(self.file_dir, self.xdmf_file)
         self._verbose = verbose
         self.autodelete = autodelete
         self.autorepack = autorepack
@@ -1346,7 +1346,7 @@ class SampleData:
         # add to index
         if indexname is None:
             indexname = name
-        self.add_to_index(indexname, os.path.join(location_path, name))
+        self.add_to_index(indexname, '%s/%s' % (location_path, name))
         # Create dataset node to store array
         if empty:
             Node = self.h5_dataset.create_carray(
@@ -1426,7 +1426,7 @@ class SampleData:
                 self._verbose_print(msg)
                 return
             # check if array location exists and remove node if asked
-            table_path = os.path.join(location_path, name)
+            table_path = '%s/%s' % (location_path, name)
             if self.h5_dataset.__contains__(table_path):
                 if replace:
                     msg = ('(add_table): existing node {} will be '
@@ -1553,7 +1553,7 @@ class SampleData:
                 self._verbose_print(msg)
                 return
             # check if array location exists and remove node if asked
-            array_path = os.path.join(location_path, name)
+            array_path = '%s/%s' % (location_path, name)
             if self.h5_dataset.__contains__(array_path):
                 if replace:
                     msg = ('(add_string_array): existing node {} will be '
@@ -1936,8 +1936,7 @@ class SampleData:
         # get mesh group
         mesh_group = self.get_node(meshname)
         # get path of Element tag
-        NT_path = os.path.join(mesh_group._v_pathname,'Geometry',
-                               'NodeTags', node_tag_nodename)
+        NT_path = '%s/Geometry/NodeTags/%s' % (mesh_group._v_pathname, node_tag_nodename)
         # get element tag type
         tag = self.get_node(NT_path, as_numpy=as_numpy)
         return tag
@@ -2085,8 +2084,7 @@ class SampleData:
             # get mesh group
             mesh_group = self.get_node(meshname)
             # get path of Element tag
-            ET_path = os.path.join(mesh_group._v_pathname,'Geometry',
-                                         'ElementsTags',el_tag_nodename)
+            ET_path = '%s/Geometry/ElementsTags/%s' % (mesh_group._v_pathname, el_tag_nodename)
             # get element tag type
             tag = self.get_node(ET_path, as_numpy=as_numpy)
             if local_IDs:
@@ -2176,7 +2174,7 @@ class SampleData:
         image_object.SetOrigin(origin)
         # Get image fields
         image_group = self.get_node(imagename)
-        FIndex_path = os.path.join(image_group._v_pathname,'Field_index')
+        FIndex_path = '%s/Field_index' % image_group._v_pathname
         Field_index = self.get_node(FIndex_path)
         if with_fields and (Field_index is not None):
             for fieldname in Field_index:
@@ -2233,7 +2231,7 @@ class SampleData:
             in the hdf5 file and defined on the grid.
         """
         grid_group = self.get_node(gridname)
-        FIndex_path = os.path.join(grid_group._v_pathname,'Field_index')
+        FIndex_path = '%s/Field_index' % grid_group._v_pathname
         Field_index = self.get_node(FIndex_path)
         Field_list = []
         if Field_index is None:
@@ -2267,7 +2265,7 @@ class SampleData:
         else:
             field = self.get_node(fieldname, as_numpy=True)
         padding = self.get_attribute('padding', fieldname)
-        parent_mesh =  self.get_attribute('parent_grid_path', fieldname)
+        parent_mesh = self.get_attribute('parent_grid_path', fieldname)
         pad_field = (padding != None) and (unpad_field)
         if (field_type == 'IP_field') and not get_visualisation_field:
             pad_field = False
@@ -2370,7 +2368,7 @@ class SampleData:
         """
         attribute = None
         data_path = self._name_or_node_to_path(nodename)
-        if (data_path is None):
+        if data_path is None:
             self._verbose_print(' (get_attribute) neither indexname nor'
                                 ' node_path passed, node return aborted')
         else:
@@ -2399,9 +2397,9 @@ class SampleData:
         k = 0
         unit = units[k]
         if convert:
-            while fsize/1024 > 1:
-                k = k+1
-                fsize = fsize/1024
+            while fsize / 1024 > 1:
+                k = k + 1
+                fsize = fsize / 1024
                 unit = units[k]
         if print_flag:
             print('File size is {:9.3f} {} for file \n {}'
@@ -2899,7 +2897,7 @@ class SampleData:
         """
         self.sync()
         head, tail = os.path.split(self.h5_path)
-        tmp_file = os.path.join(head, 'tmp_'+tail)
+        tmp_file = os.path.join(head, 'tmp_' + tail)
         self.h5_dataset.copy_file(tmp_file)
         self.h5_dataset.close()
         shutil.move(tmp_file, self.h5_path)
@@ -2983,13 +2981,13 @@ class SampleData:
         # create empty element vector field
         Nelements = int(self.get_attribute('Number_of_elements',meshname))
         mesh = self.get_node(meshname)
-        El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
-        ID_field = np.zeros((Nelements,1),dtype=float)
+        El_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
+        ID_field = np.zeros((Nelements, 1), dtype=int)
         elem_tags = self.get_mesh_elem_tags_names(meshname)
         # if mesh is provided
         i = 0
         for set_name, set_type in elem_tags.items():
-            elset_path = os.path.join(El_tag_path, 'ET_'+set_name)
+            elset_path = '%s/ET_%s' % (El_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
             if get_sets_IDs:
                 set_ID = int(set_name.strip(tags_prefix))
@@ -2998,12 +2996,12 @@ class SampleData:
                 i += 1
             ID_field[element_ids] = set_ID
             if remove_elset_fields:
-                field_path = os.path.join(El_tag_path, 'field_'+set_name)
+                field_path = '%s/field_%s' % (El_tag_path, set_name)
                 self.remove_node(field_path)
         if store:
             if fieldname is None:
                 fieldname = meshname+'_elset_ids'
-            c_opt = {'complib':'zlib', 'complevel':1, 'shuffle':True}
+            c_opt = {'complib': 'zlib', 'complevel': 1, 'shuffle': True}
             self.add_field(gridname=meshname, fieldname=fieldname,
                            array=ID_field, replace=True,
                            compression_options=c_opt)
@@ -3156,7 +3154,7 @@ class SampleData:
                        'table there.'.format(location))
                 raise tables.NodeError(msg)
             # check if array location exists and remove node if asked
-            array_path = os.path.join(location_path, arrayname)
+            array_path = '%s/%s' % (location_path, arrayname)
             if self.__contains__(array_path):
                 empty = self.get_attribute('empty', array_path)
                 if empty and (not empty_input):
@@ -3197,7 +3195,7 @@ class SampleData:
             raise ValueError('{} is not a valid group type. Use on of {}'
                              ''.format(group_type,SD_GROUP_TYPES))
         location = self._name_or_node_to_path(location)
-        group_path = os.path.join(location, groupname)
+        group_path = '%s/%s' % (location, groupname)
         # check existence and emptiness
         if self.__contains__(group_path):
             if self._is_grid(group_path):
@@ -3375,7 +3373,7 @@ class SampleData:
         if name_or_node is None:
             return None
         # name_or_node is a string or else
-        name_tmp = os.path.join('/', name_or_node)
+        name_tmp = '/%s' % name_or_node
         if self.h5_dataset.__contains__(name_tmp):
             # name is a path in hdf5 tree data
             path = name_tmp
@@ -3959,7 +3957,7 @@ class SampleData:
             for name in Ntag_list:
                 tag_name = name.decode('utf-8')
                 tag = mesh_object.GetNodalTag(tag_name)
-                tag_path = os.path.join(Ntags_group._v_pathname,'NT_'+tag_name)
+                tag_path = '%s/NT_%s' % (Ntags_group._v_pathname, tag_name)
                 tag.SetIds(self.get_node(tag_path, as_numpy))
         return mesh_object
 
@@ -3987,7 +3985,7 @@ class SampleData:
                 el_type = Etag_Etype_list[i].decode('UTF-8')
                 elem_container = AllElements.GetElementsOfType(el_type)
                 tag = elem_container.tags.CreateTag(tag_name,False)
-                tag_path = os.path.join(Etags_group._v_pathname,'ET_'+tag_name)
+                tag_path = '%s/ET_%s' % (Etags_group._v_pathname, tag_name)
                 nodes_Ids = self.get_node(tag_path, as_numpy)
                 ## Need to add local ids !! Substract the offset stored by
                 ## get_mesh_elements
@@ -4199,7 +4197,7 @@ class SampleData:
     def _append_field_index(self, gridname, fieldname):
         """Append field name to the field index of a grid group."""
         grid = self.get_node(gridname)
-        index_path = os.path.join(grid._v_pathname,'Field_index')
+        index_path = '%s/Field_index' % grid._v_pathname
         Field_index = self.get_node(index_path)
         if Field_index is None:
             grid_indexname = self.get_indexname_from_path(grid._v_pathname)

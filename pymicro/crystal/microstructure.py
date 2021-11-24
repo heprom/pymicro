@@ -2350,14 +2350,14 @@ class Microstructure(SampleData):
         # create empty element vector field
         n_elements = int(self.get_attribute('Number_of_elements', meshname))
         mesh = self.get_node(meshname)
-        el_tag_path = os.path.join(mesh._v_pathname, 'Geometry', 'ElementsTags')
+        el_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
         grain_id_field = np.zeros((n_elements, 1), dtype=int)
         grain_ids = self.get_grain_ids()
         # if mesh is provided
         for i in range(len(grain_ids)):
             set_name = '%s%d' % (elset_prefix, grain_ids[i])
             print('using elset name %s' % set_name)
-            elset_path = os.path.join(el_tag_path, set_name)
+            elset_path = '%s/%s' % (el_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True).astype(int)
             grain_id_field[element_ids == True] = grain_ids[i]
         if store:
@@ -2388,14 +2388,14 @@ class Microstructure(SampleData):
         # create empty element vector field
         n_elements = int(self.get_attribute('Number_of_elements', meshname))
         mesh = self.get_node(meshname)
-        el_tag_path = os.path.join(mesh._v_pathname, 'Geometry', 'ElementsTags')
+        el_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
         orientation_field = np.zeros((n_elements, 3), dtype=float)
         grain_ids = self.get_grain_ids()
         grain_orientations = self.get_grain_rodrigues()
         # if mesh is provided
         for i in range(len(grain_ids)):
             set_name = '%s%d' % (elset_prefix, grain_ids[i])
-            elset_path = os.path.join(el_tag_path, set_name)
+            elset_path = '%s/%s' % (el_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
             orientation_field[element_ids,:] = grain_orientations[i,:]
         if store:
@@ -3099,7 +3099,7 @@ class Microstructure(SampleData):
         print('cropping microstructure to %s' % micro_crop.h5_file)
         # crop CellData fields
         image_group = self.get_node('CellData')
-        FIndex_path = os.path.join(image_group._v_pathname,'Field_index')
+        FIndex_path = '%s/Field_index' % image_group._v_pathname
         field_list = self.get_node(FIndex_path)
         for name in field_list:
             fieldname = name.decode('utf-8')
@@ -3645,7 +3645,7 @@ class Microstructure(SampleData):
                                  '1 to n_phases): {}'.format(phase_ids))
             for phase_id in phase_ids:
                 mat = etree.Element('Material', numM=str(phase_id),
-                                    Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
+                                    Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                     Law='elasaniso')
                 # get the C_IJ values
                 phase = self.get_phase(phase_id)
@@ -3676,7 +3676,7 @@ class Microstructure(SampleData):
             # add a material for top and bottom layers
             if add_grips:
                 grips = etree.Element('Material', numM=str(grip_id + 1),
-                                      Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
+                                      Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                       Law='elasiso')
                 grips.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(grip_constants[0])))
                 grips.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(grip_constants[1])))
@@ -3684,7 +3684,7 @@ class Microstructure(SampleData):
             # add a material for external buffer
             if add_exterior or use_mask:
                 exterior = etree.Element('Material', numM=str(ext_id + 1),
-                                         Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
+                                         Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                          Law='elasiso')
                 exterior.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value='0.'))
                 exterior.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value='0.'))
@@ -4320,7 +4320,7 @@ class Microstructure(SampleData):
             data_dir = data_dir[:-1]
         scan = data_dir.split(os.sep)[-1]
         print('creating microstructure for DCT scan %s' % scan)
-        filename = os.path.join(data_dir,scan)
+        filename = os.path.join(data_dir, scan)
         micro = Microstructure(filename=filename, overwrite_hdf5=True)
         micro.data_dir = data_dir
         if use_dct_path:

@@ -47,7 +47,7 @@ class TestDerivedClass(SampleData):
         minimal_content_type_dic = {'Image_data': '3DImage',
                                     'grain_map': 'field_array',
                                     'Grain_data': 'Group',
-                                    'GrainDataTable': Test_GrainData,
+                                    'GrainDataTable': TestGrainData,
                                     'Crystal_data': 'Group',
                                     'lattice_params': 'data_array',
                                     'lattice_props': Descr,
@@ -189,7 +189,7 @@ class SampleDataTests(unittest.TestCase):
                                                      print_flag=False,
                                                      convert=False)
         # Verify data content
-        data_array = sample.get_node('test_array')
+        data_array = sample.get_node('test_array', as_numpy=True)
         self.assertTrue(np.all(self.data_array == data_array))
         # compress image data
         c_opt = {'complib': 'zlib', 'complevel': 1}

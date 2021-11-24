@@ -2274,11 +2274,17 @@ class SampleData:
         if self._is_image(parent_mesh):
             dim = self.get_attribute('dimension', parent_mesh)
             field_dim = self.get_attribute('field_dimensionality', fieldname)
+            '''
             if field_dim == 'Scalar':
                 field = field.reshape(dim)
             elif ((field_dim == 'Vector') or (field_dim == 'Tensor6')
                   or (field_dim == 'Tensor')):
                 field = field.reshape(*dim, field.shape[-1])
+            '''
+            if (field_dim == 'Vector') or (field_dim == 'Tensor6') or (field_dim == 'Tensor'):
+                field = field.reshape(*dim, field.shape[-1])
+        elif self._is_mesh(parent_mesh):
+            field = np.squeeze(field)
         return field
 
     def get_node(self, name, as_numpy=False):
@@ -2979,10 +2985,10 @@ class SampleData:
                 raise ValueError('meshname do not refer to a non empty mesh'
                                  'group')
         # create empty element vector field
-        Nelements = int(self.get_attribute('Number_of_elements',meshname))
+        n_elements = int(self.get_attribute('Number_of_elements',meshname))
         mesh = self.get_node(meshname)
         El_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
-        ID_field = np.zeros((Nelements, 1), dtype=int)
+        ID_field = np.zeros((n_elements, 1), dtype=int)
         elem_tags = self.get_mesh_elem_tags_names(meshname)
         # if mesh is provided
         i = 0
@@ -3195,7 +3201,8 @@ class SampleData:
             raise ValueError('{} is not a valid group type. Use on of {}'
                              ''.format(group_type,SD_GROUP_TYPES))
         location = self._name_or_node_to_path(location)
-        group_path = '%s/%s' % (location, groupname)
+        # get rid of potential multiple / in path
+        group_path = ('%s/%s' % (location, groupname)).replace('//', '/').replace('//', '/')
         # check existence and emptiness
         if self.__contains__(group_path):
             if self._is_grid(group_path):
@@ -3373,7 +3380,7 @@ class SampleData:
         if name_or_node is None:
             return None
         # name_or_node is a string or else
-        name_tmp = '/%s' % name_or_node
+        name_tmp = ('/%s' % name_or_node).replace('//', '/')
         if self.h5_dataset.__contains__(name_tmp):
             # name is a path in hdf5 tree data
             path = name_tmp

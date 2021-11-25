@@ -2257,6 +2257,7 @@ class SampleData:
             to the field to comply with the mesh topology and return it with
             its original size (bulk or boundary field).
         """
+        # Get field data array (or visualization field data array)
         field_type = self.get_attribute('field_type', fieldname)
         if (field_type == 'IP_field') and get_visualisation_field:
             field_path = self.get_attribute('visualisation_field_path',
@@ -2264,6 +2265,7 @@ class SampleData:
             field = self.get_node(field_path, as_numpy=True)
         else:
             field = self.get_node(fieldname, as_numpy=True)
+        # Handle array padding removal if needed
         padding = self.get_attribute('padding', fieldname)
         parent_mesh = self.get_attribute('parent_grid_path', fieldname)
         pad_field = (padding != None) and (unpad_field)
@@ -2271,19 +2273,9 @@ class SampleData:
             pad_field = False
         if pad_field:
             field = self._mesh_field_unpadding(field, parent_mesh, padding)
-        if self._is_image(parent_mesh):
-            dim = self.get_attribute('dimension', parent_mesh)
-            field_dim = self.get_attribute('field_dimensionality', fieldname)
-            '''
-            if field_dim == 'Scalar':
-                field = field.reshape(dim)
-            elif ((field_dim == 'Vector') or (field_dim == 'Tensor6')
-                  or (field_dim == 'Tensor')):
-                field = field.reshape(*dim, field.shape[-1])
-            '''
-            if (field_dim == 'Vector') or (field_dim == 'Tensor6') or (field_dim == 'Tensor'):
-                field = field.reshape(*dim, field.shape[-1])
-        elif self._is_mesh(parent_mesh):
+        # Handle field array dimensions to remove singleton dimension if field 
+        # is a scalar mesh field
+        if self._is_mesh(parent_mesh):
             field = np.squeeze(field)
         return field
 

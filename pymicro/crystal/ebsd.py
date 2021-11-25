@@ -541,13 +541,14 @@ class OimScan:
             print('changing orientation reference frame progress: {0:.2f} %'.format(progress), end='\r')
         print('\n')
 
-    def compute_god_field(self, id_list=None):
-        """Create a GOD (grain orientation deviation) field.
+    def compute_god_map(self, id_list=None):
+        """Create a GOD (grain orientation deviation) map.
 
-        This method computes the grain orientation deviation field. For each
+        This method computes the grain orientation deviation map. For each
         grain in the list (all grain by default), the mean orientation is
         computed. Then the orientation of each pixel belonging to this grain
-        is compared to the mean and the misorientation is assigned to the pixel.
+        is compared to the mean and the resulting misorientation is assigned
+        to the pixel.
 
         .. note::
 
@@ -557,19 +558,18 @@ class OimScan:
         :param list id_list: the list of the grain ids to include (compute
             for all grains by default).
         """
-        if not self.grain_ids:
+        if self.grain_ids is None:
             print('no grain_ids field, please segment your grains first')
             return None
         self.god = np.zeros_like(self.iq)
         if not id_list:
             id_list = np.unique(self.grain_ids)
 
-        for gid in id_list:
+        for i, gid in enumerate(id_list):
             if gid < 1:
                 continue
-            progress = 100 * id_list.index(gid) / len(id_list)
-            print('GOD computation progress: {0:.2f} % (grain %d)'.format(progress, gid), end='\r')
-
+            progress = 100 * i / len(id_list)
+            print('GOD computation progress: {:.2f} % (grain {:d})'.format(progress, gid), end='\r')
             indices = np.where(self.grain_ids == gid)
             # get the symmetry for this grain
             sym = self.get_phase(1 + int(self.phase[indices[0][0], indices[1][0]])).get_symmetry()

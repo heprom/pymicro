@@ -45,6 +45,8 @@ class OimScan:
         self.scan_id = ''
         self.phase_list = []
         self.init_arrays()
+        self.grain_ids = None
+        self.god = None
 
     def __repr__(self):
         """Provide a string representation of the class."""
@@ -228,6 +230,7 @@ class OimScan:
             scan.phase = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
         return scan
 
+    @staticmethod
     def read_ctf(file_path):
         """Read a scan in Channel Text File format.
 
@@ -380,6 +383,7 @@ class OimScan:
                                 (scan.rows, scan.cols)).transpose(1, 0)
             scan.iq = np.reshape(data['IQ'], (scan.rows, scan.cols)).transpose(1, 0)
             scan.ci = np.reshape(data['CI'], (scan.rows, scan.cols)).transpose(1, 0)
+            # the phase value is decreased by 1 wrt the phase_id in the list
             scan.phase = np.reshape(data['Phase'],
                                     (scan.rows, scan.cols)).transpose(1, 0)
         return scan
@@ -412,7 +416,7 @@ class OimScan:
             for j in range(self.cols):
                 o = Orientation.from_euler(np.degrees(self.euler[j, i]))
                 try:
-                    sym = self.get_phase(int(self.phase[j, i])).get_symmetry()
+                    sym = self.get_phase(1 + int(self.phase[j, i])).get_symmetry()
                     # compute IPF-Z
                     self.ipf001[j, i] = o.ipf_color(axis=np.array([0., 0., 1.]),
                                                     symmetry=sym)
@@ -480,7 +484,7 @@ class OimScan:
                 # apply region growing based on the angle misorientation (strong connectivity)
                 while len(candidates) > 0:
                     pixel = candidates.pop()
-                    sym = self.phase_list[self.phase[pixel]].get_symmetry()
+                    sym = self.get_phase(1 + int(self.phase[pixel])).get_symmetry()
                     # print('* pixel is {}, euler: {}'.format(pixel, np.degrees(euler[pixel])))
                     # get orientation of this pixel
                     o = Orientation.from_euler(np.degrees(self.euler[pixel]))
@@ -508,6 +512,8 @@ class OimScan:
                     progress = 100 * np.sum(grain_ids >= 0) / (self.cols * self.rows)
             print('segmentation progress: {0:.2f} %'.format(progress), end='\r')
         print('\n%d grains were segmented' % len(np.unique(grain_ids)))
+        # assign grain_ids array to the scan
+        self.grain_ids = grain_ids
         return grain_ids
 
     def change_orientation_reference_frame(self):
@@ -534,6 +540,49 @@ class OimScan:
                 progress = 100 * (j * self.cols + i) / (self.cols * self.rows)
             print('changing orientation reference frame progress: {0:.2f} %'.format(progress), end='\r')
         print('\n')
+
+    def compute_god_field(self, id_list=None):
+        """Create a GOD (grain orientation deviation) field.
+
+        This method computes the grain orientation deviation field. For each
+        grain in the list (all grain by default), the mean orientation is
+        computed. Then the orientation of each pixel belonging to this grain
+        is compared to the mean and the misorientation is assigned to the pixel.
+
+        .. note::
+
+          This method needs the grain segmentation to run, a message will be
+          displayed if this is not the case.
+
+        :param list id_list: the list of the grain ids to include (compute
+            for all grains by default).
+        """
+        if not self.grain_ids:
+            print('no grain_ids field, please segment your grains first')
+            return None
+        self.god = np.zeros_like(self.iq)
+        if not id_list:
+            id_list = np.unique(self.grain_ids)
+
+        for gid in id_list:
+            if gid < 1:
+                continue
+            progress = 100 * id_list.index(gid) / len(id_list)
+            print('GOD computation progress: {0:.2f} % (grain %d)'.format(progress, gid), end='\r')
+
+            indices = np.where(self.grain_ids == gid)
+            # get the symmetry for this grain
+            sym = self.get_phase(1 + int(self.phase[indices[0][0], indices[1][0]])).get_symmetry()
+            # compute the mean orientation of this grain
+            euler_gid = self.euler[np.squeeze(self.grain_ids == gid)]
+            rods = Orientation.eu2ro(euler_gid)
+            o = Orientation.compute_mean_orientation(rods, symmetry=sym)
+            # now compute the orientation deviation wrt the mean for each pixel of the grain
+            for i, j in zip(indices[0], indices[1]):
+                euler_ij = self.euler[i, j]
+                o_i = Orientation.from_euler(np.degrees(euler_ij))
+                self.god[i, j] = np.degrees(o.disorientation(o_i, crystal_structure=sym)[0])
+        print('GOD computation progress: 100.00 %')
 
     def to_h5(self, file_name):
         """Write the EBSD scan as a hdf5 file compatible OIM software (in

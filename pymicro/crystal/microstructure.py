@@ -2359,7 +2359,7 @@ class Microstructure(SampleData):
             print('using elset name %s' % set_name)
             elset_path = '%s/%s' % (el_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True).astype(int)
-            grain_id_field[element_ids == True] = grain_ids[i]
+            grain_id_field[element_ids == 1] = grain_ids[i]
         if store:
             self.add_field(gridname=meshname, fieldname='grain_ids',
                            array=grain_id_field, replace=True)
@@ -2369,17 +2369,16 @@ class Microstructure(SampleData):
                                  store=True):
         """Create a vector field of grain orientations on the input mesh.
 
-        Creates a element wise field from the microsctructure mesh provided,
-        adding to each element the value of the Rodrigues vector
-        of the local grain element set, as it is and if it is referenced in the
-        `GrainDataTable` node.
+        This method creates a element wise field on the microsctructure mesh
+        indicated, adding to each element the value of the Rodrigues vector of
+        this grain as referenced in the `GrainDataTable` node.
 
         :param str mesh: Name, Path or index name of the mesh on which an
-            orientation map element field must be constructed
+            orientation field must be constructed
         :param str elset_prefix: prefix to define the element sets representing
             the grains.
-        :param bool store: If `True`, store the orientation map in `CellData`
-            image group, with name `orientation_map`
+        :param bool store: If `True`, store the orientation field in corresponding
+            mesh group, with name `orientation_field`.
         """
         if meshname is None:
             raise ValueError('meshname do not refer to an existing mesh')
@@ -2392,15 +2391,17 @@ class Microstructure(SampleData):
         orientation_field = np.zeros((n_elements, 3), dtype=float)
         grain_ids = self.get_grain_ids()
         grain_orientations = self.get_grain_rodrigues()
+        print(grain_orientations)
         # if mesh is provided
         for i in range(len(grain_ids)):
             set_name = '%s%d' % (elset_prefix, grain_ids[i])
+            print('using elset name %s' % set_name, grain_orientations[i, :])
             elset_path = '%s/%s' % (el_tag_path, set_name)
-            element_ids = self.get_node(elset_path, as_numpy=True)
-            orientation_field[element_ids,:] = grain_orientations[i,:]
+            element_ids = self.get_node(elset_path, as_numpy=True).astype(int)
+            orientation_field[np.squeeze(element_ids) == 1, :] = grain_orientations[i, :]
         if store:
-            self.add_field(gridname=meshname, fieldname='grain_orientations',
-                           array=orientation_field)
+            self.add_field(gridname=meshname, fieldname='orientation_field',
+                           array=orientation_field, replace=True)
         return orientation_field
 
     def create_orientation_map(self, store=True):

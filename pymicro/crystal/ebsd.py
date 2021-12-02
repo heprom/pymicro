@@ -565,10 +565,10 @@ class OimScan:
         if not id_list:
             id_list = np.unique(self.grain_ids)
 
-        for i, gid in enumerate(id_list):
+        for index, gid in enumerate(id_list):
             if gid < 1:
                 continue
-            progress = 100 * i / len(id_list)
+            progress = 100 * index / len(id_list)
             print('GOD computation progress: {:.2f} % (grain {:d})'.format(progress, gid), end='\r')
             indices = np.where(self.grain_ids == gid)
             # get the symmetry for this grain
@@ -580,8 +580,8 @@ class OimScan:
             # now compute the orientation deviation wrt the mean for each pixel of the grain
             for i, j in zip(indices[0], indices[1]):
                 euler_ij = self.euler[i, j]
-                o_i = Orientation.from_euler(np.degrees(euler_ij))
-                self.god[i, j] = np.degrees(o.disorientation(o_i, crystal_structure=sym)[0])
+                o_ij = Orientation.from_euler(np.degrees(euler_ij))
+                self.god[i, j] = np.degrees(o.disorientation(o_ij, crystal_structure=sym)[0])
         print('GOD computation progress: 100.00 %')
 
     def to_h5(self, file_name):

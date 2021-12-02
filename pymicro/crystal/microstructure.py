@@ -258,6 +258,7 @@ class Orientation:
         to their fundamental zone (cubic by default)
         :returns: the mean orientation as an `Orientation` instance.
         """
+        rods = np.atleast_2d(rods)
         rods_fz = np.empty_like(rods)
         for i in range(len(rods)):
             g = Orientation.from_rodrigues(rods[i]).orientation_matrix()
@@ -1821,6 +1822,25 @@ class Microstructure(SampleData):
                                                1))
         return phase_map
 
+    def get_orientation_map(self, as_numpy=True):
+        orientation_map = self.get_field('orientation_map')
+        if orientation_map is not None:
+            print(orientation_map.shape)
+            print(orientation_map.ndim)
+        if self._is_empty('orientation_map'):
+            orientation_map = None
+        elif orientation_map.ndim == 3:
+            # case (nx, ny, 3)
+            new_dim = self.get_attribute('dimension', 'CellData')
+            print('CellData dim = ', new_dim)
+            if len(new_dim) == 3:
+                orientation_map = orientation_map.reshape(new_dim)
+            else:
+                orientation_map = orientation_map.reshape((orientation_map.shape[0],
+                                               orientation_map.shape[1],
+                                               1, 3))
+        return orientation_map
+
     def get_mask(self, as_numpy=False):
         mask = self.get_field('mask')
         if self._is_empty('mask'):
@@ -2152,6 +2172,26 @@ class Microstructure(SampleData):
                            array=phase_map, replace=True,
                            indexname='phase_map')
 
+    def set_orientation_map(self, orientation_map):
+        """Set the orientation_map map for this microstructure.
+
+        The orientation map is an array containing the voxel wise orientation
+        data in form of Rodigues vectors.
+
+        :param ndarray orientation_map: a 2D or 3D numpy array with rodrigues
+        vectors at each pixels. The size of the array must be compatible with
+        the `CellData` node image dimensions.
+        """
+        dims = orientation_map.shape
+        cell_data_dims = self.get_attribute('dimension', 'CellData')
+        if not np.all(np.equal(dims[:-1], cell_data_dims)):
+            print('warning: the orientation map shape %s is not compatible with '
+                  'CellData node shape %s' % (dims, cell_data_dims))
+            return None
+        self.add_field(gridname='CellData', fieldname='orientation_map',
+                       array=orientation_map, replace=True,
+                       indexname='orientation_map')
+
     def set_mask(self, mask, voxel_size=None):
         """Set the mask for this microstructure.
 
@@ -2416,41 +2456,132 @@ class Microstructure(SampleData):
             image group, with name `orientation_map`
         """
         # safety check
-        if self._is_empty('grain_map'):
-            raise RuntimeError('The microstructure instance has an empty'
-                                '`grain_map` node. Cannot create orientation'
-                                ' map')
-        grain_map = self.get_grain_map().squeeze()
-        grainIds = self.get_grain_ids()
+        if self._is_empty(self.active_grain_map):
+            msg = 'The microstructure instance has no associated grain_map. ' \
+                  'Cannot create orientation map.'
+            raise RuntimeError(msg)
+        grain_map = self.get_grain_map()
+        grain_ids = self.get_grain_ids()
         grain_orientations = self.get_grain_rodrigues()
         # safety check 2
         grain_list = np.unique(grain_map)
         # remove -1 and 0 from the list of grains in grain map (Ids reserved
         # for background and overlaps in non-dilated reconstructed grain maps)
         grain_list = np.delete(grain_list, np.isin(grain_list, [-1, 0]))
-        if not np.all(np.isin(grain_list, grainIds)):
-            raise ValueError('Some grain Ids in `grain_map` are not referenced'
-                             ' in the `GrainDataTable` array. Cannot create'
-                             ' orientation map.')
+        if not np.all(np.isin(grain_list, grain_ids)):
+            msg = 'Some grain ids in the grain_map are not referenced in the ' \
+                  '`GrainDataTable` array. Cannot create orientation map.'
+            raise ValueError(msg)
         # create empty orientation map with right dimensions
-        im_dim = self.get_attribute('dimension', 'CellData')
-        shape_orientation_map = np.empty(shape=(len(im_dim)+1), dtype='int32')
-        shape_orientation_map[:-1] = im_dim
-        shape_orientation_map[-1] = 3
+        im_dim = tuple(self.get_attribute('dimension', 'CellData'))
+        print(im_dim)
+        shape_orientation_map = im_dim + (3,)
+        print(shape_orientation_map)
         orientation_map = np.zeros(shape=shape_orientation_map, dtype=float)
-        omap_X = orientation_map[..., 0]
-        omap_Y = orientation_map[..., 1]
-        omap_Z = orientation_map[..., 2]
-        for i in range(len(grainIds)):
-            slc = np.where(grain_map == grainIds[i])
-            omap_X[slc] = grain_orientations[i, 0]
-            omap_Y[slc] = grain_orientations[i, 1]
-            omap_Z[slc] = grain_orientations[i, 2]
+        for i in range(len(grain_ids)):
+            #TODO use grain bounding box here
+            #slc = np.where(grain_map == grain_ids[i])
+            orientation_map[grain_map == grain_ids[i], 0] = grain_orientations[i, 0]
+            orientation_map[grain_map == grain_ids[i], 1] = grain_orientations[i, 1]
+            orientation_map[grain_map == grain_ids[i], 2] = grain_orientations[i, 2]
+            #orientation_map[slc, 1] = grain_orientations[i, 1]
+            #orientation_map[slc, 2] = grain_orientations[i, 2]
         if store:
             self.add_field(gridname='CellData', fieldname='orientation_map',
                            array=orientation_map, replace=True,
                            location='CellData')
         return orientation_map
+
+    def compute_god_map(self, id_list=None, store=True,
+                        recompute_mean_orientation=False):
+        """Create a GOD (grain orientation deviation) map.
+
+        This method computes the grain orientation deviation map. For each
+        grain in the list (all grain by default), the orientation of each
+        voxel belonging to this grain is compared to the mean and the resulting
+        misorientation is assigned to the pixel.
+
+        A grain ids list can be used to restrict the grains where to compute
+        the orientation deviation. By default, this method uses the mean
+        orientation in the GrainDataTable but the mean orientation can also be
+        recomputed from the orientation map and grain map by activating the flag
+        `recompute_mean_orientation`.
+
+        .. note::
+
+          This method needs both a grain map and an orientation map, a message
+          will be displayed if this is not the case.
+
+        :param list id_list: the list of the grain ids to include (compute
+        for all grains by default).
+        :param bool recompute_mean_orientation: if `True` the mean grain
+        orientation is recalculated from the orientatin map instead of using
+        the value in the `GrainDataTable`.
+        :param bool store: If `True`, store the grain orientation deviation map
+        in the `CellData` group, with name `grain_orientation_deviation`.
+        """
+        if self._is_empty('grain_map'):
+            print('no grain map found, please add a grain map to your data set')
+            return None
+        elif self._is_empty('orientation_map'):
+            print('no orientation map found, please add an orientation map to your data set')
+            return None
+        grain_ids = self.get_grain_map()
+        print('grain ids shape', grain_ids.shape)
+        orientation_map = self.get_orientation_map()
+        print('orientation map shape', orientation_map.shape)
+        bounding_boxes = self.get_grain_bounding_boxes(id_list)
+        # assume only one phase
+        if self.get_number_of_phases() > 1:
+            print('error, multiple phases not yet supported')
+            return None
+        sym = self.get_phase().get_symmetry()
+        god = np.zeros_like(grain_ids, dtype=np.float)
+        if not id_list:
+            id_list = np.unique(self.get_ids_from_grain_map())
+        if not recompute_mean_orientation:
+            # verify that all required grain ids are present in the GrainDataTable
+            all_grain_in_table = np.all([gid in self.get_grain_ids() for gid in id_list])
+            if not all_grain_in_table:
+                print('warning not all grains present in the grain map have an '
+                      'entry in the grain data table, the GOD map cannot be '
+                      'computed for the requested grains. Consider using the '
+                      'option `recompute_mean_orientation=True` or restrict the '
+                      'list of grains using the argument `id_list`.')
+            else:
+                print('all grains are present in the GrainDataTable')
+        for index, gid in enumerate(id_list):
+            if gid < 1:
+                continue
+            progress = 100 * index / len(id_list)
+            print('GOD computation progress: {:.2f} % (grain {:d})'.format(progress, gid), end='\r')
+            # we use grain bounding boxes to speed up calculations
+            bb = bounding_boxes[index]
+            grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                             bb[1][0]:bb[1][1],
+                                             bb[2][0]:bb[2][1]]
+            indices = np.where(grain_map == gid)
+            if recompute_mean_orientation:
+                # compute the mean orientation of this grain
+                rods_gid = np.squeeze(orientation_map[bb[0][0]:bb[0][1],
+                                                      bb[1][0]:bb[1][1],
+                                                      bb[2][0]:bb[2][1]][grain_map == gid])
+                #print('\nrods_gid shape', rods_gid.shape)
+                o = Orientation.compute_mean_orientation(rods_gid, symmetry=sym)
+            else:
+                o = self.get_grain(gid).orientation
+                #print('mean grain orientation:', o.rod)
+            # now compute the orientation deviation for each pixel of the grain
+            for i, j, k in zip(indices[0], indices[1], indices[2]):
+                ii, jj, kk = bb[0][0] + i, bb[1][0] + j, bb[2][0] + k
+                rod_ijk = orientation_map[ii, jj, kk, :]
+                o_ijk = Orientation.from_rodrigues(rod_ijk)
+                god[ii, jj, kk] = np.degrees(o.disorientation(o_ijk, crystal_structure=sym)[0])
+        print('GOD computation progress: 100.00 %')
+        if store:
+            self.add_field(gridname='CellData', array=god, replace=True,
+                           fieldname='grain_orientation_deviation')
+        return god
 
     def add_IPF_maps(self):
         """Add IPF maps to the data set.

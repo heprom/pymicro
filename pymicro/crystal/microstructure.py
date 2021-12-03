@@ -4131,17 +4131,18 @@ class Microstructure(SampleData):
                      ensemble_data='EnsembleData',
                      grain_data='FeatureData',
                      grain_orientations='AvgEulerAngles',
-                     orientation_type='euler',
-                     grain_centroid='Centroids',
+                     grain_orientations_type='euler',
+                     grain_centroids='Centroids',
                      cell_data='CellData',
                      grain_ids='FeatureIds',
                      mask='Mask',
                      phases='Phases',
+                     orientations='EulerAngles',
+                     orientations_type='euler'
                      ):
         """Read a microstructure from a Dream3d hdf5 file.
 
         :param str file_path: the path to the hdf5 file to read.
-        :param str main_key: the string describing the root key.
         :param str data_container: the string describing the data container
             group in the file.
         :param str ensemble_data: the string describing the ensemble data group
@@ -4150,10 +4151,22 @@ class Microstructure(SampleData):
             hdf5 file.
         :param str grain_orientations: the string describing the average grain
             orientations in the hdf5 file.
-        :param str orientation_type: the string describing the descriptor used
-            for orientation data.
-        :param str grain_centroid: the string describing the grain centroid in
+        :param str grain_orientations_type: the string describing the descriptor
+            used for average grain orientation data.
+        :param str grain_centroids: the string describing the grain centroids in
             the hdf5 file.
+        :param str cell_data: the string describing the cell data group in the
+            file.
+        :param str grain_ids: the string describing the field representing
+            grain ids within the cell_data data group.
+        :param str mask: the string describing the field representing the sample
+            mask within the cell_data data group.
+        :param str phases: the string describing the field representing the
+            sample phases within the cell_data data group.
+        :param str orientations: the string describing the field representing
+            voxel wise orientations within the cell_data data group.
+        :param str orientations_type: the string describing the descriptor
+            used for the orientation field.
         :return: a `Microstructure` instance created from the dream3d file.
         """
         head, tail = os.path.split(file_path)
@@ -4179,14 +4192,13 @@ class Microstructure(SampleData):
                 micro.set_phases(phase_list)
             # now get grain data informations
             grain_data_path = '%s/%s/%s' % (main_key, data_container, grain_data)
-            orientations = f[grain_data_path][grain_orientations][()]
-            centroids = f[grain_data_path][grain_centroid][()]
-            print(orientations[0])
-            if np.array_equal(orientations[0], [0., 0., 0.]):
+            grain_orientations = f[grain_data_path][grain_orientations][()]
+            centroids = f[grain_data_path][grain_centroids][()]
+            if np.array_equal(grain_orientations[0], [0., 0., 0.]):
                 # skip the background
-                orientations = orientations[1:]
+                grain_orientations = grain_orientations[1:]
                 centroids = centroids[1:]
-            micro.add_grains(orientations, orientation_type=orientation_type)
+            micro.add_grains(grain_orientations, orientation_type=grain_orientations_type)
             micro.set_centers(centroids)
             print('%d grains in the data set' % micro.get_number_of_grains())
             # read voxel size and origin
@@ -4197,13 +4209,30 @@ class Microstructure(SampleData):
             # now read cell data
             cell_data_path = '%s/%s/%s' % (main_key, data_container, cell_data)
             grain_ids = f[cell_data_path][grain_ids][:, :, :, 0]
-            print(grain_ids.shape)
+            cell_data_shape = grain_ids.shape
+            print('CellData dimensions:', cell_data_shape)
             mask = f[cell_data_path][mask][:, :, :, 0]
             phases = f[cell_data_path][phases][:, :, :, 0]
+            # now assign these arrays to the microstructure
             micro.set_grain_map(grain_ids, voxel_size=voxel_size)
             micro.set_origin('CellData', origin)
             micro.set_mask(mask)
             micro.set_phase_map(phases)
+            # add voxel wise orientation data
+            if orientations in f[cell_data_path].keys():
+                print('adding orientation field from key %s' % orientations)
+                orientation_map = f[cell_data_path][orientations][:, :, :, :]
+                if orientations_type == 'euler':
+                    # convert this array to rodrigues vectors
+                    orientation_map_euler = orientation_map.reshape((np.prod(cell_data_shape), 3))
+                    print('shape of euler angles list:', orientation_map_euler.shape)
+                    orientation_map = Orientation.eu2ro(orientation_map_euler).reshape(list(cell_data_shape) + [3])
+                elif orientations_type == 'rodrigues':
+                    pass
+                else:
+                    print('warning, only euler and rodrigues type supported at the moment')
+                micro.set_orientation_map(orientation_map)
+            del grain_ids, mask, phases,
         return micro
 
     @staticmethod

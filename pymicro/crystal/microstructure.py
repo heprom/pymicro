@@ -1792,7 +1792,14 @@ class Microstructure(SampleData):
         """
         return self.get_phase(phase_id).get_lattice()
 
-    def get_grain_map(self, as_numpy=True):
+    def get_grain_map(self):
+        """Get the grain map as a numpy array.
+
+        The grain map is the image constituted by the grain ids or labels.
+        Label zero is reserved for the background or unattributed voxels.
+
+        :return: the grain map as a numpy array.
+        """
         grain_map = self.get_field(self.active_grain_map)
         if self._is_empty(self.active_grain_map):
             grain_map = None
@@ -1800,14 +1807,20 @@ class Microstructure(SampleData):
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
             if len(new_dim) == 3:
-                grain_map = grain_map.reshape((new_dim))
+                grain_map = grain_map.reshape(new_dim)
             else:
-                grain_map = grain_map.reshape((grain_map.shape[0],
-                                               grain_map.shape[1],
-                                               1))
+                grain_map = grain_map.reshape(
+                    (grain_map.shape[0], grain_map.shape[1], 1))
         return grain_map
 
-    def get_phase_map(self, as_numpy=True):
+    def get_phase_map(self):
+        """Get the phase map as a numpy array.
+
+        The phase map is an array of int whre each voxel value tells you what
+        is the local material phase with respect to the `phase_list` attribute.
+
+        :return: the phase map as a numpy array.
+        """
         phase_map = self.get_field('phase_map')
         if self._is_empty('phase_map'):
             phase_map = None
@@ -1815,33 +1828,41 @@ class Microstructure(SampleData):
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
             if len(new_dim) == 3:
-                phase_map = phase_map.reshape((new_dim))
+                phase_map = phase_map.reshape(new_dim)
             else:
-                phase_map = phase_map.reshape((phase_map.shape[0],
-                                               phase_map.shape[1],
-                                               1))
+                phase_map = phase_map.reshape(
+                    (phase_map.shape[0], phase_map.shape[1], 1))
         return phase_map
 
-    def get_orientation_map(self, as_numpy=True):
+    def get_orientation_map(self):
+        """Get the orientation map as a numpy array.
+
+        The orientation map is an array of triplets representing orientation
+        data for each voxel in the forme of rodrigues vectors.
+
+        :return: the orientation map as a numpy array.
+        """
         orientation_map = self.get_field('orientation_map')
-        if orientation_map is not None:
-            print(orientation_map.shape)
-            print(orientation_map.ndim)
         if self._is_empty('orientation_map'):
             orientation_map = None
         elif orientation_map.ndim == 3:
             # case (nx, ny, 3)
             new_dim = self.get_attribute('dimension', 'CellData')
-            print('CellData dim = ', new_dim)
             if len(new_dim) == 3:
                 orientation_map = orientation_map.reshape(new_dim)
             else:
-                orientation_map = orientation_map.reshape((orientation_map.shape[0],
-                                               orientation_map.shape[1],
-                                               1, 3))
+                orientation_map = orientation_map.reshape(
+                    (orientation_map.shape[0], orientation_map.shape[1], 1, 3))
         return orientation_map
 
-    def get_mask(self, as_numpy=False):
+    def get_mask(self):
+        """Get the mask as a numpy array.
+
+        The mask represent the sample outline. The value 1 means we are inside
+        the sample, the value 0 means we are outside the sample.
+
+        :return: the mask as a numpy array.
+        """
         mask = self.get_field('mask')
         if self._is_empty('mask'):
             mask = None
@@ -1849,11 +1870,10 @@ class Microstructure(SampleData):
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
             if len(new_dim) == 3:
-                mask = mask.reshape((new_dim))
+                mask = mask.reshape(new_dim)
             else:
-                mask = mask.reshape((mask.shape[0],
-                                     mask.shape[1],
-                                               1))
+                mask = mask.reshape(
+                    (mask.shape[0], mask.shape[1], 1))
         return mask
 
     def get_ids_from_grain_map(self):

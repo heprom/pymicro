@@ -4525,7 +4525,10 @@ class Microstructure(SampleData):
               ''.format(index['cryst'][0][0][0][0], sym, lattice_params))
         lattice_params[:3] /= 10  # angstrom to nm
         lattice = Lattice.from_parameters(*lattice_params, symmetry=sym)
-        micro.set_lattice(lattice)
+        # create a crystalline phase
+        phase_name = index['cryst'][0][0][0]
+        phase = CrystallinePhase(name=phase_name, lattice=lattice)
+        micro.set_phase(phase)
         # add all grains to the microstructure
         grain = micro.grains.row
         for i in range(len(index['grain'][0])):
@@ -4549,6 +4552,8 @@ class Microstructure(SampleData):
                 if verbose:
                     print('loaded grain ids volume with shape: {}'
                           ''.format(micro.get_grain_map().shape))
+            print('computing grain bounding boxes')
+            micro.recompute_grain_bounding_boxes()
         # load the mask if available
         if use_dct_path:
             mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)

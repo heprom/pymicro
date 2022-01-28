@@ -19,12 +19,11 @@ class file_utils_Tests(unittest.TestCase):
         HST_write(data, 'test_bool_write.raw', pack_binary=True)
         HST_write(data, 'test_bool_write_as_uint8.raw', pack_binary=False)
         # craft a custom info file without the DATA_TYPE info
-        f = open('temp.info', 'w')
-        f.write('! PyHST_SLAVE VOLUME INFO FILE\n')
-        f.write('NUM_X = 953\n')
-        f.write('NUM_Y = 542\n')
-        f.write('NUM_Z = 104\n')
-        f.close()
+        with open('temp.raw.info', 'w') as f:
+            f.write('! PyHST_SLAVE VOLUME INFO FILE\n')
+            f.write('NUM_X = 953\n')
+            f.write('NUM_Y = 542\n')
+            f.write('NUM_Z = 104\n')
 
     def test_edf_info(self):
         infos = edf_info(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'sam8_dct0_cen_full0000.edf'))
@@ -37,13 +36,13 @@ class file_utils_Tests(unittest.TestCase):
 
     def test_HST_info(self):
         infos = HST_info('temp_20x30x10_uint8.raw.info')
-        self.assertEqual(infos['x_dim'], 20)
-        self.assertEqual(infos['y_dim'], 30)
-        self.assertEqual(infos['z_dim'], 10)
-        infos = HST_info('temp.info')
-        self.assertEqual(infos['x_dim'], 953)
-        self.assertEqual(infos['y_dim'], 542)
-        self.assertEqual(infos['z_dim'], 104)
+        self.assertEqual(infos['NUM_X'], 20)
+        self.assertEqual(infos['NUM_Y'], 30)
+        self.assertEqual(infos['NUM_Z'], 10)
+        infos = HST_info('temp.raw.info')
+        self.assertEqual(infos['NUM_X'], 953)
+        self.assertEqual(infos['NUM_Y'], 542)
+        self.assertEqual(infos['NUM_Z'], 104)
 
     def test_HST_read(self):
         data = HST_read('temp_20x30x10_uint8.raw', autoparse_filename=True)
@@ -69,10 +68,10 @@ class file_utils_Tests(unittest.TestCase):
 
     def test_pack_binary(self):
         infos = HST_info('test_bool_write.raw.info')
-        self.assertEqual(infos['x_dim'], 3)
-        self.assertEqual(infos['y_dim'], 4)
-        self.assertEqual(infos['z_dim'], 5)
-        self.assertEqual(infos['data_type'], 'PACKED_BINARY')
+        self.assertEqual(infos['NUM_X'], 3)
+        self.assertEqual(infos['NUM_Y'], 4)
+        self.assertEqual(infos['NUM_Z'], 5)
+        self.assertEqual(infos['DATA_TYPE'], 'PACKED_BINARY')
         bin_data = HST_read('test_bool_write.raw')
         self.assertEqual(bin_data.dtype, np.uint8)
         self.assertEqual(bin_data[0, 1, 2], True)
@@ -93,7 +92,7 @@ class file_utils_Tests(unittest.TestCase):
         os.remove('test_bool_write_as_uint8.raw.info')
         os.remove('test_bool_write.raw')
         os.remove('test_bool_write.raw.info')
-        os.remove('temp.info')
+        os.remove('temp.raw.info')
 
 
 class TiffTests(unittest.TestCase):

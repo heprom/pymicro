@@ -16,19 +16,19 @@ class PoleFigure:
     coordinate system (inverse pole figure).
     """
 
-    def __init__(self, microstructure=None, lattice=None, axis='Z', hkl='111',
+    def __init__(self, microstructure=None, axis='Z', hkl='111',
                  proj='stereo', verbose=False):
         """
         Create an empty PoleFigure object associated with a Microstructure.
 
-        .. warning::
+        .. note::
 
            Any crystal structure is now supported (you have to set the proper
-           crystal lattice) but it has only really be tested for cubic.
+           crystal lattice of the `Microstructure` instance). It has only really
+           be tested for cubic and hexagonal examples.
 
         :param microstructure: the :py:class:`~pymicro.crystal.microstructure.Microstructure`
             containing the collection of orientations to plot (None by default).
-        :param lattice: the crystal :py:class:`~pymicro.crystal.lattice.Lattice`.
         :param str axis: the pole figure axis ('Z' by default), vertical axis in
             the direct pole figure and direction plotted on the inverse pole figure.
         :param str hkl: slip plane family ('111' by default)
@@ -43,10 +43,6 @@ class PoleFigure:
             self.microstructure = microstructure
         else:
             self.microstructure = Microstructure()
-        if lattice:
-            self.lattice = lattice
-        else:
-            self.lattice = Lattice.cubic(1.0)
         self.family = None
         self.poles = []
         self.set_hkl_poles(hkl)
@@ -81,7 +77,7 @@ class PoleFigure:
         """
         if type(hkl) is str:
             self.family = hkl  # keep a record of this
-            hkl_planes = self.lattice.get_hkl_family(self.family)
+            hkl_planes = self.microstructure.get_lattice().get_hkl_family(self.family)
         elif type(hkl) is list:
             self.family = None
             hkl_planes = hkl
@@ -412,7 +408,7 @@ class PoleFigure:
         :return: the transformed vector.
         """
         # get the symmetry from the lattice associated with the pole figure
-        symmetry = self.lattice._symmetry
+        symmetry = self.microstructure.get_lattice()._symmetry
         if symmetry is Symmetry.cubic:
             return PoleFigure.sst_symmetry_cubic(v)
         elif symmetry is Symmetry.hexagonal:
@@ -516,7 +512,7 @@ class PoleFigure:
         """
         # first draw the boundary of the symmetry domain limited by 3 hkl plane
         # normals, called here A, B and C
-        symmetry = self.lattice.get_symmetry()
+        symmetry = self.microstructure.get_lattice().get_symmetry()
         ax = kwargs.get('ax')
         if symmetry is Symmetry.cubic:
             sst_poles = [(0, 0, 1), (1, 0, 1), (1, 1, 1)]
@@ -526,9 +522,9 @@ class PoleFigure:
             ax.axis([-0.05, 1.05, -0.05, 0.6])
         else:
             print('unsuported symmetry: %s' % symmetry)
-        A = HklPlane(*sst_poles[0], lattice=self.lattice)
-        B = HklPlane(*sst_poles[1], lattice=self.lattice)
-        C = HklPlane(*sst_poles[2], lattice=self.lattice)
+        A = HklPlane(*sst_poles[0], lattice=self.microstructure.get_lattice())
+        B = HklPlane(*sst_poles[1], lattice=self.microstructure.get_lattice())
+        C = HklPlane(*sst_poles[2], lattice=self.microstructure.get_lattice())
         self.plot_line_between_crystal_dir(A.normal(), B.normal(), ax=ax, col='k')
         self.plot_line_between_crystal_dir(B.normal(), C.normal(), ax=ax, col='k')
         self.plot_line_between_crystal_dir(C.normal(), A.normal(), ax=ax, col='k')

@@ -2685,7 +2685,7 @@ class Microstructure(SampleData):
             print('Microstructure instance mush have a grain_map field to use '
                   'this method')
             return
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
             slice = grain_map.shape[2] // 2
             print('using slice value %d' % slice)
@@ -3012,13 +3012,13 @@ class Microstructure(SampleData):
         :param bool use_mask: if True and that this microstructure has a mask,
             the dilation will be limited by it.
         """
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         grain_volume_init = (grain_map == grain_id).sum()
         grain_data = grain_map == grain_id
         grain_data = ndimage.binary_dilation(grain_data,
                                              iterations=dilation_steps).astype(np.uint8)
         if use_mask and not self._is_empty('mask'):
-            grain_data *= self.get_mask(as_numpy=True)
+            grain_data *= self.get_mask()
         grain_map[grain_data == 1] = grain_id
         grain_volume_final = (grain_map == grain_id).sum()
         print('grain %s was dilated by %d voxels' % (grain_id,
@@ -3126,14 +3126,14 @@ class Microstructure(SampleData):
             raise ValueError('microstructure %s must have an associated '
                              'grain_map ' % self.get_sample_name())
             return
-        grain_map = self.get_grain_map(as_numpy=True).copy()
+        grain_map = self.get_grain_map().copy()
         # get rid of overlap regions flaged by -1
         grain_map[grain_map == -1] = 0
 
         if not self._is_empty('mask'):
             grain_map = Microstructure.dilate_labels(grain_map,
                                                      dilation_steps=dilation_steps,
-                                                     mask=self.get_mask(as_numpy=True),
+                                                     mask=self.get_mask(),
                                                      dilation_ids=dilation_ids)
         else:
             grain_map = Microstructure.dilate_labels(grain_map,
@@ -3279,7 +3279,7 @@ class Microstructure(SampleData):
             print('Cropped dataset:')
             print(micro_crop)
         micro_crop.set_active_grain_map(self.active_grain_map)
-        grain_ids = np.unique(micro_crop.get_grain_map(as_numpy=True))
+        grain_ids = np.unique(micro_crop.get_grain_map())
         for gid in grain_ids:
             if not gid > 0:
                 continue
@@ -3337,7 +3337,7 @@ class Microstructure(SampleData):
             return
         self.sync_grain_table_with_grain_map()
         # At this point, the table and the map have the same grain Ids
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         grain_map_renum = grain_map.copy()
         if sort_by_size:
             print('sorting ids by grain size')
@@ -3462,7 +3462,7 @@ class Microstructure(SampleData):
         volumes = self.get_grain_volumes(id_list)
         if not id_list:
             id_list = self.get_grain_ids()
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         if len(grain_map.shape) < 3:
             raise ValueError('Cannot compute grain sphericities on a non'
                              ' tridimensional grain map.')
@@ -3484,7 +3484,7 @@ class Microstructure(SampleData):
         :return: a 1D numpy array of the grain aspect ratios.
         """
         from skimage.measure import regionprops
-        props = regionprops(self.get_grain_map(as_numpy=True))
+        props = regionprops(self.get_grain_map())
         grain_aspect_ratios = np.array([prop.major_axis_length /
                                         prop.minor_axis_length
                                         for prop in props])
@@ -3576,7 +3576,7 @@ class Microstructure(SampleData):
                   ' of the grains')
             return
         # find_objects will return a list of N slices with N being the max grain id
-        slices = ndimage.find_objects(self.get_grain_map(as_numpy=True))
+        slices = ndimage.find_objects(self.get_grain_map())
         for g in self.grains:
             try:
                 g_slice = slices[g['idnumber'] - 1]
@@ -3636,7 +3636,7 @@ class Microstructure(SampleData):
             print('warning: a grain map is needed to compute grains map'
                   '/table intersection.')
             return
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         map_ids = np.unique(grain_map)
         # only positive integer values are considered as valid grain ids, remove everything else:
         map_ids = np.delete(map_ids, range(0, np.where(map_ids > 0)[0][0]))
@@ -3853,14 +3853,13 @@ class Microstructure(SampleData):
             from vtk.util import numpy_support
             #TODO adapt to 2D grain maps
             #TODO build a continuous grain map for amitex
-            # grain_ids = self.get_grain_map(as_numpy=True)
+            # grain_ids = self.get_grain_map()
             grain_ids = self.renumber_grains(only_grain_map=True)
             if not self._is_empty('phase_map'):
                 # use the phase map for the material ids
-                material_ids = self.get_phase_map(as_numpy=True)
+                material_ids = self.get_phase_map()
             elif use_mask:
-                material_ids = self.get_mask(as_numpy=True).astype(
-                                                            grain_ids.dtype)
+                material_ids = self.get_mask().astype(grain_ids.dtype)
             else:
                 material_ids = np.ones_like(grain_ids)
             if add_grips:
@@ -4362,7 +4361,7 @@ class Microstructure(SampleData):
             micro.sync_grain_table_with_grain_map(sync_geometry=True)
             # if necessary set the phase_map
             if phase_ids:
-                grain_map = micro.get_grain_map(as_numpy=True)
+                grain_map = micro.get_grain_map()
                 phase_map = np.zeros_like(grain_map)
                 for grain_id, phase_id in zip(grain_ids, phase_ids):
                     # ignore phase id == 1 as this corresponds to phase_map == 0
@@ -4812,7 +4811,7 @@ class Microstructure(SampleData):
 
         # prepare a volume with the same size as the second grain map,
         # with grain ids renumbered and (X, Y) translations applied.
-        grain_map = micros[1].get_grain_map(as_numpy=True)
+        grain_map = micros[1].get_grain_map()
         grain_map_translated = grain_map.copy()
         print('renumbering grains in the overlap region of volume %s'
               % micros[1].get_sample_name())

@@ -53,8 +53,8 @@ class MicrostructureTests(unittest.TestCase):
                                                  't5_dct_slice_data.h5'))
         self.assertEqual(m.grains.nrows, 21)
         self.assertEqual(m.get_voxel_size(), 0.0014)
-        self.assertEqual(type(m.get_grain_map(as_numpy=True)), np.ndarray)
-        self.assertEqual(type(m.get_mask(as_numpy=True)), np.ndarray)
+        self.assertEqual(type(m.get_grain_map()), np.ndarray)
+        self.assertEqual(type(m.get_mask()), np.ndarray)
         self.assertTrue(True)
         del m
 
@@ -79,7 +79,7 @@ class MicrostructureTests(unittest.TestCase):
             print(' n°1 :', m.grains[i])
             print(' n°2 :', m_ref.grains[i])
             self.assertEqual(m.grains[i], m_ref.grains[i])
-        volume = np.sum(m.get_mask(as_numpy=True))
+        volume = np.sum(m.get_mask())
         self.assertEqual(volume, 194025)
         del m
         self.assertTrue(not os.path.exists(h5_file))
@@ -100,7 +100,7 @@ class MicrostructureTests(unittest.TestCase):
         gids_crop = [1, 2, 3, 4, 6, 7, 8, 13, 14, 15, 17, 20, 21, 22, 26, 27]
         for gid in m1.get_grain_ids():
             self.assertTrue(gid in gids_crop)
-        self.assertEqual(np.sum(m1.get_grain_map(as_numpy=True) == 14), 396)
+        self.assertEqual(np.sum(m1.get_grain_map() == 14), 396)
         del m1
         # verify that the mirostructure files have been deleted
         self.assertTrue(not os.path.exists(h5_file))
@@ -191,7 +191,7 @@ class MicrostructureTests(unittest.TestCase):
         self.assertAlmostEqual(m.get_voxel_size(), 0.018, 2)
         dims = (54, 65, 75)
         for i in range(3):
-            self.assertEqual(m.get_grain_map(as_numpy=True).shape[i], dims[i])
+            self.assertEqual(m.get_grain_map().shape[i], dims[i])
         del m
 
     def test_find_neighbors(self):

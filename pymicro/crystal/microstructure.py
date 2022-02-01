@@ -3603,7 +3603,16 @@ class Microstructure(SampleData):
         return self.get_grain_bounding_boxes()
 
     def compute_grains_geometry(self, overwrite_table=False):
-        """ Compute grain centers, volume and bounding box from grain_map """
+        """Compute grain geometry from the grain map.
+
+        This method computes the grain centers, volume and bounding boxes from
+        the grain map and update the grain data table. This applies only to
+        grains represented in the grain map. If other grains are present, their
+        information is unchanged unless the option `overwrite_table` is activated.
+
+        :param bool overwrite_table: if this is True, the grains present in the
+        data table and not in the grain map are removed from it.
+        """
         #TODO revisit this method as we now rely on the grain bounding boxes to compute the geometry
         grains_id = self.get_ids_from_grain_map()
         if self.grains.nrows > 0 and overwrite_table:
@@ -3653,11 +3662,11 @@ class Microstructure(SampleData):
         not_in_table = map_ids[np.isin(map_ids, table_ids, invert=True,
                              assume_unique=True)]
         if verbose:
-            print('Grains IDs both in grain map and GrainDataTable:')
+            print('Grains ids both in grain map and GrainDataTable:')
             print(str(intersection).strip('[]'))
-            print('Grains IDs in GrainDataTable but not in grain map:')
+            print('Grains ids in GrainDataTable but not in grain map:')
             print(str(not_in_map).strip('[]'))
-            print('Grains IDs in grain map but not in GrainDataTable :')
+            print('Grains ids in grain map but not in GrainDataTable :')
             print(str(not_in_table).strip('[]'))
         return intersection, not_in_map, not_in_table
 
@@ -3673,31 +3682,46 @@ class Microstructure(SampleData):
         return
 
     @staticmethod
-    def voronoi(self, shape=(256, 256), n_grain=50):
+    def voronoi(shape=(256, 256), n=50):
         """Simple voronoi tesselation to create a grain map.
 
         The method works both in 2 and 3 dimensions. The grains are labeled
-        from 1 to `n_grains` (included).
+        from 1 to `n` (included).
 
         :param tuple shape: grain map shape in 2 or 3 dimensions.
-        :param int n_grains: number of grains to generate.
-        :return: a numpy array  grain_map
+        :param int n: number of grains to generate.
+        :raise: a ValueError if the shape has not size 2 or 3.
+        :return: a 2D or 3D numpy array representing the grain map.
         """
-        if len(shape) not in [2, 3]:
+        dim = len(shape)
+        if dim not in [2, 3]:
             raise ValueError('specified shape must be either 2D or 3D')
-        grain_map = np.zeros(shape)
+        grain_map = np.zeros(shape, dtype=int)
         nx, ny = shape[0], shape[1]
         x = np.linspace(-0.5, 0.5, nx, endpoint=True)
         y = np.linspace(-0.5, 0.5, ny, endpoint=True)
-        if len(shape) == 3:
+        print('%dD voronoi tesselation' % dim)
+        if dim == 2:
+            XX, YY = np.meshgrid(x, y)
+            seeds = np.random.rand(n, 2) - np.array([0.5, 0.5])
+            distance = np.zeros(shape=(n, nx, ny))
+            # compute Voronoi distance in 2D
+            for i in range(n):
+                distance[i] = np.sqrt((XX - seeds[i, 0]) ** 2
+                                      + (YY - seeds[i, 1]) ** 2)
+            grain_map = 1 + np.argmin(distance, axis=0)
+        else:
             nz = shape[2]
             z = np.linspace(-0.5, 0.5, nz, endpoint=True)
-        XX, YY = np.meshgrid(x, y)
-        seeds = Dx * np.random.rand(n_grains, 2)
-        distance = np.zeros(shape=(nx, ny, n_grains))
-
-        XX, YY, ZZ = np.meshgrid(x, y, z)
-        # TODO finish this...
+            XX, YY, ZZ = np.meshgrid(x, y, z)
+            seeds = np.random.rand(n, 3) - np.array([0.5, 0.5, 0.5])
+            distance = np.zeros(shape=(n, nx, ny, nz))
+            # compute Voronoi distance in 3D
+            for i in range(n):
+                distance[i] = np.sqrt((XX - seeds[i, 0]) ** 2
+                                      + (YY - seeds[i, 1]) ** 2
+                                      + (ZZ - seeds[i, 2]) ** 2)
+            grain_map = 1 + np.argmin(distance, axis=0)
         return grain_map
 
     def to_amitex_fftp(self, binary=True, mat_file=True, elasaniso_path='',

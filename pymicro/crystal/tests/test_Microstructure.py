@@ -204,6 +204,19 @@ class MicrostructureTests(unittest.TestCase):
             self.assertTrue(gid in neighbors)
         del m
 
+    def test_voronoi(self):
+        n = 10  # grains
+        # create test voronoi tesselations in 2D and 3D
+        v2d = Microstructure.voronoi(shape=(64, 64), n=n)
+        v3d = Microstructure.voronoi(shape=(32, 32, 32), n=n)
+        self.assertEqual(v2d.min(), 1)
+        self.assertEqual(v2d.max(), n)
+        self.assertEqual(len(np.unique(v2d)), n)
+        self.assertEqual(v3d.min(), 1)
+        self.assertEqual(v3d.max(), n)
+        self.assertEqual(len(np.unique(v3d)), n)
+        del v2d, v3d
+
 
 class OrientationTests(unittest.TestCase):
 

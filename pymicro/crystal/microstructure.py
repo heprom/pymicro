@@ -3575,7 +3575,7 @@ class Microstructure(SampleData):
             print('warning: need a grain map to recompute the bounding boxes'
                   ' of the grains')
             return
-        # find_objects will return a list of N slices with N being the max grain id
+        # find_objects will return a list of N slices, N being the max grain id
         slices = ndimage.find_objects(self.get_grain_map())
         for g in self.grains:
             try:
@@ -3584,7 +3584,13 @@ class Microstructure(SampleData):
                 y_indices = (g_slice[1].start, g_slice[1].stop)
                 z_indices = (g_slice[2].start, g_slice[2].stop)
                 bbox = x_indices, y_indices, z_indices
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, IndexError):
+                '''
+                value or type error can be risen for grains in the data table 
+                that are not in the grain map (None will be returned from 
+                find_objects). IndexError can occur if these grain ids are 
+                larger than the maximum id in the grain map.
+                '''
                 print('skipping grain %d' % g['idnumber'])
                 continue
             if verbose:

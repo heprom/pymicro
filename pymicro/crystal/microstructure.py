@@ -2223,15 +2223,18 @@ class Microstructure(SampleData):
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
-            if not (empty):
+            if not empty:
                 create_image = False
+        if mask.dtype == 'bool':
+            # use uint8 encoding
+            mask = mask.astype(np.uint8)
         if create_image:
-            if (voxel_size is None):
+            if voxel_size is None:
                 msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
             if np.isscalar(voxel_size):
                 dim = len(mask.shape)
-                spacing_array = voxel_size*np.ones((dim,))
+                spacing_array = voxel_size * np.ones((dim, ))
             else:
                 if len(voxel_size) != len(mask.shape):
                     raise ValueError('voxel_size array must have a length '

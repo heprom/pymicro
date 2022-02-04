@@ -4544,26 +4544,25 @@ class Microstructure(SampleData):
                              ' grain file.' % index_path)
             return None
         from scipy.io import loadmat
-        index = loadmat(index_path)
-        #TODO fetch pixel size from detgeo instead
-        voxel_size = index['cryst'][0][0][25][0][0]
+        index = loadmat(index_path, simplify_cells=True)
+        voxel_size = index['cryst']['pixelsize']
         # grab the crystal lattice
-        lattice_params = index['cryst'][0][0][3][0]
-        sym = Symmetry.from_string(index['cryst'][0][0][7][0])
+        lattice_params = index['cryst']['latticepar']
+        sym = Symmetry.from_string(index['cryst']['lattice_system'])
         print('creating crystal lattice {} ({}) with parameters {}'
-              ''.format(index['cryst'][0][0][0][0], sym, lattice_params))
+              ''.format(index['cryst']['name'], sym, lattice_params))
         lattice_params[:3] /= 10  # angstrom to nm
         lattice = Lattice.from_parameters(*lattice_params, symmetry=sym)
         # create a crystalline phase
-        phase_name = index['cryst'][0][0][0]
+        phase_name = index['cryst']['name']
         phase = CrystallinePhase(name=phase_name, lattice=lattice)
         micro.set_phase(phase)
         # add all grains to the microstructure
         grain = micro.grains.row
-        for i in range(len(index['grain'][0])):
-            grain['idnumber'] = index['grain'][0][i][0][0][0][0][0]
-            grain['orientation'] = index['grain'][0][i][0][0][3][0]
-            grain['center'] = index['grain'][0][i][0][0][15][0]
+        for i in range(len(index['grain'])):
+            grain['idnumber'] = index['grain'][i]['id']
+            grain['orientation'] = index['grain'][i]['R_vector']
+            grain['center'] = index['grain'][i]['center']
             grain.append()
         micro.grains.flush()
 
@@ -4577,6 +4576,8 @@ class Microstructure(SampleData):
             with h5py.File(grain_map_path, 'r') as f:
                 # because how matlab writes the data, we need to swap X and Z
                 # axes in the DCT volume
+                print(f[vol_key][()].shape)
+                print(voxel_size)
                 micro.set_grain_map(f[vol_key][()].transpose(2, 1, 0), voxel_size)
                 if verbose:
                     print('loaded grain ids volume with shape: {}'

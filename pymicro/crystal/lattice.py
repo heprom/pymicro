@@ -59,11 +59,9 @@ class CrystallinePhase:
         self.name = name
         self.description = ''
         self.formula = ''
-        if lattice is None:
-            lattice = Lattice.cubic(1.0)
+        self._lattice = None
+        self.elastic_constants = []  # a list of C_IJ values
         self.set_lattice(lattice)
-        # a list of C_IJ values
-        self.elastic_constants = []
 
     def __repr__(self):
         """Generate a string representation of this instance."""
@@ -82,11 +80,34 @@ class CrystallinePhase:
 
         :param Lattice lattice: the crystal lattice.
         """
+        if lattice is None:
+            lattice = Lattice.cubic(1.0)
+        sym_changed = (self.get_lattice() is not None) and \
+                      (self.get_symmetry() == lattice.get_symmetry())
         self._lattice = lattice
+        if sym_changed:
+            print('symmetry was changed to %s' % self.get_symmetry())
+            n = self.get_symmetry().elastic_constants_number()
+            if len(self.elastic_constants) != n:
+                print('warning, elastic constants are inconsistent for this '
+                      'symmetry, please update them.')
 
     def get_symmetry(self):
         """Returns the type of `Symmetry` of the Lattice."""
         return self.get_lattice().get_symmetry()
+
+    def set_elastic_constants(self, elastic_constants):
+        """Set the elastic constants for this phase.
+
+        :param list elastic_constants: a list of the elastic constants in MPa.
+        :raise ValueError: if the list does not contain the appropriate number
+        of elastic constants regarding the symmetry of the phase.
+        """
+        n = self.get_symmetry().elastic_constants_number()
+        if len(elastic_constants) != n:
+            raise ValueError('Error: need %d elastic constants for cubic '
+                             'symmetry, got %d' % (n, len(elastic_constants)))
+        self.elastic_constants = elastic_constants
 
     def to_dict(self):
         d = {'phase_id': self.phase_id,
@@ -371,6 +392,23 @@ class Symmetry(enum.Enum):
             print(omegas)
             print('moving to FZ, index = %d' % index)
         return np.dot(syms[index], g)
+
+    def elastic_constants_number(self):
+        """Return the number of independent elastic constants for this symmetry."""
+        if self is Symmetry.cubic:
+            return 3
+        elif self is Symmetry.hexagonal:
+            return 5
+        elif self is Symmetry.tetragonal:
+            return 6
+        elif self is Symmetry.orthorhombic:
+            return 9
+        elif self is Symmetry.monoclinic:
+            return 13
+        elif self is Symmetry.triclinic:
+            return 21
+        else:
+            return None
 
     def stiffness_matrix(self, elastic_constants):
         """Build the stiffness matrix for this symmetry using Voigt convention.

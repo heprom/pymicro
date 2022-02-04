@@ -1619,6 +1619,8 @@ class Microstructure(SampleData):
             self.set_active_grain_map()
             self._init_phase(phase)
             self.active_phase_id = 1
+            self.default_compression_options = {'complib': 'zlib',
+                                                'complevel': 5}
         return
 
     def __repr__(self):
@@ -2118,21 +2120,22 @@ class Microstructure(SampleData):
         return
 
     def set_grain_map(self, grain_map, voxel_size=None,
-                      map_name='grain_map'):
+                      map_name='grain_map', compression=None):
         """Set the grain map for this microstructure.
 
         :param ndarray grain_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
-        # TODO: ad compression_options
+        if compression is None:
+            compression = self.default_compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
             if not empty:
                 create_image = False
         if create_image:
-            if (voxel_size is None):
+            if voxel_size is None:
                 msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
             if np.isscalar(voxel_size):
@@ -2147,25 +2150,28 @@ class Microstructure(SampleData):
                                       fieldname=map_name,
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True)
+                                      replace=True,
+                                      compression_options=compression)
         else:
             # Handle case of a 2D Microstrucutre: squeeze grain map to
             # ensure (Nx,Ny,1) array will be stored as (Nx,Ny)
-            if self._get_group_type('CellData')  == '2DImage':
+            if self._get_group_type('CellData') == '2DImage':
                 grain_map = grain_map.squeeze()
             self.add_field(gridname='CellData', fieldname=map_name,
-                           array=grain_map, replace=True)
+                           array=grain_map, replace=True,
+                           compression_options=compression)
         self.set_active_grain_map(map_name)
         return
 
-    def set_phase_map(self, phase_map, voxel_size=None):
+    def set_phase_map(self, phase_map, voxel_size=None, compression=None):
         """Set the phase map for this microstructure.
 
         :param ndarray phase_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
-        # TODO: add compression_options
+        if compression is None:
+            compression = self.default_compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2186,13 +2192,15 @@ class Microstructure(SampleData):
             self.add_image_from_field(phase_map, 'phase_map',
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True)
+                                      replace=True,
+                                      compression_options=compression)
         else:
             self.add_field(gridname='CellData', fieldname='phase_map',
                            array=phase_map, replace=True,
-                           indexname='phase_map')
+                           indexname='phase_map',
+                           compression_options=compression)
 
-    def set_orientation_map(self, orientation_map):
+    def set_orientation_map(self, orientation_map, compression=None):
         """Set the orientation_map map for this microstructure.
 
         The orientation map is an array containing the voxel wise orientation
@@ -2202,6 +2210,8 @@ class Microstructure(SampleData):
         vectors at each pixels. The size of the array must be compatible with
         the `CellData` node image dimensions.
         """
+        if compression is None:
+            compression = self.default_compression_options
         dims = orientation_map.shape
         cell_data_dims = self.get_attribute('dimension', 'CellData')
         if not np.all(np.equal(dims[:-1], cell_data_dims)):
@@ -2210,16 +2220,18 @@ class Microstructure(SampleData):
             return None
         self.add_field(gridname='CellData', fieldname='orientation_map',
                        array=orientation_map, replace=True,
-                       indexname='orientation_map')
+                       indexname='orientation_map',
+                       compression_options=compression)
 
-    def set_mask(self, mask, voxel_size=None):
+    def set_mask(self, mask, voxel_size=None, compression=None):
         """Set the mask for this microstructure.
 
         :param ndarray mask: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
-        # TODO: add compression_options
+        if compression is None:
+            compression = self.default_compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2243,10 +2255,12 @@ class Microstructure(SampleData):
             self.add_image_from_field(mask, 'mask',
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True)
+                                      replace=True,
+                                      compression_options=compression)
         else:
             self.add_field(gridname='CellData', fieldname='mask',
-                           array=mask, replace=True, indexname='mask')
+                           array=mask, replace=True, indexname='mask',
+                           compression_options=compression)
         return
 
     def set_random_orientations(self):
@@ -2615,13 +2629,16 @@ class Microstructure(SampleData):
         """
         ipf100 = self.create_IPF_map(axis=np.array([1., 0., 0.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_100',
-                       array=ipf100, replace=True)
+                       array=ipf100, replace=True,
+                       compression_options=self.default_compression_options)
         ipf010 = self.create_IPF_map(axis=np.array([0., 1., 0.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_010',
-                       array=ipf010, replace=True)
+                       array=ipf010, replace=True,
+                       compression_options=self.default_compression_options)
         ipf001 = self.create_IPF_map(axis=np.array([0., 0., 1.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_001',
-                       array=ipf001, replace=True)
+                       array=ipf001, replace=True,
+                       compression_options=self.default_compression_options)
         del ipf100, ipf010, ipf001
 
     def create_IPF_map(self, axis=np.array([0., 0., 1.])):

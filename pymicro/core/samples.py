@@ -4245,7 +4245,11 @@ class SampleData:
         return array.transpose(transpose_indices), transpose_indices
 
     def _add_field_to_xdmf(self, fieldname, field):
-        """Write field data as Grid Attribute in xdmf tree/file."""
+        """Write field data as Grid Attribute in xdmf tree/file.
+
+        :param str fieldname: the string representing the field name.
+        :param ndarray field: the field array.
+        """
         Node = self.get_node(fieldname)
         Grid_name = self.get_attribute('xdmf_gridname', fieldname)
         Xdmf_grid_node = self._find_xdmf_grid(Grid_name)
@@ -4271,13 +4275,13 @@ class SampleData:
                                        Center=Center_type)
         # Create data item element
         Dimension = self._np_to_xdmf_str(Node.shape)
-        if (np.issubdtype(field.dtype, np.floating)):
+        if np.issubdtype(field.dtype, np.floating):
             NumberType = 'Float'
-            if (str(field.dtype) == 'float'):
+            if str(field.dtype) == 'float':
                 Precision = '32'
             else:
                 Precision = '64'
-        elif (np.issubdtype(field.dtype, np.integer)):
+        elif np.issubdtype(field.dtype, np.integer):
             NumberType = 'Int'
             Precision = str(field.dtype).strip('int')
         Attribute_data = etree.Element(_tag='DataItem', Format='HDF',

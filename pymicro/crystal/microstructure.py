@@ -1607,6 +1607,7 @@ class Microstructure(SampleData):
     def _after_file_open(self, phase=None, **kwargs):
         """Initialization code to run after opening a Sample Data file."""
         self.grains = self.get_node('GrainDataTable')
+        self.default_compression_options = {'complib': 'zlib', 'complevel': 5}
         if self._file_exist:
             self.active_grain_map = self.get_attribute('active_grain_map',
                                                        'CellData')
@@ -1619,8 +1620,6 @@ class Microstructure(SampleData):
             self.set_active_grain_map()
             self._init_phase(phase)
             self.active_phase_id = 1
-            self.default_compression_options = {'complib': 'zlib',
-                                                'complevel': 5}
         return
 
     def __repr__(self):

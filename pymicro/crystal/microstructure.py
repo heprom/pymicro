@@ -4521,7 +4521,8 @@ class Microstructure(SampleData):
     @staticmethod
     def from_dct(data_dir='.', grain_file='index.mat', vol_key='vol',
                  vol_file='phase_01_vol.mat', mask_key='vol',
-                 mask_file='volume_mask.mat', use_dct_path=True, verbose=True):
+                 mask_file='volume_mask.mat', use_dct_path=True,
+                 trim_z_range=0, verbose=True):
         """Create a microstructure from a DCT reconstruction.
 
         DCT reconstructions are stored in several files. The indexed grain
@@ -4585,44 +4586,51 @@ class Microstructure(SampleData):
             grain.append()
         micro.grains.flush()
 
-        # load the grain map if available
+        # setup file pathes
         if use_dct_path:
-            grain_map_path = os.path.join(data_dir, '5_reconstruction',
-                                          vol_file)
+            grain_map_path = os.path.join(data_dir, '5_reconstruction', vol_file)
+            mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
         else:
             grain_map_path = os.path.join(data_dir, vol_file)
+            mask_path = os.path.join(data_dir, mask_file)
+        # load the grain map if available
         if os.path.exists(grain_map_path):
-            with h5py.File(grain_map_path, 'r') as f:
-                # because how matlab writes the data, we need to swap X and Z
-                # axes in the DCT volume
-                print(f[vol_key][()].shape)
-                print(voxel_size)
-                micro.set_grain_map(f[vol_key][()].transpose(2, 1, 0), voxel_size)
-                if verbose:
-                    print('loaded grain ids volume with shape: {}'
-                          ''.format(micro.get_grain_map().shape))
+            try:
+                with h5py.File(grain_map_path, 'r') as f:
+                    # because how matlab writes the data, we need to swap X and Z
+                    # axes in the DCT volume
+                    print(f[vol_key][()].shape)
+                    print(voxel_size)
+                    grain_map = f[vol_key][()].transpose(2, 1, 0)
+            except:
+                # fallback on matlab format
+                grain_map = loadmat(grain_map_path)[vol_key]
+            if trim_z_range > 0 and trim_z_range < grain_map.shape[2] // 2:
+                grain_map = grain_map[:, :, trim_z_range:-trim_z_range]
+            micro.set_grain_map(grain_map, voxel_size)
+            if verbose:
+                print('loaded grain ids volume with shape: {}'.format(
+                    micro.get_grain_map().shape))
             print('computing grain bounding boxes')
             micro.recompute_grain_bounding_boxes()
         # load the mask if available
-        if use_dct_path:
-            mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
-        else:
-            mask_path = os.path.join(data_dir, mask_file)
         if os.path.exists(mask_path):
             try:
                 with h5py.File(mask_path, 'r') as f:
                     mask = f[mask_key][()].transpose(2, 1, 0).astype(np.uint8)
-                    # check if mask shape needs to be zero padded
-                    if not mask.shape == micro.get_grain_map().shape:
-                        offset = np.array(micro.get_grain_map().shape) - np.array(mask.shape)
-                        padding = [(o // 2, o // 2) for o in offset]
-                        print('mask padding is {}'.format(padding))
-                        mask = np.pad(mask, padding, mode='constant')
-                    print('now mask shape is {}'.format(mask.shape))
-                    micro.set_mask(mask, voxel_size)
             except:
                 # fallback on matlab format
-                micro.set_mask(loadmat(mask_path)[mask_key], voxel_size)
+                mask = loadmat(mask_path)[mask_key]
+            if trim_z_range > 0 and trim_z_range < mask.shape[2] // 2:
+                mask = mask[:, :, trim_z_range:-trim_z_range]
+            # check if mask shape needs to be zero padded
+            if not mask.shape == micro.get_grain_map().shape:
+                offset = np.array(micro.get_grain_map().shape) - np.array(mask.shape)
+                padding = [(o // 2, o // 2) for o in offset]
+                print('mask padding is {}'.format(padding))
+                mask = np.pad(mask, padding, mode='constant')
+            print('now mask shape is {}'.format(mask.shape))
+            micro.set_mask(mask, voxel_size)
             if verbose:
                 print('loaded mask volume with shape: {}'.format(micro.get_mask().shape))
         return micro

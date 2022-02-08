@@ -1614,12 +1614,9 @@ class Microstructure(SampleData):
             if self.active_grain_map is None:
                 self.set_active_grain_map()
             self._init_phase(phase)
-            if not hasattr(self, 'active_phase_id'):
-                self.active_phase_id = 1
         else:
             self.set_active_grain_map()
             self._init_phase(phase)
-            self.active_phase_id = 1
         return
 
     def __repr__(self):
@@ -1792,20 +1789,18 @@ class Microstructure(SampleData):
         """Return the list of the phase ids."""
         return [phase.phase_id for phase in self._phases]
 
-    def get_phase(self, phase_id=None):
+    def get_phase(self, phase_id=1):
         """Get a crystalline phase.
 
-        If no phase_id is given, the active phase is returned.
+        If no phase_id is given, the first phase is returned.
 
         :param int phase_id: the id of the phase to return.
         :return: the `CrystallinePhase` corresponding to the id.
         """
-        if phase_id is None:
-            phase_id = self.active_phase_id
         index = self.get_phase_ids_list().index(phase_id)
         return self._phases[index]
 
-    def get_lattice(self, phase_id=None):
+    def get_lattice(self, phase_id=1):
         """Get the crystallographic lattice associated with this microstructure.
 
         If no phase_id is given, the `Lattice` of the active phase is returned.
@@ -2116,27 +2111,26 @@ class Microstructure(SampleData):
         self.set_tablecol('GrainDataTable', 'volume', column=volumes)
         return
 
-    def set_lattice(self, lattice, phase_id=None):
+    def set_lattice(self, lattice, phase_id=1):
         """Set the crystallographic lattice associated with this microstructure.
 
-        If no `phase_id` is specified, the lattice will be set for the active
-        phase.
+        If no `phase_id` is specified, the lattice will be set for the first
+        phase of the list.
 
         :param Lattice lattice: an instance of the `Lattice class`.
         :param int phase_id: the id of the phase to set the lattice.
         """
-        if phase_id is None:
-            phase_id = self.active_phase_id
         self.get_phase(phase_id)._lattice = lattice
 
     def set_active_grain_map(self, map_name='grain_map'):
-        """Set the active grain map name to inputed string.
+        """Set the active grain map name to input string.
 
-        The active_grain_map string is used as Name to get the grain_map field
-        in the dataset through the SampleData "get_field" method.
+        The `active_grain_map` string attribute is used to locate the array
+        when the `get_grain_map` method is called. This allows to have multiple
+        grain maps within a data set.
         """
         self.active_grain_map = map_name
-        self.add_attributes({'active_grain_map':map_name}, 'CellData')
+        self.add_attributes({'active_grain_map': map_name}, 'CellData')
         return
 
     def set_grain_map(self, grain_map, voxel_size=None,

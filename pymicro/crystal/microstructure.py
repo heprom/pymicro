@@ -1688,10 +1688,9 @@ class Microstructure(SampleData):
         phase_group = self.get_node('/PhaseData')
         for child in phase_group._v_children:
             d = self.get_dic_from_attributes('/PhaseData/%s' % child)
-            #print(d)
             phase = CrystallinePhase.from_dict(d)
             self._phases.append(phase)
-        #print('%d phases found in the data set' % len(self._phases))
+        print('%d phases found in the data set' % len(self._phases))
 
     def set_phase(self, phase):
         """Set a phase for the given `phase_id`.
@@ -1725,6 +1724,24 @@ class Microstructure(SampleData):
         # add each phase
         for phase in phase_list:
             self.add_phase(phase)
+
+    def set_phase_elastic_constants(self, elastic_constants, phase_id=1):
+        """Set the elastic constants of the given phase.
+
+        :param list elastic_constants: the list of elastic constants to use,
+        this has to be in agreement with the symmetry of the phase.
+        :param int phase_id: the id of the phase to use.
+        :raise ValueError: if the elastic constants do not match the phase
+        symmetry.
+        """
+        phase = self.get_phase(phase_id)
+        print('assigning elastic constants %s to phase %s' %
+              (elastic_constants, phase.name))
+        try:
+            phase.set_elastic_constants(elastic_constants)
+            self.set_phase(phase)
+        except ValueError as e:
+            print(e)
 
     def get_number_of_phases(self):
         """Return the number of phases in this microstructure.
@@ -1766,6 +1783,10 @@ class Microstructure(SampleData):
         d = phase.to_dict()
         self.add_attributes(d, '/PhaseData/phase_%02d' % new_phase_id)
         print('new phase added: %s' % phase.name)
+
+    def get_phase_list(self):
+        """Return the list of the phases in this microstructure."""
+        return self._phases
 
     def get_phase_ids_list(self):
         """Return the list of the phase ids."""
@@ -3243,7 +3264,6 @@ class Microstructure(SampleData):
         :param bool verbose: activate verbose mode.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
-        # TODO: add phase transfer to new microstructure
         if self._is_empty('grain_map'):
             print('warning: needs a grain map to crop the microstructure')
             return
@@ -3265,8 +3285,13 @@ class Microstructure(SampleData):
                     (not self.get_sample_name().endswith('_')) * '_' + 'crop'
         # create new microstructure dataset
         micro_crop = Microstructure(name=crop_name, overwrite_hdf5=True,
+                                    phase=self.get_phase(),
                                     autodelete=autodelete)
-        micro_crop.set_lattice(self.get_lattice())
+        if self.get_number_of_phases() > 1:
+            for i in range(2, self.get_number_of_phases()):
+                micro_crop.add_phase(self.get_phase(phase_id=i))
+        #micro_crop.set_phases(self.get_phase_list())
+        micro_crop.default_compression_options = self.default_compression_options
         print('cropping microstructure to %s' % micro_crop.h5_file)
         # crop CellData fields
         image_group = self.get_node('CellData')
@@ -3274,14 +3299,14 @@ class Microstructure(SampleData):
         field_list = self.get_node(FIndex_path)
         for name in field_list:
             fieldname = name.decode('utf-8')
-            spacing_array = self.get_attribute('spacing','CellData')
+            spacing_array = self.get_attribute('spacing', 'CellData')
             print('cropping field %s' % fieldname)
             field = self.get_field(fieldname)
             if not self._is_empty(fieldname):
                 if self._get_group_type('CellData') == '2DImage':
-                    field_crop = field[x_start:x_end,y_start:y_end, ...]
+                    field_crop = field[x_start:x_end, y_start:y_end, ...]
                 else:
-                    field_crop = field[x_start:x_end,y_start:y_end,
+                    field_crop = field[x_start:x_end, y_start:y_end,
                                        z_start:z_end, ...]
                 empty = micro_crop.get_attribute(attrname='empty',
                                            nodename='CellData')

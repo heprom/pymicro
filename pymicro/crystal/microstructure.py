@@ -771,6 +771,22 @@ class Orientation:
         return o
 
     @staticmethod
+    def from_amitex(n1, n2):
+        """Create an orientation instance from the two vectors used in
+        Amtiex_FFTP which are the first two rows of the orientation matrix.
+
+        :param np.array n1: the first vector describing the orientation.
+        :param np.array n2: the second vector describing the orientation.
+        :return: an instance of the `Orientation` class.
+        """
+        g = np.empty([3, 3], dtype=float)
+        g[0] = n1  # first row
+        g[1] = n2  # second row
+        g[2] = np.cross(n1, n2)  # third row
+        o = Orientation(g)
+        return o
+
+    @staticmethod
     def Zrot2OrientationMatrix(x1=None, x2=None, x3=None):
         """Compute the orientation matrix from the rotated coordinates given
         in the .inp file for Zebulon's computations.

@@ -590,6 +590,7 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, mask=None, dark_factor=1.):
 
     return tt_rock
 
+
 def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.):
     """Build a topotomography stack from raw detector images.
 
@@ -650,3 +651,100 @@ def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.)
     if save_edf:
         edf_write(tt_stack, os.path.join(data_dir, '%sstack.edf' % scan_name))
     return tt_stack
+
+
+def tt_sim_rc(micro, gid, hkl_tt, T=None, lambda_keV=40.0, omega_step=4.0,
+              base_tilt_range=0.5):
+    """Compute the complete topotomography rocking curve for a given grain.
+
+    This method compute the $I_$\omega$(\Theta)$ rocking curve by analyzing
+    the lattice rotation field of a grain and computing the diffracting
+    conditions of the selected reflection. For each $\omega$ value in [0, 360],
+    the scattering vector is rotated by the base tilt around the mean Bragg
+    angle. Each voxel will then contribute to the rocking curve depending on
+    its orientation.
+
+    :param Microstructure micro: The microstructure to study.
+    :param int gid: the id of the selected grain.
+    :param HklPlane hkl_tt: the selected reflection.
+    :param np.ndarray T: the diffractometer transformation matrix.
+    :param float lambda_keV: the X-ray wavelength in keV units.
+    :param float omega_step: the angular $\omega$ step.
+    :param float base_tilt_range: the base tilt range in degrees.
+    :return: a tuple with 3 numpy arrays: the values of omega, the base tilt
+    values and the simulated rocking curve.
+    """
+    from math import cos, sin
+    grain = micro.get_grain(gid)
+    sym = micro.get_lattice().get_symmetry()  # should get the phase id
+    o_xyz = grain.orientation.move_to_FZ(symmetry=sym)
+    ut, lt = o_xyz.topotomo_tilts(hkl_tt, T, verbose=True)
+    # compute the S and T tilt matrices (constant for this grain and this hkl_tt)
+    U = np.array([[1, 0, 0], [0, cos(ut), -sin(ut)], [0, sin(ut), cos(ut)]])
+    L = np.array([[cos(lt), 0, sin(lt)], [0, 1, 0], [-sin(lt), 0, cos(lt)]])
+    S = np.dot(L, U)
+
+    # grab all the orientation data for this grain
+    if micro._is_empty('orientation_map'):
+        print('warning: an orientation map is needed to compute the topotomography rocking curve')
+        return
+    grain_map = np.squeeze(micro.get_grain_map())
+    orientation_map = np.squeeze(micro.get_orientation_map())
+    rod_gid = orientation_map[grain_map == gid]
+    print('%d orientation data points in this grain' % len(rod_gid))
+    # now transform all orientation data for this grain to the fundamental zone
+    rod_gid_fz = np.empty_like(rod_gid)
+    for i in range(len(rod_gid)):
+        g = Orientation.from_rodrigues(rod_gid[i]).orientation_matrix()
+        g_fz = sym.move_rotation_to_FZ(g, verbose=False)
+        o_fz = Orientation(g_fz)
+        rod_gid_fz[i] = o_fz.rod
+
+    # find the diffracting condition for each voxel
+    omegas = np.arange(0, 360 + omega_step, omega_step)
+    base_tilt_step = 0.01
+    base_tilt_values = np.arange(-base_tilt_range, base_tilt_range
+                                 + base_tilt_step, base_tilt_step)
+    rc_sim = np.empty((len(omegas), len(rod_gid_fz)))
+    lambda_nm = 1.2398 / lambda_keV
+    theta = hkl_tt.bragg_angle(lambda_keV, verbose=False)
+    X = np.array([1., 0., 0.]) / lambda_nm
+    print('norm of X', np.linalg.norm(X))
+
+    for j in range(len(omegas)):
+        # pick a value for omega
+        omega = omegas[j]
+        omegar = np.radians(omega)
+        R = np.array([[cos(omegar), -sin(omegar), 0], [sin(omegar), cos(omegar), 0], [0, 0, 1]])
+
+        for i in range(len(rod_gid_fz)):
+            # grab the i-th pixel of this grain
+            o_i = Orientation.from_rodrigues(rod_gid_fz[i])
+
+            # apply the different rotation to the sample
+            gt = o_i.orientation_matrix().transpose()
+            Gs = np.dot(gt, hkl_tt.scattering_vector())  # grain orientation
+            Gs = np.dot(T.T, Gs)  # diffractometer offsets
+            Gt = np.dot(S, Gs)  # topotomo tilts
+            Gl = np.dot(R, Gt)  # omega rotation
+
+            # scan the base tilt angle (no need to offset by theta here)
+            hkl_normal_tilted = np.zeros((len(base_tilt_values), 3))
+            norm_K = np.zeros(len(base_tilt_values))
+            for k, base_tilt in enumerate(base_tilt_values):
+                base_tilt = theta + np.radians(base_tilt)
+                BT = np.array([[cos(-base_tilt), 0, sin(-base_tilt)], [0, 1, 0],
+                               [-sin(-base_tilt), 0, cos(-base_tilt)]])  # base tilt
+                hkl_normal_tilted[k] = np.dot(BT, Gl)
+                K = X + hkl_normal_tilted[k]
+                norm_K[k] = np.linalg.norm(K)
+
+            # to find the diffraction condition, it is equivalent
+            # to search when norm(K) is equal to norm(X) or to
+            # search for a zero x-component of the tilted scattering vector
+            rc_sim[j, i] = base_tilt_values[np.argmin(np.abs(norm_K - np.linalg.norm(X)))]
+            # rc_sim[j, i] = base_tilt_values[np.argmin(np.abs(hkl_normal_tilted[:, 0]))]
+        progress = 100 * (1 + j) / len(omegas)
+        print('simulating topotomography rocking curve: {0:.2f} %'.format(progress), end='\r')
+    return omegas, base_tilt_values, rc_sim
+

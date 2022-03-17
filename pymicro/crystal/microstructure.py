@@ -2018,10 +2018,20 @@ class Microstructure(SampleData):
         used to restrict the grains, by default all the grain bounding boxes
         are returned.
 
-        :param list id_list: a non empty list of the grain ids.
+        .. note::
+
+          The bounding boxes are returned in ascending order of the grain ids
+          (not necessary the same order than the list if it is not ordered).
+          The maximum length of the ids list is 256.
+
+        :param list id_list: a non empty (preferably ordered) list of the
+        selected grain ids (with a maximum number of ids of 256).
         :return: a numpy array containing the grain bounding boxes.
+        :raise: a ValueError if the length of the id list is larger than 256.
         """
         if id_list:
+            if len(id_list) > 256:
+                raise(ValueError("the id_list can only have 256 values"))
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['bounding_box']
         else:
@@ -2304,7 +2314,7 @@ class Microstructure(SampleData):
 
     def remove_grains_not_in_map(self):
         """Remove from GrainDataTable grains that are not in the grain map."""
-        _,not_in_map,_ = self.compute_grains_map_table_intersection()
+        _, not_in_map, _ = self.compute_grains_map_table_intersection()
         self.remove_grains_from_table(not_in_map)
         return
 
@@ -2565,13 +2575,14 @@ class Microstructure(SampleData):
 
         This method computes the grain orientation deviation map. For each
         grain in the list (all grain by default), the orientation of each
-        voxel belonging to this grain is compared to the mean and the resulting
-        misorientation is assigned to the pixel.
+        voxel belonging to this grain is compared to the mean orientation in
+        the grain and the resulting misorientation is assigned to the pixel.
 
         A grain ids list can be used to restrict the grains where to compute
-        the orientation deviation. By default, this method uses the mean
-        orientation in the GrainDataTable but the mean orientation can also be
-        recomputed from the orientation map and grain map by activating the flag
+        the orientation deviation (the number of grains in the list must be 256
+        maximum). By default, this method uses the mean orientation in the
+        GrainDataTable but the mean orientation can also be recomputed from the
+        orientation map and grain map by activating the flag
         `recompute_mean_orientation`.
 
         .. note::
@@ -2597,7 +2608,6 @@ class Microstructure(SampleData):
         print('grain ids shape', grain_ids.shape)
         orientation_map = self.get_orientation_map()
         print('orientation map shape', orientation_map.shape)
-        bounding_boxes = self.get_grain_bounding_boxes(id_list)
         # assume only one phase
         if self.get_number_of_phases() > 1:
             print('error, multiple phases not yet supported')
@@ -2623,7 +2633,7 @@ class Microstructure(SampleData):
             progress = 100 * index / len(id_list)
             print('GOD computation progress: {:.2f} % (grain {:d})'.format(progress, gid), end='\r')
             # we use grain bounding boxes to speed up calculations
-            bb = bounding_boxes[index]
+            bb = self.get_grain_bounding_boxes(id_list=[gid])[0]
             grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
                                              bb[1][0]:bb[1][1],
                                              bb[2][0]:bb[2][1]]

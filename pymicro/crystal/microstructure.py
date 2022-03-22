@@ -2569,6 +2569,41 @@ class Microstructure(SampleData):
                            location='CellData')
         return orientation_map
 
+    def fz_grain_orientation_data(self, grain_id, plot=True, move_to_fz=True):
+        """Plot the orientation data for this grain.
+
+        This function extracts orientation data for a given grain and creates
+        a three dimensional plot in Rodrigues space.
+
+        :param int grain_id: the grain id to retrieve orientation data.
+        :param bool plot: flag to create a 3D plot. If False, the Rodrigues
+        orientation data is simply returned.
+        :param bool plot: flag to move the orientation data to the fundamental
+        zone (the crystal lattice of the microstructure is used for that).
+        :return: a numpy array of size (n, 3) with n being the number of data
+        points for this grain.
+        """
+        orientation_map = self.get_orientation_map()
+        rods_gid = orientation_map[np.where(self.get_grain_map() == grain_id)]
+        sym = self.get_lattice().get_symmetry()
+
+        if move_to_fz:
+            # move to the fundamental zone
+            for i in range(len(rods_gid)):
+                g = Orientation.from_rodrigues(rods_gid[i]).orientation_matrix()
+                g_fz = sym.move_rotation_to_FZ(g, verbose=False)
+                o_fz = Orientation(g_fz)
+                rods_gid[i] = o_fz.rod
+
+        if plot:
+            # plot orientation data in Rodrigues space
+            from mpl_toolkits.mplot3d import Axes3D
+            fig = plt.figure()
+            ax = Axes3D(fig)
+            ax.scatter(rods_gid[:, 0], rods_gid[:, 1], rods_gid[:, 2])
+            plt.show()
+        return rods_gid
+
     def compute_god_map(self, id_list=None, store=True,
                         recompute_mean_orientation=False):
         """Create a GOD (grain orientation deviation) map.

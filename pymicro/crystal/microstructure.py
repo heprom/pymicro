@@ -771,20 +771,57 @@ class Orientation:
         return o
 
     @staticmethod
-    def from_amitex(n1, n2):
+    def from_n1n2(n1, n2):
         """Create an orientation instance from the two vectors used in
-        Amtiex_FFTP which are the first two rows of the orientation matrix.
+        Amitex_FFTP which are the first two rows of the orientation matrix.
 
         :param np.array n1: the first vector describing the orientation.
         :param np.array n2: the second vector describing the orientation.
         :return: an instance of the `Orientation` class.
         """
-        g = np.empty([3, 3], dtype=float)
-        g[0] = n1  # first row
-        g[1] = n2  # second row
-        g[2] = np.cross(n1, n2)  # third row
+        n3 = np.cross(n1, n2)  # third row
+        g = np.array([n1, n2, n3])  # orientation matrix
         o = Orientation(g)
         return o
+
+    @staticmethod
+    def from_amitex(data_dir='.', binary=True):
+        """This methods reads the orientations from Amitex files.
+
+        The orientation data is read from 6 files: N1X.bin, N1Y.bin, N1Z.bin,
+        N2X.bin, N2Y.bin and N2Z.bin (in binary format). Teh extension is
+        replaced by txt for the ascii format.
+
+        :param str data_dir: the folder where the orientation files are located.
+        :param bool binary: use binary format (True by default).
+        :return: a list containing instances of the `Orientation` class.
+        """
+        orientations = []
+        n_components = []
+        if binary:
+            for file_name in ['N1X.bin', 'N1Y.bin', 'N1Z.bin',
+                              'N2X.bin', 'N2Y.bin', 'N2Z.bin']:
+                with open(os.path.join(data_dir, file_name), 'rb') as f:
+                    line = f.readline()
+                    n = int(line.decode('UTF-8').split('\n')[0])
+                    print('%d entries in file %s' % (n, file_name))
+                    line = f.readline()
+                    n_components.append(np.frombuffer(f.read(), dtype='>d'))
+                    assert (len(n_components[-1]) == n)
+        else:
+            # using ascii file format
+            for file_name in ['N1X.txt', 'N1Y.txt', 'N1Z.txt',
+                              'N2X.txt', 'N2Y.txt', 'N2Z.txt']:
+                with open(os.path.join(data_dir, file_name), 'r') as f:
+                    n_components.append(np.atleast_1d(np.genfromtxt(file_name)))
+                n = len(n_components[-1])
+
+        # now we have the data, construct the orientations
+        for i in range(n):
+            n1 = n_components[0][i], n_components[1][i], n_components[2][i]
+            n2 = n_components[3][i], n_components[4][i], n_components[5][i]
+            orientations.append(Orientation.from_n1n2(n1, n2))
+        return orientations
 
     @staticmethod
     def Zrot2OrientationMatrix(x1=None, x2=None, x3=None):
@@ -3977,7 +4014,7 @@ class Microstructure(SampleData):
             print('material file written in mat.xml')
 
         # if possible, write the vtk file to run the computation
-        if self.__contains__('grain_map'):
+        if not self._is_empty('grain_map'):
             # convert the grain map to vtk file
             from vtk.util import numpy_support
             #TODO adapt to 2D grain maps
@@ -4546,8 +4583,9 @@ class Microstructure(SampleData):
             phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
             micro.set_phase_map(phase_map, voxel_size=spacing)
             if include_rodrigues_map:
-                micro.add_field(gridname='CellData', fieldname='rodrigues_map',
-                                array=rodrigues_map)
+                micro.set_orientation_map(rodrigues_map)
+                #micro.add_field(gridname='CellData', fieldname='rodrigues_map',
+                #                array=rodrigues_map)
 
         # create grain data table infos
         grain_ids = np.unique(grain_map)

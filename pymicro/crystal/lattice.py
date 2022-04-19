@@ -63,6 +63,23 @@ class CrystallinePhase:
         self.elastic_constants = []  # a list of C_IJ values
         self.set_lattice(lattice)
 
+    def __eq__(self, other):
+        """Override the default Equals behavior.
+
+        The equality of two CrystallinePhase instances is based on the equality
+        of their name and _lattice attributes.
+
+        :param other: the other `CrystallinePhase` instance to test.
+        :return: True if the two CrystallinePhase are equals False if not.
+        """
+        if not isinstance(other, self.__class__):
+            return False
+        if self.name != other.name:
+            return False
+        if self._lattice != other._lattice:
+            return False
+        return True
+
     def __repr__(self):
         """Generate a string representation of this instance."""
         out = 'Phase %d (%s) \n\t-- ' % (self.phase_id, self.name)

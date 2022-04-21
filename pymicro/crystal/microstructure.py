@@ -789,7 +789,7 @@ class Orientation:
         """This methods reads the orientations from Amitex files.
 
         The orientation data is read from 6 files: N1X.bin, N1Y.bin, N1Z.bin,
-        N2X.bin, N2Y.bin and N2Z.bin (in binary format). Teh extension is
+        N2X.bin, N2Y.bin and N2Z.bin (in binary format). The bin extension is
         replaced by txt for the ascii format.
 
         :param str data_dir: the folder where the orientation files are located.
@@ -803,7 +803,7 @@ class Orientation:
                               'N2X.bin', 'N2Y.bin', 'N2Z.bin']:
                 with open(os.path.join(data_dir, file_name), 'rb') as f:
                     line = f.readline()
-                    n = int(line.decode('UTF-8').split('\n')[0])
+                    n = int(line.decode('utf-8').split('\n')[0])
                     print('%d entries in file %s' % (n, file_name))
                     line = f.readline()
                     n_components.append(np.frombuffer(f.read(), dtype='>d'))
@@ -3548,8 +3548,8 @@ class Microstructure(SampleData):
             voxel_size = np.concatenate((voxel_size,np.array([0])), axis=0)
         offset = bb[:, 0]
         grain_data_bin = (grain_map == gid).astype(np.uint8)
-        local_com = ndimage.measurements.center_of_mass(grain_data_bin) \
-                    + np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
+        local_com = ndimage.measurements.center_of_mass(grain_data_bin) + \
+                    np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
         com = voxel_size * (offset + local_com
                             - 0.5 * np.array(self.get_grain_map().shape))
         return com
@@ -4637,9 +4637,11 @@ class Microstructure(SampleData):
         return micro
 
     @staticmethod
-    def from_dct(data_dir='.', grain_file='index.mat', vol_key='vol',
-                 vol_file='phase_01_vol.mat', mask_key='vol',
-                 mask_file='volume_mask.mat', use_dct_path=True,
+    def from_dct(data_dir='.', grain_file='index.mat', use_dct_path=True,
+                 vol_file='phase_01_vol.mat', vol_key='vol',
+                 mask_file='volume_mask.mat', mask_key='vol',
+                 phase_file='volume.mat', phase_key='phases',
+                 rod_map_file='phase_01_vol.mat', rod_map_key='dmvol',
                  trim_z_range=0, verbose=True):
         """Create a microstructure from a DCT reconstruction.
 
@@ -4652,13 +4654,15 @@ class Microstructure(SampleData):
         :param str data_dir: the path to the folder containing the
                               reconstruction data.
         :param str grain_file: the name of the file containing grains info.
-        :param str vol_key: the key to access the volume in the hdf5 file.
-        :param str vol_file: the name of the volume file.
-        :param str mask_key: the key to access the mask in the hdf5 file.
-        :param str mask_file: the name of the mask file.
         :param bool use_dct_path: if True, the grain_file should be located in
             4_grains/phase_01 folder and the vol_file and mask_file in the
             5_reconstruction folder.
+        :param str vol_file: the name of the volume file.
+        :param str vol_key: the key to access the volume in the hdf5 file.
+        :param str mask_file: the name of the mask file.
+        :param str mask_key: the key to access the mask in the hdf5 file.
+        :param trim_z_range: crop the specified number of slice below and above
+        the volume; this is useful when the empty slices
         :param bool verbose: activate verbose mode.
         :return: a `Microstructure` instance created from the DCT reconstruction.
         """
@@ -4708,9 +4712,13 @@ class Microstructure(SampleData):
         if use_dct_path:
             grain_map_path = os.path.join(data_dir, '5_reconstruction', vol_file)
             mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
+            phase_path = os.path.join(data_dir, '5_reconstruction', phase_file)
+            rod_map_path = os.path.join(data_dir, '5_reconstruction', rod_map_file)
         else:
             grain_map_path = os.path.join(data_dir, vol_file)
             mask_path = os.path.join(data_dir, mask_file)
+            phase_path = os.path.join(data_dir, phase_file)
+            rod_map_path = os.path.join(data_dir, rod_map_file)
         # load the grain map if available
         if os.path.exists(grain_map_path):
             try:
@@ -4739,7 +4747,7 @@ class Microstructure(SampleData):
             except:
                 # fallback on matlab format
                 mask = loadmat(mask_path)[mask_key]
-            if trim_z_range > 0 and trim_z_range < mask.shape[2] // 2:
+            if 0 < trim_z_range < mask.shape[2] // 2:
                 mask = mask[:, :, trim_z_range:-trim_z_range]
             # check if mask shape needs to be zero padded
             if not mask.shape == micro.get_grain_map().shape:
@@ -4751,6 +4759,32 @@ class Microstructure(SampleData):
             micro.set_mask(mask, voxel_size)
             if verbose:
                 print('loaded mask volume with shape: {}'.format(micro.get_mask().shape))
+        # load the phase map if available
+        if os.path.exists(phase_path):
+            try:
+                with h5py.File(phase_path, 'r') as f:
+                    phase_map = f[phase_key][()].transpose(2, 1, 0).astype(np.uint8)
+            except:
+                # fallback on matlab format
+                phase_map = loadmat(phase_path)[phase_key]
+            if 0 < trim_z_range < phase_map.shape[2] // 2:
+                phase_map = phase_map[:, :, trim_z_range:-trim_z_range]
+            micro.set_phase_map(phase_map, voxel_size)
+            if verbose:
+                print('loaded phase_map volume with shape: {}'.format(micro.get_phase_map().shape))
+        # load the orientation map if available
+        if os.path.exists(phase_path):
+            try:
+                with h5py.File(rod_map_path, 'r') as f:
+                    orientation_map = f[rod_map_key][()].transpose(3, 2, 1, 0).astype(np.float)
+            except:
+                # fallback on matlab format
+                orientation_map = loadmat(rod_map_path)[rod_map_key]
+            if 0 < trim_z_range < orientation_map.shape[2] // 2:
+                orientation_map = orientation_map[:, :, trim_z_range:-trim_z_range, :]
+            micro.set_orientation_map(orientation_map)
+            if verbose:
+                print('loaded orientation_map volume with shape: {}'.format(micro.get_orientation_map().shape))
         return micro
 
     @staticmethod
@@ -4887,13 +4921,18 @@ class Microstructure(SampleData):
 
     @staticmethod
     def merge_microstructures(micros, overlap, translation_offset=[0, 0, 0],
-                              plot=False):
+                              key_array_to_merge='/CellData', plot=False):
         """Merge two `Microstructure` instances together.
 
         The function works for two microstructures with grain maps and an
-        overlap between them. Temporarily `Microstructures` restricted to the
-        overlap regions are created and grains are matched between the two
-        based on a disorientation tolerance.
+        overlap between them along the Z direction. Temporary `Microstructures`
+        restricted to the overlap regions are created and grains are matched
+        between the two based on a disorientation tolerance.
+
+        The method is written such that the end slices of the grain map of the
+        first scan in the `micros` list must correspond to the begining of the
+        grain map of the second scan.
+
 
         .. note::
 
@@ -4908,18 +4947,15 @@ class Microstructure(SampleData):
         :return: a new `Microstructure` instance containing the merged
                  microstructure.
         """
-        from scipy import ndimage
-
         # perform some sanity checks
         for i in range(2):
             if micros[i]._is_empty('grain_map'):
                 raise ValueError('microstructure instance %s must have an '
                                  'associated grain_map attribute'
                                  % micros[i].get_sample_name())
-        if micros[0].get_lattice() != micros[1].get_lattice():
-            raise ValueError('both microstructure must have the same crystal '
-                             'lattice')
-        lattice = micros[0].get_lattice()
+        if micros[0].get_phase() != micros[1].get_phase():
+            raise ValueError('both microstructure must have the same phase')
+        phase = micros[0].get_phase()
         if micros[0].get_voxel_size() != micros[1].get_voxel_size():
             raise ValueError('both microstructure must have the same'
                              ' voxel size')
@@ -4930,8 +4966,7 @@ class Microstructure(SampleData):
         if len(micros[1].get_grain_map().shape) == 2:
             raise ValueError('Microstructures to merge must be tridimensional')
 
-        # create two microstructures for the two overlapping regions:
-        # end slices in first scan and first slices in second scan
+        # create two microstructures for the two overlapping regions
         micro1_ol = micros[0].crop(z_start=micros[0].get_grain_map().shape[2] -
                                            overlap, autodelete=True)
         micro2_ol = micros[1].crop(z_end=overlap, autodelete=True)
@@ -4940,6 +4975,8 @@ class Microstructure(SampleData):
         # match grain from micros_ol[1] to micros_ol[0] (the reference)
         matched, _, unmatched = micros_ol[0].match_grains(micros_ol[1],
                                                           verbose=True)
+        #np.save('matched.npy', matched)
+        #matched = np.load('matched.npy')
 
         # to find the translation, we compute the differences in coordinates of
         # the center of mass of the matched grains between the two microstructures
@@ -4971,7 +5008,6 @@ class Microstructure(SampleData):
             ids_ref_list.remove(-1)  # grain overlap
         if 0 in ids_ref_list:
             ids_ref_list.remove(0)  # background
-        print(ids_ref_list)
         id_offset = max(ids_ref_list)
         print('grain ids in volume %s will be offset by %d'
               % (micros[1].get_sample_name(), id_offset))
@@ -4983,7 +5019,6 @@ class Microstructure(SampleData):
             ids_mrg_list.remove(-1)  # grain overlap
         if 0 in ids_mrg_list:
             ids_mrg_list.remove(0)  # background
-        print(ids_mrg_list)
 
         # prepare a volume with the same size as the second grain map,
         # with grain ids renumbered and (X, Y) translations applied.
@@ -5041,115 +5076,7 @@ class Microstructure(SampleData):
             plt.title('voxels that are identicals')
             plt.savefig('merging_check1.pdf')
 
-        # start the merging: the first volume is the reference
-        gmap_shape = [micros[0].get_grain_map().shape,
-                      micros[1].get_grain_map().shape]
-        overlap = gmap_shape[0][2] - translation_voxel[2]
-        print('overlap is %d voxels' % overlap)
-        z_shape = gmap_shape[0][2] + gmap_shape[1][2] - overlap
-        print('vertical size will be: %d + %d + %d = %d'
-              % (gmap_shape[0][2] - overlap, overlap,
-                 gmap_shape[1][2] - overlap, z_shape))
-        shape_merged = (np.array(gmap_shape[0])
-                        + [0, 0, gmap_shape[1][2] - overlap])
-        print('initializing volume with shape {}'.format(shape_merged))
-        grain_ids_merged = np.zeros(shape_merged, dtype=np.int16)
-        print(gmap_shape[0])
-        print(gmap_shape[1])
-
-        # add the non-overlapping part of the 2 volumes as is
-        grain_ids_merged[:, :, :gmap_shape[0][2] - overlap] = (
-            micros[0].get_grain_map()[:, :, :-overlap])
-        grain_ids_merged[:, :, gmap_shape[0][2]:] = grain_map_translated[:, :,
-                                                    overlap:]
-
-        # look at vertices with the same label
-        print(micros[0].get_grain_map()[:, :, translation_voxel[2]:].shape)
-        print(grain_map_translated[:, :, :overlap].shape)
-        print('translation_voxel[2] = %d' % translation_voxel[2])
-        print('micros[0].grain_map.shape[2] - overlap = %d'
-              % (gmap_shape[0][2] - overlap))
-        same_voxel = (micros[0].get_grain_map()[:, :, translation_voxel[2]:]
-                      == grain_map_translated[:, :, :overlap])
-        print(same_voxel.shape)
-        grain_ids_merged[:, :, translation_voxel[2]:gmap_shape[0][2]] = (
-                grain_map_translated[:, :, :overlap] * same_voxel)
-
-        # look at vertices with a single label
-        single_voxels_0 = ((micros[0].get_grain_map()[:, :,
-                            translation_voxel[2]:] > 0)
-                           & (grain_map_translated[:, :, :overlap] == 0))
-        print(single_voxels_0.shape)
-        grain_ids_merged[:, :, translation_voxel[2]:gmap_shape[0][2]] += (
-            (micros[0].get_grain_map()[:, :, translation_voxel[2]:]
-             * single_voxels_0))
-        single_voxels_1 = ((grain_map_translated[:, :, :overlap] > 0)
-                           & (micros[0].get_grain_map()[:, :,
-                              translation_voxel[2]:] == 0))
-        print(single_voxels_1.shape)
-        grain_ids_merged[:, :, translation_voxel[2]:gmap_shape[0][2]] += (
-                grain_map_translated[:, :, :overlap] * single_voxels_1)
-
-        if plot:
-            fig = plt.figure(figsize=(14, 10))
-            ax1 = fig.add_subplot(1, 2, 1)
-            ax1.imshow(grain_ids_merged[:, grain_ids_merged.shape[1] // 2, :].T)
-            plt.axis('off')
-            plt.title('XZ slice')
-            ax2 = fig.add_subplot(1, 2, 2)
-            ax2.imshow(grain_ids_merged[grain_ids_merged.shape[0] // 2, :, :].T)
-            plt.axis('off')
-            plt.title('YZ slice')
-            plt.savefig('merging_check2.pdf')
-
-        if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
-            mask_translated = np.roll(micros[1].get_mask(),
-                                      translation_voxel[:2], (0, 1))
-
-            # merging the masks
-            mask_merged = np.zeros(shape_merged, dtype=np.uint8)
-            # add the non-overlapping part of the 2 volumes as is
-            mask_merged[:, :, :gmap_shape[0][2] - overlap] = (
-                micros[0].get_mask()[:, :, :-overlap])
-            mask_merged[:, :, gmap_shape[0][2]:] = (
-                mask_translated[:, :, overlap:])
-
-            # look at vertices with the same label
-            same_voxel = (micros[0].get_mask()[:, :, translation_voxel[2]:] ==
-                          mask_translated[:, :, :overlap])
-            print(same_voxel.shape)
-            mask_merged[:, :,
-            translation_voxel[2]:micros[0].get_mask().shape[2]] = (
-                    mask_translated[:, :, :overlap] * same_voxel)
-
-            # look at vertices with a single label
-            single_voxels_0 = (micros[0].get_mask()[:, :, translation_voxel[2]:]
-                               > 0) & (mask_translated[:, :, :overlap] == 0)
-            mask_merged[:, :,
-            translation_voxel[2]:micros[0].get_mask().shape[2]] += (
-                (micros[0].get_mask()[:, :, translation_voxel[2]:]
-                 * single_voxels_0).astype(np.uint8))
-            single_voxels_1 = ((mask_translated[:, :, :overlap] > 0)
-                               & (micros[0].get_mask()[:, :,
-                                  translation_voxel[2]:] == 0))
-            mask_merged[:, :,
-            translation_voxel[2]:micros[0].get_mask().shape[2]] += (
-                (mask_translated[:, :, :overlap]
-                 * single_voxels_1).astype(np.uint8))
-
-            if plot:
-                fig = plt.figure(figsize=(14, 10))
-                ax1 = fig.add_subplot(1, 2, 1)
-                ax1.imshow(mask_merged[:, 320, :].T)
-                plt.axis('off')
-                plt.title('XZ slice')
-                ax2 = fig.add_subplot(1, 2, 2)
-                ax2.imshow(mask_merged[320, :, :].T)
-                plt.axis('off')
-                plt.title('YZ slice')
-                plt.savefig('merging_check3.pdf')
-
-        # merging finished, build the new microstructure instance
+        # merging finished, building the new microstructure instance
         name_part1 = micros[0].get_sample_name()
         if name_part1.endswith('_data'):
             name_part1 = name_part1[:-5]
@@ -5161,8 +5088,7 @@ class Microstructure(SampleData):
         desc = 'merged microstructure from %s and %s' % \
                (micros[0].get_sample_name(), micros[1].get_sample_name())
         merged_micro = Microstructure(name=merged_name, description=desc,
-                                      overwrite_hdf5=True)
-        merged_micro.set_lattice(lattice)
+                                      phase=phase, overwrite_hdf5=True)
         # add all grains from the reference volume
         grains_0 = micros[0].grains.read()
         merged_micro.grains.append(grains_0)
@@ -5179,16 +5105,110 @@ class Microstructure(SampleData):
               % merged_micro.get_number_of_grains())
         merged_micro.grains.flush()
 
-        # add the full grain map
-        print('assigning merged grain map')
-        merged_micro.set_grain_map(grain_ids_merged, voxel_size)
+        # start the merging: the first volume in the list is the reference
+        gmap_shape = [micros[0].get_grain_map().shape,
+                      micros[1].get_grain_map().shape]
+        overlap = gmap_shape[0][2] - translation_voxel[2]
+        print('overlap is %d voxels' % overlap)
+        z_shape = gmap_shape[0][2] + gmap_shape[1][2] - overlap
+        print('vertical size will be: %d + %d + %d = %d'
+              % (gmap_shape[0][2] - overlap, overlap,
+                 gmap_shape[1][2] - overlap, z_shape))
+        shape_merged = (np.array(gmap_shape[0])
+                        + [0, 0, gmap_shape[1][2] - overlap])
+
+        # look at vertices with the same label
+        same_voxel = (micros[0].get_grain_map()[:, :, translation_voxel[2]:]
+                      == grain_map_translated[:, :, :overlap])
+        # look at vertices with a single label
+        single_voxels_0 = ((micros[0].get_grain_map()[:, :,
+                            translation_voxel[2]:] > 0)
+                           & (grain_map_translated[:, :, :overlap] == 0))
+        single_voxels_1 = ((grain_map_translated[:, :, :overlap] > 0)
+                           & (micros[0].get_grain_map()[:, :,
+                              translation_voxel[2]:] == 0))
+
+        # factorize the merging of all arrays
+        array_names = micros[0].get_node('%s/Field_index' % key_array_to_merge)[()]
+        for index, array_name in enumerate(array_names):
+            array_name = str(array_names[index], 'utf-8)')
+            print('merging array %s' % array_name)
+            if not micros[0]._is_empty(array_name) and not micros[1]._is_empty(array_name):
+                a_bot = micros[0].get_field(array_name)
+                array_type = a_bot.dtype
+                print(gmap_shape[0][2], a_bot.shape[2])
+                if array_name == 'grain_map':
+                    # use our renumbered grain map for the second volume
+                    a_top = grain_map_translated
+                else:
+                    # simply translate the second volume
+                    a_top = np.roll(micros[1].get_field(array_name),
+                                    translation_voxel[:2], (0, 1))
+
+                # merging the two arrays
+                shape_array_merged = shape_merged
+                print('shape same_voxel before test ndim==4', same_voxel.shape)
+                if a_bot.ndim == 4:
+                    # handle field arrays (typically local orientation map)
+                    shape_array_merged = np.concatenate((shape_merged, [a_bot.shape[3]]))
+                    same_voxel = np.expand_dims(same_voxel, axis=same_voxel.ndim)
+                    same_voxel = np.concatenate((same_voxel, same_voxel, same_voxel), axis=3)
+                    print('shape same_voxel', same_voxel.shape)
+                    single_voxels_0 = np.expand_dims(single_voxels_0, axis=single_voxels_0.ndim)
+                    single_voxels_0 = np.concatenate((single_voxels_0, single_voxels_0, single_voxels_0), axis=3)
+                    print('shape single_voxels_0', single_voxels_0.shape)
+                    single_voxels_1 = np.expand_dims(single_voxels_1, axis=single_voxels_1.ndim)
+                    single_voxels_1 = np.concatenate((single_voxels_1, single_voxels_1, single_voxels_1), axis=3)
+                    print('shape single_voxels_1', single_voxels_1.shape)
+                merged = np.zeros(shape_array_merged, dtype=array_type)
+                # add the non-overlapping part of the 2 volumes as is
+                merged[:, :, :gmap_shape[0][2] - overlap] = (a_bot[:, :, :-overlap])
+                merged[:, :, gmap_shape[0][2]:] = (a_top[:, :, overlap:])
+
+                # copy voxels with the same grain ids
+                #TODO check if we should use the mean value here
+                merged[:, :, translation_voxel[2]:a_bot.shape[2]] = (
+                        a_top[:, :, :overlap] * same_voxel)
+
+                # copy voxels with single values
+                merged[:, :, translation_voxel[2]:a_bot.shape[2]] += (
+                    (a_bot[:, :, translation_voxel[2]:]
+                     * single_voxels_0).astype(array_type))
+                merged[:, :, translation_voxel[2]:a_bot.shape[2]] += (
+                    (a_top[:, :, :overlap]
+                     * single_voxels_1).astype(array_type))
+
+                if plot:
+                    fig = plt.figure(figsize=(14, 10))
+                    ax1 = fig.add_subplot(1, 2, 1)
+                    ax1.imshow(merged[:, shape_merged[1] // 2, :].T)
+                    plt.axis('off')
+                    plt.title('%s XZ slice' % array_name)
+                    ax2 = fig.add_subplot(1, 2, 2)
+                    ax2.imshow(merged[shape_merged[0] // 2, :, :].T)
+                    plt.axis('off')
+                    plt.title('%s YZ slice' % array_name)
+                    plt.savefig('merging_check%d.pdf' % 3 + index)
+
+                if array_name == 'grain_map':
+                    print('assigning merged grain map')
+                    merged_micro.set_grain_map(merged, voxel_size)
+                else:
+                    try:
+                        print('assigning new fused array: %s' % array_name)
+                        merged_micro.add_field(gridname=key_array_to_merge,
+                                               fieldname=array_name,
+                                               array=merged, replace=True,
+                                               indexname=array_name,
+                                               compression_options=micros[0].default_compression_options)
+                    except ValueError:
+                        print('skipping array %s' % array_name)
+
         # recompute the geometry of the grains
         print('updating grain geometry')
         merged_micro.recompute_grain_bounding_boxes()
         merged_micro.recompute_grain_centers()
         merged_micro.recompute_grain_volumes()
-        if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
-            print('assigning merged mask')
-            merged_micro.set_mask(mask_merged, voxel_size)
+
         merged_micro.sync()
         return merged_micro

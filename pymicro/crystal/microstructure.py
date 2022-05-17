@@ -3817,6 +3817,66 @@ class Microstructure(SampleData):
         self.recompute_grain_volumes()
         return
 
+    def segment_mtr(self, labels_seg=None, mis_thr=20., min_area=500, store=False):
+        """Segment micro-textured regions (MTR).
+
+        This method process a `Microstructure` instance using a Region Adgency
+        Graph built with the crystal misorientation between neighbors as weights.
+
+        :param ndarray labels_seg: a pre-segmentation of the grain map, the full
+        grain map will be used if not specified.
+        :param float mis_thr: threshold in misorientation used to cut the graph.
+        :param int min_area: minimum area used to define a MTR.
+        :param bool store:
+        :return mtr_labels: array with the labels of the segmented regions.
+        """
+        import networkx as nx
+        from skimage.future import graph
+
+        if labels_seg is None:
+            labels_seg = self.get_grain_map()
+
+        # create the Region Adgency Graph
+        rag_seg = graph.RAG(labels_seg, connectivity=1)
+
+        # fill key labels to each node, each region corresponds to one grain
+        for grain_id, d in rag_seg.nodes(data=True):
+            d['labels'] = [grain_id]
+
+        # remove node and connections to the background
+        rag_seg.remove_node(0)
+
+        # assign grain misorientation between neighbors to each edge of the graph
+        sym = self.get_phase().get_symmetry()
+        for x, y, d in rag_seg.edges(data=True):
+            o_x = self.get_grain(x).orientation
+            o_y = self.get_grain(y).orientation
+            mis = np.degrees(o_x.disorientation(o_y, crystal_structure=sym)[0])
+            d['weight'] = mis
+
+        # cut our graph with the misorientation threshold
+        rag = rag_seg.copy()
+        edges_to_remove = [(x, y) for x, y, d in rag.edges(data=True)
+                           if d['weight'] >= mis_thr]
+        rag.remove_edges_from(edges_to_remove)
+        comps = nx.connected_components(rag)
+        map_array = np.arange(labels_seg.max() + 1, dtype=labels_seg.dtype)
+        for i, nodes in enumerate(comps):
+            # compute area of this component
+            area = np.sum(np.isin(labels_seg, list(nodes)))
+            if area < min_area:
+                # ignore small MTR (simply assign them to label zero)
+                i = 0
+            for node in nodes:
+                for label in rag.nodes[node]['labels']:
+                    map_array[label] = i
+        mtr_labels = map_array[labels_seg]
+        print('%d micro-textured regions were segmented' % len(np.unique(mtr_labels)))
+        if store:
+            self.add_field(gridname='CellData', fieldname='mtr_segmentation',
+                           array=mtr_labels, replace=True)
+        return mtr_labels
+
     @staticmethod
     def voronoi(shape=(256, 256), n=50):
         """Simple voronoi tesselation to create a grain map.

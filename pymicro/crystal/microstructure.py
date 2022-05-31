@@ -4899,7 +4899,7 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None, tol=5., min_ci=0.2):
+    def from_ebsd(file_path, roi=None, tol=5., min_ci=0.2, phase_list=None):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
@@ -4909,6 +4909,9 @@ class Microstructure(SampleData):
             the grains (default is 5 degrees).
         :param float min_ci: minimum confidence index for a pixel to be a valid
             EBSD measurement.
+        :param list phase_list: a list of CrystallinePhase to overwrite the ones 
+            in the file, this is particularly useful for osc files as phases 
+            cannot be read from them at the moment.
         :return: a new instance of `Microstructure`.
         """
         # Get name of file and create microstructure instance
@@ -4917,6 +4920,8 @@ class Microstructure(SampleData):
         from pymicro.crystal.ebsd import OimScan
         # Read raw EBSD .h5 data file from OIM
         scan = OimScan.from_file(file_path)
+        if phase_list:
+            scan.phase_list = phase_list
         micro.set_phases(scan.phase_list)
         if roi:
             print('importing data from region {}'.format(roi))
@@ -4956,7 +4961,7 @@ class Microstructure(SampleData):
             print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
                 progress, gid), end='\r')
             # get the symmetry for this grain
-            phase_grain = scan.phase[np.where(grain_ids == 1)]
+            phase_grain = scan.phase[np.where(grain_ids == 1)].astype(np.int)
             assert len(np.unique(phase_grain)) == 1  # all pixel of this grain must have the same phase id by
             # construction
             grain_phase_id = phase_grain[0]

@@ -4,7 +4,7 @@ crystallographic granular microstructure such as mostly present in
 metallic materials.
 
 It contains several classes which are used to describe a microstructure
-composed of several grains, each one having its own crystallographic
+composed of multiple grains, each one having its own crystallographic
 orientation:
 
  * :py:class:`~pymicro.crystal.microstructure.Microstructure`
@@ -2277,6 +2277,27 @@ class Microstructure(SampleData):
                            indexname='phase_map',
                            compression_options=compression)
 
+    def update_phase_map(self, grain_ids=None):
+        """Update the phase map from the grain map.
+
+        This method update the phase map by setting the phase of all 
+        voxels of the grains to the appropriate value.
+
+        :param list grain_ids: the list of the grains ids that are 
+            concerned by the update (all grain by default).            
+        """
+        phase_map = m.get_phase_map()
+        if not grain_ids:
+          grain_ids = self.get_grain_ids()
+        for gid in grain_ids:
+            bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
+            this_grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                                  bb[1][0]:bb[1][1],
+                                                  bb[2][0]:bb[2][1]]
+            #TODO handle multiple phases here
+            phase_map[this_grain_map == gid] = 1
+        self.set_phase_map(phase_map)
+        
     def set_orientation_map(self, orientation_map, compression=None):
         """Set the orientation_map map for this microstructure.
 
@@ -2770,14 +2791,14 @@ class Microstructure(SampleData):
             gid = grain_ids[i]
             # use the bounding box for this grain
             bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
-            grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
-                                             bb[1][0]:bb[1][1],
-                                             bb[2][0]:bb[2][1]]
+            this_grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                                  bb[1][0]:bb[1][1],
+                                                  bb[2][0]:bb[2][1]]
             o = self.get_grain(gid).orientation
             rgb = o.ipf_color(axis, symmetry=self.get_lattice().get_symmetry(), saturate=True)
             ipf_map[bb[0][0]:bb[0][1],
                     bb[1][0]:bb[1][1],
-                    bb[2][0]:bb[2][1]][grain_map == gid] = rgb
+                    bb[2][0]:bb[2][1]][this_grain_map == gid] = rgb
             progress = 100 * (1 + i) / len(grain_ids)
             print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
         return ipf_map.squeeze()
@@ -3249,10 +3270,12 @@ class Microstructure(SampleData):
         """Dilate grains to fill the gap between them.
 
         This function calls `dilate_labels` with the grain map of the
-        microstructure.
+        microstructure. The phase map is updated after the dilation.
 
-        :param int dilation_steps: the number of dilation steps to apply.
-        :param list dilation_ids: a list to restrict the dilation to the given ids.
+        :param int dilation_steps: the number of dilation steps to 
+            apply to the grain map.
+        :param list dilation_ids: a list to restrict the dilation to 
+            the given ids.
         """
         if not self.__contains__('grain_map'):
             raise ValueError('microstructure %s must have an associated '
@@ -3273,6 +3296,9 @@ class Microstructure(SampleData):
                                                      dilation_ids=dilation_ids)
         # finally assign the dilated grain map to the microstructure
         self.set_grain_map(grain_map, map_name=new_map_name)
+        # and update the phase map if necessary
+        if not self._is_empty('phase_map'):
+            self.update_phase_map(grain_ids=dilation_ids)
 
     def clean_grain_map(self,  new_map_name='grain_map_clean'):
         """Apply a morphological cleaning treatment to the active grain map.
@@ -4702,7 +4728,7 @@ class Microstructure(SampleData):
                  mask_file='volume_mask.mat', mask_key='vol',
                  phase_file='volume.mat', phase_key='phases',
                  rod_map_file='phase_01_vol.mat', rod_map_key='dmvol',
-                 trim_z_range=0, verbose=True):
+                 roi=None, verbose=True):
         """Create a microstructure from a DCT reconstruction.
 
         DCT reconstructions are stored in several files. The indexed grain
@@ -4721,8 +4747,8 @@ class Microstructure(SampleData):
         :param str vol_key: the key to access the volume in the hdf5 file.
         :param str mask_file: the name of the mask file.
         :param str mask_key: the key to access the mask in the hdf5 file.
-        :param trim_z_range: crop the specified number of slice below and above
-        the volume; this is useful when the empty slices
+        :param list roi: specify a region of interest by a list of 6 
+            integers in the form [x1, x2, y1, y2, z1, z2] to crop the grain map.
         :param bool verbose: activate verbose mode.
         :return: a `Microstructure` instance created from the DCT reconstruction.
         """
@@ -4791,8 +4817,10 @@ class Microstructure(SampleData):
             except:
                 # fallback on matlab format
                 grain_map = loadmat(grain_map_path)[vol_key]
-            if trim_z_range > 0 and trim_z_range < grain_map.shape[2] // 2:
-                grain_map = grain_map[:, :, trim_z_range:-trim_z_range]
+            # work out the ROI
+            if roi:
+                x1, x2, y1, y2, z1, z2 = roi
+                grain_map = grain_map[x1:x2, y1:y2, z1:z2]
             micro.set_grain_map(grain_map, voxel_size)
             if verbose:
                 print('loaded grain ids volume with shape: {}'.format(
@@ -4807,8 +4835,9 @@ class Microstructure(SampleData):
             except:
                 # fallback on matlab format
                 mask = loadmat(mask_path)[mask_key]
-            if 0 < trim_z_range < mask.shape[2] // 2:
-                mask = mask[:, :, trim_z_range:-trim_z_range]
+            if roi:
+                x1, x2, y1, y2, z1, z2 = roi
+                mask = mask[x1:x2, y1:y2, z1:z2]
             # check if mask shape needs to be zero padded
             if not mask.shape == micro.get_grain_map().shape:
                 offset = np.array(micro.get_grain_map().shape) - np.array(mask.shape)
@@ -4827,21 +4856,23 @@ class Microstructure(SampleData):
             except:
                 # fallback on matlab format
                 phase_map = loadmat(phase_path)[phase_key]
-            if 0 < trim_z_range < phase_map.shape[2] // 2:
-                phase_map = phase_map[:, :, trim_z_range:-trim_z_range]
+            if roi:
+                x1, x2, y1, y2, z1, z2 = roi
+                phase_map = phase_map[x1:x2, y1:y2, z1:z2]
             micro.set_phase_map(phase_map, voxel_size)
             if verbose:
                 print('loaded phase_map volume with shape: {}'.format(micro.get_phase_map().shape))
         # load the orientation map if available
-        if os.path.exists(phase_path):
+        if os.path.exists(rod_map_path):
             try:
                 with h5py.File(rod_map_path, 'r') as f:
                     orientation_map = f[rod_map_key][()].transpose(3, 2, 1, 0).astype(np.float)
             except:
                 # fallback on matlab format
                 orientation_map = loadmat(rod_map_path)[rod_map_key]
-            if 0 < trim_z_range < orientation_map.shape[2] // 2:
-                orientation_map = orientation_map[:, :, trim_z_range:-trim_z_range, :]
+            if roi:
+                x1, x2, y1, y2, z1, z2 = roi
+                orientation_map = orientation_map[x1:x2, y1:y2, z1:z2, :]
             micro.set_orientation_map(orientation_map)
             if verbose:
                 print('loaded orientation_map volume with shape: {}'.format(micro.get_orientation_map().shape))

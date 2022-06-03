@@ -434,11 +434,12 @@ class FE_Mesh():
                 break
         nv = int(mesh.readline())
         percent = math.ceil(nv / 100.)
-        print('loading nodes: %2d %%' % (0 / percent))
+        print('loading nodes: {0:.2f} %'.format(0 / percent), end='\r')
         assert (dim == 3)  # assume 3 dimensional mesh
         for i in range(nv):
             if i % percent == 0:
-                print('\b\b\b\b%2d %%' % (i / percent))
+                #print('\b\b\b\b%2d %%' % (i / percent))
+                print('loading nodes: {0:.2f} %'.format(i / percent), end='\r')
             [x, y, z, t] = mesh.readline().split()
             node = FE_Node(int(i + 1))
             node._x = float(x)
@@ -448,6 +449,7 @@ class FE_Mesh():
             if verbose:
                 print('adding node', node)
             fe_mesh._nodes.append(node)
+        print('\ndone with nodes')
         # look for Triangles
         while True:
             line = mesh.readline().strip()  # get read of unnecessary spaces
@@ -495,7 +497,11 @@ class FE_Mesh():
         nv = int(snv)
         dim = int(sdim)
         fe_mesh = FE_Mesh(dim=dim)
+        percent = math.ceil(nv / 100.)
+        print('loading nodes: {0:d} %'.format(0), end='\r')
         for i in range(nv):
+            if i % percent == 0:
+                print('loading nodes: {0:d} %'.format(int(i / percent)), end='\r')
             if dim == 2:
                 [id, x, y] = geof.readline().split()
             else:
@@ -509,6 +515,7 @@ class FE_Mesh():
             if verbose:
                 print('adding node', node)
             fe_mesh._nodes.append(node)
+        print('loading nodes: {0:d} %'.format(100))
         # build a rank <-> id table
         id_to_rank = fe_mesh.compute_id_to_rank(nodes=True)
         '''
@@ -524,10 +531,10 @@ class FE_Mesh():
                 break
         ne = int(geof.readline())
         percent = math.ceil(ne / 100.)
-        print('building elements: %2d %%' % (0 / percent))
+        print('building elements: {0:d} %'.format(0), end='\r')
         for i in range(ne):
             if i % percent == 0:
-                print('\b\b\b\b%2d %%' % (i / percent))
+                print('building elements: {0:d} %'.format(int(i / percent)), end='\r')
             line = geof.readline()
             tokens = line.split()
             el_id = int(tokens[0])
@@ -545,6 +552,7 @@ class FE_Mesh():
             if verbose:
                 print('adding element', element)
             fe_mesh._elements.append(element)
+        print('building elements: {0:d} %'.format(100))
         # look for ***group
         while True:
             line = geof.readline().strip()
@@ -560,7 +568,7 @@ class FE_Mesh():
                     line = geof.readline()
                     continue  # already stored as the first elset
                 new_elset = []
-                while (True):
+                while True:
                     line = geof.readline()
                     if line.startswith('*'):
                         break  # escape if entering anoter group
@@ -568,14 +576,15 @@ class FE_Mesh():
                         new_elset.append(int(elid))
                 if fe_mesh._elset_names.count(elset_name) == 0:
                     fe_mesh._elset_names.append(elset_name)
-                    print('adding new elset: %s' % elset_name)
+                    print('adding new elset: %s (%d elsets currently in the mesh)' % (elset_name,
+                                                                                      len(fe_mesh._elsets)), end='\r')
                     fe_mesh._elsets.append(new_elset)
                 else:
                     index = fe_mesh._elset_names.index(elset_name)
-                    print('appending element ids to elset ' + elset_name)
+                    print('appending element ids to elset %s' % elset_name, end='\r')
                     for el_id in new_elset:
                         fe_mesh._elsets[index].append(el_id)
-                print('nb of elsets currently in mesh:', len(fe_mesh._elsets))
+                print('mesh contains %d elsets' % len(fe_mesh._elsets))
             elif line.startswith('**liset'):
                 liset_name = line.split()[1]
                 new_liset = []
@@ -591,8 +600,9 @@ class FE_Mesh():
                         new_liset.append([int(tokens[1]), int(tokens[3])])
                 if fe_mesh._liset_names.count(liset_name) == 0:
                     fe_mesh._liset_names.append(liset_name)
-                    print('adding new liset: %s' % liset_name)
+                    print('adding new liset: %s' % liset_name, end='\r')
                     fe_mesh._lisets.append(new_liset)
+                print('mesh contains %d lisets' % len(fe_mesh._lisets))
             if line.startswith('***return'):
                 break
             if not line.startswith('**elset'):

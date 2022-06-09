@@ -464,6 +464,8 @@ class ExperimentEncoder(json.JSONEncoder):
             return dict_lattice
         if isinstance(o, Sample):
             dict_sample = {}
+            dict_sample['Path'] = o.h5_path
+            '''
             dict_sample['Name'] = o.name
             dict_sample['Data Dir'] = o.data_dir
             dict_sample['Position'] = o.position.tolist()
@@ -471,6 +473,7 @@ class ExperimentEncoder(json.JSONEncoder):
             dict_sample['Material'] = o.material
             dict_sample['Microstructure'] = o.microstructure
             dict_sample['Grain Ids Path'] = o.grain_ids_path
+            '''
             return dict_sample
         if isinstance(o, RegArrayDetector2d):
             dict_det = {}

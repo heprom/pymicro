@@ -37,35 +37,44 @@ def select_lambda(hkl, orientation, Xu=(1., 0., 0.), verbose=False):
     return the_energy, theta
 
 
-def build_list(lattice=None, max_miller=3, extinction=None, Laue_extinction=False, max_keV=120.):
-    hklplanes = []
+def build_list(lattice=None, max_miller=3, extinction=None, max_keV=None):
+    """Build a list of lattice planes.
+
+    This function build a list of `HklPlane` instances.
+
+    :param Lattice lattice: the crystal lattice associated with the planes.
+    :param int max_miller: the maximum miller index to consider.
+    :param bool extinction: a flag to consider extinction rule when building
+    the list (only FCC and BCC available).
+    :param float max_keV: if specified, only add a plane if it respects
+    the Ewald condition.
+    :return: a list of the hkl planes.
+    """
+    hkl_planes = []
     indices = range(-max_miller, max_miller + 1)
     for h in indices:
         for k in indices:
             for l in indices:
+                hkl = HklPlane(h, k, l, lattice)
                 if h == k == l == 0:  # skip (0, 0, 0)
                     continue
-                if not extinction :
-                    hklplanes.append(HklPlane(h, k, l, lattice))
-                if extinction == 'FCC':
+                if max_keV:
+                    # check the Ewald condition
+                    lambda_min = lambda_keV_to_nm(max_keV)
+                    if hkl.interplanar_spacing() > lambda_min / 2:
+                        continue
+                if not extinction:
+                    hkl_planes.append(hkl)
+                elif extinction == 'FCC':
                     # take plane if only all odd or all even hkl indices
-                    if (h % 2 == 0 and k % 2 == 0 and l % 2 == 0) or (h % 2 == 1 and k % 2 == 1 and l % 2 == 1):
-                        hklplanes.append(HklPlane(h, k, l, lattice))
-                if extinction == 'BCC':
+                    if (h % 2 == 0 and k % 2 == 0 and l % 2 == 0) or \
+                            (h % 2 == 1 and k % 2 == 1 and l % 2 == 1):
+                        hkl_planes.append(hkl)
+                elif extinction == 'BCC':
                     # take plane only if the sum indices is even
-                    if ((h**2 + k**2 + l**2) % 2 == 0):
-                        hklplanes.append(HklPlane(h, k, l, lattice))
-    if Laue_extinction is True:
-        lam_min = lambda_keV_to_nm(max_keV)
-        val = 2. * lattice._lengths[0] / lam_min # lattice have to be cubic !
-        print('Limit value is %d' % val)
-        for hkl in hklplanes:
-            (h, k, l) = hkl.miller_indices()
-            test = h ** 2 + k ** 2 + l ** 2
-            if val < test: # TODO check the test
-                hklplanes.remove(HklPlane(h, k, l, lattice))
-
-    return hklplanes
+                    if (h ** 2 + k ** 2 + l ** 2) % 2 == 0:
+                        hkl_planes.append(hkl)
+    return hkl_planes
 
 
 def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose=False):
@@ -770,7 +779,7 @@ class LaueForwardSimulation(ForwardSimulation):
         self.hkl_planes = []
         self.max_miller = 5
         self.use_energy_limits = False
-        self.exp = Experiment()
+        self.exp = None
 
     def set_experiment(self, experiment):
         """Attach an X-ray experiment to this simulation."""
@@ -825,9 +834,9 @@ class LaueForwardSimulation(ForwardSimulation):
         return Xu_vectors, thetas, the_energies, X_vectors, K_vectors
 
     def fsim_grain(self, gid=1):
-        self.grain = self.exp.get_sample().get_microstructure().get_grain(gid)
         sample = self.exp.get_sample()
-        lattice = sample.get_microstructure().get_lattice()
+        self.grain = sample.get_grain(gid)
+        lattice = sample.get_lattice()
         source = self.exp.get_source()
         detector = self.exp.get_active_detector()
         data = np.zeros_like(detector.data)
@@ -881,13 +890,13 @@ class LaueForwardSimulation(ForwardSimulation):
         it can be used to carry out an extended sample simulation.
         """
         full_data = np.zeros_like(self.exp.get_active_detector().data)
-        micro = self.exp.get_sample().get_microstructure()
+        sample = self.exp.get_sample()
         # for cad geometry we assume only one grain (the first in the list)
-        if self.exp.get_sample().geo.geo_type == 'cad':
-            full_data += self.fsim_grain(gid=micro.grains[0].id)
+        if sample.geo.geo_type == 'cad':
+            full_data += self.fsim_grain(gid=sample.grains[0]['idnumber'])
         else:
             # in the other cases, we use all the grains defined in the microstructure
-            for grain in micro.grains:
-                full_data += self.fsim_grain(gid=grain.id)
+            for grain_id in sample.get_grain_ids():
+                full_data += self.fsim_grain(gid=grain_id)
         return full_data
 

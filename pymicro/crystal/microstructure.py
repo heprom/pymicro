@@ -4625,7 +4625,7 @@ class Microstructure(SampleData):
 
     @staticmethod
     def from_labdct(labdct_file, data_dir='.', include_IPF_map=False,
-                    include_rodrigues_map=False):
+                    grain_map_key='GrainId', include_rodrigues_map=False):
         """Create a microstructure from a DCT reconstruction.
 
         :param str labdct_file: the name of the file containing the labDCT data.
@@ -4633,6 +4633,8 @@ class Microstructure(SampleData):
             reconstruction file.
         :param bool include_IPF_map: if True, the IPF maps will be included
             in the microstructure fields.
+        :param str grain_map_key: string defining the path to the grain map
+            (GrainId by default).
         :param bool include_rodrigues_map: if True, the rodrigues map will be
             included in the microstructure fields.
         :return: a `Microstructure` instance created from the labDCT
@@ -4645,12 +4647,13 @@ class Microstructure(SampleData):
         with h5py.File(file_path, 'r') as f:
             #TODO handle multiple phases
             phase01 = f['PhaseInfo']['Phase01']
-            phase_name = phase01['Name'][0].decode('utf-8')
+            phase_name = phase01['Name'][()].decode('utf-8')
             parameters = phase01['UnitCell'][()]  # length unit is angstrom
             a, b, c = parameters[:3] / 10  # use nm unit
             alpha, beta, gamma = parameters[3:]
             print(parameters)
-            sym = Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
+            space_group = phase01['SpaceGroup'][()]
+            sym = Symmetry.from_space_group(space_group)
             print('found %s symmetry' % sym)
             lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
             phase = CrystallinePhase(phase_id=1, name=phase_name, lattice=lattice)
@@ -4661,7 +4664,7 @@ class Microstructure(SampleData):
         with h5py.File(file_path, 'r') as f:
             spacing = f['LabDCT']['Spacing'][0]
             rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()].transpose(2, 1, 0, 3)
-            grain_map = f['LabDCT']['Data']['GrainId'][()].transpose(2, 1, 0)
+            grain_map = f['LabDCT']['Data'][grain_map_key][()].transpose(2, 1, 0)
             print('adding cell data with shape {}'.format(grain_map.shape))
             micro.set_grain_map(grain_map, voxel_size=spacing)
             mask = f['LabDCT']['Data']['Mask'][()].transpose(2, 1, 0)

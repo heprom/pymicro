@@ -942,7 +942,7 @@ class SampleData:
                              compression_options=dict()):
         """Create a 2D/3M Image group in the dataset from a field data array.
 
-        Construct an image object from the inputed field array. This array is
+        Construct an image object from the input field array. This array is
         interpreted by default as an element field of a pixelized/voxelized
         grid. Hence, if the field is of shape (Nx,Ny), the image group will
         store a (Nx,Ny) image (*i.e.* a regular grid of Nx+1,Ny+1 nodes). If
@@ -1498,7 +1498,7 @@ class SampleData:
             if not(data.dtype == descr_dtype):
                 raise ValueError('Data provided to add to the new columns'
                                  ' dtype is not consistent with the new'
-                                 ' columns description inputed.\n'
+                                 ' columns description input.\n'
                                  'Provided data dtype : {}\n'
                                  'Provided description : {}\n'
                                  ''.format(data.dtype, descr_dtype))
@@ -1639,7 +1639,7 @@ class SampleData:
         return
 
     def add_alias(self, aliasname, path=None, indexname=None):
-        """Add alias name to reference Node with inputed path or index name.
+        """Add alias name to reference Node with input path or index name.
 
         :param str aliasname: name to add as alias to reference the node
         :param str path: Path of the node to reference with `aliasname`
@@ -1647,7 +1647,7 @@ class SampleData:
             `aliasname`
         """
         if (path is None) and (indexname is None):
-            msg = ('(add_alias) None path nor indexname inputed. Alias'
+            msg = ('(add_alias) None path nor indexname input. Alias'
                    'addition aborted')
             self._verbose_print(msg)
             return
@@ -2505,7 +2505,7 @@ class SampleData:
             voxel_size = np.ones(shape=(len(old_spacing),))*voxel_size
         if len(old_spacing) != len(voxel_size):
             raise ValueError('Dimension mismatch between image group old'
-                             f' grid spacing {old_spacing} and inputed'
+                             f' grid spacing {old_spacing} and input'
                              f' new grid spacing {voxel_size}')
         self.add_attributes({'spacing': np.array(voxel_size)},
                             image_group)
@@ -2545,7 +2545,7 @@ class SampleData:
         old_origin = self.get_attribute('origin', image_group)
         if len(old_origin) != len(origin):
             raise ValueError('Dimension mismatch between image group origin'
-                             f' {old_origin} and inputed new origin'
+                             f' {old_origin} and input new origin'
                              f' {origin}')
         self.add_attributes({'origin': origin}, image_group)
         if len(origin) == 2:
@@ -2573,7 +2573,7 @@ class SampleData:
         """Store an array into a structured table column.
 
         If the column is not in the table description, a new field
-        corresponding to the inputed column is added to the table description.
+        corresponding to the input column is added to the table description.
 
         :param str tablename: Name, Path, Index name or Alias of the table
         :param str colname: Name of the column to set (analogous to name of a
@@ -2587,7 +2587,7 @@ class SampleData:
         table = self.get_node(tablename)
         col_shape = self.get_tablecol(tablename, colname).shape
         if (column.shape != col_shape):
-            raise ValueError('inputed column shape {} does not match the shape'
+            raise ValueError('input column shape {} does not match the shape'
                              '{} of column {} in table {}'
                              ''.format(column.shape, col_shape, colname,
                                        tablename))
@@ -2646,7 +2646,7 @@ class SampleData:
             instance destructor.
 
         .. note:: If compression settings are passed as additional keyword
-            arguments, they are prioritised over the settings in the inputed
+            arguments, they are prioritised over the settings in the input
             Filter object.
         """
         if node_list is None:
@@ -2686,7 +2686,7 @@ class SampleData:
             instance destructor.
 
         .. note:: If compression settings are passed as additional keyword
-            arguments, they are prioritised over the settings in the inputed
+            arguments, they are prioritised over the settings in the input
             Filter object.
         """
         if not self._is_array(nodename):
@@ -2751,7 +2751,7 @@ class SampleData:
         return
 
     def set_verbosity(self, verbosity=True):
-        """Set the verbosity of the instance methods to inputed boolean."""
+        """Set the verbosity of the instance methods to input boolean."""
         self._verbose = verbosity
         return
 
@@ -2885,6 +2885,92 @@ class SampleData:
         self._verbose_print('Node {} sucessfully removed'.format(name))
         return
 
+    def resample_image_group(self, new_voxel_size, location='CellData',
+                             new_location=None, in_place=False):
+        """Resample a whole image group with a new spatial resolution.
+
+        :param float new_voxel_size: the new spatial resolution.
+        :param str location: the location of the image group to process.
+        :param str new_location: the name of the new location to store the
+        resampled image group.
+        :param bool in_place: if True, the actual image group will be replaced
+        by the new resampled group.
+        """
+
+        # sanity check
+        if not self._get_group_type(location) == '3DImage':
+            print('works only on 3D images for now')
+            return
+
+        # work out each voxel coordinates
+        dims = self.get_attribute('dimension', location)
+        spacing = self.get_attribute('spacing', location)
+        size = dims * spacing
+        x = np.arange(0, size[0], spacing[0])
+        y = np.arange(0, size[1], spacing[1])
+        z = np.arange(0, size[2], spacing[2])
+        print(x.shape)
+
+        # create the new coordinates
+        x_new = np.arange(0, size[0], new_voxel_size)
+        y_new = np.arange(0, size[1], new_voxel_size)
+        z_new = np.arange(0, size[2], new_voxel_size)
+        print(x_new.shape)
+        X_new, Y_new, Z_new = np.meshgrid(x_new,
+                                          y_new,
+                                          z_new,
+                                          indexing='ij')
+        # settings for the new group
+        new_spacing = np.array(3 * [new_voxel_size])
+        compression = self.default_compression_options
+        if new_location is None:
+            new_location = '%s_resampled' % location
+
+        # now resample each field
+        image_group = self.get_node(location)
+        field_index_path = '%s/Field_index' % image_group._v_pathname
+        field_list = self.get_node(field_index_path)
+        from scipy.interpolate import RegularGridInterpolator
+        for name in field_list:
+            field_name = name.decode('utf-8')
+            new_field_name = field_name
+            if not in_place:
+                new_field_name += '_resampled'
+            print('+ resampling field %s' % field_name)
+            field = self.get_field(field_name)
+            # instanciate our interpolator
+            resample = RegularGridInterpolator((x, y, z),
+                                               field,
+                                               method='nearest')
+            new_shape = list(X_new.shape)
+            if field.ndim == 4:
+                new_shape = new_shape.append(field.shape[3])
+            new_field = resample(list(zip(X_new.ravel(),
+                                          Y_new.ravel(),
+                                          Z_new.ravel()))).reshape(new_shape)
+            # now add the resampled field to the new location
+            if not self.__contains__(new_location):
+                print('using add_image_from_field with %s' % new_field_name)
+                self.add_image_from_field(field_array=new_field,
+                                          fieldname=new_field_name,
+                                          imagename=new_location,
+                                          location='/',
+                                          spacing=new_spacing,
+                                          replace=True,
+                                          compression_options=compression)
+            else:
+                print('using add_field with %s' % new_field_name)
+                self.add_field(gridname=new_location,
+                                 fieldname=new_field_name,
+                                 array=new_field,
+                                 location=new_location,
+                                 replace=True,
+                                 compression_options=compression)
+        if in_place:
+            self.remove_node(location, recursive=True)
+            self.rename_node(new_location, location)
+        return
+
     def repack_h5file(self):
         """Overwrite hdf5 file with a copy of itself to recover disk space.
 
@@ -2947,7 +3033,7 @@ class SampleData:
     def create_elset_ids_field(self, meshname=None, store=True, fieldname=None,
                                get_sets_IDs=True, tags_prefix='elset',
                                remove_elset_fields=False):
-        """Create an element tag Id field on the inputed mesh.
+        """Create an element tag Id field on the input mesh.
 
         Creates a element wise field from the provided mesh,
         adding to each element the value of the Elset it belongs to.
@@ -4467,7 +4553,7 @@ class SampleData:
         return s
 
     def _get_compression_opt(self, compression_opts=dict()):
-        """Get inputed compression settings as `tables.Filters` instance."""
+        """Get input compression settings as `tables.Filters` instance."""
         Filters = tables.Filters()
         # ------ read compression options in dict
         for option in compression_opts:
@@ -4486,7 +4572,7 @@ class SampleData:
         return Filters
 
     def _get_compression_opt_from_filter(self, Filters):
-        """Get inputed compression settings as `tables.Filters` instance."""
+        """Get input compression settings as `tables.Filters` instance."""
         c_opts = {}
         c_opts['complib'] = Filters.complib
         c_opts['complevel'] = Filters.complevel

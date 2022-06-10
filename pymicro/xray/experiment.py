@@ -376,6 +376,10 @@ class Experiment:
             sample_path = dict_exp['Sample']['Path']
             print('loading existing microstructure: %s' % sample_path)
             sample = Sample(sample_path)
+            if not sample._is_empty('grain_map'):
+                sample.geo.set_type('array')
+                sample.geo.set_array(sample.get_grain_map(),
+                                     sample.get_voxel_size())
 
         # build the sample from information in the file
         else:
@@ -465,11 +469,11 @@ class ExperimentEncoder(json.JSONEncoder):
         if isinstance(o, Sample):
             dict_sample = {}
             dict_sample['Path'] = o.h5_path
+            dict_sample['Position'] = o.position.tolist()
+            dict_sample['Geometry'] = o.geo
             '''
             dict_sample['Name'] = o.name
             dict_sample['Data Dir'] = o.data_dir
-            dict_sample['Position'] = o.position.tolist()
-            dict_sample['Geometry'] = o.geo
             dict_sample['Material'] = o.material
             dict_sample['Microstructure'] = o.microstructure
             dict_sample['Grain Ids Path'] = o.grain_ids_path

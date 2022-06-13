@@ -4624,13 +4624,16 @@ class Microstructure(SampleData):
         return micro
 
     @staticmethod
-    def from_labdct(labdct_file, data_dir='.', include_IPF_map=False,
+    def from_labdct(labdct_file, data_dir='.', name=None, include_IPF_map=False,
                     grain_map_key='GrainId', include_rodrigues_map=False):
         """Create a microstructure from a DCT reconstruction.
 
         :param str labdct_file: the name of the file containing the labDCT data.
         :param str data_dir: the path to the folder containing the HDF5
             reconstruction file.
+        :param str name: the file name to use for this microstructure.
+            By default, the suffix `_data` is added to the base name of the
+            labDCT scan.
         :param bool include_IPF_map: if True, the IPF maps will be included
             in the microstructure fields.
         :param str grain_map_key: string defining the path to the grain map
@@ -4642,7 +4645,8 @@ class Microstructure(SampleData):
         """
         file_path = os.path.join(data_dir, labdct_file)
         print('creating microstructure for labDCT scan %s' % file_path)
-        name, ext = os.path.splitext(labdct_file)
+        if not name:
+            name, ext = os.path.splitext(labdct_file)
         # get the phase data
         with h5py.File(file_path, 'r') as f:
             #TODO handle multiple phases

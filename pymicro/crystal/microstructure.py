@@ -1419,7 +1419,9 @@ class Grain:
 
     A grain has a constant crystallographic `Orientation` and a grain id. The
     center attribute is the center of mass of the grain in world coordinates.
-    The volume of the grain is expressed in pixel/voxel unit.
+    The volume of the grain is normally expressed in mm unit especially when
+    working in relation with a `Microstructure` instance; if the unit has not
+    been set, the volume is then given in pixel/voxel unit.
     """
 
     def __init__(self, grain_id, grain_orientation):
@@ -1807,6 +1809,8 @@ class Microstructure(SampleData):
     def get_number_of_grains(self, from_grain_map=False):
         """Return the number of grains in this microstructure.
 
+        :param bool from_grain_map: controls if the retrurned number of grains
+        comes from the grain data table or from the grain map.
         :return: the number of grains in the microstructure.
         """
         if from_grain_map:
@@ -2286,7 +2290,7 @@ class Microstructure(SampleData):
         :param list grain_ids: the list of the grains ids that are 
             concerned by the update (all grain by default).            
         """
-        phase_map = m.get_phase_map()
+        phase_map = self.get_phase_map()
         if not grain_ids:
           grain_ids = self.get_grain_ids()
         for gid in grain_ids:
@@ -2295,7 +2299,9 @@ class Microstructure(SampleData):
                                                   bb[1][0]:bb[1][1],
                                                   bb[2][0]:bb[2][1]]
             #TODO handle multiple phases here
-            phase_map[this_grain_map == gid] = 1
+            phase_map[bb[0][0]:bb[0][1],
+                      bb[1][0]:bb[1][1],
+                      bb[2][0]:bb[2][1]][this_grain_map == gid] = 1
         self.set_phase_map(phase_map)
         
     def set_orientation_map(self, orientation_map, compression=None):

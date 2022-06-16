@@ -3040,11 +3040,11 @@ class SampleData:
 
         .. warning::
 
-            - CAUTION : the methods is designed to work with non intersecting
+            - CAUTION : the method is designed to work with non intersecting
               element tags/sets. In this case, the produce field will indicate
               the value of the last elset containing it for each element.
 
-        :param str mesh: Name, Path or index name of the mesh on which an
+        :param str meshname: Name, Path or index name of the mesh on which an
             orientation map element field must be constructed
         :param bool store: If `True`, store the field on the mesh
         :param bool get_sets_IDs: If `True`, get the sets ID numbers from their
@@ -3063,7 +3063,7 @@ class SampleData:
                 raise ValueError('meshname do not refer to a non empty mesh'
                                  'group')
         # create empty element vector field
-        n_elements = int(self.get_attribute('Number_of_elements',meshname))
+        n_elements = int(self.get_attribute('Number_of_elements', meshname))
         mesh = self.get_node(meshname)
         El_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
         ID_field = np.zeros((n_elements, 1), dtype=int)
@@ -3084,7 +3084,7 @@ class SampleData:
                 self.remove_node(field_path)
         if store:
             if fieldname is None:
-                fieldname = meshname+'_elset_ids'
+                fieldname = meshname + '_elset_ids'
             c_opt = {'complib': 'zlib', 'complevel': 1, 'shuffle': True}
             self.add_field(gridname=meshname, fieldname=fieldname,
                            array=ID_field, replace=True,

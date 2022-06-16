@@ -2292,8 +2292,10 @@ class Microstructure(SampleData):
         """
         phase_map = self.get_phase_map()
         if not grain_ids:
-          grain_ids = self.get_grain_ids()
-        for gid in grain_ids:
+          grain_ids = self.get_ids_from_grain_map()
+        for i, gid in enumerate(grain_ids):
+            progress = 100 * (1 + i) / len(grain_ids)
+            print('updating phase map: {0:.2f} %'.format(progress), end='\r')
             bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
             this_grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
                                                   bb[1][0]:bb[1][1],
@@ -2302,6 +2304,7 @@ class Microstructure(SampleData):
             phase_map[bb[0][0]:bb[0][1],
                       bb[1][0]:bb[1][1],
                       bb[2][0]:bb[2][1]][this_grain_map == gid] = 1
+        print('\n')
         self.set_phase_map(phase_map)
         
     def set_orientation_map(self, orientation_map, compression=None):
@@ -2405,7 +2408,7 @@ class Microstructure(SampleData):
         if not self._is_empty('grain_map'):
             # Remove grains from grain map
             grain_map = self.get_grain_map()
-            grain_map[np.where(np.isin(grain_map,id_list))] = 0
+            grain_map[np.where(np.isin(grain_map, id_list))] = 0
             if new_grain_map_name is not None:
                 map_name = new_grain_map_name
             else:
@@ -3272,16 +3275,22 @@ class Microstructure(SampleData):
         return array
 
     def dilate_grains(self, dilation_steps=1, dilation_ids=None,
-                      new_map_name='dilated_grain_map'):
+                      new_map_name='dilated_grain_map',
+                      update_microstructure_properties=False):
         """Dilate grains to fill the gap between them.
 
         This function calls `dilate_labels` with the grain map of the
-        microstructure. The phase map is updated after the dilation.
+        microstructure. The grain properties and the phase map can be updated
+        after the dilation by setting the `update_microstructure_properties`
+        parameter to True.
 
         :param int dilation_steps: the number of dilation steps to 
             apply to the grain map.
         :param list dilation_ids: a list to restrict the dilation to 
             the given ids.
+        :param str new_map_name: the name to use for the dilated grain map.
+        :param bool update_microstructure_properties: a flag to update all
+            grains properties and update the microstructure phase map.
         """
         if not self.__contains__('grain_map'):
             raise ValueError('microstructure %s must have an associated '
@@ -3302,9 +3311,14 @@ class Microstructure(SampleData):
                                                      dilation_ids=dilation_ids)
         # finally assign the dilated grain map to the microstructure
         self.set_grain_map(grain_map, map_name=new_map_name)
-        # and update the phase map if necessary
-        if not self._is_empty('phase_map'):
-            self.update_phase_map(grain_ids=dilation_ids)
+
+        if update_microstructure_properties:
+            self.recompute_grain_bounding_boxes()
+            self.recompute_grain_centers()
+            self.recompute_grain_volumes()
+            # and update the phase map if necessary
+            if not self._is_empty('phase_map'):
+                self.update_phase_map()
 
     def clean_grain_map(self,  new_map_name='grain_map_clean'):
         """Apply a morphological cleaning treatment to the active grain map.
@@ -3663,7 +3677,7 @@ class Microstructure(SampleData):
 
         Each grain volume is computed using the grain map. The value is
         assigned to the volume column of the GrainDataTable node.
-        If the voxel size is specified, the grain centers will be in mm unit,
+        If the voxel size is specified, the grain volumes will be in mm unit,
         if not in voxel unit.
 
         .. note::
@@ -3728,9 +3742,8 @@ class Microstructure(SampleData):
     def recompute_grain_bounding_boxes(self, verbose=False):
         """Compute and assign the center of all grains in the microstructure.
 
-        Each grain center is computed using its center of mass. The value is
-        assigned to the grain.center attribute. If the voxel size is specified,
-        the grain centers will be in mm unit, if not in voxel unit.
+        Each grain bounding box is computed in voxel unit. The value is
+        assigned to the grain.bounding_box attribute.
 
         .. note::
 

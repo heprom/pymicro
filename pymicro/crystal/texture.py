@@ -483,8 +483,9 @@ class PoleFigure:
                     axis = np.array([0., 1., 0.])
                 else:
                     axis = np.array([0., 0., 1.])
+                sym = self.microstructure.get_lattice().get_symmetry()
                 col = Orientation.from_rodrigues(
-                    grain['orientation']).get_ipf_colour(axis=axis)
+                    grain['orientation']).ipf_color(axis=axis, symmetry=sym)
             else:
                 # retrieve the position of the grain in the list
                 rank = self.microstructure.get_grain_ids().tolist().index(grain['idnumber'])

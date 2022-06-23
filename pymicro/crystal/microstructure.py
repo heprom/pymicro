@@ -2810,6 +2810,7 @@ class Microstructure(SampleData):
                     bb[2][0]:bb[2][1]][this_grain_map == gid] = rgb
             progress = 100 * (1 + i) / len(grain_ids)
             print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
+        print('\n')
         return ipf_map.squeeze()
 
     def view_slice(self, slice=None, color='random', show_mask=True,

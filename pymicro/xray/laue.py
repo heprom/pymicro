@@ -798,11 +798,12 @@ class LaueForwardSimulation(ForwardSimulation):
 
     @staticmethod
     def fsim_laue(orientation, hkl_planes, positions, source_position):
-        """Simulate Laue diffraction conditions based on a crystal orientation, a set of lattice planes and physical
-        positions.
+        """Simulate Laue diffraction conditions based on a crystal orientation,
+        a set of lattice planes and physical positions.
 
-        This function is the work horse of the forward model. It uses a set of HklPlane instances and the voxel
-        coordinates to compute the diffraction quantities.
+        This function is the work horse of the forward model. It uses a set of
+        HklPlane instances and the voxel coordinates to compute the diffraction
+        quantities.
 
         :param Orientation orientation: the crystal orientation.
         :param list hkl_planes: a list of `HklPlane` instances.
@@ -813,27 +814,37 @@ class LaueForwardSimulation(ForwardSimulation):
         n_vox = len(positions)
         gt = orientation.orientation_matrix().transpose()
 
-        # here we use list comprehension to avoid for loops
-        d_spacings = [hkl.interplanar_spacing() for hkl in hkl_planes]  # size n_hkl
-        G_vectors = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
-        Gs_vectors = [gt.dot(Gc) for Gc in G_vectors]  # size n_hkl, with 3 elements items
-        Xu_vectors = [(pos - source_position) / np.linalg.norm(pos - source_position)
-                      for pos in positions]  # size n_vox
-        thetas = [np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
-                  for Xu in Xu_vectors
-                  for Gs in Gs_vectors]  # size n_vox * n_hkl
-        the_energies = [lambda_nm_to_keV(2 * d_spacings[i_hkl] * np.sin(thetas[i_Xu * n_hkl + i_hkl]))
-                        for i_Xu in range(n_vox)
-                        for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-        X_vectors = [np.array(Xu_vectors[i_Xu]) / 1.2398 * the_energies[i_Xu * n_hkl + i_hkl]
-                     for i_Xu in range(n_vox)
-                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-        K_vectors = [X_vectors[i_Xu * n_hkl + i_hkl] + Gs_vectors[i_hkl]
-                     for i_Xu in range(n_vox)
-                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-        return Xu_vectors, thetas, the_energies, X_vectors, K_vectors
+        # here we use vectorized code to speed things up
+        d_spacings = [hkl.interplanar_spacing() for hkl in hkl_planes]
+        d_spacings = np.repeat(d_spacings, n_vox, axis=0).reshape((n_hkl, n_vox)).T.ravel()
 
-    def fsim_grain(self, gid=1):
+        # compute G vectors
+        G_hkl = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
+        G = np.matmul(np.array(G_hkl), gt.T)
+        G_vectors = np.repeat(G, n_vox, axis=0).reshape((n_hkl, n_vox, 3)) \
+            .transpose(1, 0, 2).reshape((n_hkl * n_vox, 3))
+
+        # now compute X vectors, Bragg angles and energies
+        G /= np.linalg.norm(G, axis=1).reshape((G.shape[0], 1))
+        X = positions - source_position
+        X /= np.linalg.norm(X, axis=1).reshape((X.shape[0], 1))
+        thetas = (np.arccos(np.matmul(X, G.T)) - np.pi / 2).ravel()  # size n_vox * n_hkl
+        the_energies = 1.2398 / (2 * d_spacings * np.sin(thetas))
+        X_vectors = np.repeat(X, n_hkl, axis=0) / 1.2398 * the_energies.reshape((the_energies.shape[0], 1))
+
+        # compute diffraction vectors and project them on the detector
+        K_vectors = X_vectors + G_vectors
+
+        # return all the diffraction informations
+        return thetas, the_energies, X_vectors, K_vectors
+
+    def fsim_grain_legacy(self, gid=1):
+        """Forward diffraction simulation for a given grain.
+
+        This method is the legacy code, it works well but is slow due to the
+        numerous for loops involved. It is recommended to use the `fsim_grain`
+        instead.
+        """
         sample = self.exp.get_sample()
         self.grain = sample.get_grain(gid)
         lattice = sample.get_lattice()
@@ -882,6 +893,59 @@ class LaueForwardSimulation(ForwardSimulation):
                 data[uv[k][0], uv[k][1]] += 1
         return data
 
+    def fsim_grain(self, gid=1):
+        """Forward simulation for a given grain.
+
+        Optimzed version with matrix multiplication.
+
+        :param int gid: the grain id number to simulate.
+        """
+        sample = self.exp.get_sample()
+        self.grain = sample.get_grain(gid)
+        lattice = sample.get_lattice()
+        source = self.exp.get_source()
+        detector = self.exp.get_active_detector()
+        if self.verbose:
+            print('Forward Simulation for grain %d' % self.grain.id)
+        sample.geo.discretize_geometry(grain_id=self.grain.id)
+
+        # we use either the hkl planes for this grain or the ones defined for the whole simulation
+        if hasattr(self.grain, 'hkl_planes') and len(self.grain.hkl_planes) > 0:
+            print('using hkl from the grain')
+            hkl_planes = [HklPlane(h, k, l, lattice) for (h, k, l) in self.grain.hkl_planes]
+        else:
+            if len(self.hkl_planes) == 0:
+                print('warning: no reflection defined for this simulation, using all planes with max miller=%d' % self.max_miller)
+                self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
+            hkl_planes = self.hkl_planes
+        n_hkl = len(hkl_planes)
+        positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
+
+        # call the fsim_laue function
+        thetas, the_energies, X_vectors, K_vectors = LaueForwardSimulation.fsim_laue(
+            self.grain.orientation, hkl_planes, positions, source.position)
+
+        # with diffraction informations, project them on the detector
+        origins = np.repeat(positions, n_hkl, axis=0)
+        OR_vectors = detector.project_along_directions(K_vectors, origins)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+
+        # now construct a boolean list to select the diffraction spots
+        on_det = np.where((0 < uv[:, 0]) &
+                          (uv[:, 0] < detector.get_size_px()[0]) &
+                          (0 < uv[:, 1]) &
+                          (uv[:, 1] < detector.get_size_px()[1]) &
+                          (source.min_energy < the_energies) &
+                          (the_energies < source.max_energy))
+        if self.verbose:
+            print('%d diffraction events on the detector among %d' % (np.sum(on_det), len(uv)))
+
+        # now sum the counts on the detector individual pixels
+        data = np.zeros_like(detector.data)
+        for spot in uv[on_det]:
+            data[spot[0], spot[1]] += 1
+        return data
+
     def fsim(self):
         """run the forward simulation.
 
@@ -889,6 +953,8 @@ class LaueForwardSimulation(ForwardSimulation):
         cases all the grains from the microstructure are used. In particular, if the microstructure has a grain map,
         it can be used to carry out an extended sample simulation.
         """
+        import time
+        t0 = time.time()
         full_data = np.zeros_like(self.exp.get_active_detector().data)
         sample = self.exp.get_sample()
         # for cad geometry we assume only one grain (the first in the list)
@@ -898,5 +964,7 @@ class LaueForwardSimulation(ForwardSimulation):
             # in the other cases, we use all the grains defined in the microstructure
             for grain_id in sample.get_grain_ids():
                 full_data += self.fsim_grain(gid=grain_id)
+        if self.verbose:
+            print('forward simulation duration: {}'.format(time.time() - t0))
         return full_data
 

@@ -216,16 +216,8 @@ class Sample(Microstructure):
             name = 'tmp_micro_' + randint
         Microstructure.__init__(self, filename=filename, name=name,
                                 phase=material)
-        self.name = name
         self.set_position(position)
         self.set_geometry(geo)
-
-    def set_name(self, name):
-        """Set the sample name.
-
-        :param str name: The sample name.
-        """
-        self.name = name
 
     def set_position(self, position):
         """Set the sample reference position.

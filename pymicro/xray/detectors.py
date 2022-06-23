@@ -315,7 +315,7 @@ class RegArrayDetector2d(Detector2d):
         return detector_edges
 
     def project_along_direction(self, direction, origin=[0., 0., 0.]):
-        '''
+        """
         Return the intersection point of a line and the detector plane, in laboratory coordinates.
 
         If :math:`\l` is a vector in the direction of the line, :math:`l_0` a point of the line, :math:`p_0`
@@ -329,8 +329,8 @@ class RegArrayDetector2d(Detector2d):
 
         :param direction: the direction of the projection (in the laboratory frame).
         :param origin: the origin of the projection ([0., 0., 0.] by default).
-        :returns: the point of projection in the detector plane (can be outside the detector bounds). 
-        '''
+        :return: the point of projection in the detector plane (can be outside the detector bounds).
+        """
         assert np.dot(self.w_dir, direction) != 0
         origin = np.array(origin)
         direction = np.array(direction)
@@ -338,14 +338,29 @@ class RegArrayDetector2d(Detector2d):
         p = origin + d * direction
         return p
 
+    def project_along_directions(self, directions, origins):
+        """Compute the coordinates of points on the detector interected a set of lines.
+
+        :param directions: a (n, 3) array for the directions of projection
+        (expressed in the laboratory frame).
+        :param origins: a (n, 3) array for the origin of the projections.
+        :return: a (n, 3) array of points in the detector plane (which can be
+        outside the detector bounds) defined by the projections.
+        """
+        a = np.matmul(self.ref_pos - origins, self.w_dir.T)
+        b = np.matmul(directions, self.w_dir.T)
+        d = a / b
+        p = origins + np.multiply(directions.T, d).T
+        return p
+
     def lab_to_pixel(self, points):
-        '''Compute the pixel numbers corresponding to a series physical point in space on the detector.
+        """Compute the pixel numbers corresponding to a series physical point in space on the detector.
         The points can be given as an array of size (n, 3) for n points or just as a 3 elements tuple for 
         a single point.
 
         :param ndarray points: the coordinates of the points in the laboratory frame.
         :return ndarray uv: the detector coordinates of the given points as an array of size (n, 2).
-        '''
+        """
         if len(points) == 3:
             points = np.reshape(points, (1, 3))
         vec = points - np.array(self.ref_pos)
@@ -356,8 +371,10 @@ class RegArrayDetector2d(Detector2d):
         return uv
 
     def pixel_to_lab(self, u, v):
-        """Compute the laboratory coordinates of a given pixel. , if the pixels coordinates are given using 1D arrays 
-        of length n, a numpy array of size (n, 3) with the laboratory coordinates is returned. 
+        """Compute the laboratory coordinates of a given pixel.
+
+        If the pixels coordinates are given using 1D arrays of length n, a numpy
+        array of size (n, 3) with the laboratory coordinates is returned.
 
         :param int u: the given pixel number along the first direction (can be 1D array).
         :param int v: the given pixel number along the second direction (can be 1D array).

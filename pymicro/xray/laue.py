@@ -897,10 +897,39 @@ class LaueForwardSimulation(ForwardSimulation):
                 data[uv[k][0], uv[k][1]] += 1
         return data
 
+    def select_hkl_planes(self, hkl_planes, gid=1, margin=10):
+        """Filter the list of hkl planes to keep only the ones diffracting
+        on the detector.
+
+        :param list hkl_planes: the list of hkl plane to filter.
+        :param int gid: the grain id to use.
+        :param int margin: a pixel margin to take into account.
+        :return: the list of hkl planes diffraction on the detector within
+        the margin.
+        """
+        sample = self.exp.get_sample()
+        detector = self.exp.get_active_detector()
+        positions = sample.get_grain_centers(id_list=[gid])
+        _, _, _, K_vectors = LaueForwardSimulation.fsim_laue(sample.get_grain(gid).orientation,
+                                                             hkl_planes,
+                                                             positions,
+                                                             self.exp.get_source().position)
+        origins = np.repeat(positions, len(hkl_planes), axis=0)
+        OR_vectors = detector.project_along_directions(K_vectors, origins)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+        # look at which hkl plane diffracts on the detector within the given margin
+        on_det = np.where((-margin < uv[:, 0]) &
+                          (uv[:, 0] < detector.get_size_px()[0] + margin) &
+                          (-margin < uv[:, 1]) &
+                          (uv[:, 1] < detector.get_size_px()[1] + margin))
+        print('%d diffraction planes on the detector among %d' % (len(on_det[0]), len(uv)))
+        hkl_planes_dif = [hkl_planes[i] for i in on_det[0]]
+        return hkl_planes_dif
+
     def fsim_grain(self, gid=1):
         """Forward simulation for a given grain.
 
-        Optimzed version with matrix multiplication.
+        Optimized version with matrix multiplication.
 
         :param int gid: the grain id number to simulate.
         """
@@ -922,7 +951,10 @@ class LaueForwardSimulation(ForwardSimulation):
                 print('warning: no reflection defined for this simulation, using all planes with max miller=%d' % self.max_miller)
                 self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
             hkl_planes = self.hkl_planes
+        # preprocess hkl planes by filtering out the ones not diffracting close to the detector
+        hkl_planes = self.select_hkl_planes(hkl_planes, gid=gid)
         n_hkl = len(hkl_planes)
+        print('after filtering we have %d hkl planes for this grain' % n_hkl)
         positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
 
         # call the fsim_laue function
@@ -942,7 +974,7 @@ class LaueForwardSimulation(ForwardSimulation):
                           (source.min_energy < the_energies) &
                           (the_energies < source.max_energy))
         if self.verbose:
-            print('%d diffraction events on the detector among %d' % (np.sum(on_det), len(uv)))
+            print('%d diffraction events on the detector among %d' % (len(on_det[0]), len(uv)))
 
         # now sum the counts on the detector individual pixels
         data = np.zeros_like(detector.data)
@@ -969,6 +1001,7 @@ class LaueForwardSimulation(ForwardSimulation):
             for grain_id in sample.get_grain_ids():
                 full_data += self.fsim_grain(gid=grain_id)
         if self.verbose:
-            print('forward simulation duration: {}'.format(time.time() - t0))
+            duration = int(time.time() - t0)
+            print('forward simulation duration: {:d} seconds'.format(duration))
         return full_data
 

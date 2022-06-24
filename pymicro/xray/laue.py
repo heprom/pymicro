@@ -72,7 +72,11 @@ def build_list(lattice=None, max_miller=3, extinction=None, max_keV=None):
                         hkl_planes.append(hkl)
                 elif extinction == 'BCC':
                     # take plane only if the sum indices is even
-                    if (h ** 2 + k ** 2 + l ** 2) % 2 == 0:
+                    if (h + k + l) % 2 == 0:
+                        hkl_planes.append(hkl)
+                elif extinction == 'HCP':
+                    # take plane only if l is even and h + 2k is not a multiple of 3
+                    if l % 2 == 0 and not (h + k) % 3 == 0:
                         hkl_planes.append(hkl)
     return hkl_planes
 

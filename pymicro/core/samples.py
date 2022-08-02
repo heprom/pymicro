@@ -2938,6 +2938,9 @@ class SampleData:
                 new_field_name += '_resampled'
             print('+ resampling field %s' % field_name)
             field = self.get_field(field_name)
+            if field.shape == (1,):
+                print('skipping field %s' % field_name)
+                continue
             # instanciate our interpolator
             resample = RegularGridInterpolator((x, y, z),
                                                field,
@@ -2947,7 +2950,7 @@ class SampleData:
                 new_shape = new_shape.append(field.shape[3])
             new_field = resample(list(zip(X_new.ravel(),
                                           Y_new.ravel(),
-                                          Z_new.ravel()))).reshape(new_shape)
+                                          Z_new.ravel()))).reshape(new_shape).astype(field.dtype)
             # now add the resampled field to the new location
             if not self.__contains__(new_location):
                 print('using add_image_from_field with %s' % new_field_name)
@@ -3389,13 +3392,17 @@ class SampleData:
 
     def _remove_from_xdmf(self, nodename):
         """Remove a Grid or Attribute Node from the xdmf tree."""
-        if self._is_grid(nodename):
-            xdmf_grid = self._find_xdmf_grid(nodename)
-            p = xdmf_grid.getparent()
-            p.remove(xdmf_grid)
-        elif self._is_field(nodename):
-            xdmf_field, xdmf_grid = self._find_xdmf_field(nodename)
-            xdmf_grid.remove(xdmf_field)
+        try:
+            if self._is_grid(nodename):
+                xdmf_grid = self._find_xdmf_grid(nodename)
+                p = xdmf_grid.getparent()
+                p.remove(xdmf_grid)
+            elif self._is_field(nodename):
+                xdmf_field, xdmf_grid = self._find_xdmf_field(nodename)
+                xdmf_grid.remove(xdmf_field)
+        except ValueError:
+            # node cannot be found
+            pass
         return
 
     def _find_xdmf_grid(self, gridname):
@@ -3438,14 +3445,19 @@ class SampleData:
         gridname = self.get_attribute('xdmf_gridname', fieldnodename)
         fieldname = self.get_attribute('xdmf_fieldname', fieldnodename)
         xdmf_grid = self._find_xdmf_grid(gridname)
-        for el in xdmf_grid:
-            if el.tag == 'Grid':
-                for eel in el:
-                    if eel.get('Name') == fieldname:
-                        return eel, el
-            else:
-                if el.get('Name') == fieldname:
-                    return el, xdmf_grid
+        try:
+            for el in xdmf_grid:
+                if el.tag == 'Grid':
+                    for eel in el:
+                        if eel.get('Name') == fieldname:
+                            return eel, el
+                else:
+                    if el.get('Name') == fieldname:
+                        return el, xdmf_grid
+        except TypeError:
+            msg = 'Warning: xdmf_grid not found for name %s' % fieldnodename
+            print(msg)
+            raise ValueError(msg)
         return None
 
     def _name_or_node_to_path(self, name_or_node):

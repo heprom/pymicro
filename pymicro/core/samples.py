@@ -2889,6 +2889,12 @@ class SampleData:
                              new_location=None, in_place=False):
         """Resample a whole image group with a new spatial resolution.
 
+        .. note::
+
+          In the case where the spatial resolution if increased, the new cell
+          data will have a surrounding layer of zeros (for the new cells centers
+          located outside the original cells centers).
+
         :param float new_voxel_size: the new spatial resolution.
         :param str location: the location of the image group to process.
         :param str new_location: the name of the new location to store the
@@ -2906,22 +2912,22 @@ class SampleData:
         dims = self.get_attribute('dimension', location)
         spacing = self.get_attribute('spacing', location)
         size = dims * spacing
-        x = np.arange(0, size[0], spacing[0])
-        y = np.arange(0, size[1], spacing[1])
-        z = np.arange(0, size[2], spacing[2])
+        x = np.arange(0.5 * spacing[0], size[0], spacing[0])
+        y = np.arange(0.5 * spacing[1], size[1], spacing[1])
+        z = np.arange(0.5 * spacing[2], size[2], spacing[2])
         print(x.shape)
 
         # create the new coordinates
-        x_new = np.arange(0, size[0], new_voxel_size)
-        y_new = np.arange(0, size[1], new_voxel_size)
-        z_new = np.arange(0, size[2], new_voxel_size)
+        new_spacing = np.array(3 * [new_voxel_size])
+        x_new = np.arange(0.5 * new_spacing[0], size[0], new_voxel_size)
+        y_new = np.arange(0.5 * new_spacing[1], size[1], new_voxel_size)
+        z_new = np.arange(0.5 * new_spacing[2], size[2], new_voxel_size)
         print(x_new.shape)
         X_new, Y_new, Z_new = np.meshgrid(x_new,
                                           y_new,
                                           z_new,
                                           indexing='ij')
         # settings for the new group
-        new_spacing = np.array(3 * [new_voxel_size])
         compression = self.default_compression_options
         if new_location is None:
             new_location = '%s_resampled' % location
@@ -2944,7 +2950,9 @@ class SampleData:
             # instanciate our interpolator
             resample = RegularGridInterpolator((x, y, z),
                                                field,
-                                               method='nearest')
+                                               method='nearest',
+                                               bounds_error=False,
+                                               fill_value=0)
             new_shape = list(X_new.shape)
             if field.ndim == 4:
                 new_shape = new_shape.append(field.shape[3])

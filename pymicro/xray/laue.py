@@ -779,7 +779,7 @@ class LaueForwardSimulation(ForwardSimulation):
     """Class to represent a Forward Simulation."""
 
     def __init__(self, verbose=False):
-        super(LaueForwardSimulation, self).__init__('laue', verbose=verbose)
+        super(ForwardSimulation, self).__init__('laue', verbose=verbose)
         self.hkl_planes = []
         self.max_miller = 5
         self.use_energy_limits = False
@@ -868,6 +868,7 @@ class LaueForwardSimulation(ForwardSimulation):
                 self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
             hkl_planes = self.hkl_planes
         n_hkl = len(hkl_planes)
+        sample.geo.discretize_geometry(grain_id=gid)
         positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
         n_vox = len(positions)
         Xu_vectors, thetas, the_energies, X_vectors, K_vectors = LaueForwardSimulation.fsim_laue(

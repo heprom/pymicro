@@ -11,6 +11,201 @@ from pymicro.xray.xray_utils import lambda_keV_to_nm, radiograph, radiographs
 from pymicro.crystal.microstructure import Grain, Orientation
 
 
+class Xrd3dForwardSimulation(ForwardSimulation):
+    """Class to represent a 3DXRD Forward Simulation."""
+
+    def __init__(self, verbose=False):
+        ForwardSimulation.__init__(self, '3dxrd', verbose=verbose)
+        self.hkl_planes = []
+        self.max_miller = 5
+        self.energy_keV = 40.
+        self.omega = 0.  # rotation angle in deg
+        self.integration_range = 1.  # deg
+        self.exp = None
+
+    def set_experiment(self, experiment):
+        """Attach an X-ray experiment to this simulation."""
+        self.exp = experiment
+
+    def set_energy_keV(self, energy_keV):
+        """Set the energy of the 3DXRD experiment."""
+        self.energy_keV = energy_keV
+
+    def set_hkl_planes(self, hkl_planes):
+        self.hkl_planes = hkl_planes
+
+    def setup(self, include_grains=None):
+        """Setup the forward simulation."""
+        pass
+
+    def select_hkl_planes(self, hkl_planes, gid=1, margin=10):
+        """Filter the list of hkl planes to keep only the ones diffracting
+        on the detector.
+
+        :param list hkl_planes: the list of hkl plane to filter.
+        :param int gid: the grain id to use.
+        :param int margin: a pixel margin to take into account.
+        :return: the list of hkl planes diffraction on the detector within
+        the margin.
+        """
+        lambda_nm = lambda_keV_to_nm(self.energy_keV)
+        X = np.array([1., 0., 0.]) / lambda_nm
+        sample = self.exp.get_sample()
+        grain_orientation = sample.get_grain(gid).orientation
+        gt = grain_orientation.orientation_matrix().transpose()
+        detector = self.exp.get_active_detector()
+        position = sample.get_grain_centers(id_list=[gid])[0]
+        hkl_planes_dif = []
+        omegas = []
+        G_vectors = []
+        K_vectors = []
+        origins = []
+        for hkl_plane in hkl_planes:
+            try:
+                w1, w2 = grain_orientation.dct_omega_angles(hkl_plane,
+                                                            self.energy_keV,
+                                                            verbose=False)
+            except ValueError:
+                # skip this plane
+                continue
+            for omega in [w1, w2]:
+                if self.omega < omega < (self.omega + self.integration_range):
+                    hkl_planes_dif.append(hkl_plane)
+                    omegas.append(omega)
+                    omegar = omega * np.pi / 180
+                    # grain diffracting at this angle with this hkl plane
+                    R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                                  [np.sin(omegar), np.cos(omegar), 0],
+                                  [0, 0, 1]])
+                    G = np.dot(R, np.dot(gt, hkl_plane.scattering_vector()))
+                    G_vectors.append(G)
+                    K = X + G
+                    K_vectors.append(K)
+                    # add the origin of this diffraction event as the center of the grain at this angle
+                    origins.append(np.dot(R, position))
+        print('%d diffraction vectors at this omega angle' % len(K_vectors))
+        G_vectors = np.array(G_vectors)  # shape (n, 3)
+        K_vectors = np.array(K_vectors)  # shape (n, 3)
+        origins = np.array(origins)
+        OR_vectors = detector.project_along_directions(K_vectors, origins)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+        # look at which hkl plane diffracts on the detector within the given margin
+        on_det = np.where((-margin < uv[:, 0]) &
+                          (uv[:, 0] < detector.get_size_px()[0] + margin) &
+                          (-margin < uv[:, 1]) &
+                          (uv[:, 1] < detector.get_size_px()[1] + margin))
+        print('%d diffraction planes on the detector among %d' % (len(on_det[0]), len(uv)))
+        hkl_planes_dif = [hkl_planes_dif[i] for i in on_det[0]]
+        omegas_dif = [omegas[i] for i in on_det[0]]
+        '''
+        print(hkl_planes_dif)
+        print([G_vectors[i] for i in on_det[0]])
+        print([K_vectors[i] for i in on_det[0]])
+        print([origins[i] for i in on_det[0]])
+        print([uv[i] for i in on_det[0]])
+        '''
+        return hkl_planes_dif, omegas_dif
+
+    def fsim_grain(self, gid=1):
+        """Forward simulation for a given grain.
+
+        Optimized version with matrix multiplication.
+
+        :param int gid: the grain id number to simulate.
+        """
+        #TODO move this to some relevant place
+        from pymicro.xray.laue import build_list
+        lambda_nm = lambda_keV_to_nm(self.energy_keV)
+        X = np.array([1., 0., 0.]) / lambda_nm
+        sample = self.exp.get_sample()
+        grain_orientation = sample.get_grain(gid).orientation
+        gt = grain_orientation.orientation_matrix().transpose()
+        lattice = sample.get_lattice()
+        detector = self.exp.get_active_detector()
+        if self.verbose:
+            print('Forward Simulation for grain %d' % gid)
+        sample.geo.discretize_geometry(grain_id=gid)
+
+        if len(self.hkl_planes) == 0:
+            print('warning: no reflection defined for this simulation, using all planes with max miller=%d' % self.max_miller)
+            self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
+        # preprocess hkl planes by filtering out the ones not diffracting close to the detector
+        hkl_planes_dif, omegas_dif = self.select_hkl_planes(self.hkl_planes, gid=gid)
+        n_hkl_dif = len(hkl_planes_dif)
+        print('after filtering we have %d hkl planes for this grain' % n_hkl_dif)
+        positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
+        n_vox = positions.shape[0]
+
+        # look at diffraction events for each position
+        # we will create arrays origins and K_vectors with size n_vox * n_hkl_dif
+        K_vectors = np.empty((n_hkl_dif * n_vox, 3), dtype=float)
+        origins = np.empty((n_hkl_dif * n_vox, 3), dtype=float)
+
+        for i_hkl in range(n_hkl_dif):
+            # here we assume a constant orientation per grain
+            hkl_plane = hkl_planes_dif[i_hkl]
+            omega = omegas_dif[i_hkl]
+            omegar = omega * np.pi / 180
+            # grain diffracting at this angle with this hkl plane
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                          [np.sin(omegar), np.cos(omegar), 0],
+                          [0, 0, 1]])
+            G = np.dot(R, np.dot(gt, hkl_plane.scattering_vector()))
+            K = X + G
+            for i_vox in range(n_vox):
+                index = i_vox * n_hkl_dif + i_hkl
+                K_vectors[index] = K
+                # origin is the voxel position at this angle
+                position = positions[i_vox, :]
+                origins[index] = np.dot(R, position)
+
+        # call the fsim_3dxrd function for vectorized code
+        '''
+        omegas, origins, G_vectors = Xrd3dForwardSimulation.fsim_laue(
+            grain_orientation, hkl_planes, positions)
+        '''
+
+        # with diffraction informations, project them on the detector
+        OR_vectors = detector.project_along_directions(K_vectors, origins)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+
+        # now construct a boolean list to select the diffraction spots
+        on_det = np.where((0 < uv[:, 0]) &
+                          (uv[:, 0] < detector.get_size_px()[0]) &
+                          (0 < uv[:, 1]) &
+                          (uv[:, 1] < detector.get_size_px()[1]))
+        if self.verbose:
+            print('%d diffraction events on the detector among %d' % (len(on_det[0]), len(uv)))
+
+        # now sum the counts on the detector individual pixels
+        data = np.zeros_like(detector.data)
+        for spot in uv[on_det]:
+            data[spot[0], spot[1]] += 1
+        return data, uv, on_det
+
+    def fsim(self):
+        """run the forward simulation.
+
+        If the sample has a CAD type of geometry, a single grain (the first from the list) is assumed. In the other
+        cases all the grains from the microstructure are used. In particular, if the microstructure has a grain map,
+        it can be used to carry out an extended sample simulation.
+        """
+        import time
+        t0 = time.time()
+        full_data = np.zeros_like(self.exp.get_active_detector().data)
+        sample = self.exp.get_sample()
+        # for cad geometry we assume only one grain (the first in the list)
+        if sample.geo.geo_type == 'cad':
+            full_data += self.fsim_grain(gid=sample.grains[0]['idnumber'])
+        else:
+            # in the other cases, we use all the grains defined in the microstructure
+            for grain_id in sample.get_grain_ids():
+                full_data += self.fsim_grain(gid=grain_id)
+        if self.verbose:
+            duration = int(time.time() - t0)
+            print('forward simulation duration: {:d} seconds'.format(duration))
+        return full_data
+
 class DctForwardSimulation(ForwardSimulation):
     """Class to represent a Forward Simulation."""
 

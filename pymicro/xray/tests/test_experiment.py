@@ -8,7 +8,7 @@ class ExperimentTests(unittest.TestCase):
     def setUp(self):
         """testing the experiment module:"""
         self.experiment = Experiment()
-        self.experiment.get_sample().set_name('test sample')
+        self.experiment.get_sample().set_sample_name('test sample')
         self.experiment.get_sample().autodelete = True
         self.experiment.get_source().set_max_energy(120.)
 

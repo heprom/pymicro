@@ -36,6 +36,7 @@ from pymicro.core.global_variables import (SD_GROUP_TYPES, SD_GRID_GROUPS,
                                            SD_IMAGE_GROUPS, SD_MESH_GROUPS)
 
 
+# noinspection SpellCheckingInspection
 class SampleData:
     """Base class to store multi-modal datasets for material science.
 
@@ -3153,8 +3154,8 @@ class SampleData:
                         msg = ('Updating table {}'.format(content_paths[key]))
                         self._verbose_print(msg)
                         self._update_table_columns(
-                            tablename=content_paths[key],
-                            Description=content_type[key])
+                            table_name=content_paths[key],
+                            description=content_type[key])
                     if self._is_empty(content_paths[key]):
                         self._verbose_print('Warning: node {} specified in the'
                                             ' minimal data model for this class'
@@ -3279,7 +3280,7 @@ class SampleData:
     def _init_SD_group(self, groupname='', location='/',
                        group_type='Group', replace=False):
         """Create or fetch a SampleData Group and returns it."""
-        Group = None
+        group = None
         # init flags
         fetch_group = False
         # sanity checks
@@ -3307,48 +3308,48 @@ class SampleData:
                 raise tables.NodeError(msg)
         # create or fetch group
         if fetch_group:
-            Group = self.get_node(group_path)
-            self._remove_from_index(Group._v_pathname)
+            group = self.get_node(group_path)
+            self._remove_from_index(group._v_pathname)
         else:
             self._verbose_print('Creating {} group `{}` in file {} at {}'
                                 ''.format(group_type, groupname,
-                                          self.h5_file,location))
-            Group = self.h5_dataset.create_group(where=location,
+                                          self.h5_file, location))
+            group = self.h5_dataset.create_group(where=location,
                                                  name=groupname,
                                                  title=groupname,
                                                  createparents=True)
-            self.add_attributes(dic={'group_type': group_type}, nodename=Group)
-        return Group
+            self.add_attributes(dic={'group_type': group_type}, nodename=group)
+        return group
 
     @staticmethod
-    def _merge_dtypes(dtype1, dtype2):
+    def _merge_dtypes(dtype_1, dtype_2):
         """Merge 2 numpy.void dtypes to creates a new one."""
         descr = []
-        for item in dtype1.descr:
-            if not(item in descr) and not(item[0]==''):
+        for item in dtype_1.descr:
+            if not(item in descr) and not(item[0] == ''):
                 descr.append(item)
-        for item in dtype2.descr:
-            if not(item in descr) and not(item[0]==''):
+        for item in dtype_2.descr:
+            if not(item in descr) and not(item[0] == ''):
                 descr.append(item)
         return np.dtype(descr)
 
-    def _update_table_columns(self, tablename, Description):
+    def _update_table_columns(self, table_name, description):
         """Extends table with new fields in input Description."""
-        table = self.get_node(tablename)
+        table = self.get_node(table_name)
         current_desc = table.description
         current_dtype = tables.dtype_from_descr(table.description)
-        if isinstance(Description, np.dtype):
-            desc_dtype = Description
+        if isinstance(description, np.dtype):
+            desc_dtype = description
         else:
-            desc_dtype = tables.dtype_from_descr(Description)
+            desc_dtype = tables.dtype_from_descr(description)
         new_dtype = SampleData._merge_dtypes(current_dtype, desc_dtype)
         new_descr = tables.descr_from_dtype(new_dtype)[0]
         if current_dtype == new_dtype:
             self._verbose_print('Nothing to update for table `{}`'
-                                ''.format(tablename))
+                                ''.format(table_name))
             return
         self._verbose_print('Updating `{}` with fields {}'
-                            ''.format(tablename, desc_dtype.fields))
+                            ''.format(table_name, desc_dtype.fields))
         self._verbose_print('New table description is `{}`'
                             ''.format(new_dtype.fields))
         Nrows = table.nrows
@@ -3363,7 +3364,7 @@ class SampleData:
         self._verbose_print(f'data is: {data}')
         # Get data from old table
         for key in current_desc._v_names:
-            data[key] = self.get_tablecol(tablename=tablename,
+            data[key] = self.get_tablecol(tablename=table_name,
                                           colname=key)
         # get table aliases
         if self.aliases.__contains__(tab_indexname):
@@ -3371,7 +3372,7 @@ class SampleData:
         else:
             tab_aliases = []
         # remove old table
-        tab_attrs =  self.get_dic_from_attributes(tab_indexname)
+        tab_attrs = self.get_dic_from_attributes(tab_indexname)
         self.remove_node(tab_name)
         # create new table
         new_tab = self.add_table(location=tab_path, name=tab_name,

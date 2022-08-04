@@ -36,7 +36,7 @@ from pymicro.core.global_variables import (SD_GROUP_TYPES, SD_GRID_GROUPS,
                                            SD_IMAGE_GROUPS, SD_MESH_GROUPS)
 
 
-# noinspection SpellCheckingInspection
+# noinspection SpellCheckingInspection,PyProtectedMember
 class SampleData:
     """Base class to store multi-modal datasets for material science.
 
@@ -821,7 +821,7 @@ class SampleData:
 
     def add_image(self, image_object=None, imagename='', indexname='',
                   location='/', description='', replace=False,
-                  field_indexprefix='', compression_options=dict()):
+                  field_index_prefix='', compression_options=dict()):
         """Create a 2D/3D Image group in the dataset from an ImageObject.
 
         An Image group is a HDF5 Group that contains arrays describing fields
@@ -866,6 +866,8 @@ class SampleData:
         :param str description: Description metadata for this 3D image
         :param bool replace: remove Image group in the dataset with the same
             name/location if `True` and such group exists
+        :param str field_index_prefix: the prefix to use to field stored in the
+            image object.
         :param dict compression_options: Dictionary containing compression
             options items, see `set_chunkshape_and_compression` method for
             more details.
@@ -875,7 +877,7 @@ class SampleData:
         im_attrs = dict()
         old_descr = None
         try:
-            gtype = self.get_attribute('group_type',indexname)
+            gtype = self.get_attribute('group_type', indexname)
             if gtype == 'emptyImage':
                 # we get the empty image attributes to transfer its metadata
                 # to the new image group that will overwrite it
@@ -888,27 +890,27 @@ class SampleData:
         except:
             pass
         if empty and (image_object is not None):
-            replace=True
-        ### Create or fetch image group
+            replace = True
+        # Create or fetch image group
         image_group = self.add_group(imagename, location, indexname, replace)
-        ### empty images creation
-        if (image_object is None):
+        # empty images creation
+        if image_object is None:
             self.add_attributes({'empty': True, 'group_type': 'emptyImage'},
                                 image_group._v_pathname)
             return
         else:
             self._check_image_object_support(image_object)
-        ### Add image Grid to xdmf file
+        # Add image grid to xdmf file
         self._add_image_to_xdmf(imagename, image_object)
-        ### store image metadata as HDF5 attributes
+        # store image metadata as HDF5 attributes
         image_type = self._get_image_type(image_object)
         image_nodes_dim = np.array(image_object.GetDimensions())
         image_cell_dim = image_nodes_dim - np.ones(image_nodes_dim.shape,
                                                    dtype=image_nodes_dim.dtype)
         if len(image_nodes_dim) == 2:
-            image_xdmf_dim = image_nodes_dim[[1,0]]
+            image_xdmf_dim = image_nodes_dim[[1, 0]]
         elif len(image_nodes_dim) == 3:
-            image_xdmf_dim = image_nodes_dim[[2,1,0]]
+            image_xdmf_dim = image_nodes_dim[[2, 1, 0]]
         # Add image attributes
         if (description == '') and (old_descr is not None):
             description = im_attrs['description']
@@ -923,25 +925,27 @@ class SampleData:
                          'xdmf_gridname': imagename}
         self.add_attributes(Attribute_dic, image_group._v_pathname)
         self.add_attributes(im_attrs, image_group._v_pathname)
-        ### Add fields if some are stored in the image object
+        # Add fields if some are stored in the image object
         for field_name, field in image_object.nodeFields.items():
             self.add_field(gridname=image_group._v_pathname,
-                           fieldname=field_name, array=field,
-                           indexname=field_indexprefix+field_name,
+                           fieldname=field_name,
+                           array=field,
+                           indexname=field_index_prefix + field_name,
                            compression_options=compression_options)
         for field_name, field in image_object.elemFields.items():
             self.add_field(gridname=image_group._v_pathname,
-                           fieldname=field_name, array=field,
-                           indexname=field_indexprefix+field_name,
+                           fieldname=field_name,
+                           array=field,
+                           indexname=field_index_prefix + field_name,
                            compression_options=compression_options)
         return image_object
 
     def add_image_from_field(self, field_array, fieldname, imagename='',
                              indexname='', location='/', description=' ',
                              replace=False, origin=None, spacing=None,
-                             is_scalar=True, is_elemField=True,
+                             is_scalar=True, is_elem_field=True,
                              compression_options=dict()):
-        """Create a 2D/3M Image group in the dataset from a field data array.
+        """Create a 2D/3D Image group in the dataset from a field data array.
 
         Construct an image object from the input field array. This array is
         interpreted by default as an element field of a pixelized/voxelized
@@ -961,7 +965,7 @@ class SampleData:
         :param str imagename: name used to create the Image group in dataset
         :param str indexname: Index name used to reference the Image. If none
             is provided, `imagename` is used.
-        :location str: Path, Name, Index Name or Alias of the parent group
+        :param str location: Path, Name, Index Name or Alias of the parent group
             where the Image group is to be created
         :param str description: Description metadata for this 3D image
         :param bool replace: remove Image group in the dataset with the same
@@ -973,7 +977,7 @@ class SampleData:
         :param bool is_scalar: If `True` (default value), the field is
             considered as a scalar field to compute the image dimensions from
             the field array shape.
-        :param bool is_elemField: If `True` (default value), the array is
+        :param bool is_elem_field: If `True` (default value), the array is
             considered as a pixel/voxel wise field value array. If `False`, the
             field is considered as a nodal value array.
         :param dict compression_options: Dictionary containing compression
@@ -991,7 +995,7 @@ class SampleData:
             spacing = np.ones((len(field_dimensions),))
         if origin is None:
             origin = np.zeros((len(field_dimensions),))
-        if is_elemField:
+        if is_elem_field:
             field_dimensions = field_dimensions + np.ones((field_dim,))
         image_object = ConstantRectilinearMesh(dim=field_dim)
         image_object.SetDimensions(field_dimensions)
@@ -1002,7 +1006,7 @@ class SampleData:
                        indexname=indexname, location=location,
                        description=description, replace=replace,
                        compression_options=compression_options,
-                       field_indexprefix=(imagename+'_'))
+                       field_index_prefix=(imagename + '_'))
         return
 
     def add_grid_time(self, gridname, time_list):
@@ -3113,22 +3117,20 @@ class SampleData:
             self._verbose_print('-- Opening file "{}" '.format(self.h5_file),
                                 line_break=False)
             self._file_exist = True
-            self._init_xml_tree()
-            self._init_data_model()
-            self._verbose_print('**** FILE CONTENT ****')
-            self._verbose_print(SampleData.__repr__(self))
         except IOError:
             self._file_exist = False
             self._verbose_print('-- File "{}" not found : file'
                                 ' created'.format(self.h5_file),
                                 line_break=True)
             self.h5_dataset = tables.File(self.h5_path, mode='a')
-            self._init_xml_tree()
-            # Generic Data Model initialization
-            self._init_data_model()
-            # add sample name and description
-            self.set_sample_name(sample_name)
-            self.set_description(sample_description)
+        self._init_xml_tree()
+        # Generic Data Model initialization
+        self._init_data_model()
+        self._verbose_print('**** FILE CONTENT ****')
+        self._verbose_print(SampleData.__repr__(self))
+        # add sample name and description
+        self.set_sample_name(sample_name)
+        self.set_description(sample_description)
         return
 
     def _init_data_model(self):
@@ -3259,7 +3261,7 @@ class SampleData:
                     # empty array node
                     msg = ('Existing node {} will be overwritten to recreate '
                            'array/table'.format(array_path))
-                    if not(empty):
+                    if not empty:
                         self._verbose_print(msg)
                     attrs = self.get_dic_from_attributes(array_path)
                     self.remove_node(array_path, recursive=True)
@@ -3267,7 +3269,7 @@ class SampleData:
                 if replace:
                     msg = ('Existing node {} will be overwritten to recreate '
                            'array/table'.format(array_path))
-                    if not(empty):
+                    if not empty:
                         self._verbose_print(msg)
                     self.remove_node(array_path, recursive=True)
                 else:

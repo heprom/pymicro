@@ -3927,7 +3927,8 @@ class Microstructure(SampleData):
     def voronoi(shape=(256, 256), n=50):
         """Simple voronoi tesselation to create a grain map.
 
-        The method works both in 2 and 3 dimensions. The grains are labeled
+        The method works both in 2 and 3 dimensions and will create a sample
+        with a size of 1 (domain from -0.5 to 0.5). The grains are labeled
         from 1 to `n` (included).
 
         :param tuple shape: grain map shape in 2 or 3 dimensions.
@@ -4715,12 +4716,9 @@ class Microstructure(SampleData):
                                               bb[1][0]:bb[1][1],
                                               bb[2][0]:bb[2][1]]
             x, y, z = np.where(grain_map == gid)
+            #TODO compute mean orientation here
             orientation = rodrigues_map[bb[0][0] + x[0], bb[1][0] + y[0], bb[2][0] + z[0]]
             # assign orientation to this grain
-            if i < 10:
-                print(bb[0][0] + x[0], bb[1][0] + y[0], bb[2][0] + z[0])
-                x, y, z = np.where(micro.get_grain_map() == gid)
-                print(x[0], y[0], z[0])
             g['orientation'] = orientation
             g.update()
         micro.grains.flush()

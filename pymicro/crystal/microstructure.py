@@ -2306,7 +2306,7 @@ class Microstructure(SampleData):
                       bb[2][0]:bb[2][1]][this_grain_map == gid] = 1
         print('\n')
         self.set_phase_map(phase_map)
-        
+
     def set_orientation_map(self, orientation_map, compression=None):
         """Set the orientation_map map for this microstructure.
 
@@ -3421,7 +3421,7 @@ class Microstructure(SampleData):
             z_end = self.get_grain_map().shape[2]
         if not crop_name:
             crop_name = self.get_sample_name() + \
-                    (not self.get_sample_name().endswith('_')) * '_' + 'crop'
+                        (not self.get_sample_name().endswith('_')) * '_' + 'crop'
         # create new microstructure dataset
         micro_crop = Microstructure(name=crop_name, overwrite_hdf5=True,
                                     phase=self.get_phase(),
@@ -3429,37 +3429,40 @@ class Microstructure(SampleData):
         if self.get_number_of_phases() > 1:
             for i in range(2, self.get_number_of_phases()):
                 micro_crop.add_phase(self.get_phase(phase_id=i))
-        #micro_crop.set_phases(self.get_phase_list())
         micro_crop.default_compression_options = self.default_compression_options
         print('cropping microstructure to %s' % micro_crop.h5_file)
-        # crop CellData fields
+        # crop all CellData fields
         image_group = self.get_node('CellData')
+        spacing = self.get_attribute('spacing', 'CellData')
         FIndex_path = '%s/Field_index' % image_group._v_pathname
         field_list = self.get_node(FIndex_path)
         for name in field_list:
-            fieldname = name.decode('utf-8')
-            spacing_array = self.get_attribute('spacing', 'CellData')
-            print('cropping field %s' % fieldname)
-            field = self.get_field(fieldname)
-            if not self._is_empty(fieldname):
+            field_name = name.decode('utf-8')
+            print('cropping field %s' % field_name)
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
                 if self._get_group_type('CellData') == '2DImage':
                     field_crop = field[x_start:x_end, y_start:y_end, ...]
                 else:
                     field_crop = field[x_start:x_end, y_start:y_end,
-                                       z_start:z_end, ...]
+                                 z_start:z_end, ...]
                 empty = micro_crop.get_attribute(attrname='empty',
-                                           nodename='CellData')
+                                                 nodename='CellData')
                 if empty:
                     micro_crop.add_image_from_field(
-                        field_array=field_crop, fieldname=fieldname,
+                        field_array=field_crop, fieldname=field_name,
                         imagename='CellData', location='/',
-                        spacing=spacing_array, replace=True)
+                        spacing=spacing, replace=True)
                 else:
                     micro_crop.add_field(gridname='CellData',
-                                         fieldname=fieldname,
+                                         fieldname=field_name,
                                          array=field_crop, replace=True)
+        # set the origin of the image group according to the crop
+        origin = spacing * np.array([x_start, y_start, z_start])
+        print('origin will be set to', origin)
+        micro_crop.set_origin('CellData', origin)
         if verbose:
-            print('Cropped dataset:')
+            print('cropped dataset:')
             print(micro_crop)
         micro_crop.set_active_grain_map(self.active_grain_map)
         grain_ids = np.unique(micro_crop.get_grain_map())

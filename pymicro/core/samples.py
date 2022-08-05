@@ -1137,7 +1137,7 @@ class SampleData:
             the field value array
         :param np.array array: Array containing the field values to add in the
             dataset
-        ;param str location: Path, name or indexname of the Group in which the
+        :param str location: Path, name or indexname of the Group in which the
             field array will be stored. This Group must be a children of the
             `gridname` Group. If not provided, the field is stored in the
             `gridname` Group.
@@ -1146,8 +1146,6 @@ class SampleData:
             written in a single HDF5 I/O operation
         :param bool replace: remove 3DImage group in the dataset with the same
             name/location if `True` and such group exists
-        :param Filters filters: instance of :py:class:`tables.Filters` class
-            specifying compression settings.
         :param str visualisation_type: Type of visualisation used to represent
             integration point fields with an element wise constant field.
             Possibilities are 'Elt_max' (maximum value per element), 'Elt_mean'
@@ -1197,11 +1195,11 @@ class SampleData:
                                        indexname, replace)
             # Add field path to grid node Field_list attribute
             self._append_field_index(gridname, indexname)
-            gridpath =  self._name_or_node_to_path(gridname)
-            Attribute_dic = {'parent_grid_path': gridpath,
-                             'node_type':'field_array'
+            gridpath = self._name_or_node_to_path(gridname)
+            attribute_dic = {'parent_grid_path': gridpath,
+                             'node_type': 'field_array'
                              }
-            self.add_attributes(Attribute_dic, nodename=indexname)
+            self.add_attributes(attribute_dic, nodename=indexname)
             return node
         # If needed, pad the field with 0s to comply with number of bulk and
         # boundary elements
@@ -1210,7 +1208,7 @@ class SampleData:
         # Check if the array shape is consistent with the grid geometry
         # and returns field dimension, xdmf Center attribute
         field_type, dimensionality = self._check_field_compatibility(
-                                                        gridname,array.shape)
+                                                        gridname, array.shape)
 
         # Apply indices transposition to assure consistency of the data
         # visualization in paraview with SampleData ordering and indexing
@@ -1218,12 +1216,12 @@ class SampleData:
         if self._is_image(gridname):
             # indices transposition to ensure consistency between SampleData
             # and geometrical interpretation of coordinates in Paraview
-            if self.get_attribute('group_type',gridname) == '2DImage':
+            if self.get_attribute('group_type', gridname) == '2DImage':
                 if len(array.shape) == 3:
                     array = np.squeeze(array)
             array, transpose_indices = self._transpose_image_array(
                 dimensionality, array)
-        if dimensionality in ['Tensor6','Tensor']:
+        if dimensionality in ['Tensor6', 'Tensor']:
             # indices transposition to ensure consistency between SampleData
             # components oredering convention and SampleData ordering
             # convention
@@ -1242,7 +1240,7 @@ class SampleData:
         time_suffix = ''
         if time is not None:
             time_list = self.get_attribute('time_list', gridname)
-            if (time_list is None):
+            if time_list is None:
                 time_list = [time]
                 self.add_grid_time(gridname, time_list)
             else:
@@ -1266,39 +1264,39 @@ class SampleData:
                                    chunkshape, replace,
                                    compression_options=compression_options)
         # Create attributes of the field node
-        gridpath =  self._name_or_node_to_path(gridname)
-        xdmf_gname = self.get_attribute('xdmf_gridname',gridname)
+        gridpath = self._name_or_node_to_path(gridname)
+        xdmf_gname = self.get_attribute('xdmf_gridname', gridname)
         if time_gridname is not None:
             xdmf_gname = time_gridname
-        Attribute_dic = {'field_type': field_type,
+        attribute_dic = {'field_type': field_type,
                          'field_dimensionality': dimensionality,
                          'parent_grid_path': gridpath,
                          'xdmf_gridname': xdmf_gname, 'padding': padding,
                          'node_type':'field_array'
                          }
         if time is not None:
-            Attribute_dic['time'] = time
-            Attribute_dic['time_serie_name'] = time_serie_name
+            attribute_dic['time'] = time
+            attribute_dic['time_serie_name'] = time_serie_name
         if self._is_image(gridname):
-            Attribute_dic['transpose_indices'] = transpose_indices
-        if dimensionality in ['Tensor6','Tensor']:
-            Attribute_dic['transpose_components'] = transpose_components
+            attribute_dic['transpose_indices'] = transpose_indices
+        if dimensionality in ['Tensor6', 'Tensor']:
+            attribute_dic['transpose_components'] = transpose_components
         # Add field for visualization of Integration Points mesh fields
-        if (field_type == 'IP_field') and not (visualisation_type=='None'):
+        if (field_type == 'IP_field') and not (visualisation_type == 'None'):
             vis_array = self._IP_field_for_visualisation(vis_array,
                                                          visualisation_type)
             visname = fieldname+f'_{visualisation_type}'
             visindexname = indexname+f'_{visualisation_type}'
-            if dimensionality in ['Tensor6','Tensor']:
+            if dimensionality in ['Tensor6', 'Tensor']:
                 vis_array, _ = self._transpose_field_comp(
                     dimensionality, vis_array)
             node_vis = self.add_data_array(
                 array_location, visname, vis_array, visindexname, chunkshape,
                 replace, compression_options=compression_options)
-            Attribute_dic['visualisation_type'] = visualisation_type
-            self.add_attributes(Attribute_dic, nodename=visindexname)
-            Attribute_dic['visualisation_field_path'] = node_vis._v_pathname
-        self.add_attributes(Attribute_dic, nodename=indexname)
+            attribute_dic['visualisation_type'] = visualisation_type
+            self.add_attributes(attribute_dic, nodename=visindexname)
+            attribute_dic['visualisation_field_path'] = node_vis._v_pathname
+        self.add_attributes(attribute_dic, nodename=indexname)
         # Add field description to XDMF file
         if (field_type == 'IP_field') and not (visualisation_type=='None'):
             self._add_field_to_xdmf(visindexname, vis_array)
@@ -1613,7 +1611,7 @@ class SampleData:
             a_str = bytes(string,'utf-8')
             Sarray.append([a_str])
         if len(Sarray) > 0 and self.get_attribute('empty', name):
-            self.add_attributes({'empty':False}, name)
+            self.add_attributes({'empty': False}, name)
         return
 
     def append_table(self, name, data):
@@ -2542,7 +2540,7 @@ class SampleData:
         referenced by the [0,0,0] elements of arrays in the 3DImage group. The
         values are registered in the `origin` Attribute of the 3DImage group.
 
-        :param str image_data_group: Name, Path, Index name or Alias of the
+        :param str image_group: Name, Path, Index name or Alias of the
             3DImage group
         :param np.array voxel_size: (Ox, Oy, Oz) array of the coordinates in
             each dimension of the origin of the 3Dimage

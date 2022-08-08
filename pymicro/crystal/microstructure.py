@@ -3335,11 +3335,11 @@ class Microstructure(SampleData):
 
           ..Warning::
 
-              This method relies on the code of the 'core.utils' and on Matlab
+              This method relies on the code of the `core.utils` and on Matlab
               code developed by F. Nguyen at the 'Centre des Matériaux, Mines
               Paris'. These tools and codes must be installed and referenced
               in the PATH of your workstation for this method to work. For
-              more details, see the 'utils' package.
+              more details, see the `utils` package.
         """
         from pymicro.core.utils.SDZsetUtils.SDmeshers import SDImageMesher
         Mesher = SDImageMesher(data=self)
@@ -3360,12 +3360,12 @@ class Microstructure(SampleData):
 
           ..Warning::
 
-              This method relies on the code of the 'core.utils', on Matlab
+              This method relies on the code of the `core.utils`, on Matlab
               code developed by F. Nguyen at the 'Centre des Matériaux, Mines
-              Paris', on the Zset software and the Mesh GMS software.
+              Paris', on the Z-set software and the Mesh GEMS software.
               These tools and codes must be installed and referenced
               in the PATH of your workstation for this method to work. For
-              more details, see the 'utils' package.
+              more details, see the `utils` package.
         """
         from pymicro.core.utils.SDZsetUtils.SDmeshers import SDImageMesher
         Mesher = SDImageMesher(data=self)
@@ -3541,7 +3541,7 @@ class Microstructure(SampleData):
             if not only_grain_map:
                 g['idnumber'] = new_id
                 g.update()
-        print('maxium grain id is now %d' % max(new_ids))
+        print('maximum grain id is now %d' % max(new_ids))
         if only_grain_map:
             return grain_map_renum
         # assign the renumbered grain_map to the microstructure
@@ -3595,7 +3595,7 @@ class Microstructure(SampleData):
                                          bb[2][0]:bb[2][1]]
         voxel_size = self.get_attribute('spacing', 'CellData')
         if len(voxel_size) == 2:
-            voxel_size = np.concatenate((voxel_size,np.array([0])), axis=0)
+            voxel_size = np.concatenate((voxel_size, np.array([0])), axis=0)
         offset = bb[:, 0]
         grain_data_bin = (grain_map == gid).astype(np.uint8)
         local_com = ndimage.measurements.center_of_mass(grain_data_bin) + \
@@ -3771,7 +3771,7 @@ class Microstructure(SampleData):
                 bbox = x_indices, y_indices, z_indices
             except (ValueError, TypeError, IndexError):
                 '''
-                value or type error can be risen for grains in the data table 
+                ValueError or TypeError can arise for grains in the data table 
                 that are not in the grain map (None will be returned from 
                 find_objects). IndexError can occur if these grain ids are 
                 larger than the maximum id in the grain map.
@@ -4147,29 +4147,32 @@ class Microstructure(SampleData):
                                    mode='constant', constant_values=1)
                 if use_mask:
                     # create top and bottom mask extrusions
-                    mask_top = material_ids[:,:,[-1]]
-                    mask_bot = material_ids[:,:,[0]]
-                    top_grip = np.tile(mask_top, (1,1,grip_size))
-                    bot_grip = np.tile(mask_top, (1,1,grip_size))
+                    mask_top = material_ids[:, :, [-1]]
+                    mask_bot = material_ids[:, :, [0]]
+                    top_grip = np.tile(mask_top, (1, 1, grip_size))
+                    bot_grip = np.tile(mask_bot, (1, 1, grip_size))
                     # add grip layers to unit cell matID
                     material_ids = np.concatenate(
-                        ((grip_id+1)*bot_grip, material_ids,
-                         (grip_id+1)*top_grip), axis=2)
+                        ((grip_id + 1) * bot_grip, material_ids,
+                         (grip_id + 1) * top_grip), axis=2)
                 else:
                     material_ids = np.pad(
                         material_ids, ((0, 0), (0, 0), (grip_size, grip_size)),
-                        mode='constant', constant_values=grip_id+1)
+                        mode='constant',
+                        constant_values=grip_id + 1)
             if add_exterior and not use_mask:
                 # add a layer of new_id around the first two dimensions
                 grain_ids = np.pad(grain_ids, ((exterior_size, exterior_size),
                                                (exterior_size, exterior_size),
                                                (0, 0)),
-                                   mode='constant', constant_values=1)
+                                   mode='constant',
+                                   constant_values=1)
                 material_ids = np.pad(material_ids,
                                       ((exterior_size, exterior_size),
                                        (exterior_size, exterior_size),
                                        (0, 0)),
-                                      mode='constant', constant_values=ext_id+1)
+                                      mode='constant',
+                                      constant_values=ext_id + 1)
             if use_mask:
                 grain_ids[np.where(grain_ids == 0)] = 1
                 material_ids[np.where(material_ids == 0)] = ext_id + 1

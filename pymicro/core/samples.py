@@ -725,7 +725,7 @@ class SampleData:
             :py:class:`pymicro.core.meshes.MeshObject` class
         :param str meshname: name used to create the Mesh group in dataset
         :param indexname: Index name used to reference the Mesh group
-        :location str: Path, Name, Index Name or Alias of the parent group
+        :param str location: Path, Name, Index Name or Alias of the parent group
             where the Mesh group is to be created
         :param str description: Description metadata for this mesh
         :param bool replace: remove Mesh group in the dataset with the same
@@ -2455,7 +2455,7 @@ class SampleData:
 
         By defaut the sample description is returned, from the root HDF5 Group.
 
-        :param str nodename: the path or name of the node of interest.
+        :param str node: the path or name of the node of interest.
         """
         return self.get_attribute(attrname='description', nodename=node)
 
@@ -2491,21 +2491,20 @@ class SampleData:
         self.content_index[new_indexname] = index_content
         return
 
-
     def set_voxel_size(self, image_group, voxel_size):
         """Set voxel size for an HDF5/XDMF image data group.
 
         The values are registered in the `spacing` Attribute of the 3DImage
         group.
 
-        :param str image_data_group: Name, Path, Index name or Alias of the
+        :param str image_group: Name, Path, Index name or Alias of the
             3DImage group
         :param np.array voxel_size: (dx, dy, dz) array of the voxel size in
             each dimension of the 3Dimage
         """
         old_spacing = self.get_attribute('spacing', image_group)
         if isinstance(voxel_size, float):
-            voxel_size = np.ones(shape=(len(old_spacing),))*voxel_size
+            voxel_size = np.ones(shape=(len(old_spacing),)) * voxel_size
         if len(old_spacing) != len(voxel_size):
             raise ValueError('Dimension mismatch between image group old'
                              f' grid spacing {old_spacing} and input'
@@ -2513,9 +2512,9 @@ class SampleData:
         self.add_attributes({'spacing': np.array(voxel_size)},
                             image_group)
         if len(voxel_size) == 2:
-            VoxSize = voxel_size[[1,0]]
+            VoxSize = voxel_size[[1, 0]]
         elif len(voxel_size) == 3:
-            VoxSize = voxel_size[[2,1,0]]
+            VoxSize = voxel_size[[2, 1, 0]]
         xdmf_grid = self._find_xdmf_grid(image_group)
         # find out if the grid has subgrids (temporal grid collection)
         if xdmf_grid.getchildren()[0].tag == 'Grid':
@@ -2542,8 +2541,8 @@ class SampleData:
 
         :param str image_group: Name, Path, Index name or Alias of the
             3DImage group
-        :param np.array voxel_size: (Ox, Oy, Oz) array of the coordinates in
-            each dimension of the origin of the 3Dimage
+        :param origin: (Ox, Oy, Oz) array of the coordinates in
+            each dimension of the origin of this image group.
         """
         old_origin = self.get_attribute('origin', image_group)
         if len(old_origin) != len(origin):
@@ -2666,7 +2665,7 @@ class SampleData:
                                        compression_options=dict()):
         """Set the chunkshape and compression settings for a HDF5 array node.
 
-        :param str node: Name, Path, Index name or Alias of the node
+        :param str nodename: Name, Path, Index name or Alias of the node
         :param tuple  chunkshape: The shape of the data chunk to be read or
             written in a single HDF5 I/O operation
         :param dict compression_options: Dictionary containing compression
@@ -2843,10 +2842,9 @@ class SampleData:
             return
         Node = self.get_node(node_path)
         isGroup = (Node._v_attrs.CLASS == 'GROUP')
-        if (isGroup) and not recursive:
-            msg = ('Node {} is a hdf5 group. Use `recursive=True` keyword'
-                  ' argument to remove it and its childrens.'
-                  ''.format(node_path))
+        if isGroup and not recursive:
+            msg = 'Node {} is a hdf5 group. '.format(node_path)
+            msg += 'Use `recursive=True` keyword argument to remove it and its childrens.'
             self._verbose_print(msg)
             return
 

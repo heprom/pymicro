@@ -141,7 +141,7 @@ class SampleWithFeatures(SampleData):
                     (mask.shape[0], mask.shape[1], 1))
         return mask
 
-    def get_ids_from_feature_map(self):
+    def get_ids_from_map(self):
         """Return the list of feature ids found in the feature map.
 
         By convention, only positive values are taken into account, 0 is
@@ -172,14 +172,14 @@ class SampleWithFeatures(SampleData):
         condition += "\'"
         return condition
 
-    def get_feature_ids(self):
+    def get_ids(self):
         """Return the feature ids found in the FeatureDataTable.
 
         :return: a 1D numpy array containing the feature ids.
         """
         return self.get_tablecol('FeatureDataTable', 'id')
 
-    def get_feature_volumes(self, id_list=None):
+    def get_volumes(self, id_list=None):
         """Get the feature volumes.
 
         The feature data table is queried and the volumes of the features are
@@ -190,12 +190,12 @@ class SampleWithFeatures(SampleData):
         :return: a numpy array containing the feature volumes.
         """
         if id_list:
-            condition = Microstructure.id_list_to_condition(id_list)
+            condition = SampleWithFeatures.id_list_to_condition(id_list)
             return self.features.read_where(eval(condition))['volume']
         else:
             return self.get_tablecol('FeatureDataTable', 'volume')
 
-    def get_feature_centers(self, id_list=None):
+    def get_centers(self, id_list=None):
         """Get the feature centers.
 
         The feature data table is queried and the centers of the features are
@@ -206,12 +206,12 @@ class SampleWithFeatures(SampleData):
         :return: a numpy array containing the feature centers.
         """
         if id_list:
-            condition = Microstructure.id_list_to_condition(id_list)
+            condition = SampleWithFeatures.id_list_to_condition(id_list)
             return self.features.read_where(eval(condition))['center']
         else:
             return self.get_tablecol('FeatureDataTable', 'center')
 
-    def get_feature_bounding_boxes(self, id_list=None):
+    def get_bounding_boxes(self, id_list=None):
         """Get the feature bounding boxes.
 
         The feature data table is queried and the bounding boxes of the features
@@ -280,7 +280,7 @@ class SampleWithFeatures(SampleData):
 
         :param ndarray feature_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
-            if the CellData image Node must be created.
+            if the CellData image node must be created.
         :param dict compression: a dictionary with compression settings to use.
         """
         if compression is None:
@@ -296,7 +296,7 @@ class SampleWithFeatures(SampleData):
                 raise ValueError(msg)
             if np.isscalar(voxel_size):
                 dim = len(feature_map.shape)
-                spacing_array = voxel_size*np.ones((dim,))
+                spacing_array = voxel_size * np.ones((dim,))
             else:
                 if len(voxel_size) != len(feature_map.shape):
                     raise ValueError('voxel_size array must have a length '
@@ -319,7 +319,7 @@ class SampleWithFeatures(SampleData):
         return
 
     def set_mask(self, mask, voxel_size=None, compression=None):
-        """Set the mask for this microstructure.
+        """Set the mask for this sample.
 
         :param ndarray mask: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
@@ -374,7 +374,7 @@ class SampleWithFeatures(SampleData):
             self.features.remove_row(int(where))
         return
 
-    def compute_feature_volume(self, gid):
+    def compute_volume(self, feature_id):
         """Compute the volume of the feature given its id.
 
         The total number of voxels with the given id is computed. The value is
@@ -386,18 +386,18 @@ class SampleWithFeatures(SampleData):
           This function assume the feature bounding box is correct, call
           `recompute_feature_bounding_boxes()` if this is not the case.
 
-        :param int gid: the feature id to consider.
+        :param int feature_id: the feature id to consider.
         :return: the volume of the feature.
         """
-        bb = self.features.read_where('id == %d' % gid)['bounding_box'][0]
+        bb = self.features.read_where('id == %d' % feature_id)['bounding_box'][0]
         feature_map = self.get_feature_map()[bb[0][0]:bb[0][1],
                                              bb[1][0]:bb[1][1],
                                              bb[2][0]:bb[2][1]]
         voxel_size = self.get_attribute('spacing', 'CellData')
-        volume_vx = np.sum(feature_map == np.array(gid))
+        volume_vx = np.sum(feature_map == np.array(feature_id))
         return volume_vx * np.prod(voxel_size)
 
-    def compute_feature_center(self, gid):
+    def compute_center(self, feature_id):
         """Compute the center of masses of a feature given its id.
 
         .. warning::
@@ -405,12 +405,12 @@ class SampleWithFeatures(SampleData):
           This function assume the feature bounding box is correct, call
           `recompute_feature_bounding_boxes()` if this is not the case.
 
-        :param int gid: the feature id to consider.
+        :param int feature_id: the feature id to consider.
         :return: a tuple with the center of mass in mm units
                  (or voxel if the voxel_size is not specified).
         """
         # isolate the feature within the complete feature map
-        bb = self.features.read_where('id == %d' % gid)['bounding_box'][0]
+        bb = self.features.read_where('id == %d' % feature_id)['bounding_box'][0]
         feature_map = self.get_feature_map()[bb[0][0]:bb[0][1],
                                              bb[1][0]:bb[1][1],
                                              bb[2][0]:bb[2][1]]
@@ -418,21 +418,21 @@ class SampleWithFeatures(SampleData):
         if len(voxel_size) == 2:
             voxel_size = np.concatenate((voxel_size, np.array([0])), axis=0)
         offset = bb[:, 0]
-        feature_data_bin = (feature_map == gid).astype(np.uint8)
+        feature_data_bin = (feature_map == feature_id).astype(np.uint8)
         local_com = ndimage.measurements.center_of_mass(feature_data_bin)
         local_com += np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
         com = voxel_size * (offset + local_com
                             - 0.5 * np.array(self.get_feature_map().shape))
         return com
 
-    def compute_feature_bounding_box(self, gid, as_slice=False):
+    def compute_bounding_box(self, feature_id, as_slice=False):
         """Compute the feature bounding box indices in the feature map.
 
-        :param int gid: the id of the feature.
+        :param int feature_id: the id of the feature.
         :param bool as_slice: a flag to return the feature bounding box as a slice.
         :return: the bounding box coordinates.
         """
-        slices = ndimage.find_objects(self.get_feature_map() == np.array(gid))[0]
+        slices = ndimage.find_objects(self.get_feature_map() == np.array(feature_id))[0]
         if as_slice:
             return slices
         x_indices = (slices[0].start, slices[0].stop)
@@ -440,7 +440,7 @@ class SampleWithFeatures(SampleData):
         z_indices = (slices[2].start, slices[2].stop)
         return x_indices, y_indices, z_indices
 
-    def recompute_feature_volumes(self, verbose=False):
+    def recompute_volumes(self, verbose=False):
         """Compute the volume of all feature in the sample.
 
         Each feature volume is computed using the feature map. The value is
@@ -460,20 +460,20 @@ class SampleWithFeatures(SampleData):
             print('warning: needs a feature map to recompute the volumes '
                   'of the features')
             return
-        for d in self.features:
+        for f in self.features:
             try:
-                vol = self.compute_feature_volume(d['id'])
+                vol = self.compute_volume(f['id'])
             except ValueError:
-                print('skipping feature %d' % d['id'])
+                print('skipping feature %d' % f['id'])
                 continue
             if verbose:
-                print('feature {}, computed volume is {}'.format(d['id'], vol))
-            d['volume'] = vol
-            d.update()
+                print('feature {}, computed volume is {}'.format(f['id'], vol))
+            f['volume'] = vol
+            f.update()
         self.features.flush()
-        return self.get_feature_volumes()
+        return self.get_volumes()
 
-    def recompute_feature_centers(self, verbose=False):
+    def recompute_centers(self, verbose=False):
         """Compute and assign the center of all feature in the sample.
 
         Each feature center is computed using its center of mass. The value is
@@ -492,21 +492,21 @@ class SampleWithFeatures(SampleData):
             print('warning: need a feature map to recompute the center of mass'
                   ' of the features')
             return
-        for d in self.features:
+        for f in self.features:
             try:
-                com = self.compute_feature_center(d['id'])
+                com = self.compute_center(f['id'])
             except ValueError:
-                print('skipping feature %d' % d['id'])
+                print('skipping feature %d' % f['id'])
                 continue
             if verbose:
                 print('feature %d center: %.3f, %.3f, %.3f'
-                      % (d['id'], com[0], com[1], com[2]))
-            d['center'] = com
-            d.update()
+                      % (f['id'], com[0], com[1], com[2]))
+            f['center'] = com
+            f.update()
         self.features.flush()
-        return self.get_feature_centers()
+        return self.get_centers()
 
-    def recompute_feature_bounding_boxes(self, verbose=False):
+    def recompute_bounding_boxes(self, verbose=False):
         """Compute and assign the center of all features in the SampleWithFeatures.
 
         Each feature bounding box is computed in voxel unit. The value is
@@ -525,12 +525,12 @@ class SampleWithFeatures(SampleData):
             return
         # find_objects will return a list of N slices, N being the max feature id
         slices = ndimage.find_objects(self.get_feature_map())
-        for d in self.features:
+        for f in self.features:
             try:
-                d_slice = slices[d['id'] - 1]
-                x_indices = (d_slice[0].start, d_slice[0].stop)
-                y_indices = (d_slice[1].start, d_slice[1].stop)
-                z_indices = (d_slice[2].start, d_slice[2].stop)
+                f_slice = slices[f['id'] - 1]
+                x_indices = (f_slice[0].start, f_slice[0].stop)
+                y_indices = (f_slice[1].start, f_slice[1].stop)
+                z_indices = (f_slice[2].start, f_slice[2].stop)
                 bbox = x_indices, y_indices, z_indices
             except (ValueError, TypeError, IndexError):
                 '''
@@ -539,18 +539,18 @@ class SampleWithFeatures(SampleData):
                 find_objects). IndexError can occur if these feature ids are 
                 larger than the maximum id in the feature map.
                 '''
-                print('skipping feature %d' % d['id'])
+                print('skipping feature %d' % f['id'])
                 continue
             if verbose:
                 print('feature %d bounding box: [%d:%d, %d:%d, %d:%d]'
-                      % (d['id'], bbox[0][0], bbox[0][1], bbox[1][0],
+                      % (f['id'], bbox[0][0], bbox[0][1], bbox[1][0],
                          bbox[1][1], bbox[2][0], bbox[2][1]))
-            d['bounding_box'] = bbox
-            d.update()
+            f['bounding_box'] = bbox
+            f.update()
         self.features.flush()
-        return self.get_feature_bounding_boxes()
+        return self.get_bounding_boxes()
 
-    def compute_features_geometry(self, overwrite_table=False):
+    def compute_geometry(self, overwrite_table=False):
         """Compute each feature geometry from the feature map.
 
         This method computes the feature centers, volume and bounding boxes
@@ -562,7 +562,7 @@ class SampleWithFeatures(SampleData):
         :param bool overwrite_table: if this is True, the features present in
         the data table and not in the feature map are removed from it.
         """
-        feature_ids = self.get_ids_from_feature_map()
+        feature_ids = self.get_ids_from_map()
         if overwrite_table and self.features.nrows > 0:
             self.features.remove_rows(start=0)
             for feature_id in feature_ids:
@@ -571,16 +571,16 @@ class SampleWithFeatures(SampleData):
                     feature = self.features[index]
                 else:
                     feature = np.zeros((1,), dtype=self.features.dtype)
-                feature['bounding_box'] = self.compute_feature_bounding_box(feature_id)
-                feature['center'] = self.compute_feature_center(feature_id)
-                feature['volume'] = self.compute_feature_volume(feature_id)
+                feature['bounding_box'] = self.compute_bounding_box(feature_id)
+                feature['center'] = self.compute_center(feature_id)
+                feature['volume'] = self.compute_volume(feature_id)
                 if len(index) > 0:
                     self.features[index] = feature
                 else:
                     self.features.append(feature)
             self.features.flush()
         else:
-            self.recompute_feature_bounding_boxes()
-            self.recompute_feature_centers()
-            self.recompute_feature_volumes()
+            self.recompute_bounding_boxes()
+            self.recompute_centers()
+            self.recompute_volumes()
         return

@@ -2813,21 +2813,24 @@ class Microstructure(SampleData):
         print('\n')
         return ipf_map.squeeze()
 
-    def view_slice(self, slice=None, color='random', show_mask=True,
+    def view_slice(self, slice=None, plane='XY', color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,
                    axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None,
                    display=True):
         """A simple utility method to show one microstructure slice.
 
+        The method extract a 2D orthogonal slice from the microstructure to
+        display it. The extract plane can be one of 'XY', 'YZ' or 'XZ'.
         The microstructure can be colored using different fields such as a
         random color (default), the grain ids, the Schmid factor or the grain
         orientation using IPF coloring.
         The plot can be customized in several ways. Annotations can be added
         in the grains (ids, lattice plane traces) and the list of grains where
-        annotations are shown can be controled using the `highlight_ids`
+        annotations are shown can be controlled using the `highlight_ids`
         argument. By default, if present, the mask will be shown.
 
         :param int slice: the slice number
+        :param str plane: the cut plane, must be one of 'XY', 'YZ' or 'XZ'
         :param str color: a string to chose the colormap from ('random',
             'grain_ids', 'schmid', 'ipf')
         :param bool show_mask: a flag to show the mask by transparency.
@@ -2848,11 +2851,17 @@ class Microstructure(SampleData):
             print('Microstructure instance mush have a grain_map field to use '
                   'this method')
             return
+        allowed_planes = ['YZ', 'XZ', 'XY']
+        try:
+            cut_axis = allowed_planes.index(plane)
+        except ValueError:
+            print('cut plane must be either XY, YZ or XZ')
+            return
         grain_map = self.get_grain_map()
-        if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
-            slice = grain_map.shape[2] // 2
+        if slice is None or slice > grain_map.shape[cut_axis] - 1 or slice < 0:
+            slice = grain_map.shape[cut_axis] // 2
             print('using slice value %d' % slice)
-        grains_slice = grain_map[:, :, slice]
+        grains_slice = grain_map.take(indices=slice, axis=cut_axis)
         gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
         fig, ax = plt.subplots()
         if color == 'random':
@@ -2877,7 +2886,7 @@ class Microstructure(SampleData):
             cb = plt.colorbar()
             cb.set_label('Schmid factor')
         elif color == 'ipf':
-            # build IPF image
+            # build IPF image with orientation from the grain data table
             ipf_image = np.zeros((*grains_slice.shape, 3), dtype=float)
             for gid in gids:
                 o = self.get_grain(gid).orientation
@@ -2893,12 +2902,12 @@ class Microstructure(SampleData):
                   'grain_ids, schmid, ipf}, returning')
             return
         ax.xaxis.set_label_position('top')
-        plt.xlabel('X')
-        plt.ylabel('Y')
+        plt.xlabel(plane[0])
+        plt.ylabel(plane[1])
         if not self._is_empty('mask') and show_mask:
             from pymicro.view.vol_utils import alpha_cmap
-            mask = self.get_mask()
-            plt.imshow(mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
+            mask = self.get_mask().take(indices=slice, axis=cut_axis)
+            plt.imshow(mask.T, cmap=alpha_cmap(opacity=0.3))
 
         # compute the center of mass of each grain of interest in this slice
         if show_grain_ids or show_slip_traces:
@@ -2923,6 +2932,11 @@ class Microstructure(SampleData):
                              color='k',
                              fontsize=12)
         # slip traces on this slice for a set of lattice planes
+        n_int = np.zeros(3)
+        n_int[cut_axis] = 1.
+        view_up = [0, -1, 0]
+        if 'Z' in plane:
+            view_up = [0, 0, 1]
         if show_slip_traces and hkl_planes:
             for i, gid in enumerate(gids):
                 if highlight_ids and gid not in highlight_ids:
@@ -2930,8 +2944,8 @@ class Microstructure(SampleData):
                 g = self.get_grain(gid)
                 for hkl in hkl_planes:
                     trace = hkl.slip_trace(g.orientation,
-                                           n_int=[0, 0, 1],
-                                           view_up=[0, -1, 0],
+                                           n_int=n_int,
+                                           view_up=view_up,
                                            trace_size=0.8 * np.sqrt(sizes[i]),
                                            verbose=False)
                     color = 'k'

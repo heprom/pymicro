@@ -2935,8 +2935,11 @@ class Microstructure(SampleData):
         n_int = np.zeros(3)
         n_int[cut_axis] = 1.
         view_up = [0, -1, 0]
-        if 'Z' in plane:
-            view_up = [0, 0, 1]
+        if plane == 'XZ':
+            view_up = [0, 0, -1]
+            n_int[cut_axis] = -1.
+        elif plane == 'YZ':
+            view_up = [0, 0, -1]
         if show_slip_traces and hkl_planes:
             for i, gid in enumerate(gids):
                 if highlight_ids and gid not in highlight_ids:

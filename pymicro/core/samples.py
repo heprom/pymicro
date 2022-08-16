@@ -1156,7 +1156,7 @@ class SampleData:
             more details.
         :param float time: Associate a time value for this field. IF a time
             value is provided, the suffix '_T{time_index}' is appended to
-            the fieldname and indexname
+            the field_name and indexname
         :param bool bulk_padding: If adding a field on a mesh  that has as many
             bulk as boundary elements, forces field padding to `bulk` if True,
             or to `boundary` if false
@@ -1252,7 +1252,7 @@ class SampleData:
             # get time suffix from gridname
             import re
             time_suffix = re.findall('_T\d+', time_gridname)[-1]
-            # keep suffixless fieldname as attribute name for the xdmf
+            # keep suffixless field_name as attribute name for the xdmf
             # time grid collection (same field name for each grid associated
             # to a different time step)
             time_serie_name = fieldname
@@ -1355,7 +1355,7 @@ class SampleData:
             Node = self.h5_dataset.create_carray(
                     where=location_path, name=name, obj=np.array([0]),
                     title=indexname)
-            self.add_attributes({'empty': True, 'node_type':'data_array'},
+            self.add_attributes({'empty': True, 'node_type': 'data_array'},
                                 Node._v_pathname)
         else:
             if 'normalization' in compression_options:
@@ -1661,7 +1661,7 @@ class SampleData:
                    ''.format(aliasname))
             self._verbose_print(msg)
         else:
-            if (indexname is None):
+            if indexname is None:
                 indexname = self.get_indexname_from_path(path)
             if indexname in self.aliases:
                 self.aliases[indexname].append(aliasname)
@@ -1677,9 +1677,8 @@ class SampleData:
         :param str colname: if the node is a `table` node, set colname to
             reference a column (named field) of the table with this indexname
         """
-        Is_present = (self._is_in_index(indexname)
-                      or self._is_alias(indexname))
-        if Is_present:
+        is_present = self._is_in_index(indexname) or self._is_alias(indexname)
+        if is_present:
             raise ValueError('Name `{}` already in '
                              'content_index : duplicates not allowed in Index'
                              ''.format(indexname))
@@ -2168,8 +2167,8 @@ class SampleData:
         """
         # Get image informations
         dimensions = self.get_attribute('nodes_dimension', imagename)
-        spacing =  self.get_attribute('spacing', imagename)
-        origin =  self.get_attribute('origin', imagename)
+        spacing = self.get_attribute('spacing', imagename)
+        origin = self.get_attribute('origin', imagename)
         # Create ConstantRectilinearMesh to serve as image_object
         image_object = ConstantRectilinearMesh(dim=len(dimensions))
         image_object.SetDimensions(dimensions)
@@ -2184,10 +2183,10 @@ class SampleData:
                 name = fieldname.decode('utf-8')
                 field_type = self.get_attribute('field_type', name)
                 if field_type == 'Nodal_field':
-                    data = self.get_field(fieldname=name)
+                    data = self.get_field(field_name=name)
                     image_object.nodeFields[name] = data
                 elif field_type == 'Element_field':
-                    data = self.get_field(fieldname=name)
+                    data = self.get_field(field_name=name)
                     image_object.elemFields[name] = data
         return image_object
 
@@ -2245,7 +2244,7 @@ class SampleData:
             Field_list.append(name)
         return Field_list
 
-    def get_field(self, fieldname, unpad_field=True,
+    def get_field(self, field_name, unpad_field=True,
                   get_visualisation_field=False):
         """Return a padded or unpadded field from a grid data group as array.
 
@@ -2254,24 +2253,24 @@ class SampleData:
         than the mesh) or a boundary field (defined on elements of a lower
         dimensionality than the mesh).
 
-        :param str fieldname: Name, Path, Index, Alias or Node of the field in
+        :param str field_name: Name, Path, Index, Alias or Node of the field in
             dataset
         :param bool unpad_field: if `True` (default), remove the zeros added to
             to the field to comply with the mesh topology and return it with
             its original size (bulk or boundary field).
         """
         # Get field data array (or visualization field data array)
-        field_type = self.get_attribute('field_type', fieldname)
+        field_type = self.get_attribute('field_type', field_name)
         if (field_type == 'IP_field') and get_visualisation_field:
             field_path = self.get_attribute('visualisation_field_path',
-                                            fieldname)
+                                            field_name)
             field = self.get_node(field_path, as_numpy=True)
         else:
-            field = self.get_node(fieldname, as_numpy=True)
+            field = self.get_node(field_name, as_numpy=True)
         # Handle array padding removal if needed
-        padding = self.get_attribute('padding', fieldname)
-        parent_mesh = self.get_attribute('parent_grid_path', fieldname)
-        pad_field = (padding != None) and (unpad_field)
+        padding = self.get_attribute('padding', field_name)
+        parent_mesh = self.get_attribute('parent_grid_path', field_name)
+        pad_field = (padding is not None) and unpad_field
         if (field_type == 'IP_field') and not get_visualisation_field:
             pad_field = False
         if pad_field:
@@ -2312,7 +2311,7 @@ class SampleData:
                         colname = self.content_index[name][1]
                 elif name in node.colnames:
                     colname = name
-                if (colname is not None):
+                if colname is not None:
                     node = node.col(colname)
             else:
                 node = self.h5_dataset.get_node(node_path)
@@ -2334,7 +2333,7 @@ class SampleData:
                     mu = self.get_attribute('normalization_mean', name)
                     std = self.get_attribute('normalization_std', name)
                     for comp in range(node.shape[-1]):
-                        node[...,comp] = (node[..., comp]*std[comp]) + mu[comp]
+                        node[..., comp] = (node[..., comp]*std[comp]) + mu[comp]
                 # Reverse indices transpositions apply to ensure compatibility
                 # between SampleData and Paraview ordering conventions
                 transpose_indices = self.get_attribute('transpose_indices',
@@ -2344,7 +2343,7 @@ class SampleData:
                 transpose_components = self.get_attribute('transpose_components',
                                                        name)
                 if transpose_components is not None:
-                    node = node[...,transpose_components]
+                    node = node[..., transpose_components]
                 node = np.atleast_1d(node)
         return node
 
@@ -3181,6 +3180,7 @@ class SampleData:
                 elif content_type[key] == 'field_array':
                     msg = (f'Adding empty field {content_paths[key]} to'
                            f' mesh group {head}')
+                    print(msg)
                     self.add_field(gridname=head, fieldname=tail,
                                    indexname=key)
                 elif content_type[key] == 'string_array':
@@ -3586,20 +3586,19 @@ class SampleData:
                     break
         return bool_return
 
-
     def _is_field(self, fieldname):
         """Checks conditions to consider node `name` as a field data node."""
         test = self.get_attribute('field_type', fieldname)
-        return (test is not None)
+        return test is not None
 
     def _is_in_index(self, name):
-        return (name in self.content_index)
+        return name in self.content_index
 
     def _is_alias(self, name):
         """Check if name is an HDF5 node alias."""
         Is_alias = False
         for item in self.aliases:
-            if (name in self.aliases[item]):
+            if name in self.aliases[item]:
                 Is_alias = True
                 break
         return Is_alias
@@ -3608,7 +3607,7 @@ class SampleData:
         """Return the indexname for which input name is an alias."""
         Indexname = None
         for item in self.aliases:
-            if (name in self.aliases[item]):
+            if name in self.aliases[item]:
                 Indexname = item
                 break
         return Indexname

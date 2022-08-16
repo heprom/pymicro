@@ -568,10 +568,10 @@ class SDZset():
         :type sequence_list: list[int], optional
         :raises RuntimeError: raised if the FEA has not been runed.
         :raises ValueError: raised if fields not in FEA output are required
-        :return Nodal_field_sequence: List of dict{fieldname: field array}, one
+        :return Nodal_field_sequence: List of dict{field_name: field array}, one
             element for each sequence, for the node fields.
         :rtype: list
-        :return Integ_field_sequence: List of dict{fieldname: field array}, one
+        :return Integ_field_sequence: List of dict{field_name: field array}, one
             element for each sequence, for the integration points fields.
         :rtype: list
         """
@@ -609,10 +609,10 @@ class SDZset():
         :type sequence_list: list[int], optional
         :raises RuntimeError: raised if the FEA has not been runed.
         :raises ValueError: raised if fields not in FEA output are required
-        :return Nodal_field_sequence: List of dict{fieldname: field array}, one
+        :return Nodal_field_sequence: List of dict{field_name: field array}, one
             element for each sequence, for the node fields.
         :rtype: list
-        :return Integ_field_sequence: List of dict{fieldname: field array}, one
+        :return Integ_field_sequence: List of dict{field_name: field array}, one
             element for each sequence, for the integration points fields.
         :rtype: list
         """

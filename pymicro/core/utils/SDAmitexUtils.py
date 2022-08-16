@@ -371,7 +371,7 @@ class SDAmitexIO():
         :type output_slice: numpy array (3,2)
         :return: Return a dict. of the amitex_fftp output fields stored in
             the vtk. file, whose keys are the field names.
-        :rtype: dict( 'fieldname':np.double array)
+        :rtype: dict( 'field_name':np.double array)
         """
         # local imports
         from vtk.util import numpy_support

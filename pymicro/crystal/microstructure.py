@@ -1890,7 +1890,7 @@ class Microstructure(SampleData):
     def get_phase_map(self):
         """Get the phase map as a numpy array.
 
-        The phase map is an array of int whre each voxel value tells you what
+        The phase map is an array of int where each voxel value tells you what
         is the local material phase with respect to the `phase_list` attribute.
 
         :return: the phase map as a numpy array.
@@ -3413,10 +3413,11 @@ class Microstructure(SampleData):
         :param bool autodelete: a flag to delete the microstructure files
             on the disk when it is not needed anymore.
         :param bool recompute_geometry: if `True` (default), recompute the
-            grain centers, volumes, and bounding boxes in the croped micro.
-            Use `False` when using a crop that do not cut grains, for instance
-            when cropping a microstructure within the mask, to avoid the heavy
-            computational cost of the grain geometry data update.
+            grain centers, volumes, and bounding boxes in the cropped
+            microstructure. Use `False` when using a crop that do not cut
+            grains, for instance when cropping a microstructure within the
+            mask, to avoid the heavy computational cost of the grain geometry
+            data update.
         :param bool verbose: activate verbose mode.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
@@ -3462,7 +3463,7 @@ class Microstructure(SampleData):
                     field_crop = field[x_start:x_end, y_start:y_end, ...]
                 else:
                     field_crop = field[x_start:x_end, y_start:y_end,
-                                 z_start:z_end, ...]
+                                       z_start:z_end, ...]
                 empty = micro_crop.get_attribute(attrname='empty',
                                                  nodename='CellData')
                 if empty:
@@ -3474,8 +3475,9 @@ class Microstructure(SampleData):
                     micro_crop.add_field(gridname='CellData',
                                          fieldname=field_name,
                                          array=field_crop, replace=True)
-        # set the origin of the image group according to the crop
-        origin = spacing * np.array([x_start, y_start, z_start])
+        # update the origin of the image group according to the crop
+        origin = self.get_attribute('origin', 'CellData')
+        origin += spacing * np.array([x_start, y_start, z_start])
         print('origin will be set to', origin)
         micro_crop.set_origin('CellData', origin)
         if verbose:
@@ -4721,7 +4723,7 @@ class Microstructure(SampleData):
             micro.set_phase_map(phase_map, voxel_size=spacing)
             if include_rodrigues_map:
                 micro.set_orientation_map(rodrigues_map)
-                #micro.add_field(gridname='CellData', fieldname='rodrigues_map',
+                #micro.add_field(gridname='CellData', field_name='rodrigues_map',
                 #                array=rodrigues_map)
 
         # create grain data table infos

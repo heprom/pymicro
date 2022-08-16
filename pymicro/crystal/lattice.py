@@ -382,33 +382,25 @@ class Symmetry(enum.Enum):
         """Compute the rotation matrix in the Fundamental Zone of a given
         `Symmetry` instance.
 
+        The principle is to apply all symmetry operators to the rotation matrix
+        and identify which one yield the smallest rotation angle. The
+        corresponding rotation is then returned. This computation is vectorized
+        to save time.
+
         :param g: a 3x3 matrix representing the rotation.
         :param verbose: flag for verbose mode.
         :return: a new 3x3 matrix for the rotation in the fundamental zone.
         """
-        omegas = []  # list to store all the rotation angles
         syms = self.symmetry_operators()
-        for sym in syms:
-            # apply the symmetry operator
-            om = np.dot(sym, g)
-            if verbose:
-                print(om)
-                print(om.trace())
-            # compute the Rodrigues vector of the corresponding orientation matrix
-            # from pymicro.crystal.microstructure import Orientation
-            # r = Orientation.OrientationMatrix2Rodrigues(om)
-            # print(r)
-            # and then the rotation angle
-            # omega = 2 * np.arctan(np.linalg.norm(r)) * 180 / np.pi
-            # todo: check if we can avoid computing the R vector
-            cw = 0.5 * (om.trace() - 1)
-            omega = np.arccos(cw)
-            omegas.append(omega)
+        g_syms = np.dot(syms, g)
+        traces = np.trace(g_syms, axis1=1, axis2=2)
+        omegas = np.arccos(0.5 * (traces - 1))
         index = np.argmin(omegas)
         if verbose:
+            print(traces)
             print(omegas)
             print('moving to FZ, index = %d' % index)
-        return np.dot(syms[index], g)
+        return g_syms[index]
 
     def elastic_constants_number(self):
         """Return the number of independent elastic constants for this symmetry."""

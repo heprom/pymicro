@@ -2758,7 +2758,9 @@ class Microstructure(SampleData):
                 god[ii, jj, kk] = np.degrees(o.disorientation(o_ijk, crystal_structure=sym)[0])
         print('GOD computation progress: 100.00 %')
         if store:
-            self.add_field(gridname='CellData', array=god, replace=True,
+            # pick the location of the grain map to add the new field
+            location = self._get_parent_name(self.active_grain_map)
+            self.add_field(gridname=location, array=god, replace=True,
                            fieldname='grain_orientation_deviation')
         return god
 

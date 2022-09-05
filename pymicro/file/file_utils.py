@@ -176,7 +176,7 @@ def numpy_to_esrf_datatype(data_type):
     }.get(data_type, 'UnsignedShort')
 
 
-def edf_write(data, file_name, header_size=1024):
+def edf_write(data, file_name, header_size=1024, verbose=True):
     """Write a binary edf file with the appropriate header.
 
     This function write a (x,y,z) 3D dataset to the disk.
@@ -186,14 +186,13 @@ def edf_write(data, file_name, header_size=1024):
     :param ndarray data: the data array to write to the file.
     :param str file_name: the file name to use.
     :param int header_size: the size of te header (a multiple of 512).
+    :param bool verbose: verbose flag to trigger some text information output.
     """
     # get current time
     from time import gmtime, strftime
     today = strftime('%d-%b-%Y', gmtime())
     size = np.shape(data)
-    print('data size in pixels is ', size)
     nbytes = np.prod(size) * data.dtype.itemsize
-    print('opening', file_name, 'for writing')
     # craft an ascii header of the appropriate size
     f = open(file_name, 'wb')
     head = '{\n'
@@ -201,7 +200,10 @@ def edf_write(data, file_name, header_size=1024):
     head += 'Image          = 1 ;\n'
     head += 'ByteOrder      = LowByteFirst ;\n'
     head += 'DataType       = %13s;\n' % numpy_to_esrf_datatype(data.dtype)
-    print('using data type %s' % numpy_to_esrf_datatype(data.dtype))
+    if verbose:
+        print('data size in pixels is ', size)
+        print('opening', file_name, 'for writing')
+        print('using data type %s' % numpy_to_esrf_datatype(data.dtype))
     head += 'Dim_1          = %4s;\n' % size[0]
     if len(size) > 1: head += 'Dim_2          = %4s;\n' % size[1]
     if len(size) > 2: head += 'Dim_3          = %4s;\n' % size[2]

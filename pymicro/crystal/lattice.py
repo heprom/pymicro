@@ -1571,15 +1571,24 @@ class HklPlane(HklObject):
             return self in hkl_planes or self.friedel_pair() in hkl_planes
 
     @staticmethod
-    def is_same_family(hkl1, hkl2, crystal_structure=Symmetry.cubic):
-        """Static mtd to test if both lattice planes belongs to same family.
+    def is_same_family(hkl1, hkl2):
+        """Static method to test if both lattice planes belongs to same family.
 
         A family {hkl} is composed by all planes that are equivalent to (hkl)
-        using the symmetry of the lattice. The lattice assoiated with `hkl2`
-        is not taken into account here.
+        using the symmetry of the lattice. Both HklPlane must share the same
+        crystal symmetry for this method to return True.
+
+        :param HklPlane hkl1: the first hkl plane to test.
+        :param HklPlane hkl2: the second hkl plane to test.
+        :return: True if both hkl planes have the same symmetry and belong to
+        the same family, False otherwise.
         """
-        return hkl1.is_in_list(HklPlane.get_family(hkl2.miller_indices(), lattice=hkl1._lattice,
-                                                   crystal_structure=crystal_structure))
+        sym = hkl1.get_lattice().get_symmetry()
+        if sym1 != hkl1.get_lattice().get_symmetry():
+            return False
+        return hkl1.is_in_list(HklPlane.get_family(hkl2.miller_indices(),
+                                                   lattice=hkl1.get_lattice(),
+                                                   crystal_structure=sym))
 
     @staticmethod
     def get_family(hkl, lattice=None, include_friedel_pairs=False, crystal_structure=Symmetry.cubic):

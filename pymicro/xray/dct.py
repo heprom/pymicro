@@ -9,6 +9,7 @@ from pymicro.xray.experiment import ForwardSimulation
 from pymicro.crystal.lattice import HklPlane
 from pymicro.xray.xray_utils import lambda_keV_to_nm, radiograph, radiographs
 from pymicro.crystal.microstructure import Grain, Orientation
+from pymicro.file.file_utils import edf_read, edf_write
 
 
 class Xrd3dForwardSimulation(ForwardSimulation):
@@ -786,6 +787,57 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, mask=None, dark_factor=1.):
     return tt_rock
 
 
+def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=90,
+                data_key='7.1/measurement/frelon16'):
+    """Build a topotomography stack from raw detector images.
+
+    The number of image to sum for a topograph must be specified
+    using the variable `n_topo`.
+
+    :param str scan_name: the name of the scan to process.
+    :param str data_dir: the path to the data folder.
+    :param bool save_edf: flag to save the tt stack as an EDF file.
+    :param int n_topo: the number of images to sum for a topograph.
+    :param str data_key: a string to access the data within the h5 file.
+    """
+    import h5py
+    print('number of frames to sum for a topograph = %d' % n_topo)
+
+    # parse the info file
+    h5_path = os.path.join(data_dir, scan_name, '%s.h5' % scan_name)
+    f = h5py.File(h5_path)
+    print('loading data from file %s...' % h5_path)
+    data = f[data_key][()]
+    # create a reference image with the median over the first of each topograph
+    dark = np.median(data[::90, :, :], axis=0)
+    data = data - dark
+    # print check dark level
+    print('dark level: %.1f' % np.mean(data[::90, :, :]))
+    # check number of images
+    if data.shape[0] % n_topo != 0:
+        print('warning, number of images not consistent : %d total images with '
+              '%d images per topograph' % (sata.shape[0], n_topo))
+        return None
+    infos = {}
+    infos['TOMO_N'] = int(data.shape[0] / n_topo)
+    infos['Dim_1'] = data.shape[1]
+    infos['Dim_2'] = data.shape[2]
+    print(infos)
+
+    # build the stack by combining individual images
+    data = data.reshape((n_topo, infos['TOMO_N'], infos['Dim_1'], infos['Dim_2']))
+    tt_stack = np.sum(data, axis=1)
+    del data
+    print(tt_stack[0].shape)
+    tt_stack = tt_stack.transpose((2, 1, 0))
+    f.close()
+    print('\ndone')
+
+    # save the data as edf if needed
+    if save_edf:
+        edf_write(tt_stack, os.path.join(data_dir, '%s_stack.edf' % scan_name))
+    return tt_stack
+
 def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.):
     """Build a topotomography stack from raw detector images.
 
@@ -799,7 +851,6 @@ def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.)
     :param int n_topo: the number of images to sum for a topograph.
     :param float dark_factor: a multiplicative factor for the dark image.
     """
-    from pymicro.file.file_utils import edf_read, edf_write
     if n_topo < 0:
         import glob
         # figure out the number of frames per topograph n_topo

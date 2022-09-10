@@ -788,7 +788,7 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, mask=None, dark_factor=1.):
 
 
 def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=90,
-                data_key='7.1/measurement/frelon16'):
+                data_key='7.1/measurement/frelon16', dark=None):
     """Build a topotomography stack from raw detector images.
 
     The number of image to sum for a topograph must be specified
@@ -808,15 +808,16 @@ def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=90,
     f = h5py.File(h5_path)
     print('loading data from file %s...' % h5_path)
     data = f[data_key][()]
-    # create a reference image with the median over the first of each topograph
-    dark = np.median(data[::90, :, :], axis=0)
+    if dark is None:
+        # create a reference image with the median over the first of each topograph
+        dark = np.median(data[::90, :, :], axis=0)
     data = data - dark
     # print check dark level
     print('dark level: %.1f' % np.mean(data[::90, :, :]))
     # check number of images
     if data.shape[0] % n_topo != 0:
         print('warning, number of images not consistent : %d total images with '
-              '%d images per topograph' % (sata.shape[0], n_topo))
+              '%d images per topograph' % (data.shape[0], n_topo))
         return None
     infos = {}
     infos['TOMO_N'] = int(data.shape[0] / n_topo)

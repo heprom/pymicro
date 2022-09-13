@@ -442,24 +442,24 @@ class SampleData:
             print(s)
             return
 
-    def print_node_attributes(self, nodename, as_string=False):
+    def print_node_attributes(self, node_name, as_string=False):
         """Print the hdf5 attributes (metadata) of an array node.
 
-        :param str name:Name, Path, Index name or Alias of the HDF5 Node
+        :param str node_name: Name, Path, Index name or Alias of the HDF5 Node
         :param bool as_string: If `True` solely returns string representation.
         If `False`, prints the string representation.
         :return str s: string representation of HDF5 Node compression settings
         """
         s = ''
-        Node = self.get_node(nodename)
-        if Node is None:
-            return f'No group named {nodename}'
-        s += str(f' -- {Node._v_name} attributes : \n')
-        for attr in Node._v_attrs._v_attrnamesuser:
-            value = Node._v_attrs[attr]
+        node = self.get_node(node_name)
+        if node is None:
+            return f'No group named {node_name}'
+        s += str(f' -- {node._v_name} attributes : \n')
+        for attr in node._v_attrs._v_attrnamesuser:
+            value = node._v_attrs[attr]
             s += str('\t * {} : {}\n'.format(attr, value))
         if as_string:
-            return s+'\n'
+            return s + '\n'
         else:
             print(s)
             return
@@ -1627,7 +1627,6 @@ class SampleData:
         table.flush()
         return
 
-
     def add_attributes(self, dic, nodename):
         """Add a dictionary entries as HDF5 Attributes to a Node or Group.
 
@@ -1636,9 +1635,9 @@ class SampleData:
         :param str nodename: Path, Index name or Alias of the HDF5 node or
             group receiving the Attributes
         """
-        Node = self.get_node(nodename)
+        node = self.get_node(nodename)
         for key, value in dic.items():
-            Node._v_attrs[key] = value
+            node._v_attrs[key] = value
         return
 
     def add_alias(self, aliasname, path=None, indexname=None):
@@ -2447,6 +2446,7 @@ class SampleData:
 
         :param str sample_name: a string for the sample name.
         """
+        #self.get_node('/')._v_attrs['sample_name'] = sample_name
         self.add_attributes({'sample_name': sample_name}, '/')
 
     def get_description(self, node='/'):
@@ -2544,15 +2544,16 @@ class SampleData:
             each dimension of the origin of this image group.
         """
         old_origin = self.get_attribute('origin', image_group)
-        if len(old_origin) != len(origin):
+        print(old_origin is None)
+        if old_origin is not None and (len(old_origin) != len(origin)):
             raise ValueError('Dimension mismatch between image group origin'
                              f' {old_origin} and input new origin'
                              f' {origin}')
         self.add_attributes({'origin': origin}, image_group)
         if len(origin) == 2:
-            Or = origin[[1,0]]
+            Or = origin[[1, 0]]
         elif len(origin) == 3:
-            Or = origin[[2,1,0]]
+            Or = origin[[2, 1, 0]]
         xdmf_grid = self._find_xdmf_grid(image_group)
         # find out if the grid has subgrids (temporal grid collection)
         if xdmf_grid.getchildren()[0].tag == 'Grid':
@@ -3123,9 +3124,10 @@ class SampleData:
         self._init_data_model()
         self._verbose_print('**** FILE CONTENT ****')
         self._verbose_print(SampleData.__repr__(self))
-        # add sample name and description
-        self.set_sample_name(sample_name)
-        self.set_description(sample_description)
+        if not self._file_exist:
+            # add sample name and description specified at the creation
+            self.set_sample_name(sample_name)
+            self.set_description(sample_description)
         return
 
     def _init_data_model(self):

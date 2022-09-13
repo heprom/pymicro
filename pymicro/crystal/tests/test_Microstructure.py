@@ -59,13 +59,14 @@ class MicrostructureTests(unittest.TestCase):
         del m
 
     def test_from_copy(self):
-        # test computing of grain geometrical quantities and copy of an
-        # existing Microstructure dataset
-        # create new microstructure copy of an already existing file
-        filename = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,
+        # test computing the grain geometries from the copy of a Microstructure
+        file_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,
                                 't5_dct_slice_data.h5')
-        new_file = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'tmp_slice_dct')
-        m = Microstructure.copy_sample(filename, new_file, autodelete=True,
+        copy_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'tmp_slice_dct')
+        # create a microstructure copy of an existing file
+        m = Microstructure.copy_sample(file_path, copy_path,
+                                       overwrite=True,
+                                       autodelete=True,
                                        get_object=True)
         h5_file = m.h5_path
         xdmf_file = m.xdmf_path
@@ -74,7 +75,7 @@ class MicrostructureTests(unittest.TestCase):
         m.recompute_grain_bounding_boxes()
         m.recompute_grain_centers()
         # m.recompute_grain_volumes()
-        m_ref = Microstructure(filename=filename)
+        m_ref = Microstructure(filename=file_path)
         for i in range(m_ref.grains.nrows):
             print(' n°1 :', m.grains[i])
             print(' n°2 :', m_ref.grains[i])
@@ -90,7 +91,9 @@ class MicrostructureTests(unittest.TestCase):
         # read a test microstructure
         m = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'n27-id1_data.h5'))
         # crop the microstructure
-        m1 = m.crop(x_start=20, x_end=40, y_start=10, y_end=40, z_start=15, z_end=55, autodelete=True)
+        m1 = m.crop(x_start=20, x_end=40,
+                    y_start=10, y_end=40,
+                    z_start=15, z_end=55, autodelete=True)
         h5_file = m1.h5_file
         xdmf_file = m1.xdmf_file
         dims = (20, 30, 40)
@@ -102,7 +105,7 @@ class MicrostructureTests(unittest.TestCase):
             self.assertTrue(gid in gids_crop)
         self.assertEqual(np.sum(m1.get_grain_map() == 14), 396)
         del m1
-        # verify that the mirostructure files have been deleted
+        # verify that the microstructure files have been deleted
         self.assertTrue(not os.path.exists(h5_file))
         self.assertTrue(not os.path.exists(xdmf_file))
         del m
@@ -117,7 +120,7 @@ class MicrostructureTests(unittest.TestCase):
         m = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5'))
         self.assertAlmostEqual(m.get_grain_volumes(id_list=[3])[0], 0.030025482)
         center = m.get_grain_centers(id_list=[3])[0]
-        the_center = [-0.25036922, 0.00601893, -0.09261252]
+        the_center = [-0.24255674, 0.01383143, -0.08480002]
         for i in range(3):
             self.assertAlmostEquals(center[i], the_center[i])
         rod = m.get_grain_rodrigues(id_list=[3])[0]
@@ -148,7 +151,9 @@ class MicrostructureTests(unittest.TestCase):
         # read and copy a microstructure
         m1_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5')
         copy_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_copy_data.h5')
-        m1 = Microstructure.copy_sample(m1_path, copy_path, autodelete=True,
+        m1 = Microstructure.copy_sample(m1_path, copy_path,
+                                        overwrite=True,
+                                        autodelete=True,
                                         get_object=True)
         self.assertTrue(8 not in m1.get_grain_ids())
         m1.renumber_grains()

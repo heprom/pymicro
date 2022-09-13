@@ -158,7 +158,9 @@ class HklDirectionTests(unittest.TestCase):
 class HklPlaneTests(unittest.TestCase):
     def setUp(self):
         print('testing the HklPlane class')
-        self.hex = Lattice.hexagonal(0.2931, 0.4694)  # nm
+        self.cubic = Lattice.cubic(1.)
+        self.hexagonal = Lattice.hexagonal(0.2931, 0.4694)  # nm
+        self.tetragonal = Lattice.tetragonal(1., 1.5)
 
     def test_equality(self):
         p1 = HklPlane(1, 1, 1)
@@ -174,53 +176,54 @@ class HklPlaneTests(unittest.TestCase):
         self.assertEqual(np.linalg.norm(n), 1)
 
     def test_get_family(self):
-        self.assertEqual(len(HklPlane.get_family('001', crystal_structure=Symmetry.cubic)), 3)
-        self.assertEqual(len(HklPlane.get_family('001', crystal_structure=Symmetry.cubic, include_friedel_pairs=True)), 6)
-        self.assertEqual(len(HklPlane.get_family('111', crystal_structure=Symmetry.cubic)), 4)
-        self.assertEqual(len(HklPlane.get_family('111', crystal_structure=Symmetry.cubic, include_friedel_pairs=True)), 8)
-        self.assertEqual(len(HklPlane.get_family('011', crystal_structure=Symmetry.cubic)), 6)
-        self.assertEqual(len(HklPlane.get_family('011', crystal_structure=Symmetry.cubic, include_friedel_pairs=True)), 12)
-        self.assertEqual(len(HklPlane.get_family('112', crystal_structure=Symmetry.cubic)), 12)
-        self.assertEqual(len(HklPlane.get_family('112', crystal_structure=Symmetry.cubic, include_friedel_pairs=True)), 24)
-        self.assertEqual(len(HklPlane.get_family('123', crystal_structure=Symmetry.cubic)), 24)
-        self.assertEqual(len(HklPlane.get_family('123', crystal_structure=Symmetry.cubic, include_friedel_pairs=True)), 48)
-        self.assertEqual(len(HklPlane.get_family('001', crystal_structure=Symmetry.tetragonal)), 1)
-        self.assertEqual(len(HklPlane.get_family('001', crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 2)
-        self.assertEqual(len(HklPlane.get_family('010', crystal_structure=Symmetry.tetragonal)), 2)
-        self.assertEqual(len(HklPlane.get_family('010', crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 4)
-        self.assertEqual(len(HklPlane.get_family('100', crystal_structure=Symmetry.tetragonal)), 2)
-        self.assertEqual(len(HklPlane.get_family('100', crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 4)
-        self.assertEqual(len(HklPlane.get_family([1, 0, 2], crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 8)
-        self.assertEqual(len(HklPlane.get_family([-1, 0, 2], crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 8)
-        self.assertEqual(len(HklPlane.get_family([0, 1, 2], crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 8)
-        self.assertEqual(len(HklPlane.get_family([0, -1, 2], crystal_structure=Symmetry.tetragonal, include_friedel_pairs=True)), 8)
-        self.assertEqual(len(HklPlane.get_family('001', crystal_structure=Symmetry.hexagonal)), 1)
-        self.assertEqual(len(HklPlane.get_family('001', crystal_structure=Symmetry.hexagonal, include_friedel_pairs=True)), 2)
-        self.assertEqual(len(HklPlane.get_family('100', crystal_structure=Symmetry.hexagonal)), 3)
-        self.assertEqual(len(HklPlane.get_family('100', crystal_structure=Symmetry.hexagonal, include_friedel_pairs=True)), 6)
-        self.assertEqual(len(HklPlane.get_family((1, 0, -1, 0), crystal_structure=Symmetry.hexagonal)), 3)
-        self.assertEqual(len(HklPlane.get_family((1, 0, -1, 0), crystal_structure=Symmetry.hexagonal, include_friedel_pairs=True)), 6)
-        self.assertEqual(len(HklPlane.get_family('102', crystal_structure=Symmetry.hexagonal)), 6)
-        self.assertEqual(len(HklPlane.get_family('102', crystal_structure=Symmetry.hexagonal, include_friedel_pairs=True)), 12)
+        self.assertEqual(len(HklPlane.get_hkl_family('001', lattice=self.cubic)), 3)
+        self.assertEqual(len(HklPlane.get_hkl_family('001', lattice=self.cubic, friedel_pairs=True)), 6)
+        self.assertEqual(len(HklPlane.get_hkl_family('111', lattice=self.cubic)), 4)
+        self.assertEqual(len(HklPlane.get_hkl_family('111', lattice=self.cubic, friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_hkl_family('011', lattice=self.cubic)), 6)
+        self.assertEqual(len(HklPlane.get_hkl_family('011', lattice=self.cubic, friedel_pairs=True)), 12)
+        self.assertEqual(len(HklPlane.get_hkl_family('112', lattice=self.cubic)), 12)
+        self.assertEqual(len(HklPlane.get_hkl_family('112', lattice=self.cubic, friedel_pairs=True)), 24)
+        self.assertEqual(len(HklPlane.get_hkl_family('123', lattice=self.cubic)), 24)
+        self.assertEqual(len(HklPlane.get_hkl_family('123', lattice=self.cubic, friedel_pairs=True)), 48)
+        self.assertEqual(len(HklPlane.get_hkl_family('001', lattice=self.tetragonal)), 1)
+        self.assertEqual(len(HklPlane.get_hkl_family('001', lattice=self.tetragonal, friedel_pairs=True)), 2)
+        self.assertEqual(len(HklPlane.get_hkl_family('010', lattice=self.tetragonal)), 2)
+        self.assertEqual(len(HklPlane.get_hkl_family('010', lattice=self.tetragonal, friedel_pairs=True)), 4)
+        self.assertEqual(len(HklPlane.get_hkl_family('100', lattice=self.tetragonal)), 2)
+        self.assertEqual(len(HklPlane.get_hkl_family('100', lattice=self.tetragonal, friedel_pairs=True)), 4)
+        self.assertEqual(len(HklPlane.get_hkl_family([1, 0, 2], lattice=self.tetragonal, friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_hkl_family([-1, 0, 2], lattice=self.tetragonal, friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_hkl_family([0, 1, 2], lattice=self.tetragonal, friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_hkl_family([0, -1, 2], lattice=self.tetragonal, friedel_pairs=True)), 8)
+        self.assertEqual(len(HklPlane.get_hkl_family('001', lattice=self.hexagonal)), 1)
+        self.assertEqual(len(HklPlane.get_hkl_family('001', lattice=self.hexagonal, friedel_pairs=True)), 2)
+        self.assertEqual(len(HklPlane.get_hkl_family('100', lattice=self.hexagonal)), 3)
+        self.assertEqual(len(HklPlane.get_hkl_family('100', lattice=self.hexagonal, friedel_pairs=True)), 6)
+        self.assertEqual(len(HklPlane.get_hkl_family((1, 0, -1, 0), lattice=self.hexagonal)), 3)
+        self.assertEqual(len(HklPlane.get_hkl_family((1, 0, -1, 0), lattice=self.hexagonal, friedel_pairs=True)), 6)
+        self.assertEqual(len(HklPlane.get_hkl_family('102', lattice=self.hexagonal)), 6)
+        self.assertEqual(len(HklPlane.get_hkl_family('102', lattice=self.hexagonal, friedel_pairs=True)), 12)
 
     def test_multiplicity(self):
         """Int Tables of Crystallography Vol. 1 p 32."""
-        self.assertEqual(HklPlane(1, 0, 0).multiplicity(symmetry=Symmetry.cubic), 6)
+        self.assertEqual(HklPlane(1, 0, 0, lattice=self.cubic).multiplicity(), 6)
+        self.assertEqual(HklPlane(1, 1, 1, lattice=self.cubic).multiplicity(), 8)
         for h in range(1, 4):
-            self.assertEqual(HklPlane(h, 0, 0).multiplicity(symmetry=Symmetry.tetragonal), 4)
-            self.assertEqual(HklPlane(0, h, 0).multiplicity(symmetry=Symmetry.tetragonal), 4)
-            self.assertEqual(HklPlane(h, h, 0).multiplicity(symmetry=Symmetry.tetragonal), 4)
-            self.assertEqual(HklPlane(-h, h, 0).multiplicity(symmetry=Symmetry.tetragonal), 4)
-            self.assertEqual(HklPlane(h, h, 1).multiplicity(symmetry=Symmetry.tetragonal), 8)
-            self.assertEqual(HklPlane(-h, h, 1).multiplicity(symmetry=Symmetry.tetragonal), 8)
-        self.assertEqual(HklPlane(0, 0, 1).multiplicity(symmetry=Symmetry.tetragonal), 2)
-        self.assertEqual(HklPlane(1, 0, 2).multiplicity(symmetry=Symmetry.tetragonal), 8)
-        self.assertEqual(HklPlane(-1, 0, 2).multiplicity(symmetry=Symmetry.tetragonal), 8)
-        self.assertEqual(HklPlane(0, 1, 2).multiplicity(symmetry=Symmetry.tetragonal), 8)
-        self.assertEqual(HklPlane(0, -1, 2).multiplicity(symmetry=Symmetry.tetragonal), 8)
-        self.assertEqual(HklPlane(1, 2, 0).multiplicity(symmetry=Symmetry.tetragonal), 8)
-        self.assertEqual(HklPlane(-1, 2, 0).multiplicity(symmetry=Symmetry.tetragonal), 8)
-        self.assertEqual(HklPlane(1, 2, 3).multiplicity(symmetry=Symmetry.tetragonal), 16)
+            self.assertEqual(HklPlane(h, 0, 0, lattice=self.tetragonal).multiplicity(), 4)
+            self.assertEqual(HklPlane(0, h, 0, lattice=self.tetragonal).multiplicity(), 4)
+            self.assertEqual(HklPlane(h, h, 0, lattice=self.tetragonal).multiplicity(), 4)
+            self.assertEqual(HklPlane(-h, h, 0, lattice=self.tetragonal).multiplicity(), 4)
+            self.assertEqual(HklPlane(h, h, 1, lattice=self.tetragonal).multiplicity(), 8)
+            self.assertEqual(HklPlane(-h, h, 1, lattice=self.tetragonal).multiplicity(), 8)
+        self.assertEqual(HklPlane(0, 0, 1, lattice=self.tetragonal).multiplicity(), 2)
+        self.assertEqual(HklPlane(1, 0, 2, lattice=self.tetragonal).multiplicity(), 8)
+        self.assertEqual(HklPlane(-1, 0, 2, lattice=self.tetragonal).multiplicity(), 8)
+        self.assertEqual(HklPlane(0, 1, 2, lattice=self.tetragonal).multiplicity(), 8)
+        self.assertEqual(HklPlane(0, -1, 2, lattice=self.tetragonal).multiplicity(), 8)
+        self.assertEqual(HklPlane(1, 2, 0, lattice=self.tetragonal).multiplicity(), 8)
+        self.assertEqual(HklPlane(-1, 2, 0, lattice=self.tetragonal).multiplicity(), 8)
+        self.assertEqual(HklPlane(1, 2, 3, lattice=self.tetragonal).multiplicity(), 16)
 
     def test_HklPlane_normal(self):
         ZrO2 = Lattice.tetragonal(3.64, 5.27)
@@ -275,8 +278,8 @@ class HklPlaneTests(unittest.TestCase):
         """ compute the scattering vector using the formal definition and compare it with the components obtained 
         using the reciprocal lattice. 
         The formulae are available in the Laue Atlas p61, one typo in Eq. 6.1 was corrected. """
-        (a, b, c) = self.hex._lengths
-        (alpha, beta, gamma) = np.radians(self.hex._angles)
+        (a, b, c) = self.hexagonal._lengths
+        (alpha, beta, gamma) = np.radians(self.hexagonal._angles)
         delta = pi / 2 - gamma
         chi = gamma - atan((cos(alpha) - cos(gamma) * cos(beta)) / (cos(beta) * cos(delta)))
         epsilon = pi / 2 - acos((cos(alpha) + cos(beta)) / (cos(chi) + cos(gamma - chi)))
@@ -286,7 +289,7 @@ class HklPlaneTests(unittest.TestCase):
             h = hp / a
             k = (a / hp - b / kp * cos(gamma)) / (a / hp * b / kp * cos(delta))
             l = (lp / c - hp / a * cos(beta) - kp / b * cos(psi)) / cos(epsilon)
-            Gc = HklPlane(hp, kp, lp, self.hex).scattering_vector()
+            Gc = HklPlane(hp, kp, lp, self.hexagonal).scattering_vector()
             self.assertAlmostEqual(Gc[0], h, 7)
             self.assertAlmostEqual(Gc[1], k, 7)
             self.assertAlmostEqual(Gc[2], l, 7)

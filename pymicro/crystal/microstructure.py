@@ -1015,7 +1015,8 @@ class Orientation:
     @staticmethod
     def Axis2OrientationMatrix(axis, angle):
         """
-        Compute the (passive) orientation matrix associated the rotation defined by the given (axis, angle) pair.
+        Compute the (passive) orientation matrix associated the rotation
+        defined by the given (axis, angle) pair.
 
         :param axis: the rotation axis.
         :param angle: the rotation angle (degrees).
@@ -1034,6 +1035,22 @@ class Orientation:
                        (1 - c) * axis[1] * axis[2] - s * axis[0],
                        c + (1 - c) * axis[2] ** 2]])
         return g
+
+    @staticmethod
+    def Axis2Quaternion(axis, angle, P=1):
+        """
+        Compute the quaternion associated the rotation defined by the given
+        (axis, angle) pair.
+
+        :param axis: the rotation axis.
+        :param angle: the rotation angle (degrees).
+        :param int P: convention (1 for active, -1 for passive)
+        :return: the corresponding Quaternion.
+        """
+        omega = np.radians(angle)
+        axis /= np.linalg.norm(axis)
+        q = Quaternion([np.cos(0.5 * omega), *(-P * np.sin(0.5 * omega) * axis)], convention=P)
+        return q
 
     @staticmethod
     def Euler2Axis(euler):
@@ -1093,10 +1110,10 @@ class Orientation:
 
     @staticmethod
     def eu2ro(euler):
-        """Transform a series of euler angles into rodrigues vectors.
+        """Transform a series of euler angles into Rodrigues vectors.
 
         :param ndarray euler: the (n, 3) shaped array of Euler angles (radians).
-        :returns: a (n, 3) array with the rodrigues vectors.
+        :returns: a (n, 3) array with the Rodrigues vectors.
         """
         if euler.ndim != 2 or euler.shape[1] != 3:
             raise ValueError('Wrong shape for the euler array: %s -> should be (n, 3)' % euler.shape)
@@ -1131,13 +1148,13 @@ class Orientation:
         :param euler: The triplet of the Euler angles (in degrees).
         :return g: The 3x3 orientation matrix.
         """
-        (rphi1, rPhi, rphi2) = np.radians(euler)
-        c1 = np.cos(rphi1)
-        s1 = np.sin(rphi1)
-        c = np.cos(rPhi)
-        s = np.sin(rPhi)
-        c2 = np.cos(rphi2)
-        s2 = np.sin(rphi2)
+        phi1, Phi, phi2 = np.radians(euler)
+        c1 = np.cos(phi1)
+        s1 = np.sin(phi1)
+        c = np.cos(Phi)
+        s = np.sin(Phi)
+        c2 = np.cos(phi2)
+        s2 = np.sin(phi2)
 
         # rotation matrix g
         g11 = c1 * c2 - s1 * s2 * c
@@ -2478,14 +2495,15 @@ class Microstructure(SampleData):
         return
 
     @staticmethod
-    def random_texture(n=100):
+    def random_texture(n=100, phase=None):
         """Generate a random texture microstructure.
 
-        **parameters:**
-
-        *n* The number of grain orientations in the microstructure.
+        :param int n: the number of grain orientations in the microstructure.
+        :param CrystallinePhase phase: the phase to use for this microstructure.
+        :return: a `Microstructure` instance with n randomly oriented grains.
         """
-        m = Microstructure(name='random_texture', overwrite_hdf5=True)
+        m = Microstructure(name='random_texture', phase=phase,
+                           overwrite_hdf5=True)
         grain = m.grains.row
         for i in range(n):
             grain['idnumber'] = i + 1
@@ -3442,6 +3460,7 @@ class Microstructure(SampleData):
         if not crop_name:
             crop_name = self.get_sample_name() + \
                         (not self.get_sample_name().endswith('_')) * '_' + 'crop'
+        print('CROP: %s' % crop_name)
         # create new microstructure dataset
         micro_crop = Microstructure(name=crop_name, overwrite_hdf5=True,
                                     phase=self.get_phase(),
@@ -4150,7 +4169,7 @@ class Microstructure(SampleData):
             from vtk.util import numpy_support
             #TODO adapt to 2D grain maps
             #TODO build a continuous grain map for amitex
-            # grain_ids = self.get_grain_map()
+            #grain_ids = self.get_grain_map()
             grain_ids = self.renumber_grains(only_grain_map=True)
             if not self._is_empty('phase_map'):
                 # use the phase map for the material ids

@@ -1603,7 +1603,8 @@ class HklPlane(HklObject):
         """
         hkl_planes = []
         for hkl in hkl_family_list:
-            family = HklPlane.get_family(hkl,
+            family = HklPlane.get_hkl_family(hkl,
+                                         lattice,
                                          friedel_pairs=friedel_pairs)
             hkl_planes.extend(family)
         return hkl_planes

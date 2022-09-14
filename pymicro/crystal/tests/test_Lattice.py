@@ -175,6 +175,10 @@ class HklPlaneTests(unittest.TestCase):
         n = p.normal()
         self.assertEqual(np.linalg.norm(n), 1)
 
+    def test_from_families(self):
+        self.assertEqual(len(HklPlane.from_families(['001', '111'], lattice=self.cubic)), 7)
+        self.assertEqual(len(HklPlane.from_families(['001', '111'], lattice=self.cubic, friedel_pairs=True)), 14)
+
     def test_get_family(self):
         self.assertEqual(len(HklPlane.get_hkl_family('001', lattice=self.cubic)), 3)
         self.assertEqual(len(HklPlane.get_hkl_family('001', lattice=self.cubic, friedel_pairs=True)), 6)

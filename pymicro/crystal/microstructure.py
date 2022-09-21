@@ -248,9 +248,16 @@ class Orientation:
         """Compute the mean orientation.
 
         This function computes a mean orientation from several data points
-        representing orientations. Each orientation is first moved to the
-        fundamental zone, then the corresponding Rodrigues vectors can be
-        averaged to compute the mean orientation.
+        representing orientations by averaging the corresponding Rodrigues
+        vector. One caveat with this averaging method is if the vectors belong
+        to different asymetric domains, the mean orientation will be wrong.
+
+        To avoid this, we compute all equivalent rotation for all data points
+        and then use kmeans clustering to separate all points. The number of
+        clusters is known to be equal to the number of symmetry operators.
+
+        A mean orientation is then computed for each cluster and the one which
+        belongs to the fundamental zone is returned.
 
         :param ndarray rods: a (n, 3) shaped array containing the Rodrigues
         vectors of the orientations.
@@ -259,14 +266,42 @@ class Orientation:
         :returns: the mean orientation as an `Orientation` instance.
         """
         rods = np.atleast_2d(rods)
-        rods_fz = np.empty_like(rods)
+        syms = symmetry.symmetry_operators()
+
+        # apply all symmetries to compute Rodrigues vectors
+        rods_syms = np.zeros((len(syms), len(rods), 3), dtype=float)
         for i in range(len(rods)):
             g = Orientation.from_rodrigues(rods[i]).orientation_matrix()
-            g_fz = symmetry.move_rotation_to_FZ(g, verbose=False)
-            o_fz = Orientation(g_fz)
-            rods_fz[i] = o_fz.rod
-        mean_orientation = Orientation.from_rodrigues(np.mean(rods_fz, axis=0))
-        return mean_orientation
+            # apply all symmetries
+            g_syms = np.dot(syms, g)
+            for j in range(len(syms)):
+                # compute the rodrigues vector for each symmetry
+                rods_syms[j, i] = Orientation(g_syms[j]).rod
+
+        # we now apply kmeans clustering
+        X = rods_syms.reshape((len(syms) * len(rods), 3))
+        # we need to initialize the centroid with one point in each zone
+        from sklearn.cluster import KMeans
+        kmeans = KMeans(n_clusters=len(syms), init=rods_syms[:, 0, :]).fit(
+            X)  # number of clusters = nb of symmetry operators
+
+        # now compute the mean orientation for each cluster
+        mean_rods_syms = np.empty((len(syms), 3), dtype=float)
+        for j in range(len(syms)):
+            mean_rods_syms[j] = np.mean(X[kmeans.labels_ == j], axis=0)
+        # find which orientation belongs to the FZ
+        if symmetry == Symmetry.cubic:
+             index_fz = np.argmax([(np.abs(r).sum() <= 1.0) and
+                                   (np.abs(r).max() <= 2 ** 0.5 - 1)
+                                   for r in mean_rods_syms])
+        elif symmetry == Symmetry.hexagonal:
+            index_fz = np.argmax([Orientation.fzDihedral(r, 6)
+                                  for r in mean_rods_syms])
+        else:
+            raise (ValueError('unsupported crystal symmetry: %s' % symmetry))
+        rod_sym_mean = mean_rods_syms[index_fz]
+
+        return Orientation.from_rodrigues(rod_sym_mean)
 
     @staticmethod
     def fzDihedral(rod, n):

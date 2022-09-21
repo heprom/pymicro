@@ -1063,15 +1063,11 @@ class Lattice:
         """Get a list of the hkl planes composing the given family for
         this crystal lattice.
 
-        *Parameters*
-
-        **hkl**: miller indices of the requested family
-
-        *Returns*
-
-        A list of the hkl planes in the given family.
+        :param sequence hkl: a sequence of 3 (4 for hexagonal) numbers
+        corresponding to the miller indices.
+        :return: a list of the hkl planes in the given family.
         """
-        planes = HklPlane.get_family(hkl, lattice=self, crystal_structure=self._symmetry)
+        planes = HklPlane.get_hkl_family(hkl, lattice=self)
         return planes
 
     def get_slip_systems(self, slip_type='oct'):

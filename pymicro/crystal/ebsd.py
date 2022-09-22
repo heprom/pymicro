@@ -519,9 +519,11 @@ class OimScan:
     def change_orientation_reference_frame(self):
         """Change the reference frame for orientation data.
 
+        For this we can use a change base matrix
+
         In OIM, the reference frame for orientation data (euler angles) is
         termed A1A2A3 and differs from the sample reference frame XYZ. This can
-        be set befor the acquisition but the default case is:
+        be set before the acquisition but the default case is:
 
         X = -A2, Y = -A1, Z = -A3.
 

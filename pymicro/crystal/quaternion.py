@@ -15,6 +15,17 @@ class Quaternion:
             self.q0, self.q1, self.q2, self.q3)
         return s
 
+    def __repr__(self):
+        return 'Quaternion ' + str(self)
+
+    def __add__(self, other):
+        """Redefine addition operator for the Quaternion class."""
+        return Quaternion([self.quat + other.quat])
+
+    def __sub__(self, other):
+        """Redefine substraction operator for the Quaternion class."""
+        return Quaternion([self.quat - other.quat])
+
     @property
     def q0(self):
         return self.quat[0]
@@ -30,9 +41,6 @@ class Quaternion:
     @property
     def q3(self):
         return self.quat[3]
-
-    def __repr__(self):
-        return 'Quaternion ' + str(self)
 
     def norm(self):
         """Compute the norm of the quaternion (should be 1)."""

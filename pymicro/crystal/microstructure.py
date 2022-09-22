@@ -253,8 +253,11 @@ class Orientation:
         to different asymetric domains, the mean orientation will be wrong.
 
         To avoid this, we compute all equivalent rotation for all data points
-        and then use kmeans clustering to separate all points. The number of
-        clusters is known to be equal to the number of symmetry operators.
+        and then use kmeans clustering to separate all points. We do this using
+        quaternions to avoid arbitrarily large rodrigues vectors when the
+        rotation angle approaches pi (this would make the clustering algorithm
+        fail). The number of clusters is known to be equal to the number of
+        symmetry operators.
 
         A mean orientation is then computed for each cluster and the one which
         belongs to the fundamental zone is returned.
@@ -265,6 +268,7 @@ class Orientation:
         to their fundamental zone (cubic by default)
         :returns: the mean orientation as an `Orientation` instance.
         """
+        from pymicro.crystal.rotation import ro2qu
         rods = np.atleast_2d(rods)
         syms = symmetry.symmetry_operators()
 
@@ -278,12 +282,16 @@ class Orientation:
                 # compute the rodrigues vector for each symmetry
                 rods_syms[j, i] = Orientation(g_syms[j]).rod
 
-        # we now apply kmeans clustering
+        # we now apply kmeans clustering in quaternion space
         X = rods_syms.reshape((len(syms) * len(rods), 3))
+        Q = np.empty((len(X), 4), dtype=float)
+        for i in range(len(X)):
+            Q[i] = ro2qu(X[i])
         # we need to initialize the centroid with one point in each zone
         from sklearn.cluster import KMeans
-        kmeans = KMeans(n_clusters=len(syms), init=rods_syms[:, 0, :]).fit(
-            X)  # number of clusters = nb of symmetry operators
+        kmeans = KMeans(n_clusters=len(syms),  # number of clusters = nb of symmetry operators
+                        init=Q[::len(rods)],  # explicit centroids
+                        n_init=1).fit(Q)
 
         # now compute the mean orientation for each cluster
         mean_rods_syms = np.empty((len(syms), 3), dtype=float)

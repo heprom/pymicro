@@ -225,8 +225,8 @@ class DctForwardSimulation(ForwardSimulation):
         symmetry = self.exp.get_sample().get_material().get_symmetry()
         hkl_planes = []
         for hkl in hkl_list:
-            # here we set include_friedel_pairs to False as we take it into account in the calculation
-            planes = HklPlane.get_family(hkl, include_friedel_pairs=True, crystal_structure=symmetry)
+            # here we set friedel_pairs to False as we take it into account in the calculation
+            planes = HklPlane.get_family(hkl, friedel_pairs=True, crystal_structure=symmetry)
             for plane in planes:  # fix the lattice
                 plane.set_lattice(self.exp.get_sample().get_material())
             hkl_planes.extend(planes)
@@ -799,6 +799,7 @@ def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=90,
     :param bool save_edf: flag to save the tt stack as an EDF file.
     :param int n_topo: the number of images to sum for a topograph.
     :param str data_key: a string to access the data within the h5 file.
+    :param array dark: image to use as dark correction.
     """
     import h5py
     print('number of frames to sum for a topograph = %d' % n_topo)

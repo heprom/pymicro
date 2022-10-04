@@ -556,7 +556,6 @@ class FE_Mesh():
         # look for ***group
         while True:
             line = geof.readline().strip()
-            print(line)
             if line.startswith('***group'):
                 break
         # look for ***return
@@ -584,7 +583,7 @@ class FE_Mesh():
                     print('appending element ids to elset %s' % elset_name, end='\r')
                     for el_id in new_elset:
                         fe_mesh._elsets[index].append(el_id)
-                print('mesh contains %d elsets' % len(fe_mesh._elsets))
+                print('mesh contains %d elsets' % len(fe_mesh._elsets), end='\r')
             elif line.startswith('**liset'):
                 liset_name = line.split()[1]
                 new_liset = []
@@ -602,11 +601,12 @@ class FE_Mesh():
                     fe_mesh._liset_names.append(liset_name)
                     print('adding new liset: %s' % liset_name, end='\r')
                     fe_mesh._lisets.append(new_liset)
-                print('mesh contains %d lisets' % len(fe_mesh._lisets))
+                print('mesh contains %d lisets' % len(fe_mesh._lisets), end='\r')
             if line.startswith('***return'):
                 break
             if not line.startswith('**elset'):
                 line = geof.readline()
+        print('mesh contains %d elsets' % len(fe_mesh._elsets) + ' ' * 40)
         fe_mesh.update_number_of_gauss_points()
         geof.close()
         return fe_mesh

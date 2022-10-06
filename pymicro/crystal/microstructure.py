@@ -2613,9 +2613,9 @@ class Microstructure(SampleData):
             group, with name `grain_ids`
         """
         if meshname is None:
-            raise ValueError('meshname do not refer to an existing mesh')
+            raise ValueError('mesh_name do not refer to an existing mesh')
         if not self._is_mesh(meshname) or self._is_empty(meshname):
-            raise ValueError('meshname do not refer to a non empty mesh group')
+            raise ValueError('mesh_name do not refer to a non empty mesh group')
         # create empty element vector field
         n_elements = int(self.get_attribute('Number_of_elements', meshname))
         mesh = self.get_node(meshname)
@@ -2650,9 +2650,9 @@ class Microstructure(SampleData):
             mesh group, with name `orientation_field`.
         """
         if meshname is None:
-            raise ValueError('meshname do not refer to an existing mesh')
+            raise ValueError('mesh_name do not refer to an existing mesh')
         if not(self._is_mesh(meshname)) or self._is_empty(meshname):
-            raise ValueError('meshname do not refer to a non empty mesh group')
+            raise ValueError('mesh_name do not refer to a non empty mesh group')
         # create empty element vector field
         n_elements = int(self.get_attribute('Number_of_elements', meshname))
         mesh = self.get_node(meshname)
@@ -4234,9 +4234,9 @@ class Microstructure(SampleData):
         if not self._is_empty('grain_map'):
             # convert the grain map to vtk file
             from vtk.util import numpy_support
-            #TODO adapt to 2D grain maps
-            #TODO build a continuous grain map for amitex
-            #grain_ids = self.get_grain_map()
+            # TODO adapt to 2D grain maps
+            # TODO build a continuous grain map for amitex
+            # grain_ids = self.get_grain_map()
             grain_ids = self.renumber_grains(only_grain_map=True)
             if not self._is_empty('phase_map'):
                 # use the phase map for the material ids
@@ -4307,9 +4307,9 @@ class Microstructure(SampleData):
                 print('%s array written in legacy vtk form for AMITEX_FFTP' %
                       array_name)
 
-    def from_amitex_fftp(self, basename, grip_size=0, ext_size=0,
-                         sim_prefix='Amitex', int_var_names=dict(),
-                         load_fields=True, compression_options=dict()):
+    def from_amitex_fftp(self, base_name, grip_size=0, ext_size=0,
+                         sim_prefix='Amitex', int_var_names={},
+                         load_fields=True, compression_options={}):
         """Read the output of a Amitex_fftp simulation and store the field
         in the dataset.
 
@@ -4335,16 +4335,13 @@ class Microstructure(SampleData):
                 be modified in the future to allow to specify a new image data
                 group to store de results (created if needed).
 
-        :param basename: Basename of Amitex .std, .vtk output files to
+        :param base_name: Basename of Amitex .std, .vtk output files to
             load in dataset.
-        :type basename: str
+        :type base_name: str
         :param grip_size: Thickness of the grips added to simulation unit cell
             by the method 'to_amitex_fftp' of this class, defaults to 0. This
             value corresponds to a number of voxels on both ends of the cell.
         :type grip_size: int, optional
-        :param grip_dim: Dimension along which the tension test has been
-            simulated (0:x, 1:y, 2:z)
-        :type grip_dim: int, optional
         :param ext_size: Thickness of the exterior region added to simulation
             unit cell by the method 'to_amitex_fftp' of this class,
             defaults to 0.  This value corresponds to a number of voxels on
@@ -4358,15 +4355,19 @@ class Microstructure(SampleData):
             (varInt1, varInt2, ...) and values are corresponding names for
             these variables in the dataset.
         :type int_var_names: dict, optional
+        :param bool load_fields: Flag to control if the fields are imported
+            from the vtk files.
+        :param dict compression_options: Dictionary containing the compression
+            options to use for the imported fields.
         """
         # TODO: add grain map to all time steps
         from pymicro.core.utils.SDAmitexUtils import SDAmitexIO
         # get std result file path (.std or .mstd)
         std_suffix = '.std' if grip_size == 0 and ext_size == 0 else '.mstd'
-        std_path = Path(str(basename)).absolute().with_suffix(std_suffix)
+        std_path = Path(str(base_name)).absolute().with_suffix(std_suffix)
         # safety check
         if not std_path.exists():
-            raise ValueError('results not found, "basename" argument'
+            raise ValueError('results not found, "base_name" argument'
                              ' not associated with Amitex_fftp simulation'
                              ' results.')
         step = 1
@@ -4394,7 +4395,7 @@ class Microstructure(SampleData):
                        indexname=f'{sim_prefix}_std', replace=True,
                        description=std_res.dtype, data=std_res)
         # idem for zstd --> Add as Mechanical Grain Data Table
-        zstd_path = Path(str(basename) + '_1').with_suffix('.zstd')
+        zstd_path = Path(str(base_name) + '_1').with_suffix('.zstd')
         if zstd_path.exists():
             # load .zstd results
             zstd_res = SDAmitexIO.load_std(zstd_path,
@@ -4409,48 +4410,48 @@ class Microstructure(SampleData):
             IDs = np.tile(grain_ids, n_zone_times).astype(dtype_col)
             self.add_tablecols(tablename='MechanicalGrainDataTable',
                                description=IDs.dtype, data=IDs)
-        # End of macroscopic data loading. Check if field data must be loaded.
+        # end of macroscopic data loading. Check if field data must be loaded.
         if not load_fields:
             return
-        # Get vtk files results
-        Stress, Strain, VarInt, Incr_list = SDAmitexIO.load_amitex_output_fields(
-            basename, grip_size=grip_size, ext_size=ext_size,
+        # get results from vtk files
+        stress, strain, var_int, incr_list = SDAmitexIO.load_amitex_output_fields(
+            base_name, grip_size=grip_size, ext_size=ext_size,
             grip_dim=2)
-        ## Loop over time steps: create group to store results
+        # loop over time steps: create group to store results
         self.add_group(groupname=f'{sim_prefix}_fields',
                        location='/CellData', indexname='fft_fields',
                        replace=True)
-        # Create CellData temporal subgrids for each time value with a vtk
-        # field output
-        time_values = std_res['time'][Incr_list].squeeze()
-        if len(time_values) == 0:
+        # create CellData sub-grids for each time value with a vtk field output
+        time_values = std_res['time'][incr_list].squeeze()
+        if np.size(time_values) == 0:
             time_values = [0.]
+            print(time_values)
         self.add_grid_time('CellData', time_values)
 
-        # Add fields to CellData grid collections
-        for incr in Stress:
-            Time = std_res['time'][incr].squeeze()
-            fieldname = f'{sim_prefix}_stress'
-            self.add_field(gridname='CellData', fieldname=fieldname,
-                           array=Stress[incr], location='fft_fields',
-                           time=Time, compression_options=compression_options)
-        for incr in Strain:
-            Time = std_res['time'][incr].squeeze()
-            fieldname = f'{sim_prefix}_strain'
-            self.add_field(gridname='CellData', fieldname=fieldname,
-                           array=Strain[incr], location='fft_fields',
-                           time=Time, compression_options=compression_options)
-        for mat in VarInt:
-            for incr in VarInt[mat]:
-                Time = std_res['time'][incr].squeeze()
-                for var in VarInt[mat][incr]:
-                    varname = var
+        # add fields to CellData grid collections
+        for incr in stress:
+            time = std_res['time'][incr].squeeze()
+            field_name = f'{sim_prefix}_stress'
+            self.add_field(gridname='CellData', fieldname=field_name,
+                           array=stress[incr], location='fft_fields',
+                           time=time, compression_options=compression_options)
+        for incr in strain:
+            time = std_res['time'][incr].squeeze()
+            field_name = f'{sim_prefix}_strain'
+            self.add_field(gridname='CellData', fieldname=field_name,
+                           array=strain[incr], location='fft_fields',
+                           time=time, compression_options=compression_options)
+        for mat in var_int:
+            for incr in var_int[mat]:
+                time = std_res['time'][incr].squeeze()
+                for var in var_int[mat][incr]:
+                    var_name = var
                     if int_var_names.__contains__(var):
-                        varname = int_var_names[var]
-                    fieldname = f'{sim_prefix}_mat{mat}_{varname}'
-                    self.add_field(gridname='CellData', fieldname=fieldname,
-                                   array=VarInt[mat][incr][var],
-                                   location='fft_fields', time=Time,
+                        var_name = int_var_names[var]
+                    field_name = f'{sim_prefix}_mat{mat}_{var_name}'
+                    self.add_field(gridname='CellData', fieldname=field_name,
+                                   array=var_int[mat][incr][var],
+                                   location='fft_fields', time=time,
                                    compression_options=compression_options)
         return
 
@@ -4527,7 +4528,7 @@ class Microstructure(SampleData):
         # geometry
         geom = m.create_group('_SIMPL_GEOMETRY')
         geom.attrs['GeometryType'] = np.uint32(999)
-        geom.attrs['GeometryTypeName'] = np.string_('UnkownGeometry')
+        geom.attrs['GeometryTypeName'] = np.string_('UnknownGeometry')
         # create the data container bundles group
         f.create_group('DataContainerBundles')
         f.close()
@@ -4550,6 +4551,7 @@ class Microstructure(SampleData):
         """Read a microstructure from a Dream3d hdf5 file.
 
         :param str file_path: the path to the hdf5 file to read.
+        :param str main_key: the string describing the main key group.
         :param str data_container: the string describing the data container
             group in the file.
         :param str ensemble_data: the string describing the ensemble data group

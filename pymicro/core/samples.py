@@ -83,7 +83,7 @@ class SampleData:
     .. rubric:: Arguments of the Class constructor
 
     :filename: `str`
-        basename of HDF5/XDMF files to create/read. A file pair is created if
+        base_name of HDF5/XDMF files to create/read. A file pair is created if
         the `filename` do not match any existing file.
     :sample_name: `str`, optional ('')
         name of the sample associated to data (metadata, dataset "title"). If
@@ -108,7 +108,7 @@ class SampleData:
 
     .. rubric:: Class attributes
 
-    :h5_file: basename of HDF5 file containing dataset (`str`)
+    :h5_file: base_name of HDF5 file containing dataset (`str`)
     :h5_path: full path of the HDF5 dataset file
     :h5_dataset: :py:class:`tables.File` instance associated to the
         `h5_file`
@@ -1413,7 +1413,7 @@ class SampleData:
                             ''.format(name, location))
         # get location path
         location_path = self._name_or_node_to_path(location)
-        if (location_path is None):
+        if location_path is None:
             msg = ('(add_table): location {} does not exist, table'
                    ' cannot be added. Use optional argument'
                    ' "createparents=True" to force location Group creation'
@@ -1465,7 +1465,7 @@ class SampleData:
             self._verbose_print(warn_msg)
             indexname = name
         self.add_to_index(indexname, table._v_pathname)
-        self.add_attributes({'node_type':'structured_array'},
+        self.add_attributes({'node_type' : 'structured_array'},
                             table._v_pathname)
         return table
 
@@ -2213,7 +2213,7 @@ class SampleData:
                 table = self.get_node(name=data_path)
                 data = table.col(colname)
             else:
-                msg = ('(get_tablecol) Data is not an table node.')
+                msg = '(get_tablecol) Data is not a table node.'
                 self._verbose_print(msg)
         return data
 
@@ -3042,66 +3042,67 @@ class SampleData:
             del new_sample
             return
 
-    def create_elset_ids_field(self, meshname=None, store=True, fieldname=None,
-                               get_sets_IDs=True, tags_prefix='elset',
-                               remove_elset_fields=False):
-        """Create an element tag Id field on the input mesh.
+    def create_elset_ids_field(self, mesh_name=None, store=True,
+                               field_name=None, get_sets_ids=True,
+                               tags_prefix='elset', remove_elset_fields=False):
+        """Create an element tag id field on the input mesh.
 
         Creates a element wise field from the provided mesh,
         adding to each element the value of the Elset it belongs to.
 
-        .. warning::
+        .. note::
 
             - CAUTION : the method is designed to work with non intersecting
               element tags/sets. In this case, the produce field will indicate
               the value of the last elset containing it for each element.
 
-        :param str meshname: Name, Path or index name of the mesh on which an
+        :param str mesh_name: Name, Path or index name of the mesh on which an
             orientation map element field must be constructed
         :param bool store: If `True`, store the field on the mesh
-        :param bool get_sets_IDs: If `True`, get the sets ID numbers from their
+        :param str field_name: the name to use for the newly created field, if
+        not specified, the string '_elset_ids' will be appended to the mesh name.
+        :param bool get_sets_ids: If `True`, get the sets id numbers from their
             names by substracting the input prefix. If `False`, use the set
-            position in the mesh elset list as ID number.
+            position in the mesh elset list as id number.
         :param str tags_prefix: Remove from element sets/tags names
-            prefix to determine the set/tag ID. This supposes that sets
-            names have the form prefix+ID
+            prefix to determine the set/tag id. This supposes that sets
+            names have the form prefix + id
         :param bool remove_elset_fields: If `True`, removes the elset
             indicator fields after construction of the elset id field.
             (default is `False`)
         """
-        if meshname is None:
-                raise ValueError('meshname do not refer to an existing mesh')
-        if not(self._is_mesh(meshname)) or  self._is_empty(meshname):
-                raise ValueError('meshname do not refer to a non empty mesh'
-                                 'group')
+        if mesh_name is None:
+            raise ValueError('mesh_name do not refer to an existing mesh')
+        if not self._is_mesh(mesh_name) or self._is_empty(mesh_name):
+            raise ValueError('mesh_name do not refer to a non empty mesh group')
         # create empty element vector field
-        n_elements = int(self.get_attribute('Number_of_elements', meshname))
-        mesh = self.get_node(meshname)
-        El_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
-        ID_field = np.zeros((n_elements, 1), dtype=int)
-        elem_tags = self.get_mesh_elem_tags_names(meshname)
+        n_elements = int(self.get_attribute('Number_of_elements', mesh_name))
+        mesh = self.get_node(mesh_name)
+        el_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
+        id_field = np.zeros((n_elements, 1), dtype=int)
+        elem_tags = self.get_mesh_elem_tags_names(mesh_name)
         # if mesh is provided
         i = 0
         for set_name, set_type in elem_tags.items():
-            elset_path = '%s/ET_%s' % (El_tag_path, set_name)
+            elset_path = '%s/ET_%s' % (el_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True)
-            if get_sets_IDs:
-                set_ID = int(set_name.strip(tags_prefix))
+            if get_sets_ids:
+                set_id = int(set_name.strip(tags_prefix))
             else:
-                set_ID = i
+                set_id = i
                 i += 1
-            ID_field[element_ids] = set_ID
+            id_field[element_ids] = set_id
             if remove_elset_fields:
-                field_path = '%s/field_%s' % (El_tag_path, set_name)
+                field_path = '%s/field_%s' % (el_tag_path, set_name)
                 self.remove_node(field_path)
         if store:
-            if fieldname is None:
-                fieldname = meshname + '_elset_ids'
-            c_opt = {'complib': 'zlib', 'complevel': 1, 'shuffle': True}
-            self.add_field(gridname=meshname, fieldname=fieldname,
-                           array=ID_field, replace=True,
-                           compression_options=c_opt)
-        return ID_field
+            if field_name is None:
+                field_name = mesh_name + '_elset_ids'
+            comp_options = {'complib': 'zlib', 'complevel': 1, 'shuffle': True}
+            self.add_field(gridname=mesh_name, fieldname=field_name,
+                           array=id_field, replace=True,
+                           compression_options=comp_options)
+        return id_field
 
     # =========================================================================
     #  SampleData private methods

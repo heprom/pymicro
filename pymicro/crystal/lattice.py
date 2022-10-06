@@ -140,6 +140,29 @@ class CrystallinePhase:
         #print(d)
         return d
 
+    def stiffness_matrix(self):
+        """Return the stiffness matrix (Voigt convention) for this phase.
+
+        :return: a (6, 6) numpy array of the stiffness matrix.
+        """
+        sym = self.get_symmetry()
+        return sym.stiffness_matrix(self.elastic_constants)
+
+    def orthotropic_constants(self):
+        """Return the 9 orthotropic elastic constants for this phase.
+
+        :raise ValueError: if the symmetry of the phase is too low.
+        :return: a dictionary of the 9 orthotropic elastic constants. Keys are
+            'E1','E2','E3','nu12','nu13','nu23','G12','G13','G23'
+        """
+        sym = self.get_symmetry()
+        if sym.elastic_constants_number > 9:
+            raise ValueError('orthotropic constants can only be determined '
+                             'with sufficient symmetry, not %s' % sym)
+        C = self.stiffness_matrix()
+        d = sym.orthotropic_constants_from_stiffness(C)
+        return d
+
     @staticmethod
     def from_dict(d):
         sym = Symmetry.from_string(d['symmetry'])
@@ -277,7 +300,7 @@ class Symmetry(enum.Enum):
         Those come from Randle & Engler, 2000. For instance in the cubic
         crystal struture, for instance there are 24 equivalent cube orientations.
 
-        :returns array: A numpy array of shape (n, 3, 3) where n is the \
+        :return array: A numpy array of shape (n, 3, 3) where n is the \
         number of symmetries of the given crystal structure.
         """
         if self is Symmetry.cubic:
@@ -388,7 +411,7 @@ class Symmetry(enum.Enum):
         to save time.
 
         :param g: a 3x3 matrix representing the rotation.
-        :param verbose: flag for verbose mode.
+        :param bool verbose: flag for verbose mode.
         :return: a new 3x3 matrix for the rotation in the fundamental zone.
         """
         syms = self.symmetry_operators()
@@ -402,8 +425,28 @@ class Symmetry(enum.Enum):
             print('moving to FZ, index = %d' % index)
         return g_syms[index]
 
+    def lattice_parameters_number(self):
+        """Return the number of parameter associated with a lattice of this
+        symmetry.
+
+        :return: the number of parameters.
+        """
+        if self is Symmetry.cubic:
+            return 1
+        elif self in [Symmetry.hexagonal, Symmetry.trigonal, Symmetry.tetragonal]:
+            return 2
+        elif self is Symmetry.orthorhombic:
+            return 3
+        elif self is Symmetry.monoclinic:
+            return 4
+        else:  # triclinic case
+            return 6
+
     def elastic_constants_number(self):
-        """Return the number of independent elastic constants for this symmetry."""
+        """Return the number of independent elastic constants for this symmetry.
+
+        :return: the number of elastic constants.
+        """
         if self is Symmetry.cubic:
             return 3
         elif self is Symmetry.hexagonal:
@@ -414,10 +457,8 @@ class Symmetry(enum.Enum):
             return 9
         elif self is Symmetry.monoclinic:
             return 13
-        elif self is Symmetry.triclinic:
+        else:  # triclinic case
             return 21
-        else:
-            return None
 
     def stiffness_matrix(self, elastic_constants):
         """Build the stiffness matrix for this symmetry using Voigt convention.
@@ -511,25 +552,25 @@ class Symmetry(enum.Enum):
 
         :param ndarray C: a numpy array of shape (6, 6) representing
             the stiffness matrix.
-        :return dict OrthoElas: Dict of orthotropic elastic constants
+        :return dict ortho_elas: a dictionary of orthotropic elastic constants
             corresponding to the input stiffness matrix. Keys are
             'E1','E2','E3','nu12','nu13','nu23','G12','G13','G23'
         """
         # compute the compliance matrix
         S = np.linalg.inv(C)
-        # compute orthotropic elastic constants
-        OrthoElas = dict()
-        OrthoElas['E1'] = 1 / S[0, 0]
-        OrthoElas['E2'] = 1 / S[1, 1]
-        OrthoElas['E3'] = 1 / S[2, 2]
-        OrthoElas['Nu12'] = -OrthoElas['E1'] * S[1, 0]
-        OrthoElas['Nu13'] = -OrthoElas['E1'] * S[2, 0]
-        OrthoElas['Nu23'] = -OrthoElas['E2'] * S[2, 1]
-        OrthoElas['G12'] = 1 / S[5, 5]
-        OrthoElas['G13'] = 1 / S[4, 4]
-        OrthoElas['G23'] = 1 / S[3, 3]
-        # return a dictionnay populated with the relevant values
-        return OrthoElas
+        # compute the orthotropic elastic constants
+        ortho_elas = dict()
+        ortho_elas['E1'] = 1 / S[0, 0]
+        ortho_elas['E2'] = 1 / S[1, 1]
+        ortho_elas['E3'] = 1 / S[2, 2]
+        ortho_elas['Nu12'] = -ortho_elas['E1'] * S[1, 0]
+        ortho_elas['Nu13'] = -ortho_elas['E1'] * S[2, 0]
+        ortho_elas['Nu23'] = -ortho_elas['E2'] * S[2, 1]
+        ortho_elas['G12'] = 1 / S[5, 5]
+        ortho_elas['G13'] = 1 / S[4, 4]
+        ortho_elas['G23'] = 1 / S[3, 3]
+        # return a dictionary populated with the relevant values
+        return ortho_elas
 
 
 class Lattice:
@@ -558,8 +599,8 @@ class Lattice:
       l = Lattice.face_centered_cubic(a)
       print(l.volume())
 
-    Additionnally the point-basis can be controlled to address non
-    Bravais lattice cells. It is set to a single atoms at (0, 0, 0) by
+    Additionally the point-basis can be controlled to address non
+    Bravais lattice cells. It is set to a single atom at (0, 0, 0) by
     default so that each cell is a Bravais lattice but may be changed to
     something more complex to achieve HCP structure or Diamond structure
     for instance.
@@ -611,7 +652,7 @@ class Lattice:
         return True
 
     def __repr__(self):
-        """Gives a string representation of this instance of the Lattice class."""
+        """Gives a string representation of this instance of the Lattice."""
         a, b, c = self._lengths
         alpha, beta, gamma = self._angles
         out = 'Lattice (%s)' % self._symmetry
@@ -620,7 +661,7 @@ class Lattice:
         return out
 
     def reciprocal_lattice(self):
-        '''Compute the reciprocal lattice.
+        """Compute the reciprocal lattice.
 
         The reciprocal lattice defines a crystal in terms of vectors that
         are normal to a plane and whose lengths are the inverse of the
@@ -632,13 +673,13 @@ class Lattice:
          * a.a^* = 1
          * b.b^* = 1
          * c.c^* = 1
-        '''
+        """
         [a, b, c] = self._matrix
         V = self.volume()
-        astar = np.cross(b, c) / V
-        bstar = np.cross(c, a) / V
-        cstar = np.cross(a, b) / V
-        return [astar, bstar, cstar]
+        a_star = np.cross(b, c) / V
+        b_star = np.cross(c, a) / V
+        c_star = np.cross(a, b) / V
+        return [a_star, b_star, c_star]
 
     @property
     def matrix(self):
@@ -654,17 +695,19 @@ class Lattice:
         """Define the equivalent crystal symmetries.
 
         Those come from Randle & Engler, 2000. For instance in the cubic
-        crystal struture, for instance there are 24 equivalent cube orientations.
+        crystal struture, there are 24 equivalent cube orientations.
 
-        :param crystal_structure: an instance of the `Symmetry` class describing the crystal symmetry.
+        :param crystal_structure: an instance of the `Symmetry` class
+        describing the crystal symmetry.
         :raise ValueError: if the given symmetry is not supported.
-        :returns array: A numpy array of shape (n, 3, 3) where n is the \
+        :return array: A numpy array of shape (n, 3, 3) where n is the
         number of symmetries of the given crystal structure.
         """
         return crystal_structure.symmetry_operators(use_miller_bravais=use_miller_bravais)
 
     def get_lattice_parameters(self):
-        """This function create a list of the independent lattice parameters depending on the symmetry.
+        """This function create a list of the independent lattice parameters
+        depending on the symmetry.
 
         :return: a list of the lattice parameters.
         """
@@ -698,11 +741,21 @@ class Lattice:
         """Guess the lattice symmetry from the geometry."""
         (a, b, c) = self._lengths
         (alpha, beta, gamma) = self._angles
-        return Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
+        return Lattice.guess_symmetry_from_parameters(a, b, c,
+                                                      alpha, beta, gamma)
 
     @staticmethod
     def guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma):
-        """Guess the lattice symmetry from the geometrical parameters."""
+        """Guess the lattice symmetry from the geometrical parameters.
+
+        :param float a: first lattice length parameter.
+        :param float b: second lattice length parameter.
+        :param float c: third lattice length parameter.
+        :param float alpha: first lattice angle parameter.
+        :param float beta: second lattice angle parameter.
+        :param float gamma: third lattice angle parameter.
+        :return: the symmetry guessed from the parameters.
+        """
         if alpha == 90. and beta == 90. and gamma == 90:
             if a == b and a == c:
                 return Symmetry.cubic
@@ -736,8 +789,8 @@ class Lattice:
            Lattice constants are given in Angstrom in CIF files and so
            converted to nanometer.
 
-        :param str file_path: The path to the CIF file representing the crystal structure.
-        :returns: A `Lattice` instance corresponding to the given CIF file.
+        :param str file_path: the path to the CIF file representing the crystal structure.
+        :return: a `Lattice` instance corresponding to the given CIF file.
         """
         cf = CifFile.ReadCif(file_path)
         # crystal = eval('cf[\'%s\']' % symbol)
@@ -751,225 +804,203 @@ class Lattice:
         try:
             symmetry = Symmetry.from_string(crystal['_symmetry_cell_setting'])
         except KeyError:
-            symmetry = Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
-        return Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=symmetry)
+            symmetry = Lattice.guess_symmetry_from_parameters(a, b, c, alpha,
+                                                              beta, gamma)
+        return Lattice.from_parameters(a, b, c, alpha, beta, gamma,
+                                       symmetry=symmetry)
 
     @staticmethod
     def from_symbol(symbol):
-        '''
+        """
         Create a crystal Lattice using information contained in a unit cell.
 
-        *Parameters*
-
-        **symbol**: The chemical symbol of the crystal (eg 'Al')
-
-        *Returns*
-
-        A `Lattice` instance corresponding to the given element.
-        '''
+        :param str symbol: the chemical symbol of the crystal (eg 'Al')
+        :return: a `Lattice` instance corresponding to the given element.
+        """
         path = os.path.dirname(__file__)
         return Lattice.from_cif(os.path.join(path, 'cif', '%s.cif' % symbol))
 
     @staticmethod
     def cubic(a):
-        '''
+        """
         Create a cubic Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter (a = b = c here)
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a primitice cubic lattice.
-        '''
-        return Lattice([[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]], symmetry=Symmetry.cubic)
+        :param float a: the unique lattice parameter (in nm).
+        :return: a `Lattice` instance corresponding to a primitive centered
+        cubic lattice.
+        """
+        return Lattice([[a, 0.0, 0.0], [0.0, a, 0.0], [0.0, 0.0, a]],
+                       symmetry=Symmetry.cubic)
 
     @staticmethod
     def body_centered_cubic(a):
-        '''
+        """
         Create a body centered cubic Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter (a = b = c here)
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a body centered cubic
+        :param float a: the unique lattice parameter (in nm).
+        :return: a `Lattice` instance corresponding to a body centered cubic
         lattice.
-        '''
-        return Lattice.from_parameters(a, a, a, 90, 90, 90, centering='I', symmetry=Symmetry.cubic)
+        """
+        return Lattice.from_parameters(a, a, a, 90, 90, 90, centering='I',
+                                       symmetry=Symmetry.cubic)
 
     @staticmethod
     def face_centered_cubic(a):
-        '''
+        """
         Create a face centered cubic Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter (a = b = c here)
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a face centered cubic
+        :param float a: the unique lattice parameter (in nm).
+        :return: a `Lattice` instance corresponding to a face centered cubic
         lattice.
-        '''
-        return Lattice.from_parameters(a, a, a, 90, 90, 90, centering='F', symmetry=Symmetry.cubic)
+        """
+        return Lattice.from_parameters(a, a, a, 90, 90, 90, centering='F',
+                                       symmetry=Symmetry.cubic)
 
     @staticmethod
     def tetragonal(a, c):
-        '''
+        """
         Create a tetragonal Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter
-
-        **c**: third lattice length parameter (b = a here)
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a primitive tetragonal
+        :param float a: lattice parameter for the a-axis (in nm).
+        :param float c: lattice parameter for the c-axis  (in nm).
+        :return: a `Lattice` instance corresponding to a primitive tetragonal
         lattice.
-        '''
-        return Lattice.from_parameters(a, a, c, 90, 90, 90, symmetry=Symmetry.tetragonal)
+        """
+        return Lattice.from_parameters(a, a, c, 90, 90, 90,
+                                       symmetry=Symmetry.tetragonal)
 
     @staticmethod
     def body_centered_tetragonal(a, c):
-        '''
+        """
         Create a body centered tetragonal Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter
-
-        **c**: third lattice length parameter (b = a here)
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a body centered tetragonal
-        lattice.
-        '''
-        return Lattice.from_parameters(a, a, c, 90, 90, 90, centering='I', symmetry=Symmetry.tetragonal)
+        :param float a: lattice parameter for the a-axis (in nm).
+        :param float c: lattice parameter for the c-axis  (in nm).
+        :return: a `Lattice` instance corresponding to a body centered
+        tetragonal lattice.
+        """
+        return Lattice.from_parameters(a, a, c, 90, 90, 90, centering='I',
+                                       symmetry=Symmetry.tetragonal)
 
     @staticmethod
     def orthorhombic(a, b, c):
-        '''
+        """
         Create a tetragonal Lattice unit cell with 3 different length
         parameters a, b and c.
-        '''
-        return Lattice.from_parameters(a, b, c, 90, 90, 90, symmetry=Symmetry.orthorhombic)
+
+        :param float a: first lattice length parameter (in nm).
+        :param float b: second lattice length parameter (in nm).
+        :param float c: third lattice length parameter (in nm).
+        :return: a `Lattice` instance corresponding to a primitive orthorombic
+        lattice.
+        """
+        return Lattice.from_parameters(a, b, c, 90, 90, 90,
+                                       symmetry=Symmetry.orthorhombic)
 
     @staticmethod
     def base_centered_orthorhombic(a, b, c):
-        '''
+        """
         Create a based centered orthorombic Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter
-
-        **b**: second lattice length parameter
-
-        **c**: third lattice length parameter
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a based centered orthorombic
-        lattice.
-        '''
-        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='C', symmetry=Symmetry.orthorhombic)
+        :param float a: first lattice length parameter (in nm).
+        :param float b: second lattice length parameter (in nm).
+        :param float c: third lattice length parameter (in nm).
+        :return: a `Lattice` instance corresponding to a base centered
+        orthorombic lattice.
+        """
+        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='C',
+                                       symmetry=Symmetry.orthorhombic)
 
     @staticmethod
     def body_centered_orthorhombic(a, b, c):
-        '''
+        """
         Create a body centered orthorombic Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter
-
-        **b**: second lattice length parameter
-
-        **c**: third lattice length parameter
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a body centered orthorombic
-        lattice.
-        '''
-        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='I', symmetry=Symmetry.orthorhombic)
+        :param float a: first lattice length parameter (in nm).
+        :param float b: second lattice length parameter (in nm).
+        :param float c: third lattice length parameter (in nm).
+        :return: a `Lattice` instance corresponding to a body centered
+        orthorombic lattice.
+        """
+        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='I',
+                                       symmetry=Symmetry.orthorhombic)
 
     @staticmethod
     def face_centered_orthorhombic(a, b, c):
-        '''
+        """
         Create a face centered orthorombic Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter
-
-        **b**: second lattice length parameter
-
-        **c**: third lattice length parameter
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a face centered orthorombic
+        :param float a: first lattice length parameter (in nm).
+        :param float b: second lattice length parameter (in nm).
+        :param float c: third lattice length parameter (in nm).
+        :return: a `Lattice` instance corresponding to a primitive orthorombic
         lattice.
-        '''
-        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='F', symmetry=Symmetry.orthorhombic)
+        """
+        return Lattice.from_parameters(a, b, c, 90, 90, 90, centering='F',
+                                       symmetry=Symmetry.orthorhombic)
 
     @staticmethod
     def hexagonal(a, c):
-        '''
+        """
         Create a hexagonal Lattice unit cell with length parameters a and c.
-        '''
-        return Lattice.from_parameters(a, a, c, 90, 90, 120, symmetry=Symmetry.hexagonal)
+
+        :param float a: lattice parameter for the a-axis (in nm).
+        :param float c: lattice parameter for the c-axis (in nm).
+        :return: a `Lattice` instance corresponding to a primitive hexagonal
+        lattice.
+        """
+        return Lattice.from_parameters(a, a, c, 90, 90, 120,
+                                       symmetry=Symmetry.hexagonal)
 
     @staticmethod
     def rhombohedral(a, alpha):
-        '''
+        """
         Create a rhombohedral Lattice unit cell with one length
         parameter a and the angle alpha.
-        '''
-        return Lattice.from_parameters(a, a, a, alpha, alpha, alpha, symmetry=Symmetry.trigonal)
+
+        :param float a: lattice length parameter (in nm).
+        :param float alpha: lattice angle parameter (in radians).
+        :return: a `Lattice` instance corresponding to a primitive rhombohedral
+        lattice.
+        """
+        return Lattice.from_parameters(a, a, a, alpha, alpha, alpha,
+                                       symmetry=Symmetry.trigonal)
 
     @staticmethod
     def monoclinic(a, b, c, alpha):
-        '''
-        Create a monoclinic Lattice unit cell with 3 different length
-        parameters a, b and c. The cell angle is given by alpha.
-        The lattice centering id primitive ie. 'P'
-        '''
-        return Lattice.from_parameters(a, b, c, alpha, 90, 90, symmetry=Symmetry.monoclinic)
+        """Create a monoclinic Lattice unit cell.
+
+        The monoclinic cell is defined from 3 different length parameters `a`,
+        `b` and `c`; the cell angle is given by `alpha`. The lattice centering
+        is primitive ie. 'P'.
+
+        :param float a: first lattice length parameter (in nm).
+        :param float b: second lattice length parameter (in nm).
+        :param float c: third lattice length parameter (in nm).
+        :param float alpha: first lattice angle parameter (in radians).
+        :return: a `Lattice` instance corresponding to a primitive monoclinic
+        lattice.
+        """
+        return Lattice.from_parameters(a, b, c, alpha, 90, 90,
+                                       symmetry=Symmetry.monoclinic)
 
     @staticmethod
     def base_centered_monoclinic(a, b, c, alpha):
-        '''
-        Create a based centered monoclinic Lattice unit cell.
+        """Create a based centered monoclinic Lattice unit cell.
 
-        *Parameters*
-
-        **a**: first lattice length parameter
-
-        **b**: second lattice length parameter
-
-        **c**: third lattice length parameter
-
-        **alpha**: first lattice angle parameter
-
-        *Returns*
-
-        A `Lattice` instance corresponding to a based centered monoclinic
-        lattice.
-        '''
-        return Lattice.from_parameters(a, b, c, alpha, 90, 90, centering='C', symmetry=Symmetry.monoclinic)
+        :param float a: first lattice length parameter (in nm).
+        :param float b: second lattice length parameter (in nm).
+        :param float c: third lattice length parameter (in nm).
+        :param float alpha: first lattice angle parameter (in radians).
+        :return: a `Lattice` instance corresponding to a base centered
+        monoclinic lattice.
+        """
+        return Lattice.from_parameters(a, b, c, alpha, 90, 90, centering='C',
+                                       symmetry=Symmetry.monoclinic)
 
     @staticmethod
     def triclinic(a, b, c, alpha, beta, gamma):
-        '''
+        """
         Create a triclinic Lattice unit cell with 3 different length
         parameters a, b, c and three different cell angles alpha, beta
         and gamma.
@@ -979,48 +1010,59 @@ class Lattice:
            This method is here for the sake of completeness since one can
            create the triclinic cell directly using the `from_parameters`
            method.
-        '''
-        return Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=Symmetry.triclinic)
+
+        :param float a: first lattice length parameter.
+        :param float b: second lattice length parameter.
+        :param float c: third lattice length parameter.
+        :param float alpha: first lattice angle parameter.
+        :param float beta: second lattice angle parameter.
+        :param float gamma: third lattice angle parameter.
+        :return: a `Lattice` instance with the specified parameters.
+        """
+        return Lattice.from_parameters(a, b, c, alpha, beta, gamma,
+                                       symmetry=Symmetry.triclinic)
 
     @staticmethod
     def from_symmetry(symmetry, parameters):
-        """Create a new lattice based on a type of symmetry and a list of lattice parameters.
+        """Create a new lattice based on a type of symmetry and a list of
+        lattice parameters.
 
-        The type of symmetry should be an instance of `Symmetry` and the list of parameters should contain the
-        appropriate number: 1 for cubic, 2 for hexagonal, tetragonal or trigonal, 3 for orthorhombic, 4 for monoclinic
-        or 6 for triclinic.
+        The type of symmetry should be an instance of `Symmetry` and the list
+        of parameters should contain the appropriate number: 1 for cubic,
+        2 for hexagonal, tetragonal or trigonal, 3 for orthorhombic,
+        4 for monoclinic and 6 for triclinic.
 
         :param symmetry: an instance of `Symmetry`.
         :param list parameters: a list of the lattice parameters.
         :return: the newly created `Lattice` instance.
         """
+        n = symmetry.lattice_parameters_number()
+        if len(parameters) != n:
+            raise ValueError('The number of parameters for %s symmetry should '
+                             'be %d, got %d' % (symmetry, n, len(parameters)))
         if symmetry is Symmetry.cubic:
-            if len(parameters) != 1:
-                raise(ValueError('The number of parameters for %s symmetry should be 1, got %d' % (symmetry, len(parameters))))
             return Lattice.cubic(parameters[0])
         elif symmetry in [Symmetry.hexagonal, Symmetry.trigonal]:
-            if len(parameters) != 2:
-                raise(ValueError('The number of parameters for %s symmetry should be 2, got %d' % (symmetry, len(parameters))))
-            return Lattice.hexagonal(parameters[0], parameters[1])
+            return Lattice.hexagonal(parameters[0],
+                                     parameters[1])
         elif symmetry is Symmetry.orthorhombic:
-            if len(parameters) != 3:
-                raise(ValueError('The number of parameters for %s symmetry should be 3, got %d' % (symmetry, len(parameters))))
-            return Lattice.orthorhombic(parameters[0], parameters[1], parameters[2])
+            return Lattice.orthorhombic(parameters[0],
+                                        parameters[1],
+                                        parameters[2])
         elif symmetry is Symmetry.tetragonal:
-            if len(parameters) != 2:
-                raise(ValueError('The number of parameters for %s symmetry should be 2, got %d' % (symmetry, len(parameters))))
-            return Lattice.tetragonal(parameters[0], parameters[1])
+            return Lattice.tetragonal(parameters[0],
+                                      parameters[1])
         elif symmetry is Symmetry.monoclinic:
-            if len(parameters) != 4:
-                raise(ValueError('The number of parameters for %s symmetry should be 4, got %d' % (symmetry, len(parameters))))
-            return Lattice.monoclinic(parameters[0], parameters[1], parameters[2], parameters[3])
+            return Lattice.monoclinic(parameters[0],
+                                      parameters[1],
+                                      parameters[2],
+                                      parameters[3])
         else:
-            if len(parameters) != 6:
-                raise(ValueError('The number of parameters for triclinic symmetry should be 6, got %d' % len(parameters)))
             return Lattice.triclinic(*parameters)
 
     @staticmethod
-    def from_parameters(a, b, c, alpha, beta, gamma, x_aligned_with_a=True, centering='P', symmetry=Symmetry.triclinic):
+    def from_parameters(a, b, c, alpha, beta, gamma, x_aligned_with_a=True,
+                        centering='P', symmetry=Symmetry.triclinic):
         """
         Create a Lattice using unit cell lengths and angles (in degrees).
         The lattice centering can also be specified (among 'P', 'I', 'F',
@@ -1032,10 +1074,13 @@ class Lattice:
         :param float alpha: first lattice angle parameter.
         :param float beta: second lattice angle parameter.
         :param float gamma: third lattice angle parameter.
-        :param bool x_aligned_with_a: flag to control the convention used to define the Cartesian frame.
-        :param str centering: lattice centering ('P' by default) passed to the `Lattice` class.
+        :param bool x_aligned_with_a: flag to control the convention used
+        to define the Cartesian frame.
+        :param str centering: lattice centering ('P' by default) passed
+        to the `Lattice` class.
         :param symmetry: a `Symmetry` instance to be passed to the lattice.
-        :return: A `Lattice` instance with the specified lattice parameters and centering.
+        :return: A `Lattice` instance with the specified lattice parameters
+        and centering.
         """
         alpha_r = radians(alpha)
         beta_r = radians(beta)
@@ -1050,7 +1095,8 @@ class Lattice:
             cos_gamma_star = (cos(alpha_r) * cos(beta_r) - cos(gamma_r)) / (sin(alpha_r) * sin(beta_r))
             sin_gamma_star = np.sqrt(1 - cos_gamma_star ** 2)
             vector_a = [a * sin(beta_r), 0.0, a * cos(beta_r)]
-            vector_b = [-b * sin(alpha_r) * cos_gamma_star, b * sin(alpha_r) * sin_gamma_star, b * cos(alpha_r)]
+            vector_b = [-b * sin(alpha_r) * cos_gamma_star, b * sin(alpha_r) *
+                        sin_gamma_star, b * cos(alpha_r)]
             vector_c = [0.0, 0.0, float(c)]
         return Lattice([vector_a, vector_b, vector_c], centering=centering, symmetry=symmetry)
 
@@ -1144,6 +1190,29 @@ class SlipSystem:
         return SlipSystem(plane, direction)
 
     @staticmethod
+    def from_indices_list(plane_indices, direction_indices, lattice=None):
+        """Build a list of slip systems based on two list of equal lengths for
+        the slip plane indices and the slip direction indices.
+
+        :param list plane_indices: the list of miller indices tuples of the slip
+        planes to build the slip systems.
+        :param list direction_indices: the list of miller indices tuples of the
+        slip directions to build the slip systems.
+        :param Lattice lattice: the crystal lattice for all slip systems.
+        :return list: a list of :py:class:`~pymicro.crystal.lattice.SlipSystem`.
+        """
+        if not len(plane_indices) == len(direction_indices):
+            print('warning, both plane and direction indices lists must have '
+                  'the same length')
+            return None
+        slip_systems = []
+        for i in range(len(plane_indices)):
+            slip_systems.append(SlipSystem.from_indices(plane_indices[i],
+                                                        direction_indices[i],
+                                                        lattice))
+        return slip_systems
+
+    @staticmethod
     def get_slip_systems(slip_type='oct', lattice=None):
         """Get all slip systems for a given hkl plane family.
 
@@ -1155,16 +1224,26 @@ class SlipSystem:
          * prism for [11-20] slip in (1-100) planes (hexagonal)
 
         :param str slip_type: a string describing the slip system type.
+        :param Lattice lattice: the crystal lattice.
         :return list: a list of :py:class:`~pymicro.crystal.lattice.SlipSystem`.
         """
         slip_systems = []
         if slip_type in ['cube', '001']:
+            plane_indices = [(0, 0, 1), (0, 0, 1), (1, 0, 0),
+                             (1, 0, 0), (0, 1, 0), (0, 1, 0)]
+            direction_indices = [(-1, 1, 0), (1, 1, 0), (0, 1, 1),
+                                 (0, -1, 1), (-1, 0, 1), (1, 0, 1)]
+            slip_systems = SlipSystem.from_indices_list(plane_indices,
+                                                        direction_indices,
+                                                        lattice)
+            '''
             slip_systems.append(SlipSystem.from_indices((0, 0, 1), (-1, 1, 0), lattice))  # E5
             slip_systems.append(SlipSystem.from_indices((0, 0, 1), (1, 1, 0), lattice))  # E6
             slip_systems.append(SlipSystem.from_indices((1, 0, 0), (0, 1, 1), lattice))  # F1
             slip_systems.append(SlipSystem.from_indices((1, 0, 0), (0, -1, 1), lattice))  # F2
             slip_systems.append(SlipSystem.from_indices((0, 1, 0), (-1, 0, 1), lattice))  # G4
             slip_systems.append(SlipSystem.from_indices((0, 1, 0), (1, 0, 1), lattice))  # G3
+            '''
         elif slip_type in ['oct', '111']:
             slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 0, 1), lattice))  # Bd
             slip_systems.append(SlipSystem.from_indices((1, 1, 1), (0, -1, 1), lattice))  # Ba
@@ -1223,7 +1302,8 @@ class SlipSystem:
             pyrss6 = SlipSystem(p_pyr6, HklDirection(*HklDirection.four_to_three_indices(1, 1, -2, 0), lattice))
             slip_systems = [pyrss1, pyrss2, pyrss3, pyrss4, pyrss5, pyrss6]
         else:
-            print('unsupported slip system type: %s, try one of (cube, oct, 112, basal, prism, pyr1_a)' % slip_type)
+            print('unsupported slip system type: %s, try one of (cube, oct, '
+                  '112, basal, prism, pyr1_a)' % slip_type)
         return slip_systems
 
 
@@ -1235,7 +1315,7 @@ class HklObject:
         """Create a new hkl object with the given Miller indices and
            crystal lattice.
         """
-        if lattice == None:
+        if lattice is None:
             lattice = Lattice.cubic(1.0)
         self._lattice = lattice
         self._h = h
@@ -1267,7 +1347,7 @@ class HklObject:
 
     def miller_indices(self):
         """Returns an immutable tuple of the plane Miller indices."""
-        return (self._h, self._k, self._l)
+        return self.h, self.k, self.l
 
     @staticmethod
     def skip_higher_order(hkl_list, keep_friedel_pair=False, verbose=False):
@@ -1276,7 +1356,7 @@ class HklObject:
         :param list hkl_list: The list of `HklObject`.
         :param bool keep_friedel_pair: flag to keep order -1 in the list.
         :param bool verbose: activate verbose mode.
-        :returns list: A new list of :py:class:`~pymicro.crystal.lattice.HklObject` without any multiple reflection.
+        :return list: A new list of :py:class:`~pymicro.crystal.lattice.HklObject` without any multiple reflection.
         """
         # create array with all the miller indices
         hkl_array = np.empty((len(hkl_list), 3), dtype=int)
@@ -1352,7 +1432,7 @@ class HklDirection(HklObject):
         :param tuple hkl2: The triplet of the miller indices of the second direction.
         :param Lattice lattice: The crystal lattice, will default to cubic if not specified.
 
-        :returns float: The angle in radian.
+        :return float: The angle in radian.
         """
         d1 = HklDirection(*hkl1, lattice=lattice)
         d2 = HklDirection(*hkl2, lattice=lattice)
@@ -1384,7 +1464,7 @@ class HklDirection(HklObject):
         :param tuple hkil1: The quartet of the indices of the first direction.
         :param tuple hkil2: The quartet of the indices of the second direction.
         :param tuple ac: the lattice parameters of the hexagonal structure in the form (a, c).
-        :returns float: The angle in radian.
+        :return float: The angle in radian.
         """
         h1, k1, i1, l1 = hkil1
         h2, k2, i2, l2 = hkil2
@@ -1402,7 +1482,7 @@ class HklDirection(HklObject):
         hkl planes which verify :math:`h.u + k.v + l.w = 0`.
 
         :param max_miller: The maximum miller index to limt the search`
-        :returns list: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` objects \
+        :return list: A list of :py:class:`~pymicro.crystal.lattice.HklPlane` objects \
         describing all the planes in zone with the direction.
         """
         (u, v, w) = self.miller_indices()
@@ -1475,7 +1555,7 @@ class HklPlane(HklObject):
 
           G_c = h.a^* + k.b^* + l.c^*
 
-        :returns: a numpy vector expressed in the cartesian coordinate system of the crystal.
+        :return: a numpy vector expressed in the cartesian coordinate system of the crystal.
         """
         [astar, bstar, cstar] = self._lattice.reciprocal_lattice()
         (h, k, l) = self.miller_indices()

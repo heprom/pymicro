@@ -599,6 +599,33 @@ class PoleFigure:
         ax.axis('off')
         ax.set_title('%s-axis inverse %s projection' % (self.axis, self.proj))
 
+    def plot_grain_orientation_change_ipf(self, grain_id, Re):
+        """Plot the change in orientation for the given grain.
+
+        :param list grain_id: the id of the grain to plot.
+        :param Re: a numpy array of size (K, 3, 3) containing the rotation of
+        the crystal lattice as a function of time (with respect to the initial
+        grain orientation), K being the number of time increments.
+        """
+        g = self.microstructure.get_grain(grain_id).orientation_matrix()
+        fig = plt.figure(1, figsize=(6, 5))
+        ax1 = fig.add_subplot(111, aspect='equal')
+        self.plot_sst(ax=ax1, mk='o', col='k', ann=False)
+        ax1.set_title('grain rotation')
+        axis = np.array([0, 0, 1])
+        cgid = Microstructure.rand_cmap().colors[grain_id]
+        axis_rot_sst_prev = np.array(self.sst_symmetry(g.dot(axis)))
+        # plot a lin between the orientations at two different consecutive times
+        for k in range(len(Re)):
+            new_g = Re[k].transpose().dot(g)
+            axis_rot_sst = self.sst_symmetry(new_g.dot(axis))
+            self.plot_line_between_crystal_dir(axis_rot_sst_prev, axis_rot_sst,
+                                               ax=ax1, col=cgid, steps=2)
+            axis_rot_sst_prev = axis_rot_sst
+        plt.legend(loc='upper left')
+        plt.subplots_adjust(bottom=0.0, top=0.9, left=0.0, right=1.0)
+        plt.show()
+
     @staticmethod
     def plot(orientations, **kwargs):
         """Plot a pole figure (both direct and inverse) for a list of crystal

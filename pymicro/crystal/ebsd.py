@@ -153,6 +153,7 @@ class OimScan:
             # start by parsing the header
             line = f.readline().strip()
             while line.startswith('#'):
+                print(line)
                 tokens = line.split()
                 if len(tokens) <= 2:
                     line = f.readline().strip()
@@ -167,7 +168,7 @@ class OimScan:
                     scan.z_star = float(tokens[2])
                 elif tokens[1] == 'WorkingDistance':
                     scan.working_distance = float(tokens[2])
-                elif tokens[1] == 'Phase':
+                elif tokens[1] == 'Phase' and tokens[2].isdigit():
                     phase = OimPhase(int(tokens[2]))
                     line = f.readline().strip()
                     phase.name = line.split()[2]
@@ -179,7 +180,9 @@ class OimScan:
                     line = f.readline().strip()
                     line = f.readline().strip()
                     sym = Symmetry.from_tsl(int(line.split()[2]))
-                    tokens = f.readline().strip().split()
+                    while not line.startswith('# LatticeConstants'):
+                        line = f.readline().strip()
+                    tokens = line.split()
                     # convert lattice constants to nm
                     lattice = Lattice.from_parameters(float(tokens[2]) / 10,
                                                       float(tokens[3]) / 10,
@@ -353,18 +356,21 @@ class OimScan:
             self.phase_list.append(phase)
 
     @staticmethod
-    def read_h5(file_path):
+    def read_h5(file_path, scan_key=None):
         """Read a scan in H5 format.
 
         :raise ValueError: if the grid type in not square.
         :param str file_path: the path to the h5 file to read.
+        :param str scan_key: a string to force the scan key, be default it is
+            read as the third key at the file root.
         :return: a new instance of OimScan populated with the data from the file.
         """
         scan = OimScan((0, 0))
         with h5py.File(file_path, 'r') as f:
-            # find out the scan key (the third one)
-            key_list = [key for key in f.keys()]
-            scan_key = key_list[2]
+            if not scan_key:
+                # find out the scan key (the third one)
+                key_list = [key for key in f.keys()]
+                scan_key = key_list[2]
             print('reading EBSD scan %s from file %s' % (scan_key, file_path))
             header = f[scan_key]['EBSD']['Header']
             scan.read_header(header)

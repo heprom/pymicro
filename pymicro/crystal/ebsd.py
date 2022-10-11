@@ -197,19 +197,19 @@ class OimScan:
                     print('grid type is %s' % tokens[2])
                     if scan.grid_type != 'SqrGrid':
                         raise ValueError('only square grid is supported, please convert your scan')
-                elif tokens[1] == 'XSTEP':
+                elif tokens[1].startswith('XSTEP'):
                     scan.xStep = float(tokens[2])
-                elif tokens[1] == 'YSTEP':
+                elif tokens[1].startswith('YSTEP'):
                     scan.yStep = float(tokens[2])
                 elif tokens[1].startswith('NCOLS'):
                     scan.cols = int(tokens[2])
                 elif tokens[1].startswith('NROWS'):
                     scan.rows = int(tokens[2])
-                elif tokens[1] == 'OPERATOR:':
+                elif tokens[1].startswith('OPERATOR'):
                     scan.operator = tokens[2]
-                elif tokens[1] == 'SAMPLEID:':
+                elif tokens[1].startswith('SAMPLEID'):
                     scan.sample_id = tokens[2] if len(tokens) >= 3 else ''
-                elif tokens[1] == 'SCANID:':
+                elif tokens[1].startswith('SCANID'):
                     scan.scan_id = tokens[2] if len(tokens) >= 3 else ''
                 line = f.readline().strip()
             print('finished reading header, scan size is %d x %d' % (scan.cols, scan.rows))

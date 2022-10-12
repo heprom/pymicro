@@ -153,6 +153,7 @@ class OimScan:
             # start by parsing the header
             line = f.readline().strip()
             while line.startswith('#'):
+                print(line)
                 tokens = line.split()
                 if len(tokens) <= 2:
                     line = f.readline().strip()

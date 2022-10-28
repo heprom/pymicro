@@ -638,8 +638,7 @@ class PoleFigure:
         """
         micro = Microstructure(autodelete=True)
         if isinstance(orientations, list):
-            for i in range(len(orientations)):
-                micro.add_grains([o.euler for o in orientations])
+            micro.add_grains([o.euler for o in orientations])
         elif isinstance(orientations, Orientation):
             micro.add_grains([orientations.euler])
         else:

@@ -2514,15 +2514,16 @@ class Microstructure(SampleData):
         return
 
     def add_grains(self, orientation_list, orientation_type='euler', grain_ids=None):
-        """A a list of grains to this microstructure.
+        """Add a list of grains to this microstructure.
 
-        This function adds a list of grains represented by a list of Euler
-        angles triplets, to the microstructure. If provided, the `grain_ids`
-        list will be used for the grain ids.
+        This function adds a list of grains represented by their orientation
+        (either a list of Euler angles or Rodrigues vectors) to the
+        microstructure. If provided, the `grain_ids` list will be used for
+        the grain ids.
 
         :param list orientation_list: a list of values representing the orientations.
-        :param str orientation_type: euler or rod for Euler angles (Bunge passive convention) or
-        Rodrigues vectors.
+        :param str orientation_type: euler or rod for Euler angles (Bunge
+        passive convention) or Rodrigues vectors.
         :param list grain_ids: an optional list for the ids of the new grains.
         """
         grain = self.grains.row
@@ -2541,7 +2542,7 @@ class Microstructure(SampleData):
             elif orientation_type in ['rod', 'rodrigues']:
                 grain['orientation'] = orientation
             else:
-                raise ValueError('unknowned type of orientation: %s' % orientation_type)
+                raise ValueError('unknown type of orientation: %s' % orientation_type)
             grain.append()
         self.grains.flush()
 
@@ -2553,12 +2554,12 @@ class Microstructure(SampleData):
         _, _, not_in_table = self.compute_grains_map_table_intersection()
         # remove ID <0 from list (reserved to background)
         not_in_table = np.delete(not_in_table, np.where(not_in_table <= 0))
-        # generate random eule r angles
-        phi1 = np.random.rand(len(not_in_table),1) * 360.
-        Phi = 180. * np.arccos(2 * np.random.rand(len(not_in_table),1)- 1) / np.pi
-        phi2 = np.random.rand(len(not_in_table),1) * 360.
-        euler_list = np.concatenate((phi1,Phi,phi2), axis=1)
-        self.add_grains(euler_list, grain_ids=not_in_table)
+        # generate random euler angles
+        phi1 = np.random.rand(len(not_in_table), 1) * 360.
+        Phi = 180. * np.arccos(2 * np.random.rand(len(not_in_table), 1) - 1) / np.pi
+        phi2 = np.random.rand(len(not_in_table), 1) * 360.
+        euler_list = np.concatenate((phi1, Phi, phi2), axis=1)
+        self.add_grains(euler_list, orientation_type='euler', grain_ids=not_in_table)
         return
 
     @staticmethod
@@ -2634,28 +2635,28 @@ class Microstructure(SampleData):
                            array=grain_id_field, replace=True)
         return grain_id_field
 
-    def create_orientation_field(self, meshname=None, elset_prefix='grain_',
+    def create_orientation_field(self, mesh_name=None, elset_prefix='grain_',
                                  store=True):
         """Create a vector field of grain orientations on the input mesh.
 
-        This method creates a element wise field on the microsctructure mesh
+        This method creates a element wise field on the microstructure mesh
         indicated, adding to each element the value of the Rodrigues vector of
         this grain as referenced in the `GrainDataTable` node.
 
-        :param str mesh: Name, Path or index name of the mesh on which an
+        :param str mesh_name: Name, Path or index name of the mesh on which an
             orientation field must be constructed
         :param str elset_prefix: prefix to define the element sets representing
             the grains.
         :param bool store: If `True`, store the orientation field in corresponding
             mesh group, with name `orientation_field`.
         """
-        if meshname is None:
+        if mesh_name is None:
             raise ValueError('mesh_name do not refer to an existing mesh')
-        if not(self._is_mesh(meshname)) or self._is_empty(meshname):
+        if not(self._is_mesh(mesh_name)) or self._is_empty(mesh_name):
             raise ValueError('mesh_name do not refer to a non empty mesh group')
         # create empty element vector field
-        n_elements = int(self.get_attribute('Number_of_elements', meshname))
-        mesh = self.get_node(meshname)
+        n_elements = int(self.get_attribute('Number_of_elements', mesh_name))
+        mesh = self.get_node(mesh_name)
         el_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
         orientation_field = np.zeros((n_elements, 3), dtype=float)
         grain_ids = self.get_grain_ids()
@@ -2669,14 +2670,14 @@ class Microstructure(SampleData):
             element_ids = self.get_node(elset_path, as_numpy=True).astype(int)
             orientation_field[np.squeeze(element_ids) == 1, :] = grain_orientations[i, :]
         if store:
-            self.add_field(gridname=meshname, fieldname='orientation_field',
+            self.add_field(gridname=mesh_name, fieldname='orientation_field',
                            array=orientation_field, replace=True)
         return orientation_field
 
     def create_orientation_map(self, store=True):
         """Create a vector field in CellData of grain orientations.
 
-        Creates a (Nx, Ny, Nz, 3) or (Nx, Ny, 3) field from the microsctructure
+        Creates a (Nx, Ny, Nz, 3) or (Nx, Ny, 3) field from the microstructure
         `grain_map`, adding to each voxel the value of the Rodrigues vector
         of the local grain Id, as it is and if it is referenced in the
         `GrainDataTable` node.

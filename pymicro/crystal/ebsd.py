@@ -63,6 +63,54 @@ class OimScan:
         self.ci = np.zeros((self.cols, self.rows))
         self.phase = np.zeros((self.cols, self.rows), dtype='int')
 
+    def crop(self, x_start=None, x_end=None, y_start=None, y_end=None,
+             in_place=True):
+        """Crop an EBSD scan.
+
+        :param int x_start: start value for slicing the first axis (cols).
+        :param int x_end: end value for slicing the first axis.
+        :param int y_start: start value for slicing the second axis (rows).
+        :param int y_end: end value for slicing the second axis.
+        :param bool in_place: crop the actual EBSD scan, if False, a new scan
+        is returned
+        """
+        # input default values for bounds if not specified
+        if not x_start or x_start < 0:
+            x_start = 0
+        if not y_start or y_start < 0:
+            y_start = 0
+        if not x_end or x_end > self.cols:
+            x_end = self.cols
+        if not y_end or y_end > self.rows:
+            y_end = self.rows
+        if in_place:
+            self.cols = x_end - x_start
+            self.rows = y_end - y_start
+            self.euler = self.euler[x_start:x_end, y_start:y_end, :]
+            self.x = self.x[x_start:x_end, y_start:y_end]
+            self.y = self.y[x_start:x_end, y_start:y_end]
+            self.iq = self.iq[x_start:x_end, y_start:y_end]
+            self.ci = self.ci[x_start:x_end, y_start:y_end]
+            self.phase = self.phase[x_start:x_end, y_start:y_end]
+            if self.grain_ids is not None:
+                self.grain_ids = self.grain_ids[x_start:x_end, y_start:y_end]
+        else:
+            crop = OimScan((x_end - x_start, y_end - y_start),
+                           resolution=(self.xStep, self.yStep))
+            crop.operator = self.operator
+            crop.sample_id = self.sample_id
+            crop.scan_id = self.scan_id + 'cropped'
+            crop.phase_list = self.phase_list
+            crop.euler = self.euler[x_start:x_end, y_start:y_end, :]
+            crop.x = self.x[x_start:x_end, y_start:y_end]
+            crop.y = self.y[x_start:x_end, y_start:y_end]
+            crop.iq = self.iq[x_start:x_end, y_start:y_end]
+            crop.ci = self.ci[x_start:x_end, y_start:y_end]
+            crop.phase = self.phase[x_start:x_end, y_start:y_end]
+            if self.grain_ids is not None:
+                crop.grain_ids = self.grain_ids[x_start:x_end, y_start:y_end]
+            return crop
+
     @staticmethod
     def from_file(file_path):
         """Create a new EBSD scan by reading a data file.

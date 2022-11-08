@@ -2751,9 +2751,8 @@ class Microstructure(SampleData):
 
         if plot:
             # plot orientation data in Rodrigues space
-            from mpl_toolkits.mplot3d import Axes3D
             fig = plt.figure()
-            ax = Axes3D(fig)
+            ax = fig.add_subplot(projection='3d')
             ax.scatter(rods_gid[:, 0], rods_gid[:, 1], rods_gid[:, 2])
             plt.show()
         return rods_gid

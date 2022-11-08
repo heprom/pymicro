@@ -20,6 +20,7 @@ from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
+from pymicro.crystal.rotation import om2ro
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
@@ -53,7 +54,7 @@ class Orientation:
         g = np.array(matrix, dtype=np.float64).reshape((3, 3))
         self._matrix = g
         self.euler = Orientation.OrientationMatrix2Euler(g)
-        self.rod = Orientation.OrientationMatrix2Rodrigues(g)
+        self.rod = om2ro(g)
         self.quat = Orientation.OrientationMatrix2Quaternion(g, P=1)
 
     def orientation_matrix(self):

@@ -433,6 +433,13 @@ class OrientationTests(unittest.TestCase):
         mis_angle = Orientation.misorientation_angle_from_delta(delta)
         self.assertAlmostEqual(mis_angle * 180 / np.pi, 7.24, 2)
 
+    def test_compute_mean_orientation(self):
+        rods = np.load(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'rods.npy'))
+        o = Orientation.compute_mean_orientation(rods)
+        rod = np.array([-0.09655562, 0.09261893, 0.11932359])
+        for i in range(3):
+            self.assertAlmostEqual(o.rod[i], rod[i])
+
 
 if __name__ == '__main__':
     unittest.main()

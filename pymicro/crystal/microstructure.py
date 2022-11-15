@@ -20,7 +20,7 @@ from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
-from pymicro.crystal.rotation import om2ro
+from pymicro.crystal.rotation import om2ro, ro2qu
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
@@ -55,7 +55,7 @@ class Orientation:
         self._matrix = g
         self.euler = Orientation.OrientationMatrix2Euler(g)
         self.rod = om2ro(g)
-        self.quat = Orientation.OrientationMatrix2Quaternion(g, P=1)
+        self.quat = Quaternion(ro2qu(self.rod))
 
     def orientation_matrix(self):
         """Returns the orientation matrix in the form of a 3x3 numpy array."""
@@ -66,8 +66,8 @@ class Orientation:
         s = 'Crystal Orientation \n-------------------'
         s += '\norientation matrix = \n %s' % self._matrix.view()
         s += '\nEuler angles (degrees) = (%8.3f,%8.3f,%8.3f)' % (self.phi1(), self.Phi(), self.phi2())
-        s += '\nRodrigues vector = %s' % self.OrientationMatrix2Rodrigues(self._matrix)
-        s += '\nQuaternion = %s' % self.OrientationMatrix2Quaternion(self._matrix, P=1)
+        s += '\nRodrigues vector = %s' % self.rod
+        s += '\nQuaternion = %s' % self.quat
         return s
 
     def to_crystal(self, v):
@@ -269,7 +269,6 @@ class Orientation:
         to their fundamental zone (cubic by default)
         :returns: the mean orientation as an `Orientation` instance.
         """
-        from pymicro.crystal.rotation import ro2qu
         rods = np.atleast_2d(rods)
         syms = symmetry.symmetry_operators()
 
@@ -437,8 +436,8 @@ class Orientation:
 
         Compute the angle associated with this misorientation matrix :math:`\\Delta g`.
         It is defined as :math:`\\omega = \\arccos(\\text{trace}(\\Delta g)/2-1)`.
-        To avoid float rounding error, the argument is rounded to 1.0 if it is
-        within 1 and 1 plus 32 bits floating point precison.
+        To avoid float rounding point error, the value of :math:`\\cos\\omega`
+        is clipped to [-1.0, 1.0].
 
         .. note::
 
@@ -450,10 +449,7 @@ class Orientation:
         :param delta: The 3x3 misorientation matrix.
         :returns float: the misorientation angle in radians.
         """
-        cw = 0.5 * (delta.trace() - 1)
-        if cw > 1. and cw - 1. < 10 * np.finfo('float32').eps:
-            # print('cw=%.20f, rounding to 1.' % cw)
-            cw = 1.
+        cw = np.clip(0.5 * (delta.trace() - 1), -1., 1.)
         omega = np.arccos(cw)
         return omega
 

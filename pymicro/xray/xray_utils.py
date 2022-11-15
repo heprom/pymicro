@@ -62,6 +62,7 @@ elements = {3: Element('Lithium', 'Li', 0.533),
             48: Element('Cadmium', 'Cd', 8.65),
             49: Element('Indium', 'In', 7.31),
             50: Element('Tin', 'Sn', 7.265),
+            73: Element('Tantalum', 'Ta', 16.4),
             74: Element('Tungsten', 'W', 19.3),
             82: Element('Lead', 'Pb', 11.330),
             83: Element('Bismuth', 'Bi', 9.747)

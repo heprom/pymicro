@@ -787,7 +787,7 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, mask=None, dark_factor=1.):
     return tt_rock
 
 
-def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=90,
+def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=-1,
                 data_key='7.1/measurement/frelon16', dark=None):
     """Build a topotomography stack from raw detector images.
 
@@ -809,17 +809,19 @@ def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=90,
     f = h5py.File(h5_path)
     print('loading data from file %s...' % h5_path)
     data = f[data_key][()]
+    # check number of images
+    if data.shape[0] % 90 != 0:
+        print('warning, number of images not consistent : %d total images for '
+              '%d topograph' % (data.shape[0], 90))
+        return None
+    else:
+        n_topo = int(data.shape[0] / 90)
     if dark is None:
         # create a reference image with the median over the first of each topograph
-        dark = np.median(data[::90, :, :], axis=0)
+        dark = np.median(data[::2 * n_topo, :, :], axis=0)
     data = data - dark
     # print check dark level
     print('dark level: %.1f' % np.mean(data[::90, :, :]))
-    # check number of images
-    if data.shape[0] % n_topo != 0:
-        print('warning, number of images not consistent : %d total images with '
-              '%d images per topograph' % (data.shape[0], n_topo))
-        return None
     infos = {}
     infos['TOMO_N'] = int(data.shape[0] / n_topo)
     infos['Dim_1'] = data.shape[1]

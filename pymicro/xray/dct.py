@@ -787,7 +787,7 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, mask=None, dark_factor=1.):
     return tt_rock
 
 
-def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=-1,
+def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_angles=90,
                 data_key='7.1/measurement/frelon16', dark=None):
     """Build a topotomography stack from raw detector images.
 
@@ -797,33 +797,33 @@ def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_topo=-1,
     :param str scan_name: the name of the scan to process.
     :param str data_dir: the path to the data folder.
     :param bool save_edf: flag to save the tt stack as an EDF file.
-    :param int n_topo: the number of images to sum for a topograph.
+    :param int n_angles: the number of angles in the acquisition.
     :param str data_key: a string to access the data within the h5 file.
     :param array dark: image to use as dark correction.
     """
     import h5py
-    print('number of frames to sum for a topograph = %d' % n_topo)
 
     # parse the info file
     h5_path = os.path.join(data_dir, scan_name, '%s.h5' % scan_name)
-    f = h5py.File(h5_path)
+    f = h5py.File(h5_path, 'r')
     print('loading data from file %s...' % h5_path)
     data = f[data_key][()]
     # check number of images
-    if data.shape[0] % 90 != 0:
+    if data.shape[0] % n_angles != 0:
         print('warning, number of images not consistent : %d total images for '
-              '%d topograph' % (data.shape[0], 90))
+              '%d topograph' % (data.shape[0], n_angles))
         return None
     else:
-        n_topo = int(data.shape[0] / 90)
+        n_topo = int(data.shape[0] / n_angles)
+    print('number of frames to sum for a topograph = %d' % n_topo)
     if dark is None:
         # create a reference image with the median over the first of each topograph
         dark = np.median(data[::2 * n_topo, :, :], axis=0)
     data = data - dark
     # print check dark level
-    print('dark level: %.1f' % np.mean(data[::90, :, :]))
+    print('dark level: %.1f' % np.mean(data[::n_angles, :, :]))
     infos = {}
-    infos['TOMO_N'] = int(data.shape[0] / n_topo)
+    infos['TOMO_N'] = n_angles
     infos['Dim_1'] = data.shape[1]
     infos['Dim_2'] = data.shape[2]
     print(infos)

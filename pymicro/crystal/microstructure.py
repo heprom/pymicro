@@ -480,6 +480,8 @@ class Orientation:
             (sample coordinates).
         """
         the_angle = np.pi
+        the_axis = np.array([0., 0., 1.])
+        the_axis_xyz = np.array([0., 0., 1.])
         symmetries = crystal_structure.symmetry_operators()
         (gA, gB) = (self.orientation_matrix(), orientation.orientation_matrix())  # nicknames
         for (g1, g2) in [(gA, gB), (gB, gA)]:
@@ -502,15 +504,15 @@ class Orientation:
         return the_angle, the_axis, the_axis_xyz
 
     def phi1(self):
-        """Convenience methode to expose the first Euler angle."""
+        """Convenience method to expose the first Euler angle."""
         return self.euler[0]
 
     def Phi(self):
-        """Convenience methode to expose the second Euler angle."""
+        """Convenience method to expose the second Euler angle."""
         return self.euler[1]
 
     def phi2(self):
-        """Convenience methode to expose the third Euler angle."""
+        """Convenience method to expose the third Euler angle."""
         return self.euler[2]
 
     def compute_XG_angle(self, hkl, omega, verbose=False):

@@ -270,6 +270,8 @@ class Orientation:
         :returns: the mean orientation as an `Orientation` instance.
         """
         rods = np.atleast_2d(rods)
+        # omit nan values from the calculation
+        rods = rods[~np.prod(np.isnan(rods), 1).astype(bool)]
         syms = symmetry.symmetry_operators()
 
         # apply all symmetries to compute Rodrigues vectors
@@ -2531,7 +2533,8 @@ class Microstructure(SampleData):
             else:
                 min_id = 0
             grain_ids = range(min_id, min_id + len(orientation_list))
-        print('adding %d grains to the microstructure' % len(grain_ids))
+        if len(grain_ids) > 0:
+            print('adding %d grains to the microstructure' % len(grain_ids))
         for gid, orientation in zip(grain_ids, orientation_list):
             grain['idnumber'] = gid
             if orientation_type == 'euler':
@@ -4074,7 +4077,8 @@ class Microstructure(SampleData):
             grain_map = 1 + np.argmin(distance, axis=0)
         return grain_map
 
-    def to_amitex_fftp(self, binary=True, mat_file=True, elasaniso_path='',
+    def to_amitex_fftp(self, binary=True, mat_file=True, algo_file=True,
+                       char_file=True, elasaniso_path='',
                        add_grips=False, grip_size=10,
                        grip_constants=(104100., 49440.), add_exterior=False,
                        exterior_size=10, use_mask=False):
@@ -4095,6 +4099,8 @@ class Microstructure(SampleData):
 
         :param bool binary: flag to write the files in binary or ascii format.
         :param bool mat_file: flag to write the material file for Amitex.
+        :param bool algo_file: flag to write the algorithm file for Amitex.
+        :param bool char_file: flag to write the loading file for Amitex.
         :param str elasaniso_path: path for the libUmatAmitex.so in
             the Amitex_FFTP installation.
         :param bool add_grips: add a constant region at the beginning and the
@@ -4161,6 +4167,51 @@ class Microstructure(SampleData):
         n2z.close()
         print('orientation data written for AMITEX_FFTP')
 
+        # if required, write the loading file for Amitex
+        if char_file:
+            from lxml import etree, builder
+            root = etree.Element('Loading_Output')
+            output = etree.Element('Output')
+            output.append(etree.Element(_tag='vtk_StressStrain', Strain='1', Stress='0'))
+            root.append(output)
+            loading = etree.Element('Loading', Tag='1')
+            loading.append(etree.Element(_tag='Time_Discretization', Discretization='Linear', Nincr='1', Tfinal='1'))
+            loading.append(etree.Element(_tag='Output_zone', Number='1'))
+            output_vtk_list = etree.Element('Output_vtkList')
+            output_vtk_list.text = "1"
+            loading.append(output_vtk_list)
+            loading.append(etree.Element(_tag='xx', Driving='Stress', Evolution='Constant'))
+            loading.append(etree.Element(_tag='yy', Driving='Stress', Evolution='Constant'))
+            loading.append(etree.Element(_tag='zz', Driving='Stress', Evolution='Linear', Value='100.0'))
+            loading.append(etree.Element(_tag='xy', Driving='Stress', Evolution='Constant'))
+            loading.append(etree.Element(_tag='xz', Driving='Stress', Evolution='Constant'))
+            loading.append(etree.Element(_tag='yz', Driving='Stress', Evolution='Constant'))
+            root.append(loading)
+            # write the file
+            tree = etree.ElementTree(root)
+            tree.write('char.xml', xml_declaration=True, pretty_print=True,
+                       encoding='UTF-8')
+            print('FFT loading file written in char.xml')
+
+        # if required, write the material file for Amitex
+        if algo_file:
+            from lxml import etree, builder
+            root = etree.Element('Algorithm_Parameters')
+            algo = etree.Element('Algorithm', Type='Basic_Scheme')
+            algo.append(etree.Element(_tag='Convergence_Criterion', Value='Default'))
+            algo.append(etree.Element(_tag='Convergence_Acceleration', Value='true'))
+            algo.append(etree.Element(_tag='Nitermin_acv', Value='0'))
+            root.append(algo)
+            mech = etree.Element('Mechanics')
+            mech.append(etree.Element(_tag='Filter', Type='Default'))
+            mech.append(etree.Element(_tag='Small_Perturbations', Value='true'))
+            root.append(mech)
+            # write the file
+            tree = etree.ElementTree(root)
+            tree.write('algo.xml', xml_declaration=True, pretty_print=True,
+                       encoding='UTF-8')
+            print('FFT algorithm file written in algo.xml')
+
         # if required, write the material file for Amitex
         if mat_file:
             from lxml import etree, builder
@@ -4176,6 +4227,8 @@ class Microstructure(SampleData):
                 raise ValueError('inconsistent phase numbering (should be from '
                                  '1 to n_phases): {}'.format(phase_ids))
             for phase_id in phase_ids:
+                comment = etree.Comment(' phase %d: %s ' % (phase_id, self.get_phase().name))
+                root.append(comment)
                 mat = etree.Element('Material', numM=str(phase_id),
                                     Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                     Law='elasaniso')
@@ -4187,6 +4240,8 @@ class Microstructure(SampleData):
                 (1, 2, 3, 4, 5, 6) = (11, 22, 33, 12, 13, 23)
                 Because of this indices 4 and 6 are inverted with respect to the Voigt convention.
                 '''
+                comment = etree.Comment(' orthotropic elasticity coefficients (9 values) ')
+                mat.insert(0, comment)
                 mat.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(C[0, 0])))  # C11
                 mat.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(C[0, 1])))  # C12
                 mat.append(etree.Element(_tag='Coeff', Index='3', Type='Constant', Value=str(C[0, 2])))  # C13
@@ -4196,6 +4251,8 @@ class Microstructure(SampleData):
                 mat.append(etree.Element(_tag='Coeff', Index='7', Type='Constant', Value=str(C[5, 5])))  # C66
                 mat.append(etree.Element(_tag='Coeff', Index='8', Type='Constant', Value=str(C[4, 4])))  # C55
                 mat.append(etree.Element(_tag='Coeff', Index='9', Type='Constant', Value=str(C[3, 3])))  # C44
+                comment = etree.Comment(' cristal orientation: N1 coeff(10-12), N2 coeff(13-15) ')
+                mat.insert(9, comment)
                 fmt = "binary" if binary else "ascii"
                 mat.append(etree.Element(_tag='Coeff', Index="10", Type="Constant_Zone", File="N1X.bin", Format=fmt))
                 mat.append(etree.Element(_tag='Coeff', Index="11", Type="Constant_Zone", File="N1Y.bin", Format=fmt))
@@ -4203,10 +4260,16 @@ class Microstructure(SampleData):
                 mat.append(etree.Element(_tag='Coeff', Index="13", Type="Constant_Zone", File="N2X.bin", Format=fmt))
                 mat.append(etree.Element(_tag='Coeff', Index="14", Type="Constant_Zone", File="N2Y.bin", Format=fmt))
                 mat.append(etree.Element(_tag='Coeff', Index="15", Type="Constant_Zone", File="N2Z.bin", Format=fmt))
+                comment = etree.Comment(' internal variable for the elastic strain field ')
+                mat.append(comment)
+                for i in range(6):
+                    mat.append(etree.Element(_tag='IntVar', Index=str(i + 1), Type="Constant", Value="0."))
 
                 root.append(mat)
             # add a material for top and bottom layers
             if add_grips:
+                comment = etree.Comment(' Isotropic elastic material for tension test grips ')
+                root.append(comment)
                 grips = etree.Element('Material', numM=str(grip_id + 1),
                                       Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                       Law='elasiso')
@@ -4215,6 +4278,8 @@ class Microstructure(SampleData):
                 root.append(grips)
             # add a material for external buffer
             if add_exterior or use_mask:
+                comment = etree.Comment(' Isotropic elastic material for the exterior ')
+                root.append(comment)
                 exterior = etree.Element('Material', numM=str(ext_id + 1),
                                          Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                          Law='elasiso')
@@ -4237,7 +4302,7 @@ class Microstructure(SampleData):
             grain_ids = self.renumber_grains(only_grain_map=True)
             if not self._is_empty('phase_map'):
                 # use the phase map for the material ids
-                material_ids = self.get_phase_map()
+                material_ids = self.get_phase_map().astype(grain_ids.dtype)
             elif use_mask:
                 material_ids = self.get_mask().astype(grain_ids.dtype)
             else:

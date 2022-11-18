@@ -4826,8 +4826,8 @@ class Microstructure(SampleData):
         return micro
 
     @staticmethod
-    def from_labdct(labdct_file, data_dir='.', name=None, include_IPF_map=False,
-                    grain_map_key='GrainId', include_rodrigues_map=False):
+    def from_labdct(labdct_file, data_dir='.', name=None, include_ipf_map=False,
+                    grain_map_key='GrainId'):
         """Create a microstructure from a DCT reconstruction.
 
         :param str labdct_file: the name of the file containing the labDCT data.
@@ -4836,12 +4836,10 @@ class Microstructure(SampleData):
         :param str name: the file name to use for this microstructure.
             By default, the suffix `_data` is added to the base name of the
             labDCT scan.
-        :param bool include_IPF_map: if True, the IPF maps will be included
+        :param bool include_ipf_map: if True, the IPF maps will be included
             in the microstructure fields.
         :param str grain_map_key: string defining the path to the grain map
             (GrainId by default).
-        :param bool include_rodrigues_map: if True, the rodrigues map will be
-            included in the microstructure fields.
         :return: a `Microstructure` instance created from the labDCT
             reconstruction file.
         """
@@ -4853,7 +4851,8 @@ class Microstructure(SampleData):
         with h5py.File(file_path, 'r') as f:
             #TODO handle multiple phases
             phase01 = f['PhaseInfo']['Phase01']
-            phase_name = phase01['Name'][()].decode('utf-8')
+            #phase_name = phase01['Name'][()].decode('utf-8')
+            phase_name = phase01['Name'][0].decode('utf-8')
             parameters = phase01['UnitCell'][()]  # length unit is angstrom
             a, b, c = parameters[:3] / 10  # use nm unit
             alpha, beta, gamma = parameters[3:]
@@ -4864,7 +4863,7 @@ class Microstructure(SampleData):
             lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
             phase = CrystallinePhase(phase_id=1, name=phase_name, lattice=lattice)
         # create the microstructure with the phase infos
-        micro = Microstructure(name=name, overwrite_hdf5=True, phase=phase)
+        m = Microstructure(name=name, overwrite_hdf5=True, phase=phase)
 
         # load cell data
         with h5py.File(file_path, 'r') as f:
@@ -4872,61 +4871,63 @@ class Microstructure(SampleData):
             rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()].transpose(2, 1, 0, 3)
             grain_map = f['LabDCT']['Data'][grain_map_key][()].transpose(2, 1, 0)
             print('adding cell data with shape {}'.format(grain_map.shape))
-            micro.set_grain_map(grain_map, voxel_size=spacing)
+            m.set_grain_map(grain_map, voxel_size=spacing)
             mask = f['LabDCT']['Data']['Mask'][()].transpose(2, 1, 0)
-            micro.set_mask(mask, voxel_size=spacing)
+            m.set_mask(mask, voxel_size=spacing)
             phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
-            micro.set_phase_map(phase_map, voxel_size=spacing)
-            if include_rodrigues_map:
-                micro.set_orientation_map(rodrigues_map)
-                #micro.add_field(gridname='CellData', field_name='rodrigues_map',
-                #                array=rodrigues_map)
+            m.set_phase_map(phase_map, voxel_size=spacing)
+            m.set_orientation_map(rodrigues_map)
+            completeness_map = f['LabDCT']['Data']['Completeness'][()].transpose(2, 1, 0)
+            m.add_field(gridname='CellData', fieldname='completeness_map',
+                        array=completeness_map)
 
         # create grain data table infos
         grain_ids = np.unique(grain_map)
         print(grain_ids)
-        micro.build_grain_table_from_grain_map()
+        m.build_grain_table_from_grain_map()
         # now get each grain orientation from the rodrigues map
-        for i, g in enumerate(micro.grains):
+        from tqdm import tqdm
+        for g in tqdm(m.grains):
             gid = g['idnumber']
-            progress = 100 * (1 + i) / len(micro.grains)
+            #progress = 100 * (1 + i) / len(m.grains)
             print('adding grains: {0:.2f} %'.format(progress), end='\r')
             # use the grain bounding box
-            bb = micro.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
-            grain_map = micro.get_grain_map()[bb[0][0]:bb[0][1],
-                                              bb[1][0]:bb[1][1],
-                                              bb[2][0]:bb[2][1]]
-            x, y, z = np.where(grain_map == gid)
-            #TODO compute mean orientation here
-            orientation = rodrigues_map[bb[0][0] + x[0], bb[1][0] + y[0], bb[2][0] + z[0]]
+            bb = g['bounding_box']
+            grain_map = m.get_grain_map()[bb[0][0]:bb[0][1],
+                                          bb[1][0]:bb[1][1],
+                                          bb[2][0]:bb[2][1]]
+            #x, y, z = np.where(grain_map == gid)
             # assign orientation to this grain
-            g['orientation'] = orientation
+            rods_gid = rodrigues_map[bb[0][0]:bb[0][1],
+                                     bb[1][0]:bb[1][1],
+                                     bb[2][0]:bb[2][1]][grain_map == gid]
+            g['orientation'] = Orientation.compute_mean_orientation(rods_gid, symmetry=sym)
             g.update()
-        micro.grains.flush()
+        m.grains.flush()
 
-        if include_IPF_map:
+        if include_ipf_map:
             print('adding IPF maps')
             with h5py.File(file_path, 'r') as f:
                 if 'IPF001' in f['LabDCT/Data']:
                     IPF001_map = f['LabDCT/Data/IPF001'][()].transpose(2, 1, 0, 3)
                 else:
                     IPF001_map = micro.create_IPF_map(axis=np.array([0., 0., 1.]))
-                micro.add_field(gridname='CellData', fieldname='IPF001_map',
-                                array=IPF001_map)
+                m.add_field(gridname='CellData', fieldname='IPF001_map',
+                            array=IPF001_map)
                 if 'IPF010' in f['LabDCT/Data']:
                     IPF010_map = f['LabDCT/Data/IPF010'][()].transpose(2, 1, 0, 3)
                 else:
                     IPF010_map = micro.create_IPF_map(axis=np.array([0., 1., 0.]))
-                micro.add_field(gridname='CellData', fieldname='IPF010_map',
-                                array=IPF010_map)
+                m.add_field(gridname='CellData', fieldname='IPF010_map',
+                            array=IPF010_map)
                 if 'IPF100' in f['LabDCT/Data']:
                     IPF100_map = f['LabDCT/Data/IPF100'][()].transpose(2, 1, 0, 3)
                 else:
                     IPF100_map = micro.create_IPF_map(axis=np.array([1., 0., 0.]))
-                micro.add_field(gridname='CellData', fieldname='IPF100_map',
-                                array=IPF100_map)
+                m.add_field(gridname='CellData', fieldname='IPF100_map',
+                            array=IPF100_map)
                 del IPF001_map, IPF010_map, IPF100_map
-        return micro
+        return m
 
     @staticmethod
     def from_dct(data_dir='.', grain_file='index.mat', use_dct_path=True,

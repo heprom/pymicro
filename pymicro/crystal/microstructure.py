@@ -4954,6 +4954,12 @@ class Microstructure(SampleData):
         :param str vol_key: the key to access the volume in the hdf5 file.
         :param str mask_file: the name of the mask file.
         :param str mask_key: the key to access the mask in the hdf5 file.
+        :param str phase_file: the name of the file containing the phase map array.
+        :param str phase_key: the key to access the phase array in the hdf5 file.
+        :param str rod_map_file: the name of the file containing the local
+            orientations as a rodrigues vector array.
+        :param str rod_map_key: the key to access the phase rodrigues vector
+            array in the file.
         :param list roi: specify a region of interest by a list of 6 
             integers in the form [x1, x2, y1, y2, z1, z2] to crop the grain map.
         :param bool verbose: activate verbose mode.
@@ -5021,7 +5027,7 @@ class Microstructure(SampleData):
                     print(f[vol_key][()].shape)
                     print(voxel_size)
                     grain_map = f[vol_key][()].transpose(2, 1, 0)
-            except:
+            except OSError:
                 # fallback on matlab format
                 grain_map = loadmat(grain_map_path)[vol_key]
             # work out the ROI
@@ -5039,7 +5045,7 @@ class Microstructure(SampleData):
             try:
                 with h5py.File(mask_path, 'r') as f:
                     mask = f[mask_key][()].transpose(2, 1, 0).astype(np.uint8)
-            except:
+            except OSError:
                 # fallback on matlab format
                 mask = loadmat(mask_path)[mask_key]
             if roi:
@@ -5060,7 +5066,7 @@ class Microstructure(SampleData):
             try:
                 with h5py.File(phase_path, 'r') as f:
                     phase_map = f[phase_key][()].transpose(2, 1, 0).astype(np.uint8)
-            except:
+            except OSError:
                 # fallback on matlab format
                 phase_map = loadmat(phase_path)[phase_key]
             if roi:
@@ -5074,15 +5080,16 @@ class Microstructure(SampleData):
             try:
                 with h5py.File(rod_map_path, 'r') as f:
                     orientation_map = f[rod_map_key][()].transpose(3, 2, 1, 0).astype(np.float)
-            except:
-                # fallback on matlab format
-                orientation_map = loadmat(rod_map_path)[rod_map_key]
-            if roi:
-                x1, x2, y1, y2, z1, z2 = roi
-                orientation_map = orientation_map[x1:x2, y1:y2, z1:z2, :]
-            micro.set_orientation_map(orientation_map)
-            if verbose:
-                print('loaded orientation_map volume with shape: {}'.format(micro.get_orientation_map().shape))
+                    if roi:
+                        x1, x2, y1, y2, z1, z2 = roi
+                        orientation_map = orientation_map[x1:x2, y1:y2, z1:z2, :]
+                    micro.set_orientation_map(orientation_map)
+                    if verbose:
+                        print('loaded orientation_map volume with shape: {}'.format(micro.get_orientation_map().shape))
+            except KeyError:
+                print('warning, local orientation not found in %s' % rod_map_file)
+                # give up on local orientations
+                pass
         return micro
 
     @staticmethod

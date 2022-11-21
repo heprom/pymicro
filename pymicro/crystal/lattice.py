@@ -1840,7 +1840,7 @@ class HklPlane(HklObject):
         if type(hkl) == list:
             hkl_planes = hkl
         else:
-            hkl_planes = HklPlane.get_family(hkl)
+            hkl_planes = HklPlane.get_hkl_family(hkl)
         if not len(hkl_planes) > 0:
             raise ValueError('no item found in the list of lattice planes to '
                              'display, please check your parameters')

@@ -165,7 +165,8 @@ class Orientation:
 
         :param ndarray axis: the direction to use to compute the IPF colour.
         :param Symmetry symmetry: the symmetry operator to use.
-        :return bool saturate: a flag to saturate the RGB values.
+        :param bool saturate: a flag to saturate the RGB values.
+        :return: the IPF colour in RGB form.
         """
         axis /= np.linalg.norm(axis)
         Vc = np.dot(self.orientation_matrix(), axis)
@@ -1412,25 +1413,38 @@ class Orientation:
         q = 0.5 * (np.outer(l_rot, n_rot) - np.outer(n_rot, l_rot))
         return q
 
-    def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
+    def schmid_factor(self, slip_system, load_direction=[0., 0., 1],
+                      unidirectional=False):
         """Compute the Schmid factor for this crystal orientation and the
         given slip system.
+
+        .. note::
+
+          The Schmid factor is usually regarded as positive (dislocation slip
+          can happend in both shear directions), because of this, the absolute
+          value of the dot product is returned. In some case, is can be useful
+          to compute the unidirectional value of the Schmid factor, in this
+          case, set the unidirectional parameter to True.
 
         :param slip_system: a `SlipSystem` instance.
         :param load_direction: a unit vector describing the loading direction
             (default: vertical axis [0, 0, 1]).
-        :return float: a number between 0 ad 0.5.
+        :param bool unidirectional: if True, a positive value is not enforced.
+        :return float: a number between 0 ad 0.5 (or -0.5 and 0.5 with the
+        unidirectional option).
         """
+        t = load_direction / np.linalg.norm(load_direction)
         plane = slip_system.get_slip_plane()
         gt = self.orientation_matrix().transpose()
         n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
         slip = slip_system.get_slip_direction().direction()
         slip_rot = np.dot(gt, slip)
-        schmid_factor = np.abs(np.dot(n_rot, load_direction) *
-                               np.dot(slip_rot, load_direction))
+        schmid_factor = np.dot(n_rot, t) * np.dot(slip_rot, t)
+        if not unidirectional:
+            schmid_factor = abs(schmid_factor)
         return schmid_factor
 
-    def compute_all_schmid_factors(self, slip_systems,
+    def compute_all_schmid_factors(self, slip_systems, unidirectional=False,
                                    load_direction=[0., 0., 1], verbose=False):
         """Compute all Schmid factors for this crystal orientation and the
         given list of slip systems.
@@ -1439,12 +1453,13 @@ class Orientation:
             the Schmid factor values.
         :param load_direction: a unit vector describing the loading direction
             (default: vertical axis [0, 0, 1]).
+        :param bool unidirectional: if True, a positive value is not enforced.
         :param bool verbose: activate verbose mode.
         :return list: a list of the schmid factors.
         """
         schmid_factor_list = []
         for ss in slip_systems:
-            sf = self.schmid_factor(ss, load_direction)
+            sf = self.schmid_factor(ss, load_direction, unidirectional)
             if verbose:
                 print('Slip system: %s, Schmid factor is %.3f' % (ss, sf))
             schmid_factor_list.append(sf)

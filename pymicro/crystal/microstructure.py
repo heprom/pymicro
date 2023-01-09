@@ -2924,7 +2924,7 @@ class Microstructure(SampleData):
     def view_slice(self, slice=None, plane='XY', color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,
                    axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None,
-                   unit='pixel', display=True):
+                   show_gb=False, unit='pixel', display=True):
         """A simple utility method to show one microstructure slice.
 
         The method extract a 2D orthogonal slice from the microstructure to
@@ -2953,6 +2953,8 @@ class Microstructure(SampleData):
         :param bool show_slip_traces: activate slip traces plot in each grain.
         :param list hkl_planes: the list of planes to plot the slip traces.
         :param str unit: switch between mm and pixel units.
+        :param bool show_gb: show the grain boundaries, works only
+            with color='ipf' for now.
         :param bool display: if True, the show method is called, otherwise,
             the figure is simply returned.
         """
@@ -3019,8 +3021,14 @@ class Microstructure(SampleData):
                     print('problem moving to the fundamental zone for rodrigues vector {}'.format(o.rod))
                     c = np.array([0., 0., 0.])
                 ipf_image[grains_slice == gid] = c
-            plt.imshow(ipf_image.transpose(1, 0, 2),
-                       interpolation='nearest', extent=extent)
+            if show_gb:
+                from skimage import segmentation
+                ipf_image = segmentation.mark_boundaries(ipf_image, grains_slice,
+                                                         color=(0, 0, 0))
+                plt.imshow(ipf_image.transpose(1, 0, 2), extent=extent)
+            else:
+                plt.imshow(ipf_image.transpose(1, 0, 2),
+                           interpolation='nearest', extent=extent)
         else:
             print('unknown color scheme requested, please chose between {random, '
                   'grain_ids, schmid, ipf}, returning')

@@ -1602,21 +1602,24 @@ class Grain:
                 thresh.SetInputData(grid)
             else:
                 thresh.SetInput(grid)
-            thresh.Update()
             if verbose:
                 print('thresholding label: %d' % label)
                 print(thresh.GetOutput())
-            self.SetVtkMesh(thresh.GetOutput())
+            edges = vtk.vtkExtractEdges()
+            edges.SetInputConnection(thresh.GetOutputPort())
+            edges.Update()
+            self.SetVtkMesh(edges.GetOutput())
 
     def vtk_file_name(self):
-        return 'grain_%d.vtu' % self.id
+        return 'grain_%d.vtp' % self.id
 
     def save_vtk_repr(self, file_name=None):
         import vtk
         if not file_name:
             file_name = self.vtk_file_name()
         print('writting ' + file_name)
-        writer = vtk.vtkXMLUnstructuredGridWriter()
+        writer = vtk.vtkXMLPolyDataWriter()
+        #writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(file_name)
         if vtk.vtkVersion().GetVTKMajorVersion() > 5:
             writer.SetInputData(self.vtkmesh)
@@ -1628,7 +1631,8 @@ class Grain:
         import vtk
         if verbose:
             print('reading ' + file_name)
-        reader = vtk.vtkXMLUnstructuredGridReader()
+        #reader = vtk.vtkXMLUnstructuredGridReader()
+        reader = vtk.vtkXMLPolyDataReader()
         reader.SetFileName(file_name)
         reader.Update()
         self.vtkmesh = reader.GetOutput()
@@ -2920,7 +2924,7 @@ class Microstructure(SampleData):
     def view_slice(self, slice=None, plane='XY', color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,
                    axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None,
-                   display=True):
+                   unit='pixel', display=True):
         """A simple utility method to show one microstructure slice.
 
         The method extract a 2D orthogonal slice from the microstructure to
@@ -2948,6 +2952,7 @@ class Microstructure(SampleData):
             the Schmid factor or to display IPF coloring.
         :param bool show_slip_traces: activate slip traces plot in each grain.
         :param list hkl_planes: the list of planes to plot the slip traces.
+        :param str unit: switch between mm and pixel units.
         :param bool display: if True, the show method is called, otherwise,
             the figure is simply returned.
         """
@@ -2961,6 +2966,9 @@ class Microstructure(SampleData):
         except ValueError:
             print('cut plane must be either XY, YZ or XZ')
             return
+        if unit not in ['mm', 'pixel']:
+            print('unit must be mm or pixel, defaulting to pixel')
+            unit = 'pixel'
         grain_map = self.get_grain_map()
         if slice is None or slice > grain_map.shape[cut_axis] - 1 or slice < 0:
             slice = grain_map.shape[cut_axis] // 2
@@ -2968,11 +2976,22 @@ class Microstructure(SampleData):
         grains_slice = grain_map.take(indices=slice, axis=cut_axis)
         gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
         fig, ax = plt.subplots()
+        # assuming origin is upper
+        extent = [0, grains_slice.shape[0], grains_slice.shape[1], 0]
+        if unit == 'mm':
+            # work out extent in mm unit
+            extent += np.array([-0.5 * grains_slice.shape[0],
+                                -0.5 * grains_slice.shape[0],
+                                -0.5 * grains_slice.shape[1],
+                                -0.5 * grains_slice.shape[1]])
+            extent *= self.get_voxel_size()
         if color == 'random':
             grain_cmap = Microstructure.rand_cmap(first_is_black=True)
-            ax.imshow(grains_slice.T, cmap=grain_cmap, vmin=0, interpolation='nearest')
+            ax.imshow(grains_slice.T, cmap=grain_cmap, vmin=0,
+                      interpolation='nearest', extent=extent)
         elif color == 'grain_ids':
-            ax.imshow(grains_slice.T, cmap='viridis', vmin=0, interpolation='nearest')
+            ax.imshow(grains_slice.T, cmap='viridis', vmin=0,
+                      interpolation='nearest', extent=extent)
         elif color == 'schmid':
             # construct a Schmid factor image
             schmid_image = np.zeros_like(grains_slice, dtype=float)
@@ -2985,8 +3004,8 @@ class Microstructure(SampleData):
                 else:
                     sf = o.schmid_factor(slip_system, axis)
                 schmid_image[grains_slice == gid] = sf
-            from matplotlib import cm
-            plt.imshow(schmid_image.T, cmap=cm.gray, vmin=0, vmax=0.5, interpolation='nearest')
+            plt.imshow(schmid_image.T, cmap=plt.cm.gray, vmin=0, vmax=0.5,
+                       interpolation='nearest', extent=extent)
             cb = plt.colorbar()
             cb.set_label('Schmid factor')
         elif color == 'ipf':
@@ -3000,18 +3019,19 @@ class Microstructure(SampleData):
                     print('problem moving to the fundamental zone for rodrigues vector {}'.format(o.rod))
                     c = np.array([0., 0., 0.])
                 ipf_image[grains_slice == gid] = c
-            plt.imshow(ipf_image.transpose(1, 0, 2), interpolation='nearest')
+            plt.imshow(ipf_image.transpose(1, 0, 2),
+                       interpolation='nearest', extent=extent)
         else:
             print('unknown color scheme requested, please chose between {random, '
                   'grain_ids, schmid, ipf}, returning')
             return
         ax.xaxis.set_label_position('top')
-        plt.xlabel(plane[0])
-        plt.ylabel(plane[1])
+        plt.xlabel(plane[0] + ' [%s]' % unit)
+        plt.ylabel(plane[1] + ' [%s]' % unit)
         if not self._is_empty('mask') and show_mask:
             from pymicro.view.vol_utils import alpha_cmap
             mask = self.get_mask().take(indices=slice, axis=cut_axis)
-            plt.imshow(mask.T, cmap=alpha_cmap(opacity=0.3))
+            plt.imshow(mask.T, cmap=alpha_cmap(opacity=0.3), extent=extent)
 
         # compute the center of mass of each grain of interest in this slice
         if show_grain_ids or show_slip_traces:
@@ -3023,7 +3043,10 @@ class Microstructure(SampleData):
                 sizes[i] = np.sum(grains_slice == gid)
                 centers[i] = ndimage.measurements.center_of_mass(
                     grains_slice == gid, grains_slice)
-
+            if unit == 'mm':
+                centers += np.array([-0.5 * grains_slice.shape[0],
+                                     -0.5 * grains_slice.shape[1]])
+                centers *= self.get_voxel_size()
         # grain id labels
         if show_grain_ids:
             for i, gid in enumerate(gids):
@@ -3055,16 +3078,14 @@ class Microstructure(SampleData):
                                            view_up=view_up,
                                            trace_size=0.8 * np.sqrt(sizes[i]),
                                            verbose=False)
+                    if unit == 'mm':
+                        trace *= self.get_voxel_size()
                     color = 'k'
                     x = centers[i][0] + np.array([-trace[0] / 2, trace[0] / 2])
                     y = centers[i][1] + np.array([-trace[1] / 2, trace[1] / 2])
-                    #plt.plot(centers[i][0], centers[i][1], 'o', color=color)
                     plt.plot(x, y, '-', linewidth=1, color=color)
-            extent = (-self.get_voxel_size() * grains_slice.shape[0] / 2,
-                      self.get_voxel_size() * grains_slice.shape[0] / 2,
-                      self.get_voxel_size() * grains_slice.shape[1] / 2,
-                      -self.get_voxel_size() * grains_slice.shape[1] / 2)
-            plt.axis([0, grains_slice.shape[0], grains_slice.shape[1], 0])
+                # prevent axis to move due to traces spanning outside the map
+                plt.axis(extent)
         if display:
             plt.show()
         return fig, ax

@@ -194,6 +194,20 @@ class Orientation:
             angleB = Vc_phi  # blue color proportional to phi
             minAngleB = 0
             maxAngleB = 30
+        elif symmetry is Symmetry.tetragonal:
+            angleR = 90 - Vc_psi  # red color proportional to (90 - psi)
+            minAngleR = 0
+            maxAngleR = 90
+            angleB = Vc_phi  # blue color proportional to phi
+            minAngleB = 0
+            maxAngleB = 45
+        elif symmetry is Symmetry.orthorhombic:
+            angleR = 90 - Vc_psi  # red color proportional to (90 - psi)
+            minAngleR = 0
+            maxAngleR = 90
+            angleB = Vc_phi  # blue color proportional to phi
+            minAngleB = 0
+            maxAngleB = 90
         else:
             raise(ValueError('unsupported crystal symmetry to compute IPF color'))
         # find the axis lying in the fundamental zone

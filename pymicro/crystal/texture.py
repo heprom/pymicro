@@ -443,6 +443,20 @@ class PoleFigure:
                 else:
                     break
             return v_sym
+        elif symmetry is Symmetry.orthorhombic:
+            syms = symmetry.symmetry_operators()
+            for i in range(syms.shape[0]):
+                sym = syms[i]
+                v_sym = np.dot(sym, v)
+                # look at vectors pointing up
+                if v_sym[2] < 0:
+                    v_sym *= -1
+                # now evaluate if projection is in the sst
+                if v_sym[1] < 0 or v_sym[0] < 0:
+                    continue
+                else:
+                    break
+            return v_sym
         else:
             print('unsupported symmetry: %s' % symmetry)
             return None
@@ -540,14 +554,17 @@ class PoleFigure:
         elif symmetry is Symmetry.tetragonal:
             sst_poles = [(0, 0, 1), (1, 0, 0), (1, 1, 0)]
             ax.axis([-0.05, 1.05, -0.05, 0.75])
+        elif symmetry is Symmetry.orthorhombic:
+            sst_poles = [(0, 0, 1), (1, 0, 0), (0, 1, 0)]
+            ax.axis([-0.05, 1.05, -0.05, 1.05])
         else:
             print('unsuported symmetry: %s' % symmetry)
         A = HklPlane(*sst_poles[0], lattice=self.microstructure.get_lattice())
         B = HklPlane(*sst_poles[1], lattice=self.microstructure.get_lattice())
         C = HklPlane(*sst_poles[2], lattice=self.microstructure.get_lattice())
-        self.plot_line_between_crystal_dir(A.normal(), B.normal(), ax=ax, col='k')
-        self.plot_line_between_crystal_dir(B.normal(), C.normal(), ax=ax, col='k')
-        self.plot_line_between_crystal_dir(C.normal(), A.normal(), ax=ax, col='k')
+        self.plot_line_between_crystal_dir(A.normal(), B.normal(), steps=2, ax=ax, col='k')
+        self.plot_line_between_crystal_dir(B.normal(), C.normal(), steps=21, ax=ax, col='k')
+        self.plot_line_between_crystal_dir(C.normal(), A.normal(), steps=2, ax=ax, col='k')
         # display the 3 crystal axes
         poles = [A, B, C]
         v_align = ['top', 'top', 'bottom']

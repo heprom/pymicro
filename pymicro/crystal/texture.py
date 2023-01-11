@@ -427,6 +427,22 @@ class PoleFigure:
                 else:
                     break
             return v_sym
+        elif symmetry is Symmetry.tetragonal:
+            syms = symmetry.symmetry_operators()
+            for i in range(syms.shape[0]):
+                sym = syms[i]
+                v_sym = np.dot(sym, v)
+                # look at vectors pointing up
+                if v_sym[2] < 0:
+                    v_sym *= -1
+                # now evaluate if projection is in the sst
+                if v_sym[1] < 0 or v_sym[0] < 0:
+                    continue
+                elif v_sym[1] > v_sym[0]:
+                    continue
+                else:
+                    break
+            return v_sym
         else:
             print('unsupported symmetry: %s' % symmetry)
             return None
@@ -521,6 +537,9 @@ class PoleFigure:
         elif symmetry is Symmetry.hexagonal:
             sst_poles = [(0, 0, 1), (2, -1, 0), (1, 0, 0)]
             ax.axis([-0.05, 1.05, -0.05, 0.6])
+        elif symmetry is Symmetry.tetragonal:
+            sst_poles = [(0, 0, 1), (1, 0, 0), (1, 1, 0)]
+            ax.axis([-0.05, 1.05, -0.05, 0.75])
         else:
             print('unsuported symmetry: %s' % symmetry)
         A = HklPlane(*sst_poles[0], lattice=self.microstructure.get_lattice())

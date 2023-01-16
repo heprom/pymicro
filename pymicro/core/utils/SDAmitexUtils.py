@@ -395,6 +395,40 @@ class SDAmitexIO():
                         output_slice[1,0]:output_slice[1,1],
                         output_slice[2,0]:output_slice[2,1],...]
         return data
+    
+    def write_vtk_legacy(array, vtk_path='output', voxel_size=1,
+                         array_name="mat_id"):
+        """ Writes a vtk legacy file from a numpy array
+
+        :param array: Numpy array to write as binary image
+        :type array: numpy array 
+        :param output_name: path of the vtk file to write
+        :type output_name: string
+
+        """
+        from vtk.util import numpy_support
+        
+        # transform data to vtk data array
+        vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array, order='F'),
+                                                    deep=1)
+        vtk_data_array.SetName(array_name)
+        
+        # Init VTK regular grid 
+        grid = vtk.vtkImageData()
+        size = array.shape
+        grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
+        grid.GetCellData().SetScalars(vtk_data_array)
+        grid.SetSpacing(voxel_size, voxel_size, voxel_size)
+        
+        # Init vtk writer and write file
+        writer = vtk.vtkStructuredPointsWriter()
+        writer.SetFileName('%s.vtk' % vtk_path)
+        writer.SetFileTypeToBinary()
+        writer.SetInputData(grid)
+        writer.Write()
+        
+        print(f'File {vtk_path}.vtk written as VTK legacy file')
+        return
 
     @staticmethod
     def get_amitex_tension_test_relevant_slice(init_shape, grip_size=1,

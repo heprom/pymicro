@@ -167,7 +167,7 @@ class ObjectGeometry:
          to set the cad geometry must be the path to the STL file.
         """
         if self.geo_type == 'point':
-            self.positions = np.array(self.origin)
+            self.positions = np.array(self.origin).reshape((1, len(self.origin)))
         elif self.geo_type == 'array':
             vx, vy, vz = self.array.shape  # number of voxels
             print(vx, vy, vz)
@@ -208,14 +208,15 @@ class Sample(Microstructure):
     real space.
     """
 
-    def __init__(self, filename=None, name=None, material=None, position=None, geo=None):
+    def __init__(self, filename=None, name=None, material=None, position=None,
+                 geo=None, overwrite_hdf5=False):
         if filename is None and name is None:
             # Create random name to avoid opening another microstructure with
             # same file name when initializing another sample
             randint = str(np.random.randint(1, 10000 + 1))
             name = 'tmp_micro_' + randint
         Microstructure.__init__(self, filename=filename, name=name,
-                                phase=material)
+                                phase=material, overwrite_hdf5=overwrite_hdf5)
         self.set_position(position)
         self.set_geometry(geo)
 

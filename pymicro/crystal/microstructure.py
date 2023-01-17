@@ -2569,7 +2569,8 @@ class Microstructure(SampleData):
                 min_id = 0
             grain_ids = range(min_id, min_id + len(orientation_list))
         if len(grain_ids) > 0:
-            print('adding %d grains to the microstructure' % len(grain_ids))
+            s = 's' if len(grain_ids) > 1 else ''
+            print(f'adding {len(grain_ids)} grain{s} to the microstructure')
         for gid, orientation in zip(grain_ids, orientation_list):
             grain['idnumber'] = gid
             if orientation_type == 'euler':

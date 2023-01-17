@@ -775,11 +775,12 @@ def diffracting_normals_vector(gnom):
 
 from pymicro.xray.experiment import ForwardSimulation, Experiment
 
+
 class LaueForwardSimulation(ForwardSimulation):
     """Class to represent a Forward Simulation."""
 
     def __init__(self, verbose=False):
-        super(ForwardSimulation, self).__init__('laue', verbose=verbose)
+        ForwardSimulation.__init__(self, 'laue', verbose=verbose)
         self.hkl_planes = []
         self.max_miller = 5
         self.use_energy_limits = False
@@ -957,7 +958,6 @@ class LaueForwardSimulation(ForwardSimulation):
         n_hkl = len(hkl_planes)
         print('after filtering we have %d hkl planes for this grain' % n_hkl)
         positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
-
         # call the fsim_laue function
         thetas, the_energies, X_vectors, K_vectors = LaueForwardSimulation.fsim_laue(
             self.grain.orientation, hkl_planes, positions, source.position)
@@ -968,6 +968,7 @@ class LaueForwardSimulation(ForwardSimulation):
         uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
 
         # now construct a boolean list to select the diffraction spots
+        # FIXME handle case when min and max energies not set
         on_det = np.where((0 < uv[:, 0]) &
                           (uv[:, 0] < detector.get_size_px()[0]) &
                           (0 < uv[:, 1]) &

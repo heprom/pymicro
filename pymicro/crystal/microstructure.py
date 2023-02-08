@@ -266,7 +266,7 @@ class Orientation:
         This function computes a mean orientation from several data points
         representing orientations by averaging the corresponding Rodrigues
         vector. One caveat with this averaging method is if the vectors belong
-        to different asymetric domains, the mean orientation will be wrong.
+        to different asymmetric domains, the mean orientation will be wrong.
 
         To avoid this, we compute all equivalent rotation for all data points
         and then use kmeans clustering to separate all points. We do this using
@@ -283,6 +283,34 @@ class Orientation:
         :param `Symmetry` symmetry: the symmetry used to move orientations
         to their fundamental zone (cubic by default)
         :returns: the mean orientation as an `Orientation` instance.
+        """
+        rod_sym_mean = compute_mean_rodrigues(rods, symmetry=symmetry)
+        return Orientation.from_rodrigues(rod_sym_mean)
+
+    @staticmethod
+    def compute_mean_rodrigues(rods, symmetry=Symmetry.cubic):
+        """Compute the mean orientation as a rodrigues vector.
+
+        This function computes a mean orientation from several data points
+        representing orientations by averaging the corresponding Rodrigues
+        vector. One caveat with this averaging method is if the vectors belong
+        to different asymmetric domains, the mean orientation will be wrong.
+
+        To avoid this, we compute all equivalent rotation for all data points
+        and then use kmeans clustering to separate all points. We do this using
+        quaternions to avoid arbitrarily large rodrigues vectors when the
+        rotation angle approaches pi (this would make the clustering algorithm
+        fail). The number of clusters is known to be equal to the number of
+        symmetry operators.
+
+        A mean orientation is then computed for each cluster and the one which
+        belongs to the fundamental zone is returned.
+
+        :param ndarray rods: a (n, 3) shaped array containing the Rodrigues
+        vectors of the orientations.
+        :param `Symmetry` symmetry: the symmetry used to move orientations
+        to their fundamental zone (cubic by default)
+        :returns: the mean orientation as a rodrigues vector.
         """
         rods = np.atleast_2d(rods)
         # omit nan values from the calculation
@@ -324,9 +352,8 @@ class Orientation:
                                   for r in mean_rods_syms])
         else:
             raise (ValueError('unsupported crystal symmetry: %s' % symmetry))
-        rod_sym_mean = mean_rods_syms[index_fz]
 
-        return Orientation.from_rodrigues(rod_sym_mean)
+        return mean_rods_syms[index_fz]
 
     @staticmethod
     def fzDihedral(rod, n):
@@ -4960,7 +4987,7 @@ class Microstructure(SampleData):
             rods_gid = rodrigues_map[bb[0][0]:bb[0][1],
                                      bb[1][0]:bb[1][1],
                                      bb[2][0]:bb[2][1]][grain_map == gid]
-            g['orientation'] = Orientation.compute_mean_orientation(rods_gid, symmetry=sym).rod
+            g['orientation'] = Orientation.compute_mean_rodrigues(rods_gid, symmetry=sym)
             g.update()
         m.grains.flush()
 

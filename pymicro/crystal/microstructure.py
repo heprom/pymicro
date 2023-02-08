@@ -2863,7 +2863,7 @@ class Microstructure(SampleData):
             print('error, multiple phases not yet supported')
             return None
         sym = self.get_phase().get_symmetry()
-        god = np.zeros_like(grain_ids, dtype=np.float)
+        god = np.zeros_like(grain_ids, dtype=float)
         if not id_list:
             id_list = np.unique(self.get_ids_from_grain_map())
         if not recompute_mean_orientation:
@@ -5165,7 +5165,7 @@ class Microstructure(SampleData):
         if os.path.exists(rod_map_path):
             try:
                 with h5py.File(rod_map_path, 'r') as f:
-                    orientation_map = f[rod_map_key][()].transpose(3, 2, 1, 0).astype(np.float)
+                    orientation_map = f[rod_map_key][()].transpose(3, 2, 1, 0).astype(float)
                     if roi:
                         x1, x2, y1, y2, z1, z2 = roi
                         orientation_map = orientation_map[x1:x2, y1:y2, z1:z2, :]

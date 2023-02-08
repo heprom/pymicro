@@ -156,7 +156,7 @@ class CrystallinePhase:
             'E1','E2','E3','nu12','nu13','nu23','G12','G13','G23'
         """
         sym = self.get_symmetry()
-        if sym.elastic_constants_number > 9:
+        if sym.elastic_constants_number() > 9:
             raise ValueError('orthotropic constants can only be determined '
                              'with sufficient symmetry, not %s' % sym)
         C = self.stiffness_matrix()
@@ -462,6 +462,9 @@ class Symmetry(enum.Enum):
 
     def stiffness_matrix(self, elastic_constants):
         """Build the stiffness matrix for this symmetry using Voigt convention.
+
+        The Voigt notation contracts 2 tensor indices into a single index:
+        11 -> 1, 22 -> 2, 33 -> 3, 23 -> 4, 31 -> 5, 12 -> 6
 
         :param list elastic_constants: the elastic constants (the number must
             correspond to the type of symmetry, eg 3 for cubic).
@@ -1141,8 +1144,14 @@ class SlipSystem:
         self._direction = direction
 
     def __repr__(self):
-        out = '(%d%d%d)' % self._plane.miller_indices()
-        out += '[%d%d%d]' % self._direction.miller_indices()
+        if self._plane.lattice.get_symmetry() is Symmetry.hexagonal:
+            h, k, l = self._plane.miller_indices()
+            out = '(%d%d%d%d)' % HklPlane.three_to_four_indices(h, k, l)
+            u, v, w = np.array(self._direction.miller_indices()).astype(int)
+            out +='[%d%d%d%d]' % HklDirection.three_to_four_indices(u, v, w)
+        else:
+            out = '(%d%d%d)' % self._plane.miller_indices()
+            out += '[%d%d%d]' % self._direction.miller_indices()
         return out
 
     def get_slip_plane(self):

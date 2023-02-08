@@ -4960,7 +4960,7 @@ class Microstructure(SampleData):
             rods_gid = rodrigues_map[bb[0][0]:bb[0][1],
                                      bb[1][0]:bb[1][1],
                                      bb[2][0]:bb[2][1]][grain_map == gid]
-            g['orientation'] = Orientation.compute_mean_orientation(rods_gid, symmetry=sym)
+            g['orientation'] = Orientation.compute_mean_orientation(rods_gid, symmetry=sym).rod
             g.update()
         m.grains.flush()
 

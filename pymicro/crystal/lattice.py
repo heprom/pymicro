@@ -1108,6 +1108,18 @@ class Lattice:
         m = self._matrix
         return abs(np.dot(np.cross(m[0], m[1]), m[2]))
 
+    def ubi_to_rod(self, ubi):
+        """convert a UBI matrix to rodrigues vector.
+
+        :param ndarray ubi: 3x3 matrix describing the lattice vectors in
+        the reciprocal space (in angstrom^-1 unit).
+        :return: the cristal orientation in the for of Rodrigues vector
+        """
+        from pymicro.crystal.rotation import om2ro
+        B = np.array(self.reciprocal_lattice()) * 10  # angstrom
+        U = np.dot(B, ubi).T
+        return om2ro(U)
+
     def get_hkl_family(self, hkl):
         """Get a list of the hkl planes composing the given family for
         this crystal lattice.

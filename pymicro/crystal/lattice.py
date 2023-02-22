@@ -332,7 +332,7 @@ class Symmetry(enum.Enum):
         elif self is Symmetry.hexagonal:
             if use_miller_bravais:
               # using the Miller-Bravais representation here
-              sym = np.zeros((12, 4, 4), dtype=np.int)
+              sym = np.zeros((12, 4, 4), dtype=int)
               sym[0] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
               sym[1] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
               sym[2] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, 1]])

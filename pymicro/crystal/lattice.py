@@ -1116,7 +1116,7 @@ class Lattice:
         :return: the cristal orientation in the for of Rodrigues vector
         """
         from pymicro.crystal.rotation import om2ro
-        B = np.array(self.reciprocal_lattice()) * 10  # angstrom
+        B = np.array(self.reciprocal_lattice()) / 10  # angstrom^-1
         U = np.dot(B, ubi).T
         return om2ro(U)
 

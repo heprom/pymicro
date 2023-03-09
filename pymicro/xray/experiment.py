@@ -25,8 +25,8 @@ class XraySource:
 
     def __init__(self, position=None):
         self.set_position(position)
-        self._min_energy = None
-        self._max_energy = None
+        self._min_energy = 0.
+        self._max_energy = 450.
 
     def set_position(self, position):
         if position is None:

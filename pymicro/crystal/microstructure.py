@@ -5326,15 +5326,23 @@ class Microstructure(SampleData):
         between the two based on a disorientation tolerance.
 
         The method is written such that the end slices of the grain map of the
-        first scan in the `micros` list must correspond to the begining of the
+        first scan in the `micros` list must correspond to the beginning of the
         grain map of the second scan.
 
+        .. note::
+
+          The overlap value can be negative, in that case, the first and last
+          layers of the two microstructure are used to match grains and the
+          merged microstructure is constructed with a gap that may be filled
+          later with the `dilate_grains` method.
 
         .. note::
 
           The two microstructure must have the same crystal lattice and the
           same voxel_size for this method to run.
 
+        :param str key_array_to_merge: the path to the arrays to merge in the
+            hdf5 files.
         :param list micros: a list containing the two microstructures to merge.
         :param int overlap: the overlap to use.
         :param list translation_offset: a manual translation (in voxels) offset
@@ -5363,9 +5371,10 @@ class Microstructure(SampleData):
             raise ValueError('Microstructures to merge must be tridimensional')
 
         # create two microstructures for the two overlapping regions
-        micro1_ol = micros[0].crop(z_start=micros[0].get_grain_map().shape[2] -
-                                           overlap, autodelete=True)
-        micro2_ol = micros[1].crop(z_end=overlap, autodelete=True)
+        z1 = micros[0].get_grain_map().shape[2] - max(1, overlap)
+        z2 = max(1, overlap)
+        micro1_ol = micros[0].crop(z_start=z1, autodelete=True)
+        micro2_ol = micros[1].crop(z_end=z2, autodelete=True)
         micros_ol = [micro1_ol, micro2_ol]
 
         # match grain from micros_ol[1] to micros_ol[0] (the reference)
@@ -5393,6 +5402,9 @@ class Microstructure(SampleData):
         print('translation is in voxels {}'.format(translation_voxel))
         # manually correct the result if necessary
         translation_voxel += translation_offset
+        #if overlap < 0:
+        #    translation_voxel[2] -= overlap
+        #    print('translation in voxels updated to {}'.format(translation_voxel))
 
         # now delete overlapping microstructures
         del micro1_ol, micro2_ol
@@ -5441,14 +5453,17 @@ class Microstructure(SampleData):
             renumbered_grains.append([other_id, new_id])
 
         # apply translation along the (X, Y) axes
-        grain_map_translated = np.roll(grain_map_translated,
-                                       translation_voxel[:2], (0, 1))
+        print(grain_map_translated.shape)
+        shifts = translation_voxel[:2].tolist() + [0]
+        print('shifts:', shifts)
+        grain_map_translated = ndimage.shift(grain_map_translated,
+                                             shifts, order=0, cval=0)
 
         check = overlap // 2
-        print(grain_map_translated.shape)
+        print('check=%d' % check)
         print(overlap)
         print(translation_voxel[2] + check)
-        if plot:
+        if plot and overlap > 0:
             slice_ref = micros[0].get_grain_map()[:, :,
                                                   translation_voxel[2] + check]
             slice_renum = grain_map_translated[:, :, check]
@@ -5469,7 +5484,7 @@ class Microstructure(SampleData):
                           == grain_map_translated[:, :, check])
             ax3.imshow(same_voxel.T, vmin=0, vmax=2)
             plt.axis('off')
-            plt.title('voxels that are identicals')
+            plt.title('voxels that are identical')
             plt.savefig('merging_check1.pdf')
 
         # merging finished, building the new microstructure instance
@@ -5512,17 +5527,19 @@ class Microstructure(SampleData):
                  gmap_shape[1][2] - overlap, z_shape))
         shape_merged = (np.array(gmap_shape[0])
                         + [0, 0, gmap_shape[1][2] - overlap])
+        print('shape merged: {}'.format(shape_merged))
 
-        # look at vertices with the same label
-        same_voxel = (micros[0].get_grain_map()[:, :, translation_voxel[2]:]
-                      == grain_map_translated[:, :, :overlap])
-        # look at vertices with a single label
-        single_voxels_0 = ((micros[0].get_grain_map()[:, :,
-                            translation_voxel[2]:] > 0)
-                           & (grain_map_translated[:, :, :overlap] == 0))
-        single_voxels_1 = ((grain_map_translated[:, :, :overlap] > 0)
-                           & (micros[0].get_grain_map()[:, :,
-                              translation_voxel[2]:] == 0))
+        if overlap > 0:
+            # look at vertices with the same label
+            same_voxel = (micros[0].get_grain_map()[:, :, translation_voxel[2]:]
+                          == grain_map_translated[:, :, :overlap])
+            # look at vertices with a single label
+            single_voxels_0 = ((micros[0].get_grain_map()[:, :,
+                                translation_voxel[2]:] > 0)
+                               & (grain_map_translated[:, :, :overlap] == 0))
+            single_voxels_1 = ((grain_map_translated[:, :, :overlap] > 0)
+                               & (micros[0].get_grain_map()[:, :,
+                                  translation_voxel[2]:] == 0))
 
         # factorize the merging of all arrays
         array_names = micros[0].get_node('%s/Field_index' % key_array_to_merge)[()]
@@ -5538,41 +5555,51 @@ class Microstructure(SampleData):
                     a_top = grain_map_translated
                 else:
                     # simply translate the second volume
-                    a_top = np.roll(micros[1].get_field(array_name),
-                                    translation_voxel[:2], (0, 1))
+                    #a_top = np.roll(micros[1].get_field(array_name),
+                    #                translation_voxel[:2], (0, 1))
+                    a_top = ndimage.shift(micros[1].get_field(array_name),
+                                          shifts, order=0, cval=0)
 
                 # merging the two arrays
                 shape_array_merged = shape_merged
-                print('shape same_voxel before test ndim==4', same_voxel.shape)
-                if a_bot.ndim == 4:
-                    # handle field arrays (typically local orientation map)
-                    shape_array_merged = np.concatenate((shape_merged, [a_bot.shape[3]]))
-                    same_voxel = np.expand_dims(same_voxel, axis=same_voxel.ndim)
-                    same_voxel = np.concatenate((same_voxel, same_voxel, same_voxel), axis=3)
-                    print('shape same_voxel', same_voxel.shape)
-                    single_voxels_0 = np.expand_dims(single_voxels_0, axis=single_voxels_0.ndim)
-                    single_voxels_0 = np.concatenate((single_voxels_0, single_voxels_0, single_voxels_0), axis=3)
-                    print('shape single_voxels_0', single_voxels_0.shape)
-                    single_voxels_1 = np.expand_dims(single_voxels_1, axis=single_voxels_1.ndim)
-                    single_voxels_1 = np.concatenate((single_voxels_1, single_voxels_1, single_voxels_1), axis=3)
-                    print('shape single_voxels_1', single_voxels_1.shape)
                 merged = np.zeros(shape_array_merged, dtype=array_type)
-                # add the non-overlapping part of the 2 volumes as is
-                merged[:, :, :gmap_shape[0][2] - overlap] = (a_bot[:, :, :-overlap])
-                merged[:, :, gmap_shape[0][2]:] = (a_top[:, :, overlap:])
+                if overlap > 0:
+                    print('shape same_voxel before test ndim==4', same_voxel.shape)
+                    if a_bot.ndim == 4:
+                        # handle field arrays (typically local orientation map)
+                        shape_array_merged = np.concatenate((shape_merged, [a_bot.shape[3]]))
+                        same_voxel = np.expand_dims(same_voxel, axis=same_voxel.ndim)
+                        same_voxel = np.concatenate((same_voxel, same_voxel, same_voxel), axis=3)
+                        print('shape same_voxel', same_voxel.shape)
+                        single_voxels_0 = np.expand_dims(single_voxels_0, axis=single_voxels_0.ndim)
+                        single_voxels_0 = np.concatenate((single_voxels_0, single_voxels_0, single_voxels_0), axis=3)
+                        print('shape single_voxels_0', single_voxels_0.shape)
+                        single_voxels_1 = np.expand_dims(single_voxels_1, axis=single_voxels_1.ndim)
+                        single_voxels_1 = np.concatenate((single_voxels_1, single_voxels_1, single_voxels_1), axis=3)
+                        print('shape single_voxels_1', single_voxels_1.shape)
+                    # add the non-overlapping part of the 2 volumes as is
+                    merged[:, :, :gmap_shape[0][2] - overlap] = (a_bot[:, :, :-overlap])
+                    merged[:, :, gmap_shape[0][2]:] = (a_top[:, :, overlap:])
 
-                # copy voxels with the same grain ids
-                #TODO check if we should use the mean value here
-                merged[:, :, translation_voxel[2]:a_bot.shape[2]] = (
-                        a_top[:, :, :overlap] * same_voxel)
+                    # copy voxels with the same grain ids
+                    #TODO check if we should use the mean value here
+                    merged[:, :, translation_voxel[2]:a_bot.shape[2]] = (
+                            a_top[:, :, :overlap] * same_voxel)
 
-                # copy voxels with single values
-                merged[:, :, translation_voxel[2]:a_bot.shape[2]] += (
-                    (a_bot[:, :, translation_voxel[2]:]
-                     * single_voxels_0).astype(array_type))
-                merged[:, :, translation_voxel[2]:a_bot.shape[2]] += (
-                    (a_top[:, :, :overlap]
-                     * single_voxels_1).astype(array_type))
+                    # copy voxels with single values
+                    merged[:, :, translation_voxel[2]:a_bot.shape[2]] += (
+                        (a_bot[:, :, translation_voxel[2]:]
+                         * single_voxels_0).astype(array_type))
+                    merged[:, :, translation_voxel[2]:a_bot.shape[2]] += (
+                        (a_top[:, :, :overlap]
+                         * single_voxels_1).astype(array_type))
+                else:
+                    # overlap is < 0
+                    print('shape merged: {}'.format(merged.shape))
+                    print(a_bot.shape, a_top.shape)
+                    print('gmap_shape[1][2]: {}'.format(gmap_shape[1][2]))
+                    merged[:, :, :gmap_shape[0][2]] = a_bot
+                    merged[:, :, -gmap_shape[1][2]:] = a_top
 
                 if plot:
                     fig = plt.figure(figsize=(14, 10))
@@ -5584,7 +5611,7 @@ class Microstructure(SampleData):
                     ax2.imshow(merged[shape_merged[0] // 2, :, :].T)
                     plt.axis('off')
                     plt.title('%s YZ slice' % array_name)
-                    plt.savefig('merging_check%d.pdf' % 3 + index)
+                    plt.savefig('merging_check%d.pdf' % (3 + index))
 
                 if array_name == 'grain_map':
                     print('assigning merged grain map')

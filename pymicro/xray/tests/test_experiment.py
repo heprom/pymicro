@@ -1,7 +1,42 @@
 import unittest
 import os
-from pymicro.xray.experiment import Experiment
+from pymicro.xray.experiment import ForwardSimulation, Experiment, Sample, ObjectGeometry
 from pymicro.xray.detectors import RegArrayDetector2d
+from config import PYMICRO_EXAMPLES_DATA_DIR
+
+
+class ForwardSimulationTests(unittest.TestCase):
+
+    def setUp(self):
+        """testing the ForwardSimulation class:"""
+        self.fsim = ForwardSimulation('test')
+
+    def test_set_geo_type(self):
+        print(self.fsim.sample_geo)
+        print(self.fsim.sample_geo.geo_type)
+        self.assertEqual(self.fsim.sample_geo.geo_type, 'point')
+        self.fsim.set_sample_geo_type('array')
+        self.assertEqual(self.fsim.sample_geo.geo_type, 'array')
+
+
+class ObjectGeometryTests(unittest.TestCase):
+
+    def setUp(self):
+        """testing the ObjectGeometry class:"""
+        self.geo = ObjectGeometry()
+        self.sample = Sample(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5'))
+
+    def test_discretize_geometry(self):
+        self.geo.discretize_geometry()
+        self.assertEqual(len(self.geo.get_positions()), 1)
+        self.geo.set_type('array')
+        self.geo.set_array(self.sample.get_grain_map(),
+                           self.sample.get_voxel_size())
+        self.geo.discretize_geometry(grain_id=1)
+        self.assertEqual(len(self.geo.get_positions()), 1547)
+
+    def tearDown(self):
+        del self.sample
 
 class ExperimentTests(unittest.TestCase):
 
@@ -19,7 +54,7 @@ class ExperimentTests(unittest.TestCase):
         self.experiment.add_detector(detector)
         self.assertEqual(self.experiment.get_number_of_detectors(), 1)
         self.assertTrue(self.experiment.sample.autodelete)
-        del self.experiment
+        del detector, self.experiment
 
     def test_save(self):
         """Test the save method for an experiment."""
@@ -41,7 +76,7 @@ class ExperimentTests(unittest.TestCase):
         del self.experiment
         exp = Experiment.load('experiment.txt')
         self.assertTrue(exp.get_source().max_energy == 120.)
-        del exp
+        del detector1, detector2, exp
 
     def tearDown(self):
         if os.path.exists('experiment.txt'):

@@ -13,17 +13,41 @@ class ForwardSimulation:
     def __init__(self, sim_type, verbose=False):
         self.sim_type = sim_type
         self.verbose = verbose
+        self.sample_geo = ObjectGeometry(geo_type='point')
         self.exp = Experiment()
+
+    def set_sample_geo_type(self, geo_type='point'):
+        """Set the type of geometry to consider for this sample.
+
+        The Forward simulation models can use different geometry types depending
+        on the results expected and also on the sample associated with the
+        experiment.
+
+        :param str geo_type: a string describing the sample geometry, must be
+            one of 'point', 'array', 'cad'.
+        """
+        if geo_type not in ['point', 'cad', 'array']:
+            raise ValueError('parameter geo_type must be point, array or cad.')
+        self.sample_geo.set_type('array')
+        if geo_type == 'array' and hasattr(self.exp, 'sample') \
+                and not self.exp.get_sample()._is_empty('grain_map'):
+            self.sample_geo.set_array(self.exp.get_sample().get_grain_map(),
+                                      self.exp.get_sample().get_voxel_size())
 
     def set_experiment(self, experiment):
         """Attach an X-ray experiment to this simulation."""
         self.exp = experiment
+
+    def set_sample(self, sample):
+        """Set the sample for the experiment """
+        self.exp.set_sample(sample)
 
 
 class XraySource:
     """Class to represent a X-ray source."""
 
     def __init__(self, position=None):
+        self.position = np.array([0., 0., 0.])
         self.set_position(position)
         self._min_energy = 0.
         self._max_energy = 450.
@@ -218,7 +242,7 @@ class Sample(Microstructure):
         Microstructure.__init__(self, filename=filename, name=name,
                                 phase=material, overwrite_hdf5=overwrite_hdf5)
         self.set_position(position)
-        self.set_geometry(geo)
+        #self.set_geometry(geo)
 
     def set_position(self, position):
         """Set the sample reference position.
@@ -228,16 +252,6 @@ class Sample(Microstructure):
         if position is None:
             position = (0., 0., 0.)
         self.position = np.array(position)
-
-    def set_geometry(self, geo):
-        """Set the geometry of this sample.
-
-        :param ObjectGeometry geo: A vector (tuple or array form) describing the sample position.
-        """
-        if geo is None:
-            geo = ObjectGeometry()
-        assert isinstance(geo, ObjectGeometry) is True
-        self.geo = geo
 
     def get_material(self):
         return self.get_phase()
@@ -369,10 +383,6 @@ class Experiment:
             sample_path = dict_exp['Sample']['Path']
             print('loading existing microstructure: %s' % sample_path)
             sample = Sample(sample_path)
-            if not sample._is_empty('grain_map'):
-                sample.geo.set_type('array')
-                sample.geo.set_array(sample.get_grain_map(),
-                                     sample.get_voxel_size())
 
         # build the sample from information in the file
         else:
@@ -448,10 +458,10 @@ class Experiment:
 class ExperimentEncoder(json.JSONEncoder):
 
     def default(self, o):
-        if isinstance(o, ObjectGeometry):
-            dict_geo = {}
-            dict_geo['Type'] = o.geo_type
-            return dict_geo
+        #if isinstance(o, ObjectGeometry):
+        #    dict_geo = {}
+        #    dict_geo['Type'] = o.geo_type
+        #    return dict_geo
         if isinstance(o, Lattice):
             dict_lattice = {}
             dict_lattice['Angles'] = o._angles.tolist()
@@ -463,8 +473,8 @@ class ExperimentEncoder(json.JSONEncoder):
             dict_sample = {}
             dict_sample['Path'] = o.h5_path
             dict_sample['Position'] = o.position.tolist()
-            dict_sample['Geometry'] = o.geo
             '''
+            dict_sample['Geometry'] = o.geo
             dict_sample['Name'] = o.name
             dict_sample['Data Dir'] = o.data_dir
             dict_sample['Material'] = o.material

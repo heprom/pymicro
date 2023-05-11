@@ -5,6 +5,7 @@ from math import cos, sin, tan, atan2, pi
 from pymicro.crystal.lattice import HklPlane, Symmetry, HklDirection, HklObject
 from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import lambda_nm_to_keV, lambda_keV_to_nm
+from pymicro.xray.experiment import ForwardSimulation, Experiment
 from pymicro.xray.dct import add_to_image
 import os
 
@@ -773,8 +774,6 @@ def diffracting_normals_vector(gnom):
 
     return hkl_normals
 
-from pymicro.xray.experiment import ForwardSimulation, Experiment
-
 
 class LaueForwardSimulation(ForwardSimulation):
     """Class to represent a Forward Simulation."""
@@ -782,6 +781,8 @@ class LaueForwardSimulation(ForwardSimulation):
     def __init__(self, verbose=False):
         ForwardSimulation.__init__(self, 'laue', verbose=verbose)
         self.hkl_planes = []
+        # omega: rotation angle (degrees) around the vertical axis.
+        self.omega = 0.
         self.max_miller = 5
         self.use_energy_limits = False
         self.exp = None
@@ -802,7 +803,7 @@ class LaueForwardSimulation(ForwardSimulation):
         pass
 
     @staticmethod
-    def fsim_laue(orientation, hkl_planes, positions, source_position):
+    def fsim_laue(orientation, hkl_planes, positions, source_position, omega):
         """Simulate Laue diffraction conditions based on a crystal orientation,
         a set of lattice planes and physical positions.
 
@@ -814,6 +815,7 @@ class LaueForwardSimulation(ForwardSimulation):
         :param list hkl_planes: a list of `HklPlane` instances.
         :param list positions: a list of (x, y, z) positions.
         :param tuple source_position: a (x, y, z) tuple describing the source position.
+        :param omega: rotation angle (degrees) around the vertical axis.
         """
         n_hkl = len(hkl_planes)
         n_vox = len(positions)
@@ -826,6 +828,12 @@ class LaueForwardSimulation(ForwardSimulation):
         # compute G vectors
         G_hkl = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
         G = np.matmul(np.array(G_hkl), gt.T)
+        if omega != 0.:
+            omegar = omega * np.pi / 180
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                          [np.sin(omegar), np.cos(omegar), 0],
+                          [0, 0, 1]])
+            G = np.matmul(G, R.T)
         G_vectors = np.repeat(G, n_vox, axis=0).reshape((n_hkl, n_vox, 3)) \
             .transpose(1, 0, 2).reshape((n_hkl * n_vox, 3))
 
@@ -858,7 +866,7 @@ class LaueForwardSimulation(ForwardSimulation):
         data = np.zeros_like(detector.data)
         if self.verbose:
             print('Forward Simulation for grain %d' % self.grain.id)
-        sample.geo.discretize_geometry(grain_id=self.grain.id)
+        self.sample_geo.discretize_geometry(grain_id=self.grain.id)
         # we use either the hkl planes for this grain or the ones defined for the whole simulation
         if hasattr(self.grain, 'hkl_planes') and len(self.grain.hkl_planes) > 0:
             print('using hkl from the grain')
@@ -869,11 +877,11 @@ class LaueForwardSimulation(ForwardSimulation):
                 self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
             hkl_planes = self.hkl_planes
         n_hkl = len(hkl_planes)
-        sample.geo.discretize_geometry(grain_id=gid)
-        positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
+        self.sample_geo.discretize_geometry(grain_id=gid)
+        positions = self.sample_geo.get_positions()  # size n_vox, with 3 elements items
         n_vox = len(positions)
         Xu_vectors, thetas, the_energies, X_vectors, K_vectors = LaueForwardSimulation.fsim_laue(
-            self.grain.orientation, hkl_planes, positions, source.position)
+            self.grain.orientation, hkl_planes, positions, source.position, self.omega)
         OR_vectors = [detector.project_along_direction(origin=positions[i_vox],
                                                        direction=K_vectors[i_vox * n_hkl + i_hkl])
                       for i_vox in range(n_vox)
@@ -912,10 +920,18 @@ class LaueForwardSimulation(ForwardSimulation):
         sample = self.exp.get_sample()
         detector = self.exp.get_active_detector()
         positions = sample.get_grain_centers(id_list=[gid])
+        if self.omega != 0.:
+            # rotate grain centers
+            omegar = self.omega * np.pi / 180
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                          [np.sin(omegar), np.cos(omegar), 0],
+                          [0, 0, 1]])
+            positions = np.dot(R, positions.T).T
         _, _, _, K_vectors = LaueForwardSimulation.fsim_laue(sample.get_grain(gid).orientation,
                                                              hkl_planes,
                                                              positions,
-                                                             self.exp.get_source().position)
+                                                             self.exp.get_source().position,
+                                                             self.omega)
         origins = np.repeat(positions, len(hkl_planes), axis=0)
         OR_vectors = detector.project_along_directions(K_vectors, origins)
         uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
@@ -940,9 +956,10 @@ class LaueForwardSimulation(ForwardSimulation):
         lattice = sample.get_lattice()
         source = self.exp.get_source()
         detector = self.exp.get_active_detector()
+        data = np.zeros_like(detector.data)
         if self.verbose:
             print('Forward Simulation for grain %d' % self.grain.id)
-        sample.geo.discretize_geometry(grain_id=self.grain.id)
+        self.sample_geo.discretize_geometry(grain_id=self.grain.id)
 
         # we use either the hkl planes for this grain or the ones defined for the whole simulation
         if hasattr(self.grain, 'hkl_planes') and len(self.grain.hkl_planes) > 0:
@@ -957,10 +974,17 @@ class LaueForwardSimulation(ForwardSimulation):
         hkl_planes = self.select_hkl_planes(hkl_planes, gid=gid)
         n_hkl = len(hkl_planes)
         print('after filtering we have %d hkl planes for this grain' % n_hkl)
-        positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
+        if n_hkl == 0:
+            return data
+        positions = self.sample_geo.get_positions()  # size n_vox, with 3 elements items
+        if self.omega != 0.:
+            omegar = self.omega * np.pi / 180
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
+            positions = np.dot(R, positions.T).T
+
         # call the fsim_laue function
         thetas, the_energies, X_vectors, K_vectors = LaueForwardSimulation.fsim_laue(
-            self.grain.orientation, hkl_planes, positions, source.position)
+            self.grain.orientation, hkl_planes, positions, source.position, self.omega)
 
         # with diffraction informations, project them on the detector
         origins = np.repeat(positions, n_hkl, axis=0)
@@ -979,13 +1003,12 @@ class LaueForwardSimulation(ForwardSimulation):
             print('%d diffraction events on the detector among %d' % (len(on_det[0]), len(uv)))
 
         # now sum the counts on the detector individual pixels
-        data = np.zeros_like(detector.data)
         for spot in uv[on_det]:
             data[spot[0], spot[1]] += 1
         return data
 
     def fsim(self):
-        """run the forward simulation.
+        """Run the forward simulation.
 
         If the sample has a CAD type of geometry, a single grain (the first from the list) is assumed. In the other
         cases all the grains from the microstructure are used. In particular, if the microstructure has a grain map,
@@ -996,7 +1019,7 @@ class LaueForwardSimulation(ForwardSimulation):
         full_data = np.zeros_like(self.exp.get_active_detector().data)
         sample = self.exp.get_sample()
         # for cad geometry we assume only one grain (the first in the list)
-        if sample.geo.geo_type == 'cad':
+        if self.sample_geo.geo_type == 'cad':
             full_data += self.fsim_grain(gid=sample.grains[0]['idnumber'])
         else:
             # in the other cases, we use all the grains defined in the microstructure

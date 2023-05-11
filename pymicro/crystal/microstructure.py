@@ -284,7 +284,7 @@ class Orientation:
         to their fundamental zone (cubic by default)
         :returns: the mean orientation as an `Orientation` instance.
         """
-        rod_sym_mean = compute_mean_rodrigues(rods, symmetry=symmetry)
+        rod_sym_mean = Orientation.compute_mean_rodrigues(rods, symmetry=symmetry)
         return Orientation.from_rodrigues(rod_sym_mean)
 
     @staticmethod

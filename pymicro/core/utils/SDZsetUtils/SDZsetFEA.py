@@ -57,7 +57,7 @@ class SDZsetFEA(SDZset):
         :param input_meshfile: Name of .geof mesh file to use as Zset input.
             If `inputmesh` is `None`, the file must exist and be a valid .geof
             meshfile for Zset. If `inputmesh` is not `None`, then the mesh data
-            refered by `meshname` in the SampleData instance will be written
+            refered by `mesh_name` in the SampleData instance will be written
             as a .geof mesh file `meshfilename.geof`.
             Defaults to `./input.geof`
         :type input_meshfile: str, optional
@@ -561,7 +561,7 @@ class SDZsetFieldsTransfer(SDZset):
         """SDZsetFEA class constructor.
         
         :param problem_name: Base name of the Zset files where the fields to
-            transfer are stored (basename.ut or basename.integ ....).
+            transfer are stored (base_name.ut or base_name.integ ....).
         :type problem name: str
         :param transfer_type: Type of field transfer to apply. 'nodal': node
             field transfer, 'integ': integration points field transfer.
@@ -590,7 +590,7 @@ class SDZsetFieldsTransfer(SDZset):
         :param input_meshfile: Name of .geof mesh on which the fields must
             be transfered. If `inputmesh` is `None`, the file must exist and
             be a valid .geof meshfile for Zset. If `inputmesh` is not `None`,
-            then the mesh data refered by `meshname` in the SampleData instance
+            then the mesh data refered by `mesh_name` in the SampleData instance
             will be written as a .geof mesh file `meshfilename.geof`.
             Defaults to `./input.geof`
             Defaults to `./input.geof`
@@ -628,7 +628,7 @@ class SDZsetFieldsTransfer(SDZset):
     def set_problem_name(self, problem_name):
         """Set the finite element calculation type.
         
-        :param problem_name: Name of basename of the Zset .ut file where the
+        :param problem_name: Name of base_name of the Zset .ut file where the
             fields to transfer metadata are stored.
         :type problem name: str
         """
@@ -807,7 +807,7 @@ class SDZsetPostProcessing(SDZset):
         :param input_meshfile: Name of .geof mesh on which the fields must
             be transfered. If `inputmesh` is `None`, the file must exist and
             be a valid .geof meshfile for Zset. If `inputmesh` is not `None`,
-            then the mesh data refered by `meshname` in the SampleData instance
+            then the mesh data refered by `mesh_name` in the SampleData instance
             will be written as a .geof mesh file `meshfilename.geof`.
             Defaults to `./input.geof`
             Defaults to `./input.geof`

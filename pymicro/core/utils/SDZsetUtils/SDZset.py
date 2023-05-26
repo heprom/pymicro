@@ -63,7 +63,7 @@ class SDZset():
         :param input_meshfile: Name of .geof mesh file to use as Zset input.
             If `inputmesh` is `None`, the file must exist and be a valid .geof
             meshfile for Zset. If `inputmesh` is not `None`, then the mesh data
-            refered by `meshname` in the SampleData instance will be written
+            refered by `mesh_name` in the SampleData instance will be written
             as a .geof mesh file `meshfilename.geof`.
             Defaults to `./input.geof`
         :type input_meshfile: str, optional
@@ -167,9 +167,9 @@ class SDZset():
         :param str meshname: Name, Path, Indexname or Alias of the mesh group
             to use as input mesh for Zset in the SampleData instance.
         :param str meshfilename: Name of the mesh file to use as input mesh
-            for the mesher. If `meshname` is `None`, the file must exist and be
-            a valid .geof meshfile for Zset. If `meshname` is not `None`, then
-            the mesh data refered by `meshname` in the SampleData instance will
+            for the mesher. If `mesh_name` is `None`, the file must exist and be
+            a valid .geof meshfile for Zset. If `mesh_name` is not `None`, then
+            the mesh data refered by `mesh_name` in the SampleData instance will
             be written as a .geof mesh file `meshfilename.geof`
         """
         self.fields_to_transfer = []
@@ -189,7 +189,7 @@ class SDZset():
         :param str meshname: Name, Path, Indexname or Alias of the mesh group
             to use as output data group to store the mesh processed by a
             Zset mesher in the SampleData instance.
-            If `meshname` is `None`, the mesher will only output a .geof file,
+            If `mesh_name` is `None`, the mesher will only output a .geof file,
             with name `meshfilename`.
         :param str meshfilename: Name of the mesh .geof file to use as output.
         """
@@ -297,7 +297,7 @@ class SDZset():
     def print_Zset_msg(self):
         """Print the content of the Zset .msg output log file."""
         # The .inp file template is transformed into a _tmp.inp script file
-        # and hence, the .msg file has the same basename {inp}_tmp.msg
+        # and hence, the .msg file has the same base_name {inp}_tmp.msg
         msg_file = self.inp_script.parent / f'{self.inp_script.stem}_tmp.msg'
         print('\n============================================')
         print('Content of the {} file'.format(str(msg_file)))
@@ -702,9 +702,9 @@ class SDZset():
         :param meshname: SampleData mesh group to write as Zset output.
             If `None` (default), uses the `data_inputmesh` class attribute.
         :type meshname: str, optional
-        :param problem_name: Name of the Zset problem to write, i.e. basename
+        :param problem_name: Name of the Zset problem to write, i.e. base_name
             for the .ut, .node, .integ files.
-            If `None` (default), uses the `inp_script` class attribute basename
+            If `None` (default), uses the `inp_script` class attribute base_name
         :type problem_name: TYPE, optional
         :param fields_sequences: field values to write as Zset output.
         :type fields_sequences: TYPE, optional
@@ -717,7 +717,7 @@ class SDZset():
             ut_file = Path(problem_name).absolute()
         else:
             ut_file = str(self.inp_script.with_suffix('.ut'))
-        # get meshname
+        # get mesh_name
         if meshname is None:
             meshname = self.data_inputmesh
         # Create time sequence metadata
@@ -736,12 +736,12 @@ class SDZset():
 
         This method writes a
 
-        :param meshname: SampleData mesh group to write as Zset output.
+        :param mesh_name: SampleData mesh group to write as Zset output.
             If `None` (default), uses the `data_inputmesh` class attribute.
-        :type meshname: str, optional
-        :param problem_name: Name of the Zset problem to write, i.e. basename
+        :type mesh_name: str, optional
+        :param problem_name: Name of the Zset problem to write, i.e. base_name
             for the .ut, .node, .integ files.
-            If `None` (default), uses the `inp_script` class attribute basename
+            If `None` (default), uses the `inp_script` class attribute base_name
         :type problem_name: TYPE, optional
         :param fields_sequences: field values to write as Zset output.
         :type fields_sequences: TYPE, optional
@@ -754,7 +754,7 @@ class SDZset():
             ut_file = Path(problem_name).absolute().with_suffix('.ut')
         else:
             ut_file = self.inp_script.with_suffix('.ut')
-        # get meshname
+        # get mesh_name
         if imagename is None:
             imagename = self.data_inputmesh
         # Create time sequence metadata
@@ -1036,14 +1036,14 @@ class SDZset():
         import re
 
         tmp_dict = field_dict.copy()
-        # find out basename of tensor fields
+        # find out base_name of tensor fields
         Tensor_list = re.findall('\\b[a-zA-z]*\d\d\\b', str(field_dict.keys()))
         for i in range(len(Tensor_list)):
             Tensor_list[i] = Tensor_list[i][:-2]
         # get a list of tensor names without duplicates
         Tensor_list = list(set(Tensor_list))
 
-        # find out basename of vector fields
+        # find out base_name of vector fields
         Vector_list = re.findall('\\b[a-zA-z]*\d\\b', str(field_dict.keys()))
         for i in range(len(Vector_list)):
             Vector_list[i] = Vector_list[i][:-1]

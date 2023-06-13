@@ -1266,18 +1266,18 @@ class SlipSystem:
             slip_systems.append(SlipSystem.from_indices((0, 1, 0), (1, 0, 1), lattice))  # G3
             '''
         elif slip_type in ['oct', '111']:
-            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 0, 1), lattice))  # Bd
-            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (0, -1, 1), lattice))  # Ba
-            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 1, 0), lattice))  # Bc
-            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (-1, 0, 1), lattice))  # Db
-            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (0, 1, 1), lattice))  # Dc
-            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (1, 1, 0), lattice))  # Da
-            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (0, -1, 1), lattice))  # Ab
-            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (1, 1, 0), lattice))  # Ad
-            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (1, 0, 1), lattice))  # Ac
-            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (-1, 1, 0), lattice))  # Cb
-            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (1, 0, 1), lattice))  # Ca
-            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (0, 1, 1), lattice))  # Cd
+            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 0, 1), lattice))  # B4 - Bd
+            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (0, -1, 1), lattice))  # B2 - Ba
+            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 1, 0), lattice))  # B5 - Bc
+            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (-1, 0, 1), lattice))  # D4 - Db
+            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (0, 1, 1), lattice))  # D1 - Dc
+            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (1, 1, 0), lattice))  # D6 - Da
+            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (0, -1, 1), lattice))  # A2 - Ab
+            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (1, 1, 0), lattice))  # A6 - Ad
+            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (1, 0, 1), lattice))  # A3 - Ac
+            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (-1, 1, 0), lattice))  # C5 - Cb
+            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (1, 0, 1), lattice))  # C3 - Ca
+            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (0, 1, 1), lattice))  # C1 - Cd
         elif slip_type == '112':
             slip_systems.append(SlipSystem.from_indices((1, 1, 2), (1, 1, -1), lattice))
             slip_systems.append(SlipSystem.from_indices((-1, 1, 2), (1, -1, 1), lattice))
@@ -1326,6 +1326,17 @@ class SlipSystem:
             print('unsupported slip system type: %s, try one of (cube, oct, '
                   '112, basal, prism, pyr1_a)' % slip_type)
         return slip_systems
+
+    @staticmethod
+    def schmid_boas_notation():
+        """print the correspondence from miller indices and the Schmid and Boas
+        notation for the 12 octahedral slip systems.
+        """
+        schmid_boas = ['B4', 'B2', 'B5', 'D4', 'D1', 'D6',
+                       'A2', 'A6', 'A3', 'C5', 'C3', 'C1']
+        ss = SlipSystem.get_slip_systems('oct')
+        for (name, s) in zip(schmid_boas, ss):
+            print(name, s)
 
 
 class HklObject:

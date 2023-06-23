@@ -236,7 +236,7 @@ class SDAmitexIO():
         # Fill strain dict with output
         for file in eps_files:
             eps_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
-            increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
+            increment = int(incr_pattern.findall(file)[0].strip('.vtk'))
             comp_list = comp_pattern.findall(file)
             if len(comp_list) == 0:
                 # all components are within the same vtk file
@@ -384,7 +384,7 @@ class SDAmitexIO():
         reader.Update()
         # read raw data
         Array = reader.GetOutput().GetCellData().GetArray(0)
-        # spacing = reader.GetOutput().GetSpacing()
+        spacing = reader.GetOutput().GetSpacing()
         dim = reader.GetOutput().GetDimensions()
         output_shape = tuple([i-1 for i in dim])
         data = numpy_support.vtk_to_numpy(Array)
@@ -394,9 +394,9 @@ class SDAmitexIO():
             data = data[output_slice[0,0]:output_slice[0,1],
                         output_slice[1,0]:output_slice[1,1],
                         output_slice[2,0]:output_slice[2,1],...]
-        return data
+        return data, spacing
     
-    def write_vtk_legacy(array, vtk_path='output', voxel_size=1,
+    def write_vtk_legacy(array, vtk_path='output', spacing=1,
                          array_name="mat_id"):
         """ Writes a vtk legacy file from a numpy array
 
@@ -414,11 +414,16 @@ class SDAmitexIO():
         vtk_data_array.SetName(array_name)
         
         # Init VTK regular grid 
+        if len(spacing) == 1:
+            voxel_size = np.array([spacing, spacing, spacing])
+        else:
+            voxel_size = spacing
+            
         grid = vtk.vtkImageData()
         size = array.shape
         grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
         grid.GetCellData().SetScalars(vtk_data_array)
-        grid.SetSpacing(voxel_size, voxel_size, voxel_size)
+        grid.SetSpacing(voxel_size[0], voxel_size[1], voxel_size[2])
         
         # Init vtk writer and write file
         writer = vtk.vtkStructuredPointsWriter()

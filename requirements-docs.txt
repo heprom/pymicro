@@ -3,3 +3,5 @@ sphinxcontrib-bibtex
 pandoc
 nbsphinx
 ipykernel
+mock
+sphinx_rtd_theme

@@ -55,10 +55,10 @@ class PoleFigure:
         self.z = np.array([0., 0., 1.])
 
         # list all crystal directions
-        #self.c001s = np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=np.float)
+        #self.c001s = np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=float)
         #self.c011s = np.array([[0, 1, 1], [1, 0, 1], [1, 1, 0], [0, -1, 1], [-1, 0, 1], [-1, 1, 0]],
-        #                      dtype=np.float) / np.sqrt(2)
-        #self.c111s = np.array([[1, 1, 1], [-1, -1, 1], [1, -1, 1], [-1, 1, 1]], dtype=np.float) / np.sqrt(3)
+        #                      dtype=float) / np.sqrt(2)
+        #self.c111s = np.array([[1, 1, 1], [-1, -1, 1], [1, -1, 1], [-1, 1, 1]], dtype=float) / np.sqrt(3)
 
     def get_orientations(self):
         """Get the list of orientations in the PoleFigure.
@@ -81,6 +81,9 @@ class PoleFigure:
         elif type(hkl) is list:
             self.family = None
             hkl_planes = hkl
+        else:
+            print('specified hkl variable must be a list or a string')
+            return
         self.poles = hkl_planes
 
     def set_map_field(self, field_name, field=None, field_min_level=None, field_max_level=None, lut='hot'):
@@ -427,6 +430,36 @@ class PoleFigure:
                 else:
                     break
             return v_sym
+        elif symmetry is Symmetry.tetragonal:
+            syms = symmetry.symmetry_operators()
+            for i in range(syms.shape[0]):
+                sym = syms[i]
+                v_sym = np.dot(sym, v)
+                # look at vectors pointing up
+                if v_sym[2] < 0:
+                    v_sym *= -1
+                # now evaluate if projection is in the sst
+                if v_sym[1] < 0 or v_sym[0] < 0:
+                    continue
+                elif v_sym[1] > v_sym[0]:
+                    continue
+                else:
+                    break
+            return v_sym
+        elif symmetry is Symmetry.orthorhombic:
+            syms = symmetry.symmetry_operators()
+            for i in range(syms.shape[0]):
+                sym = syms[i]
+                v_sym = np.dot(sym, v)
+                # look at vectors pointing up
+                if v_sym[2] < 0:
+                    v_sym *= -1
+                # now evaluate if projection is in the sst
+                if v_sym[1] < 0 or v_sym[0] < 0:
+                    continue
+                else:
+                    break
+            return v_sym
         else:
             print('unsupported symmetry: %s' % symmetry)
             return None
@@ -521,14 +554,20 @@ class PoleFigure:
         elif symmetry is Symmetry.hexagonal:
             sst_poles = [(0, 0, 1), (2, -1, 0), (1, 0, 0)]
             ax.axis([-0.05, 1.05, -0.05, 0.6])
+        elif symmetry is Symmetry.tetragonal:
+            sst_poles = [(0, 0, 1), (1, 0, 0), (1, 1, 0)]
+            ax.axis([-0.05, 1.05, -0.05, 0.75])
+        elif symmetry is Symmetry.orthorhombic:
+            sst_poles = [(0, 0, 1), (1, 0, 0), (0, 1, 0)]
+            ax.axis([-0.05, 1.05, -0.05, 1.05])
         else:
             print('unsuported symmetry: %s' % symmetry)
         A = HklPlane(*sst_poles[0], lattice=self.microstructure.get_lattice())
         B = HklPlane(*sst_poles[1], lattice=self.microstructure.get_lattice())
         C = HklPlane(*sst_poles[2], lattice=self.microstructure.get_lattice())
-        self.plot_line_between_crystal_dir(A.normal(), B.normal(), ax=ax, col='k')
-        self.plot_line_between_crystal_dir(B.normal(), C.normal(), ax=ax, col='k')
-        self.plot_line_between_crystal_dir(C.normal(), A.normal(), ax=ax, col='k')
+        self.plot_line_between_crystal_dir(A.normal(), B.normal(), steps=2, ax=ax, col='k')
+        self.plot_line_between_crystal_dir(B.normal(), C.normal(), steps=21, ax=ax, col='k')
+        self.plot_line_between_crystal_dir(C.normal(), A.normal(), steps=2, ax=ax, col='k')
         # display the 3 crystal axes
         poles = [A, B, C]
         v_align = ['top', 'top', 'bottom']
@@ -678,7 +717,7 @@ class TaylorModel:
         self.L = np.array([[-0.5, 0.0, 0.0], [0.0, -0.5, 0.0], [0.0, 0.0, 1.0]])  # velocity gradient
 
     def compute_step(self, g, check=True):
-        Wc = np.zeros((3, 3), dtype=np.float)
+        Wc = np.zeros((3, 3), dtype=float)
         # compute Schmid factors
         SF = []
         for s in self.slip_systems:
@@ -692,7 +731,7 @@ class TaylorModel:
         # now we need to solve: L = gam1*m1 + gam2*m2+ ...
         iu = np.triu_indices(3)  # indices of the upper part of a 3x3 matrix
         L = self.L[iu][:5]  # form a vector with the velocity gradient components
-        M = np.zeros((5, self.nact), dtype=np.float)
+        M = np.zeros((5, self.nact), dtype=float)
         for i in range(len(ss_rank)):
             s = self.slip_systems[ss_rank[i]]
             m = g.orientation.slip_system_orientation_tensor(s)
@@ -719,7 +758,7 @@ class TaylorModel:
         print('dgammas (LST) =', dgammas)
         if check:
             # check consistency
-            Lcheck = np.zeros((3, 3), dtype=np.float)
+            Lcheck = np.zeros((3, 3), dtype=float)
             for i in range(len(ss_rank)):
                 s = self.slip_systems[ss_rank[i]]
                 ms = g.orientation.slip_system_orientation_tensor(s)

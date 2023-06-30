@@ -17,6 +17,56 @@ class OimPhase(CrystallinePhase):
         self.hklFamilies = []
         self.categories = []
 
+    @staticmethod
+    def from_OIM_h5(h5_phase_path, phase_id):
+        """Create a phase from information stored in a h5 file.
+
+        :param str h5_phase_path: a reference to the Phase node in the h5 file.
+        :param str phase_id: the phase id which is also the node in the h5 file
+            where the information is stored.
+        :return: a new instance OimPhase.
+        """
+        print(h5_phase_path.keys())
+        print(phase_id)
+        #assert phase_id == h5_phase_path[phase_id]
+        # each phase has the following keys: 'Formula', 'Info', 'Lattice Constant a', 'Lattice Constant alpha',
+        # 'Lattice Constant b', 'Lattice Constant beta', 'Lattice Constant c', 'Lattice Constant gamma',
+        # 'Laue Group', 'MaterialName', 'NumberFamilies', 'Point Group', 'Symmetry', 'hkl Families'
+        phase = OimPhase(int(phase_id))
+        # Material Name may or may not have a space
+        keys = list(h5_phase_path[phase_id].keys())
+        name_key = [item for item in keys if item.endswith('Name')][0]
+        phase.name = h5_phase_path[phase_id][name_key][0].decode('utf-8')
+        phase.formula = h5_phase_path[phase_id]['Formula'][0].decode('utf-8')
+        phase.description = h5_phase_path[phase_id]['Info'][0].decode('utf-8')
+        # create a crystal lattice for this phase
+        sym = Symmetry.from_tsl(h5_phase_path[phase_id]['Symmetry'][0])
+        # convert lattice constants to nm
+        key_a = [item for item in keys if item.startswith('Lat') and (item.endswith(' A') or item.endswith(' a'))][0]
+        key_b = [item for item in keys if item.startswith('Lat') and (item.endswith(' B') or item.endswith(' b'))][0]
+        key_c = [item for item in keys if item.startswith('Lat') and (item.endswith(' C') or item.endswith(' c'))][0]
+        key_alpha = [item for item in keys if item.startswith('Lat') and item.endswith('lpha')][0]
+        key_beta = [item for item in keys if item.startswith('Lat') and item.endswith('eta')][0]
+        key_gamma = [item for item in keys if item.startswith('Lat') and item.endswith('amma')][0]
+        a = h5_phase_path[phase_id][key_a][0] / 10
+        b = h5_phase_path[phase_id][key_b][0] / 10
+        c = h5_phase_path[phase_id][key_c][0] / 10
+        alpha = h5_phase_path[phase_id][key_alpha][0]
+        beta = h5_phase_path[phase_id][key_beta][0]
+        gamma = h5_phase_path[phase_id][key_gamma][0]
+        lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
+        phase.set_lattice(lattice)
+        hkl_key = [item for item in keys if item.endswith('Families')][0]
+        for row in h5_phase_path[phase_id][hkl_key]:
+            family = OimHklFamily()
+            family.hkl = [row[0], row[1], row[2]]
+            family.useInIndexing = row[4]
+            family.diffractionIntensity = row[3]
+            family.showBands = row[5]
+            phase.hklFamilies.append(family)
+        phase.categories = [0, 0, 0, 0, 0]
+        return phase
+
 
 class OimHklFamily:
     def __init__(self):
@@ -374,33 +424,7 @@ class OimScan:
         self.scan_id = header['Scan ID'][0].decode('utf-8')
         # get the different phases
         for key in header['Phase'].keys():
-            phase = header['Phase'][key]
-            # each phase has the following keys: 'Formula', 'Info', 'Lattice Constant a', 'Lattice Constant alpha',
-            # 'Lattice Constant b', 'Lattice Constant beta', 'Lattice Constant c', 'Lattice Constant gamma',
-            # 'Laue Group', 'MaterialName', 'NumberFamilies', 'Point Group', 'Symmetry', 'hkl Families'
-            phase = OimPhase(int(key))
-            phase.name = header['Phase'][key]['MaterialName'][0].decode('utf-8')
-            phase.formula = header['Phase'][key]['Formula'][0].decode('utf-8')
-            phase.description = header['Phase'][key]['Info'][0].decode('utf-8')
-            # create a crystal lattice for this phase
-            sym = Symmetry.from_tsl(header['Phase'][key]['Symmetry'][0])
-            # convert lattice constants to nm
-            a = header['Phase'][key]['Lattice Constant a'][0] / 10
-            b = header['Phase'][key]['Lattice Constant b'][0] / 10
-            c = header['Phase'][key]['Lattice Constant c'][0] / 10
-            alpha = header['Phase'][key]['Lattice Constant alpha'][0]
-            beta = header['Phase'][key]['Lattice Constant beta'][0]
-            gamma = header['Phase'][key]['Lattice Constant gamma'][0]
-            lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
-            phase.set_lattice(lattice)
-            for row in header['Phase'][key]['hkl Families']:
-                family = OimHklFamily()
-                family.hkl = [row[0], row[1], row[2]]
-                family.useInIndexing = row[4]
-                family.diffractionIntensity = row[3]
-                family.showBands = row[5]
-                phase.hklFamilies.append(family)
-            phase.categories = [0, 0, 0, 0, 0]
+            phase = OimPhase.from_OIM_h5(header['Phase'], phase_id=key)
             self.phase_list.append(phase)
 
     @staticmethod

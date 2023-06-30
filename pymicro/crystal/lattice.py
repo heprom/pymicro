@@ -156,7 +156,7 @@ class CrystallinePhase:
             'E1','E2','E3','nu12','nu13','nu23','G12','G13','G23'
         """
         sym = self.get_symmetry()
-        if sym.elastic_constants_number > 9:
+        if sym.elastic_constants_number() > 9:
             raise ValueError('orthotropic constants can only be determined '
                              'with sufficient symmetry, not %s' % sym)
         C = self.stiffness_matrix()
@@ -304,7 +304,7 @@ class Symmetry(enum.Enum):
         number of symmetries of the given crystal structure.
         """
         if self is Symmetry.cubic:
-            sym = np.zeros((24, 3, 3), dtype=np.float)
+            sym = np.zeros((24, 3, 3), dtype=float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
             sym[1] = np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]])
             sym[2] = np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]])
@@ -332,7 +332,7 @@ class Symmetry(enum.Enum):
         elif self is Symmetry.hexagonal:
             if use_miller_bravais:
               # using the Miller-Bravais representation here
-              sym = np.zeros((12, 4, 4), dtype=np.int)
+              sym = np.zeros((12, 4, 4), dtype=int)
               sym[0] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
               sym[1] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
               sym[2] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
@@ -346,7 +346,7 @@ class Symmetry(enum.Enum):
               sym[10] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, -1]])
               sym[11] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, -1]])
             else:
-              sym = np.zeros((12, 3, 3), dtype=np.float)
+              sym = np.zeros((12, 3, 3), dtype=float)
               s60 = sin(60 * np.pi / 180)
               sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
               sym[1] = np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]])
@@ -361,13 +361,13 @@ class Symmetry(enum.Enum):
               sym[10] = np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]])
               sym[11] = np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]])
         elif self is Symmetry.orthorhombic:
-            sym = np.zeros((4, 3, 3), dtype=np.float)
+            sym = np.zeros((4, 3, 3), dtype=float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
             sym[1] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
             sym[2] = np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]])
             sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
         elif self is Symmetry.tetragonal:
-            sym = np.zeros((8, 3, 3), dtype=np.float)
+            sym = np.zeros((8, 3, 3), dtype=float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
             sym[1] = np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])
             sym[2] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
@@ -377,7 +377,7 @@ class Symmetry(enum.Enum):
             sym[6] = np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]])
             sym[7] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
         elif self is Symmetry.triclinic:
-            sym = np.zeros((1, 3, 3), dtype=np.float)
+            sym = np.zeros((1, 3, 3), dtype=float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
         else:
             raise ValueError('warning, symmetry not supported: %s' % self)
@@ -462,6 +462,9 @@ class Symmetry(enum.Enum):
 
     def stiffness_matrix(self, elastic_constants):
         """Build the stiffness matrix for this symmetry using Voigt convention.
+
+        The Voigt notation contracts 2 tensor indices into a single index:
+        11 -> 1, 22 -> 2, 33 -> 3, 23 -> 4, 31 -> 5, 12 -> 6
 
         :param list elastic_constants: the elastic constants (the number must
             correspond to the type of symmetry, eg 3 for cubic).
@@ -1105,6 +1108,18 @@ class Lattice:
         m = self._matrix
         return abs(np.dot(np.cross(m[0], m[1]), m[2]))
 
+    def ubi_to_rod(self, ubi):
+        """convert a UBI matrix to rodrigues vector.
+
+        :param ndarray ubi: 3x3 matrix describing the lattice vectors in
+        the reciprocal space (in angstrom^-1 unit).
+        :return: the cristal orientation in the for of Rodrigues vector
+        """
+        from pymicro.crystal.rotation import om2ro
+        B = np.array(self.reciprocal_lattice()) / 10  # angstrom^-1
+        U = np.dot(B, ubi).T
+        return om2ro(U)
+
     def get_hkl_family(self, hkl):
         """Get a list of the hkl planes composing the given family for
         this crystal lattice.
@@ -1141,8 +1156,14 @@ class SlipSystem:
         self._direction = direction
 
     def __repr__(self):
-        out = '(%d%d%d)' % self._plane.miller_indices()
-        out += '[%d%d%d]' % self._direction.miller_indices()
+        if self._plane.lattice.get_symmetry() is Symmetry.hexagonal:
+            h, k, l = self._plane.miller_indices()
+            out = '(%d%d%d%d)' % HklPlane.three_to_four_indices(h, k, l)
+            u, v, w = np.array(self._direction.miller_indices()).astype(int)
+            out +='[%d%d%d%d]' % HklDirection.three_to_four_indices(u, v, w)
+        else:
+            out = '(%d%d%d)' % self._plane.miller_indices()
+            out += '[%d%d%d]' % self._direction.miller_indices()
         return out
 
     def get_slip_plane(self):
@@ -1799,7 +1820,7 @@ class HklPlane(HklObject):
         # now we have the trace vector expressed in the XYZ coordinate system
         # we need to change the coordinate system to the intersection plane
         # (then only the first two component will be non zero)
-        P = np.zeros((3, 3), dtype=np.float)
+        P = np.zeros((3, 3), dtype=float)
         Zp = n_int
         Yp = view_up / np.linalg.norm(view_up)
         Xp = np.cross(Yp, Zp)

@@ -5635,3 +5635,24 @@ class Microstructure(SampleData):
 
         merged_micro.sync()
         return merged_micro
+
+    def get_grain_boundaries_map(self, kernel_size=3):
+        """
+        method to compute grain boundaries map using microstructure grain_map
+        """
+        x, y, z = self.get_grain_map().shape
+        grain_boundaries_map = np.ones_like(self.get_grain_map())
+        pad_grain_map = np.pad(self.get_grain_map(), pad_width=1)
+                
+        for i in range(x):
+            for j in range(y):
+                for k in range(z):
+                    kernel = pad_grain_map[i:i+kernel_size//2+1,
+                                        j:j+kernel_size//2+1,
+                                        k:k+kernel_size//2+1]
+                    mean_kernel = np.mean(kernel)
+                    inten_level = np.abs(grain_map[i, j, k] - mean_kernel)
+                    if inten_level > 0:
+                        grain_boundaries_map[i, j, k] = 1
+
+        return grain_boundaries_map

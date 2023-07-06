@@ -5656,3 +5656,107 @@ class Microstructure(SampleData):
                         grain_boundaries_map[i, j, k] = 1
 
         return grain_boundaries_map
+    
+    def resample(self, resampling_factor, resample_name=None, autodelete=False,
+            recompute_geometry=True, verbose=False):
+    """Resample the microstructure by a given factor to create a new one.
+
+        This method resamples the CellData image group to a new microstructure,
+        and adapts the GrainDataTable to the resampled.
+
+        :param int resample_factor
+        :param str resample_name: the name for the resampled microstructure
+            (the default is to append '_resampled' to the initial name).
+        :param bool autodelete: a flag to delete the microstructure files
+            on the disk when it is not needed anymore.
+        :param bool recompute_geometry: if `True` (default), recompute the
+            grain centers, volumes, and bounding boxes in the resampled
+            microstructure. Use `False` when using a resample that do not cut
+            grains, for instance when resampling a microstructure within the
+            mask, to avoid the heavy computational cost of the grain geometry
+            data update.
+        :param bool verbose: activate verbose mode.
+        :return: a new `Microstructure` instance with the resampled grain map.
+        """
+        if self._is_empty('grain_map'):
+            print('warning: needs a grain map to resample the microstructure')
+            return
+        # input default values for bounds if not specified
+        if not resample_name:
+            resample_name = self.get_sample_name() + \
+                        (not self.get_sample_name().endswith('_')) * '_' + 'resampled' + \
+                            '_' + str(resampling_factor)
+        print('RESAMPLING: %s' % resample_name)
+        # create new microstructure dataset
+        micro_resampled = Microstructure(name=resample_name, overwrite_hdf5=True,
+                                    phase=self.get_phase(),
+                                    autodelete=autodelete)
+        if self.get_number_of_phases() > 1:
+            for i in range(2, self.get_number_of_phases()):
+                micro_resampled.add_phase(self.get_phase(phase_id=i))
+        micro_resampled.default_compression_options = self.default_compression_options
+        print('resampling microstructure to %s' % micro_resampled.h5_file)
+        # crop all CellData fields
+        image_group = self.get_node('CellData')
+        spacing = self.get_attribute('spacing', 'CellData')
+        FIndex_path = '%s/Field_index' % image_group._v_pathname
+        field_list = self.get_node(FIndex_path)
+ 
+        dims = self.get_attribute('dimension', 'CellData')
+        if len(dims) == 3:
+            X, Y, Z = dims
+            end_X, end_Y, end_Z = resampling_factor * np.array([X//resampling_factor,
+                                                                Y//resampling_factor,
+                                                                Z//resampling_factor])
+        elif len(dims) == 2:
+            X, Y = dims
+            end_X, end_Y = resampling_factor * np.array([X//resampling_factor,
+                                                         Y//resampling_factor])
+        else:
+            raise ValueError('CellData should be either 2D or 3D')
+    
+        resampled_voxel_size = self.get_voxel_size() * resampling_factor  
+
+        for name in field_list:
+            field_name = name.decode('utf-8')
+            print('resampling field %s' % field_name)
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
+                if self._get_group_type('CellData') == '2DImage':
+                    field_resampled = field[:end_X:scale, :end_Y:scale, :end_Z:scale]
+                    
+                else:
+                    field_resampled = field[x_start:x_end, y_start:y_end,
+                                       z_start:z_end, ...]
+                empty = micro_resampled.get_attribute(attrname='empty',
+                                                 nodename='CellData')
+                if empty:
+                    micro_resampled.add_image_from_field(
+                        field_array=field_resampled, fieldname=field_name,
+                        imagename='CellData', location='/',
+                        spacing=spacing, replace=True)
+                else:
+                    micro_resampled.add_field(gridname='CellData',
+                                         fieldname=field_name,
+                                         array=field_resampled, replace=True)
+        # update the origin of the image group according to the resampling
+        if verbose:
+            print('resampled dataset:')
+            print(micro_resampled)
+        micro_resampled.set_active_grain_map(self.active_grain_map)
+        micro_resampled.set_voxel_size(resampled_voxel_size)
+        grain_ids = np.unique(micro_resampled.get_grain_map())
+        for gid in grain_ids:
+            if not gid > 0:
+                continue
+            grain = self.grains.read_where('idnumber == gid')
+            micro_resampled.grains.append(grain)
+        print('%d grains in resampled microstructure' % micro_resampled.grains.nrows)
+        micro_resampled.grains.flush()
+        # recompute the grain geometry
+        if recompute_geometry:
+            print('updating grain geometry')
+            micro_resampled.recompute_grain_bounding_boxes(verbose)
+            micro_resampled.recompute_grain_centers(verbose)
+            micro_resampled.recompute_grain_volumes(verbose)
+        return micro_resampled

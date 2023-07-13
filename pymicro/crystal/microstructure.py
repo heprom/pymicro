@@ -421,6 +421,20 @@ class Orientation:
         om = symmetry.move_rotation_to_FZ(self.orientation_matrix(), verbose=verbose)
         return Orientation(om)
 
+    def rotate_orientation(self, rotation_xyz):
+        """Rotate this grain orientation given the rotation matrix expressed
+        in the laboratory coordinate system.
+
+        :param rotation_xyz: a 3x3 array representing the rotation matrix to apply.
+        :return: a new Orientation instance rotated.
+        """
+        # express the rotation in the crystal frame
+        g = self.orientation_matrix()
+        rotation_cry = np.dot(g, np.dot(rotation_xyz, g.T)).T
+        # apply the rotation and create a new orientation
+        g_rot = np.dot(rotation_cry, g)
+        return Orientation(g_rot)
+
     @staticmethod
     def misorientation_MacKenzie(psi):
         """Return the fraction of the misorientations corresponding to the
@@ -4963,9 +4977,10 @@ class Microstructure(SampleData):
             phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
             m.set_phase_map(phase_map, voxel_size=spacing)
             m.set_orientation_map(rodrigues_map)
-            completeness_map = f['LabDCT']['Data']['Completeness'][()].transpose(2, 1, 0)
-            m.add_field(gridname='CellData', fieldname='completeness_map',
-                        array=completeness_map)
+            if 'Completeness' in f['LabDCT/Data']:
+                completeness_map = f['LabDCT']['Data']['Completeness'][()].transpose(2, 1, 0)
+                m.add_field(gridname='CellData', fieldname='completeness_map',
+                            array=completeness_map)
 
         # create grain data table infos
         grain_ids = np.unique(grain_map)
@@ -4976,13 +4991,12 @@ class Microstructure(SampleData):
         for g in tqdm(m.grains):
             gid = g['idnumber']
             #progress = 100 * (1 + i) / len(m.grains)
-            print('adding grains: {0:.2f} %'.format(progress), end='\r')
+            #print('adding grains: {0:.2f} %'.format(progress), end='\r')
             # use the grain bounding box
             bb = g['bounding_box']
             grain_map = m.get_grain_map()[bb[0][0]:bb[0][1],
                                           bb[1][0]:bb[1][1],
                                           bb[2][0]:bb[2][1]]
-            #x, y, z = np.where(grain_map == gid)
             # assign orientation to this grain
             rods_gid = rodrigues_map[bb[0][0]:bb[0][1],
                                      bb[1][0]:bb[1][1],

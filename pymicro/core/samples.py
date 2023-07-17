@@ -123,6 +123,7 @@ class SampleData:
     :aliases: Dictionnary of list of aliases for each item in
         content_index (`dic`)
 """
+
 # TODO: Homogenize docstrings style
 
     def __init__(self, filename='sample_data', sample_name='',
@@ -154,7 +155,7 @@ class SampleData:
         return
 
     def _after_file_open(self, **kwargs):
-        """Initialization code to run after opening a Sample Data file.
+        """Initialize code to run after opening a Sample Data file.
 
         Empty method for this class. Use it for SampleData inherited classes,
         to create shortcut class attribute that are linked with hdf5 dataset
@@ -165,12 +166,7 @@ class SampleData:
         return
 
     def __del__(self):
-        """Sample Data destructor.
-
-        Deletes SampleData instance and:
-              - closes h5_file --> writes data structure into the .h5 file
-              - writes the .xdmf file
-        """
+        """Sample Data destructor."""
         self._verbose_print('Deleting DataSample object ')
         self.sync()
         if self.autorepack:
@@ -182,7 +178,6 @@ class SampleData:
                   ''.format(self.__class__.__name__, self.h5_file,
                             self.xdmf_file))
             os.remove(self.h5_path)
-            os.remove(self.xdmf_path)
             if os.path.exists(self.h5_path) or os.path.exists(self.xdmf_path):
                 raise RuntimeError('HDF5 and XDMF not removed')
         return
@@ -282,6 +277,7 @@ class SampleData:
 
     def print_xdmf(self):
         """Print a readable version of xdmf_tree content."""
+        self._build_xdmf_tree()
         print(etree.tostring(self.xdmf_tree, pretty_print=True,
                              encoding='unicode'))
         return
@@ -291,19 +287,10 @@ class SampleData:
         self._verbose_print('.... writing xdmf file : {}'
                             ''.format(self.xdmf_file),
                             line_break=False)
-        self.xdmf_tree.write(self.xdmf_path,
-                             xml_declaration=True,
-                             pretty_print=True,
-                             doctype='<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>')
-
-        # correct xml declaration to allow Paraview reader compatibility
-        with open(self.xdmf_path, 'r') as f:
-            lines = f.readlines()
-
-        lines[0] = lines[0].replace("encoding='ASCII'", "")
-
-        with open(self.xdmf_path, 'w') as f:
-            f.writelines(lines)
+        # Build xdmf tree from dataset content
+        self._build_xdmf_tree()
+        # write XML file
+        self._write_xml_from_tree()
         return
 
     def print_dataset_content(self, as_string=False, max_depth=3,
@@ -605,24 +592,13 @@ class SampleData:
         return s
 
     def sync(self):
-        """Synchronize and flush .h5 and .xdmf files with dataset content.
-
-        After using the `sync` method, the XDMF file can be opened in Paraview
-        and 3DImage and/or Mesh data visualized, even if the files are still
-        open in the class instance.
-
-        .. important::
-            Paraview >=5 cannot read data from synchronized files, you must
-            close them first. In this case, use method
-            :func:`pause_for_visualization`.
-        """
+        """Synchronize Index and flush .h5 file."""
         message = ('.... Storing content index in {}:/Index attributes'
                    ''.format(self.h5_file))
         self._verbose_print(message,
                             line_break=False)
         self.add_attributes(dic=self.content_index, nodename='/Index')
         self.add_attributes(dic=self.aliases, nodename='/Index/Aliases')
-        self.write_xdmf()
         self._verbose_print('.... flushing data in file {}'.format(
                                 self.h5_file), line_break=False)
         self.h5_dataset.flush()
@@ -1009,6 +985,29 @@ class SampleData:
                        field_index_prefix=(imagename + '_'))
         return
 
+    def add_field_time(self, fieldname, time):
+        """Add a time value to a field array node.
+
+        If the grid supporting the field does not have this time value stored,
+        the time value is added to the grid time serie.
+
+        :param str fieldname: Path, name or indexname of the field Node
+        :param float time: Time value to add to the field
+        """
+        # add time attribute to field node
+        self.add_attributes({'time':time}, fieldname)
+        # check if time value is in parent grid time serie
+        parent_grid = self._get_parent_grid(fieldname)
+        time_serie = self.get_attribute('time_list', parent_grid)
+        if time_serie is None:
+            time_serie = [time]
+        else:
+            if time not in time_serie:
+                time_serie.append(time)
+                time_serie.sort()
+        self.add_attributes({'time_list':time_serie}, parent_grid)
+        return
+
     def add_grid_time(self, gridname, time_list):
         """Add a list of time values to a grid data group.
 
@@ -1031,6 +1030,7 @@ class SampleData:
         if isinstance(time_list, int):
             time_list = [time_list]
         time_list = sorted(time_list)
+        # TODO: transfer into xdmf writing methods
         # get xdmf node of main grid
         xdmf_gridname = self.get_attribute('xdmf_gridname',gridname)
         grid = self._find_xdmf_grid(xdmf_gridname)
@@ -1057,6 +1057,7 @@ class SampleData:
             grid.append(grid0)
             # Append grid collection to Domain
             p.append(grid)
+            # TODO: only set time_list attribute in this method
             # Create a time_list with only first time value
             self.add_attributes({'time_list':[time_list.pop(0)]},gridname)
         elif grid_type == 'Collection':
@@ -1245,16 +1246,17 @@ class SampleData:
                 self.add_grid_time(gridname, time_list)
             else:
                 if time not in time_list:
-                    time_list = [time]
+                    time_list.append(time)
                     self.add_grid_time(gridname, time_list)
-                    time_list = self.get_attribute('time_list', gridname)
-            time_gridname = self._get_xdmf_time_grid_name(gridname,time)
+                    # time_list = self.get_attribute('time_list', gridname)
+            # time_gridname = self._get_xdmf_time_grid_name(gridname,time)
             # get time suffix from gridname
-            import re
-            time_suffix = re.findall('_T\d+', time_gridname)[-1]
+            # import re
+            # time_suffix = re.findall('_T\d+', time_gridname)[-1]
             # keep suffixless field_name as attribute name for the xdmf
             # time grid collection (same field name for each grid associated
             # to a different time step)
+            time_suffix = f'_T{time}'.replace('.','_')
             time_serie_name = fieldname
             # Add time suffix to field indexname and name
             fieldname = fieldname + time_suffix
@@ -1298,10 +1300,10 @@ class SampleData:
             attribute_dic['visualisation_field_path'] = node_vis._v_pathname
         self.add_attributes(attribute_dic, nodename=indexname)
         # Add field description to XDMF file
-        if (field_type == 'IP_field') and not (visualisation_type=='None'):
-            self._add_field_to_xdmf(visindexname, vis_array)
-        else:
-            self._add_field_to_xdmf(indexname, array)
+        # if (field_type == 'IP_field') and not (visualisation_type=='None'):
+        #     self._add_field_to_xdmf(visindexname, vis_array)
+        # else:
+        #     self._add_field_to_xdmf(indexname, array)
         # Add field path to grid node Field_list attribute
         self._append_field_index(gridname, indexname)
         return node
@@ -2274,7 +2276,7 @@ class SampleData:
             pad_field = False
         if pad_field:
             field = self._mesh_field_unpadding(field, parent_mesh, padding)
-        # Handle field array dimensions to remove singleton dimension if field 
+        # Handle field array dimensions to remove singleton dimension if field
         # is a scalar mesh field
         if self._is_mesh(parent_mesh):
             field = np.squeeze(field)
@@ -3107,6 +3109,25 @@ class SampleData:
     # =========================================================================
     #  SampleData private methods
     # =========================================================================
+    def _build_xdmf_tree(self):
+        """Build xdmf tree from dataset content."""
+        self._verbose_print('.... building xdmf tree')
+        # Init XDMF file and tree
+        self._init_xdmf_tree()
+        # Browse through grid objects and write them into XDMF
+        for group in self.h5_dataset.walk_groups():
+            if self._is_image(group._v_name):
+                # Add image Grid node to XDMF Domain
+                if not self._is_empty(group._v_name):
+                    image_object = self.get_image(imagename=group._v_name)
+                    self._add_image_to_xdmf(group._v_name, image_object)
+            elif self._is_mesh(group._v_name):
+                # Add mesh Grid node to XDMF Domain
+                if not self._is_empty(group._v_name):
+                    mesh_group = self.get_node(group._v_name)
+                    self._add_mesh_to_xdmf(mesh_group)
+        return
+
     def _init_file_object(self, sample_name='', sample_description=''):
         """Initiate or create PyTable HDF5 file object."""
         try:
@@ -3120,6 +3141,7 @@ class SampleData:
                                 ' created'.format(self.h5_file),
                                 line_break=True)
             self.h5_dataset = tables.File(self.h5_path, mode='a')
+        # TODO: modify _init_xml : no more reading from xdmf
         self._init_xml_tree()
         # Generic Data Model initialization
         self._init_data_model()
@@ -3193,9 +3215,25 @@ class SampleData:
         self._verbose_print('Minimal data model initialization done\n')
         return
 
+    def _init_xdmf_tree(self):
+        """Create xdmf file tree structure object."""
+        E = lxml.builder.ElementMaker(
+                namespace="http://www.w3.org/2003/XInclude",
+                nsmap={'xi': "http://www.w3.org/2003/XInclude"})
+        root = E.root()
+        root.tag = 'Xdmf'
+        root.set("Version", "2.2")
+        self.xdmf_tree = etree.ElementTree(root)
+
+        # create element Domain as a children of root
+        self.xdmf_tree.getroot().append(etree.Element("Domain"))
+        return
+
     def _init_xml_tree(self):
         """Read xml tree structured in .xdmf file or initiate one."""
+        # TODO: add xdmf etree construction from dataset images and grids
         try:
+        # TODO: remove xdmf file loading
             file_parser = etree.XMLParser(remove_blank_text=True)
             with open(self.xdmf_path, 'rb') as source:
                 self.xdmf_tree = etree.parse(source, parser=file_parser)
@@ -3218,6 +3256,7 @@ class SampleData:
             self.xdmf_tree.getroot().append(etree.Element("Domain"))
 
             # write file
+            # TODO: remove file writing
             self.write_xdmf()
         return
 
@@ -3415,28 +3454,37 @@ class SampleData:
             pass
         return
 
-    def _find_xdmf_grid(self, gridname):
-        name = self.get_attribute('xdmf_gridname', gridname)
-        if name is None:
-            # in case we are looking for a temporal grid collection subgrid,
-            # its name will be directly passed as argument to this method
-            # but no node in the dataset will have this name.
-            name = gridname
-        for el in self.xdmf_tree.iterfind('.//Grid'):
-            if el.get('Name') == name:
-                return el
-        return None
-
-    def _get_xdmf_time_grid_name(self, gridname, time):
-        name = self.get_attribute('xdmf_gridname', gridname)
+    def _find_xdmf_grid(self, gridname, time=None):
+        gridNode = self.get_node(gridname)
+        name = gridNode._v_name
+        grid0 = None
         for el in self.xdmf_tree.iterfind('.//Grid'):
             if el.get('Name') == name:
                 grid0 = el
+        if time is not None:
+            for ch_grid in grid0.iterchildren():
+                for ch in ch_grid.iterchildren():
+                    if ch.tag == 'Time':
+                        if float(ch.get('Value')) == time:
+                            return ch_grid
+            return None
+        else:
+            return grid0
+
+    def _get_xdmf_time_grid_name(self, gridname, time):
+        name = self.get_attribute('xdmf_gridname', gridname)
+        grid0 = None
+        for el in self.xdmf_tree.iterfind('.//Grid'):
+            if el.get('Name') == name:
+                grid0 = el
+        if grid0 is None:
+            raise ValueError(f'Grid {gridname} not found in XDMF tree')
         for ch_grid in grid0.iterchildren():
             for ch in ch_grid.iterchildren():
                 if ch.tag == 'Time':
                     if float(ch.get('Value')) == time:
                         return ch_grid.get('Name')
+        return None
 
     def _find_xdmf_geometry(self, xdmf_grid):
         for el in xdmf_grid:
@@ -3938,7 +3986,7 @@ class SampleData:
                                       array=data, replace=replace,
                                       location=Ntags_group._v_pathname,
                                       compression_options=c_opt)
-                # remove from index : Elsets may be too numerous and
+                # remove from index : NSets may be too numerous and
                 # overload content index --> actual choice is to remove
                 # them from index
                 self._remove_from_index(node._v_pathname)
@@ -4202,7 +4250,7 @@ class SampleData:
         return
 
     def _add_image_to_xdmf(self, imagename, image_object):
-        """Write grid geometry and topoly in xdmf tree/file."""
+        """Write grid geometry, topoly and attributes in xdmf tree/file."""
         # add 1 to each dimension to get grid dimension (from cell number to
         # point number --> XDMF indicates Grid points)
         image_type = self._get_image_type(image_object)
@@ -4212,21 +4260,33 @@ class SampleData:
         Spacing_tmp = image_object.GetSpacing()
         Origin_tmp = image_object.GetOrigin()
         if len(Dimension_tmp) == 2:
+        # revert shape for 2D images
             Dimension_tmp = Dimension_tmp[[1,0]]
             Spacing_tmp = Spacing_tmp[[1,0]]
             Origin_tmp = Origin_tmp[[1,0]]
         elif len(Dimension_tmp) == 3:
+        # revert shape for 3D images
             Dimension_tmp = Dimension_tmp[[2,1,0]]
             Spacing_tmp = Spacing_tmp[[2,1,0]]
             Origin_tmp = Origin_tmp[[2,1,0]]
+        # Get Image dimensions to suited string format to write in XMDF file
         Dimension = self._np_to_xdmf_str(Dimension_tmp)
         Spacing = self._np_to_xdmf_str(Spacing_tmp)
         Origin = self._np_to_xdmf_str(Origin_tmp)
         Dimensionality = str(image_object.GetDimensionality())
-        self._verbose_print('Updating xdmf tree...', line_break=False)
-        # Creatge Grid element
-        image_xdmf = etree.Element(_tag='Grid', Name=imagename,
-                                   GridType='Uniform')
+
+        # Check presence of time values for the image
+        time_list = self.get_attribute('time_list', imagename)
+        # Create Image Grid node for XDMF file
+        if time_list is not None:
+        # Create Grid Collection if this is a time serie Image
+            image_xdmf = etree.Element(_tag='Grid', Name=imagename,
+                                       GridType='Collection',
+                                       CollectionType='Temporal')
+        else:
+        # Create Uniform Grid if there is no time serie
+            image_xdmf = etree.Element(_tag='Grid', Name=imagename,
+                                       GridType='Uniform')
         # Create Topology element
         Topotype = XDMF_IMAGE_TOPOLOGY[image_type]
         topology_xdmf = etree.Element(_tag='Topology', TopologyType=Topotype,
@@ -4243,20 +4303,58 @@ class SampleData:
         # Add nodes DataItem as childrens of node Geometry
         geometry_xdmf.append(origin_data)
         geometry_xdmf.append(spacing_data)
-        # Add Geometry and Topology as childrens of Grid
-        image_xdmf.append(topology_xdmf)
-        image_xdmf.append(geometry_xdmf)
-        # Add Grid to node Domain and get XDMF pathes
+        # Add Geometry and Topology as childrens of each Grid
+        if time_list is not None:
+            # Create a grid for each time value if time serie Image, and
+            # append topology, geometry and time value
+            for T_index in range(len(time_list)):
+                imageT_name = imagename + f'_T{T_index}'
+                imageT = etree.Element(_tag='Grid', Name=imageT_name,
+                                      GridType='Uniform')
+                # get time value and add it to imageT node
+                T = time_list[T_index]
+                timeT = etree.Element(_tag='Time', Value=f'{T}')
+                imageT.append(timeT)
+                # Append topology and geometry
+                imageT.append(topology_xdmf.__copy__())
+                imageT.append(geometry_xdmf.__copy__())
+                # append imageT to image
+                image_xdmf.append(imageT)
+        else:
+            # append topology and geometry to uniform Image
+            image_xdmf.append(topology_xdmf)
+            image_xdmf.append(geometry_xdmf)
+
+        # Add Image node to node Domain
         self.xdmf_tree.getroot()[0].append(image_xdmf)
+
+        # Add fields to XDMF
+        for fieldname, field in image_object.nodeFields.items():
+            self._add_field_to_xdmf(fieldname, field)
+        for fieldname, field in image_object.elemFields.items():
+            self._add_field_to_xdmf(fieldname, field)
         return
 
     def _add_mesh_to_xdmf(self, mesh_group):
         """Write mesh grid element geometry and topoly in xdmf tree/file."""
-        # get mesh group
+        # Get mesh group
         mesh_path = mesh_group._v_pathname
-        # Creatge Grid element
-        mesh_xdmf = etree.Element(_tag='Grid', Name=mesh_group._v_name,
-                                  GridType='Uniform')
+        # Get list of fields in mesh
+        mesh_indexname = self.get_indexname_from_path(mesh_path)
+        FIndex = mesh_indexname+'_Field_index'
+        Field_index = self.get_node(FIndex)
+        # Check presence of time values for the mesh
+        time_list = self.get_attribute('time_list', mesh_indexname)
+        # Create Mesh element
+        if time_list is not None:
+            # Create Grid Collection for a time serie mesh
+            mesh_xdmf = etree.Element(_tag='Grid', Name=mesh_group._v_name,
+                                       GridType='Collection',
+                                       CollectionType='Temporal')
+        else:
+            # Create Uniform Grid Element if there is no time serie
+            mesh_xdmf = etree.Element(_tag='Grid', Name=mesh_group._v_name,
+                                      GridType='Uniform')
         # Create Geometry element
         mesh_type = self.get_attribute('group_type', mesh_path)
         if mesh_type == '2DMesh':
@@ -4293,11 +4391,41 @@ class SampleData:
         topology_data.text = self.h5_file + ':' + elems._v_pathname
         # Add node DataItem as children of node Topology
         topology_xdmf.append(topology_data)
-        # Add Geometry and Topology as childrens of Grid
-        mesh_xdmf.append(geometry_xdmf)
-        mesh_xdmf.append(topology_xdmf)
-        # Add Grid to node Domain
+        # Add Geometry and Topology as childrens of each Grid
+        if time_list is not None:
+            # Create a grid for each time value if time serie Image, and
+            # append topology, geometry and time value
+            for T_index in range(len(time_list)):
+                meshT_name = mesh_group._v_name + f'_T{T_index}'
+                meshT = etree.Element(_tag='Grid', Name=meshT_name,
+                                      GridType='Uniform')
+                # get time value and add it to imageT node
+                T = time_list[T_index]
+                timeT = etree.Element(_tag='Time', Value=f'{T}')
+                meshT.append(timeT)
+                # Append topology and geometry
+                meshT.append(topology_xdmf.__copy__())
+                meshT.append(geometry_xdmf.__copy__())
+                # append imageT to image
+                mesh_xdmf.append(meshT)
+        else:
+            # append topology and geometry to uniform Image
+            mesh_xdmf.append(topology_xdmf)
+            mesh_xdmf.append(geometry_xdmf)
+
+        # Add Mesh to node Domain
         self.xdmf_tree.getroot()[0].append(mesh_xdmf)
+
+        # Add fields
+        for fieldname in Field_index:
+            name = fieldname.decode('utf-8')
+            # For NodeTags or ElTags fields :indexname in FieldIndex
+            # cannot be found by get_node --> try by removing grid indexname
+            if not self.__contains__(name):
+                name = name.split('_',1)[1]
+            Node = self.get_node(name)
+            data = self.get_field(name, unpad_field=True)
+            self._add_field_to_xdmf(name, data)
         return
 
     def _append_field_index(self, gridname, fieldname):
@@ -4358,8 +4486,11 @@ class SampleData:
         :param ndarray field: the field array.
         """
         Node = self.get_node(fieldname)
+        if Node is None:
+            raise ValueError(f'Field {fieldname} not found in dataset.')
         Grid_name = self.get_attribute('xdmf_gridname', fieldname)
-        Xdmf_grid_node = self._find_xdmf_grid(Grid_name)
+        Time = self.get_attribute('time', fieldname)
+        Xdmf_grid_node = self._find_xdmf_grid(Grid_name, Time)
         field_type = self.get_attribute('field_type', fieldname)
         if field_type == 'Nodal_field':
             Center_type = 'Node'
@@ -4508,6 +4639,11 @@ class SampleData:
         Group = Node._g_getparent()
         return Group._v_name
 
+    def _get_parent_grid(self, fieldname):
+        """Return the grid group that supports input field."""
+        gridname = self.get_attribute('parent_grid_path', fieldname)
+        return self.get_node(gridname)
+
     def _get_group_info(self, groupname, as_string=False, short=False):
         """Print a human readable information on the Pytables Group object."""
         s = ''
@@ -4647,6 +4783,19 @@ class SampleData:
             Msg = ('\n' + Msg)
         if self._verbose:
             print(Msg)
+        return
+
+    def _write_xml_from_tree(self):
+        self.xdmf_tree.write(self.xdmf_path,
+                             xml_declaration=True,
+                             pretty_print=True,
+                             doctype='<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>')
+        # correct xml declaration to allow Paraview reader compatibility
+        with open(self.xdmf_path, 'r') as f:
+            lines = f.readlines()
+        lines[0] = lines[0].replace("encoding='ASCII'", "")
+        with open(self.xdmf_path, 'w') as f:
+            f.writelines(lines)
         return
 
     def _np_to_xdmf_str(self, array):

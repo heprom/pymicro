@@ -924,6 +924,43 @@ class Orientation:
         return orientations
 
     @staticmethod
+    def transformation_matrix(hkl_1, hkl_2, n_1, n_2):
+        """Compute the orientation matrix from the two known hkl plane 
+        normals.
+        
+        The function build two orthonormal basis, one in the crystal 
+        frame and the other in the sample frame. the orientation matrix 
+        brings the second one into coincidence with first one.
+
+        :param hkl_1: the first `HklPlane` instance.
+        :param hkl_2: the second `HklPlane` instance.
+        :param n_1: a vector normal to the first lattice plane.
+        :param n_2: a vector normal to the second lattice plane.
+        :return: the corresponding 3x3 orientation matrix.
+        """
+        # create the vectors representing this frame in the crystal coordinate system
+        e1_hat_c = hkl_1.normal()
+        e2_hat_c = np.cross(hkl_1.normal(), hkl_2.normal()) / np.linalg.norm(
+            np.cross(hkl_1.normal(), hkl_2.normal()))
+        e3_hat_c = np.cross(e1_hat_c, e2_hat_c)
+        e_hat_c = np.array([e1_hat_c, e2_hat_c, e3_hat_c])
+        # create local frame attached to the indexed crystallographic features in XYZ
+        e1_hat_s = n_1
+        e2_hat_s = np.cross(n_1, n_2) / np.linalg.norm(
+            np.cross(n_1, n_2))
+        e3_hat_s = np.cross(e1_hat_s, e2_hat_s)
+        e_hat_s = np.array([e1_hat_s, e2_hat_s, e3_hat_s])
+        # now build the orientation matrix
+        orientation_matrix = np.dot(e_hat_c.T, e_hat_s)
+        return orientation_matrix
+
+    @staticmethod
+    def from_two_hkl_normals(hkl_1, hkl_2, xyz_normal_1, xyz_normal_2):
+        g = Orientation.transformation_matrix(hkl_1, hkl_2, 
+                                              xyz_normal_1, xyz_normal_2)
+        return Orientation(g)
+
+    @staticmethod
     def Zrot2OrientationMatrix(x1=None, x2=None, x3=None):
         """Compute the orientation matrix from the rotated coordinates given
         in the .inp file for Zebulon's computations.

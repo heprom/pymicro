@@ -417,6 +417,17 @@ class OrientationTests(unittest.TestCase):
         for i in range(3):
             self.assertAlmostEqual(o_fz.euler[i], val[i], 3)
 
+    def test_rotate_orientation(self):
+        o = Orientation.from_euler(self.test_eulers[0])
+        theta_deg = 15.
+        theta = np.radians(theta_deg)
+        Rx = np.array([[1.0, 0., 0.],
+                       [0., np.cos(theta), -np.sin(theta)],
+                       [0., np.sin(theta), np.cos(theta)]])
+        o_rot = o.rotate_orientation(Rx)
+        (angle, axis, axis_xyz) = o.disorientation(o_rot, crystal_structure=Symmetry.cubic)
+        self.assertAlmostEqual(angle * 180 / np.pi, theta_deg)
+
     def test_small_disorientation(self):
         o_ref = Orientation(np.array([[-0.03454188, 0.05599919, -0.99783313],
                                       [-0.01223192, -0.99837784, -0.05560633],
@@ -439,6 +450,24 @@ class OrientationTests(unittest.TestCase):
         rod = np.array([-0.09655562, 0.09261893, 0.11932359])
         for i in range(3):
             self.assertAlmostEqual(o.rod[i], rod[i])
+
+    def test_from_two_hkl_normals(self):
+        o_ref = Orientation.from_euler(self.test_eulers[1])
+        gt = o_ref.orientation_matrix().T
+        si = Lattice.face_centered_cubic(0.352)
+        # pick two lattice planes
+        hkl_plane_1 = HklPlane(-1, 5, 5, lattice=si)
+        hkl_plane_2 = HklPlane(-1, 3, 3, lattice=si)
+        # compute the hkl plane normals in the laboratory frame
+        G1 = hkl_plane_1.scattering_vector()
+        xyz_normal_1 = np.dot(gt, G1 / np.linalg.norm(G1))
+        G2 = hkl_plane_2.scattering_vector()
+        xyz_normal_2 = np.dot(gt, G2 / np.linalg.norm(G2))
+        # compute the asociated crystal orientation
+        o = Orientation.from_two_hkl_normals(hkl_plane_1, hkl_plane_2, 
+                                             xyz_normal_1, xyz_normal_2)
+        mis_angle = o.disorientation(o_ref, crystal_structure=Symmetry.cubic)[0]
+        self.assertEqual(mis_angle * 180 / np.pi, 0.)
 
 
 if __name__ == '__main__':

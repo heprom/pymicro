@@ -730,6 +730,19 @@ class Lattice:
             parameters = [a, b, c, alpha, beta, gamma]
         return parameters
 
+    def get_lattice_constants(self, angstrom=False):
+        """Return a list of the 6 elastic constants.
+
+        By default the units are nanometer and degrees.
+
+        :param bool angstrom: if True the lattice length parameters
+        are returned in angtrom.
+        :return: a list of the 6 lattice constants.
+        """
+        a, b, c = self._lengths * 10 if angstrom is True else self._lengths
+        alpha, beta, gamma = self._angles
+        return [a, b, c, alpha, beta, gamma]
+
     def metric_tensor(self):
         """Compute the metric tensor for this lattice."""
         a, b, c = self._lengths
@@ -1356,6 +1369,10 @@ class HklObject:
 
     @property
     def lattice(self):
+        return self._lattice
+
+    def get_lattice(self):
+        """Returns the crystal lattice."""
         return self._lattice
 
     def set_lattice(self, lattice):

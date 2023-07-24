@@ -121,10 +121,8 @@ class SampleData:
     :content_index: Dictionnary of data items (nodes/groups)
         names and pathes in HDF5 dataset (`dic`)
     :aliases: Dictionnary of list of aliases for each item in
-        content_index (`dic`)
+        content_index (`dic`).
 """
-
-# TODO: Homogenize docstrings style
 
     def __init__(self, filename='sample_data', sample_name='',
                  sample_description=' ', verbose=False, overwrite_hdf5=False,
@@ -161,7 +159,7 @@ class SampleData:
         to create shortcut class attribute that are linked with hdf5 dataset
         elements (for instance, class attribute pointing towards a dataset
         structured table -- see `add_table` method and Microstructure class
-        `grains` attribute)
+        `grains` attribute).
         """
         return
 
@@ -178,8 +176,8 @@ class SampleData:
                   ''.format(self.__class__.__name__, self.h5_file,
                             self.xdmf_file))
             os.remove(self.h5_path)
-            if os.path.exists(self.h5_path) or os.path.exists(self.xdmf_path):
-                raise RuntimeError('HDF5 and XDMF not removed')
+            if os.path.exists(self.h5_path):
+                raise RuntimeError('HDF5 file not removed')
         return
 
     def __repr__(self):
@@ -282,7 +280,7 @@ class SampleData:
                              encoding='unicode'))
         return
 
-    def write_xdmf(self):
+    def write_xdmf(self, filename=None):
         """Write xdmf_tree in .xdmf file with suitable XML declaration."""
         self._verbose_print('.... writing xdmf file : {}'
                             ''.format(self.xdmf_file),
@@ -290,7 +288,7 @@ class SampleData:
         # Build xdmf tree from dataset content
         self._build_xdmf_tree()
         # write XML file
-        self._write_xml_from_tree()
+        self._write_xml_from_tree(filename=filename)
         return
 
     def print_dataset_content(self, as_string=False, max_depth=3,
@@ -911,7 +909,7 @@ class SampleData:
                            compression_options=compression_options)
         return image_object
 
-    def add_image_from_field(self, field_array, fieldname, imagename='',
+    def add_image_from_field(self, field_array, fieldname, imagename,
                              indexname='', location='/', description=' ',
                              replace=False, origin=None, spacing=None,
                              is_scalar=True, is_elem_field=True,
@@ -1885,7 +1883,7 @@ class SampleData:
 
     def get_mesh_elements(self, meshname, with_tags=True, as_numpy=True,
                           get_eltype_connectivity=None):
-        """Return the mesh elements connectivity as HDF5 node or Numpy array.
+        """Return mesh elements as a Basictools elements container.
 
         :param str meshname: Name, Path, Index name or Alias of the Mesh group
             in dataset
@@ -2776,6 +2774,7 @@ class SampleData:
         :param bool in_place: if True, the actual image group will be replaced
         by the new resampled group.
         """
+        # TODO: move in Grid utils
         # sanity check
         if not self._get_group_type(location) == '3DImage':
             print('works only on 3D images for now')
@@ -4560,10 +4559,12 @@ class SampleData:
             print(Msg)
         return
 
-    def _write_xml_from_tree(self):
-        self.xdmf_tree.write(self.xdmf_path,
-                             xml_declaration=True,
-                             pretty_print=True,
+    def _write_xml_from_tree(self, filename=None):
+        if filename is None:
+            file = self.xdmf_path
+        else:
+            file = filename
+        self.xdmf_tree.write(file, xml_declaration=True, pretty_print=True,
                              doctype='<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>')
         # correct xml declaration to allow Paraview reader compatibility
         with open(self.xdmf_path, 'r') as f:

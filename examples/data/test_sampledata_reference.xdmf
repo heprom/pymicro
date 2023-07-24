@@ -1,0 +1,97 @@
+<?xml version='1.0' ?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>
+<Xdmf xmlns:xi="http://www.w3.org/2003/XInclude" Version="2.2">
+  <Domain>
+    <Grid Name="test_image" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="test_image_T0" GridType="Uniform">
+        <Time Value="1.0"/>
+        <Topology TopologyType="3DCoRectMesh" Dimensions="10 10 10"/>
+        <Geometry Type="ORIGIN_DXDYDZ">
+          <DataItem Format="XML" Dimensions="3">-1. -1. -1.</DataItem>
+          <DataItem Format="XML" Dimensions="3">0.2 0.2 0.2</DataItem>
+        </Geometry>
+        <Attribute Name="test_tensor" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" Dimensions="10  10  10  9" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_image/test_tensor_T1_0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="test_image_T1" GridType="Uniform">
+        <Time Value="2.0"/>
+        <Topology TopologyType="3DCoRectMesh" Dimensions="10 10 10"/>
+        <Geometry Type="ORIGIN_DXDYDZ">
+          <DataItem Format="XML" Dimensions="3">-1. -1. -1.</DataItem>
+          <DataItem Format="XML" Dimensions="3">0.2 0.2 0.2</DataItem>
+        </Geometry>
+        <Attribute Name="test_tensor" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" Dimensions="10  10  10  9" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_image/test_tensor_T2_0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="test_image_T2" GridType="Uniform">
+        <Time Value="3.0"/>
+        <Topology TopologyType="3DCoRectMesh" Dimensions="10 10 10"/>
+        <Geometry Type="ORIGIN_DXDYDZ">
+          <DataItem Format="XML" Dimensions="3">-1. -1. -1.</DataItem>
+          <DataItem Format="XML" Dimensions="3">0.2 0.2 0.2</DataItem>
+        </Geometry>
+        <Attribute Name="test_tensor" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" Dimensions="10  10  10  9" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_image/test_tensor_T3_0</DataItem>
+        </Attribute>
+      </Grid>
+      <Attribute Name="test_image_field" AttributeType="Scalar" Center="Node">
+        <DataItem Format="HDF" Dimensions="10  10  10" NumberType="Int" Precision="16">test_sampledata_ref.h5:/test_image/test_image_field</DataItem>
+      </Attribute>
+    </Grid>
+    <Grid Name="test_mesh" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="test_mesh_T0" GridType="Uniform">
+        <Time Value="1.0"/>
+        <Topology TopologyType="Triangle" NumberOfElements="8">
+          <DataItem Format="HDF" Dimensions="24 " NumberType="Int" Precision="64">test_sampledata_ref.h5:/test_mesh/Geometry/Elements</DataItem>
+        </Topology>
+        <Geometry Type="XYZ">
+          <DataItem Format="HDF" Dimensions="6  3" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Geometry/Nodes</DataItem>
+        </Geometry>
+        <Attribute Name="test_vector" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" Dimensions="6  3" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/test_vector_T1_0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="test_mesh_T1" GridType="Uniform">
+        <Time Value="2.0"/>
+        <Topology TopologyType="Triangle" NumberOfElements="8">
+          <DataItem Format="HDF" Dimensions="24 " NumberType="Int" Precision="64">test_sampledata_ref.h5:/test_mesh/Geometry/Elements</DataItem>
+        </Topology>
+        <Geometry Type="XYZ">
+          <DataItem Format="HDF" Dimensions="6  3" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Geometry/Nodes</DataItem>
+        </Geometry>
+        <Attribute Name="test_vector" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" Dimensions="6  3" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/test_vector_T2_0</DataItem>
+        </Attribute>
+      </Grid>
+      <Attribute Name="field_Z0_plane" AttributeType="Scalar" Center="Node">
+        <DataItem Format="HDF" Dimensions="6  1" NumberType="Int" Precision="8">test_sampledata_ref.h5:/test_mesh/Geometry/NodeTags/field_Z0_plane</DataItem>
+      </Attribute>
+      <Attribute Name="field_out_of_plane" AttributeType="Scalar" Center="Node">
+        <DataItem Format="HDF" Dimensions="6  1" NumberType="Int" Precision="8">test_sampledata_ref.h5:/test_mesh/Geometry/NodeTags/field_out_of_plane</DataItem>
+      </Attribute>
+      <Attribute Name="field_2D" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="8  1" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Geometry/ElementsTags/field_2D</DataItem>
+      </Attribute>
+      <Attribute Name="field_Top" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="8  1" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Geometry/ElementsTags/field_Top</DataItem>
+      </Attribute>
+      <Attribute Name="field_Bottom" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="8  1" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Geometry/ElementsTags/field_Bottom</DataItem>
+      </Attribute>
+      <Attribute Name="Test_field1" AttributeType="Scalar" Center="Node">
+        <DataItem Format="HDF" Dimensions="6  1" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Test_field1</DataItem>
+      </Attribute>
+      <Attribute Name="Test_field2" AttributeType="Scalar" Center="Node">
+        <DataItem Format="HDF" Dimensions="6  1" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Test_field2</DataItem>
+      </Attribute>
+      <Attribute Name="Test_field3" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="8  1" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Test_field3</DataItem>
+      </Attribute>
+      <Attribute Name="Test_field4" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="8  1" NumberType="Float" Precision="64">test_sampledata_ref.h5:/test_mesh/Test_field4</DataItem>
+      </Attribute>
+    </Grid>
+  </Domain>
+</Xdmf>

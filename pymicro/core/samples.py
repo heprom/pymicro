@@ -146,7 +146,6 @@ class SampleData:
             self._verbose_print('-- File "{}" exists  and will be '
                                 'overwritten'.format(self.h5_path))
             os.remove(self.h5_path)
-            os.remove(self.xdmf_path)
         self._init_file_object(sample_name, sample_description)
         self._after_file_open(**after_file_open_args)
         self.sync()
@@ -2679,19 +2678,10 @@ class SampleData:
         elif indexname == node._v_name:
             self.content_index.pop(indexname)
             indexname = newname
-        # change nodename in XDMF file
-        xdmf_lines = []
-        with open(self.xdmf_path, 'r') as f:
-            old_xdmf_lines = f.readlines()
-        for line in old_xdmf_lines:
-            xdmf_lines.append(line.replace(node._v_name, newname))
-        with open(self.xdmf_path, 'w') as f:
-            f.writelines(xdmf_lines)
         # change HDF5 node name
         self.h5_dataset.rename_node(node, newname, overwrite=replace)
         # change index
         self.content_index[indexname] = node._v_pathname
-        self.xdmf_tree = etree.parse(self.xdmf_path)
         self.sync()
         return
 
@@ -2891,17 +2881,7 @@ class SampleData:
             new_sample_name = sample.get_attribute('sample_name', '/')
         # copy HDF5 file
         dst_sample_file_h5 = os.path.splitext(dst_sample_file)[0] + '.h5'
-        dst_sample_file_xdmf = os.path.splitext(dst_sample_file)[0] + '.xdmf'
         sample.h5_dataset.copy_file(dst_sample_file_h5, overwrite=overwrite)
-        # copy XDMF file
-        dst_xdmf_lines = []
-        with open(sample.xdmf_path, 'r') as f:
-            src_xdmf_lines = f.readlines()
-        _, new_file = os.path.split(dst_sample_file_h5)
-        for line in src_xdmf_lines:
-            dst_xdmf_lines.append(line.replace(sample.h5_file, new_file))
-        with open(dst_sample_file_xdmf, 'w') as f:
-            f.writelines(dst_xdmf_lines)
         del sample
         new_sample = SampleData(filename=dst_sample_file_h5,
                                 autodelete=autodelete)
@@ -4567,10 +4547,10 @@ class SampleData:
         self.xdmf_tree.write(file, xml_declaration=True, pretty_print=True,
                              doctype='<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>')
         # correct xml declaration to allow Paraview reader compatibility
-        with open(self.xdmf_path, 'r') as f:
+        with open(file, 'r') as f:
             lines = f.readlines()
         lines[0] = lines[0].replace("encoding='ASCII'", "")
-        with open(self.xdmf_path, 'w') as f:
+        with open(file, 'w') as f:
             f.writelines(lines)
         return
 

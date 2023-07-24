@@ -8,7 +8,6 @@ from BasicTools.Containers.ConstantRectilinearMesh import ConstantRectilinearMes
 import BasicTools.Containers.UnstructuredMeshCreationTools as UMCT
 from config import PYMICRO_EXAMPLES_DATA_DIR
 
-
 class TestGrainData(IsDescription):
     """
        Description class specifying structured storage for tests
@@ -55,7 +54,6 @@ class TestDerivedClass(SampleData):
                                     'Mesh_data': 'Mesh'
                                     }
         return minimal_content_index_dic, minimal_content_type_dic
-
 
 class SampleDataTests(unittest.TestCase):
 
@@ -149,9 +147,6 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(os.path.exists(self.filename + '.h5'))
         self.assertEqual(sample.get_sample_name(), self.sample_name)
         self.assertEqual(sample.get_description(), self.sample_description)
-        # Test XDMF file writing
-        sample.write_xdmf()
-        self.assertTrue(os.path.exists(self.filename+'.xdmf'))
         # close sample data instance
         del sample
         # reopen sample data instance
@@ -209,6 +204,31 @@ class SampleDataTests(unittest.TestCase):
         del sample
         self.assertTrue(not os.path.exists(self.filename+'.h5'))
 
+    def test_tables(self):
+        """Test creation of structured tables + data recovery."""
+        # SampleData object Instantiation
+        sample = SampleData(filename=self.filename,
+                            overwrite_hdf5=True, verbose=False,
+                            sample_name=self.sample_name,
+                            sample_description=self.sample_description)
+        # Add new group and array to SampleData dataset
+        sample.add_group(groupname='test_group', location='/',
+                         indexname='group')
+        # Add a structured array as table node
+        sample.add_table('group', 'test_table', description=self.dtype1,
+                         data=self.struct_array1)
+        # close sample data instance
+        del sample
+        # reopen sample data instance
+        sample = SampleData(filename=self.filename, autodelete=True)
+        # get table data and check content
+        density = sample['test_table']['density'][:]
+        self.assertTrue(np.all(density == self.struct_array1['density'][:]))
+        # Close and Remove dataset
+        sample.autodelete = True
+        del sample
+        self.assertTrue(not os.path.exists(self.filename+'.h5'))
+
     def test_image_group(self):
         """Test storage and recovery of image data via SampleData."""
         # SampleData object Instantiation
@@ -251,11 +271,10 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(np.all(np.isin(time_list, np.array([1.,2.,3.]))))
         image_field = sample['test_tensor_T2_0']
         self.assertTrue(np.all(image_field[:,:,:,4] == 4*2*self.image))
-        # test sampledata instance and file autodelete function
+        # Close and Remove dataset
         sample.autodelete = True
         del sample
         self.assertTrue(not os.path.exists(self.filename+'.h5'))
-        # raise ValueError('voila')
 
     def test_add_image_from_field(self):
         """Test construction of image data from a numpy array."""
@@ -278,6 +297,7 @@ class SampleDataTests(unittest.TestCase):
         spacing = sample.get_attribute('spacing', 'test_image')
         self.assertTrue(np.all(origin == (-self.image_origin)))
         self.assertTrue(np.all(spacing == (self.image_voxel_size/2.0)))
+        # Close and Remove dataset
         del sample
         self.assertTrue(not os.path.exists(self.filename+'.h5'))
 
@@ -341,7 +361,29 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(np.all(shape_f1 == self.vector_nodal1))
         shape_f1 = sample.get_field('test_vector_T2_0')
         self.assertTrue(np.all(shape_f1 == self.vector_nodal2))
-        # test sampledata instance and file autodelete function
+        # Close and Remove dataset
+        del sample
+
+    def test_copy(self):
+        """Test dataset creation by copying another dataset."""
+        # Creation of new dataset from copy of reference file
+        sample = SampleData.copy_sample(src_sample_file=self.reference_file,
+                                        dst_sample_file=self.filename,
+                                        overwrite=True, get_object=True,
+                                        autodelete=True)
+        # various data content checks
+        # get table data and check content
+        density = sample['test_table']['density'][:]
+        self.assertTrue(np.all(density == self.struct_array1['density'][:]))
+        # test recovery of image grid specifications
+        origin = sample.get_attribute('origin', 'test_image')
+        spacing = sample.get_attribute('spacing', 'test_image')
+        # test mesh fields recovery
+        self.assertTrue(np.all(origin == self.image_origin))
+        self.assertTrue(np.all(spacing == self.image_voxel_size))
+        shape_f1 = sample.get_field('test_vector_T1_0')
+        self.assertTrue(np.all(shape_f1 == self.vector_nodal1))
+        # Close and Remove dataset
         del sample
 
     def test_print_dataset_content(self):
@@ -372,9 +414,16 @@ class SampleDataTests(unittest.TestCase):
         sample.print_xdmf()
         del sample
 
-    def test_copy_and_compress(self):
-        """ Copy the reference dataset and compress it """
-        # TODO: test normalization
+    def test_write_xdmf(self):
+        """Test XDMF file writing from reference SampeData dataset."""
+        # Open reference SampleData file
+        sample = SampleData(filename=self.reference_file)
+        # test writing XDMF file
+        sample.write_xdmf()
+        del sample
+
+    def test_compress(self):
+        """Test data array compression."""
         sample = SampleData.copy_sample(src_sample_file=self.reference_file,
                                         dst_sample_file=self.filename,
                                         overwrite=True, get_object=True,
@@ -385,9 +434,6 @@ class SampleDataTests(unittest.TestCase):
         original_size, _ = sample.get_node_disk_size('test_image_field',
                                                      print_flag=False,
                                                      convert=False)
-        # Verify data content
-        data_array = sample.get_node('test_array', as_numpy=True)
-        self.assertTrue(np.all(self.data_array == data_array))
         # compress image data
         c_opt = {'complib': 'zlib', 'complevel': 1}
         sample.set_chunkshape_and_compression(nodename='test_image_field',
@@ -403,6 +449,48 @@ class SampleDataTests(unittest.TestCase):
         new_filesize, _ = sample.get_file_disk_size(print_flag=False,
                                                     convert=False)
         self.assertGreater(original_filesize, new_filesize)
+        # Verify data content
+        data_array = sample.get_node('test_image_field', as_numpy=True)
+        self.assertTrue(np.all(self.image == data_array))
+        # delete SampleData instance and assert files deletion
+        del sample
+        self.assertTrue(not os.path.exists(self.filename + '.h5'))
+
+    def test_lossy_compression(self):
+        """Test data array compression."""
+        # TODO: test normalization
+        sample = SampleData.copy_sample(src_sample_file=self.reference_file,
+                                        dst_sample_file=self.filename,
+                                        overwrite=True, get_object=True,
+                                        autodelete=True)
+        # get filesizes
+        original_filesize, _ = sample.get_file_disk_size(print_flag=False,
+                                                         convert=False)
+        original_size, _ = sample.get_node_disk_size('test_array',
+                                                     print_flag=False,
+                                                     convert=False)
+        # Verify data content
+        data_array = sample.get_node('test_array', as_numpy=True)
+        self.assertTrue(np.all(self.data_array == data_array))
+        # compress image data
+        c_opt = {'complib': 'zlib', 'complevel': 1,
+                 'least_significant_digit':2}
+        sample.set_chunkshape_and_compression(nodename='test_array',
+                                              compression_options=c_opt)
+        # assert that node size is smaller after compression
+        new_size, _ = sample.get_node_disk_size('test_array',
+                                                print_flag=False,
+                                                convert=False)
+        new_filesize, _ = sample.get_file_disk_size(print_flag=False,
+                                                    convert=False)
+        # repack file and assert file size is lower than original filesize
+        sample.repack_h5file()
+        new_filesize, _ = sample.get_file_disk_size(print_flag=False,
+                                                    convert=False)
+        self.assertGreater(original_filesize, new_filesize)
+        # Verify data content recovery to prescribed precision
+        data_array = sample.get_node('test_array', as_numpy=True)
+        self.assertTrue(np.all((self.data_array - data_array) < 10**(-2)))
         # delete SampleData instance and assert files deletion
         del sample
         self.assertTrue(not os.path.exists(self.filename + '.h5'))

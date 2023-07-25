@@ -291,7 +291,7 @@ class SampleData:
         return
 
     def print_dataset_content(self, as_string=False, max_depth=3,
-                              to_file=None, short=False):
+                              to_file=None, short=False, printTags=False):
         """Print information on all nodes in the HDF5 file.
 
         :param bool as_string: If `True` solely returns string representation.
@@ -306,6 +306,8 @@ class SampleData:
         :param bool short: If `True`, return a short description of the
             dataset content, reduced to hdf5 tree structure and node memory
             sizes.
+        :param bool printTags: If 'True', print information for mesh element
+            and node Tags nodes. Default is 'False'.
         :return str s: string representation of HDF5 nodes information
         """
         size, unit = self.get_file_disk_size(print_flag=False)
@@ -327,7 +329,8 @@ class SampleData:
                                                   recursive=True,
                                                   as_string=True,
                                                   max_depth=max_depth,
-                                                  short=short)
+                                                  short=short,
+                                                  printTags=printTags)
                 if not short:
                     s += ('\n**********************************'
                           '**************\n\n')
@@ -342,7 +345,8 @@ class SampleData:
             return
 
     def print_group_content(self, groupname, recursive=False, as_string=False,
-                            max_depth=1000,  to_file=None, short=False):
+                            max_depth=1000,  to_file=None, short=False,
+                            printTags=False):
         """Print information on all nodes in a HDF5 group.
 
         :param str groupname: Name, Path, Index name or Alias of the HDF5 group
@@ -363,6 +367,8 @@ class SampleData:
         :param bool short: If `True`, return a short description of the
             dataset content, reduced to hdf5 tree structure and node memory
             sizes.
+        :param bool printTags: If 'True', print information for mesh element
+            and node Tags nodes. Default is 'False'.
         :return str s: string representation of HDF5 nodes information
         """
         if short:
@@ -370,7 +376,7 @@ class SampleData:
         else:
             s = '\n****** Group {} CONTENT ******\n'.format(groupname)
         group = self.get_node(groupname)
-        if group._v_depth > max_depth:
+        if group._v_depth >= max_depth:
             return ''
         if group._v_nchildren == 0:
             return ''
@@ -381,15 +387,26 @@ class SampleData:
             s += self.print_node_info(node._v_pathname, as_string=True,
                                       short=short)
             if (self._is_group(node._v_pathname) and recursive):
-                if ((node._v_name == 'ElementsTags') or
-                   (node._v_name == 'NodeTags')):
-                    # skip mesh Element and Node Tags group content
-                    # that can be very large
+                # skip mesh Element and Node Tags group content
+                # that can be very large
+                isTag = False
+                if (node._v_name == 'ElementsTags') and not printTags:
+                    s += ('  '*(node._v_depth+1))+(
+                        ' -- Use "get_mesh_elem_tags_names" methods to print'
+                        ' content.\n')
+                    isTag = True
+                if (node._v_name == 'NodeTags') and not printTags:
+                    s += ('  '*(node._v_depth+1))+(
+                        ' -- Use "get_mesh_node_tags_names" methods to print'
+                        ' content.\n')
+                    isTag = True
+                if (isTag) and (not printTags):
                     continue
                 s += self.print_group_content(node._v_pathname, recursive=True,
                                               as_string=True,
-                                              max_depth=max_depth-1,
-                                              short=short)
+                                              max_depth=max_depth,
+                                              short=short,
+                                              printTags=printTags)
         if to_file:
             with open(to_file,'w') as f:
                 f.write(s)
@@ -2992,8 +3009,8 @@ class SampleData:
         self._init_xdmf_tree()
         # Generic Data Model initialization
         self._init_data_model()
-        self._verbose_print('**** FILE CONTENT ****')
-        self._verbose_print(SampleData.__repr__(self))
+        # self._verbose_print('**** FILE CONTENT ****')
+        # self._verbose_print(SampleData.__repr__(self))
         if not self._file_exist:
             # add sample name and description specified at the creation
             self.set_sample_name(sample_name)

@@ -5641,7 +5641,7 @@ class Microstructure(SampleData):
         method to compute grain boundaries map using microstructure grain_map
         """
         x, y, z = self.get_grain_map().shape
-        grain_boundaries_map = np.ones_like(self.get_grain_map())
+        grain_boundaries_map = np.zeros_like(self.get_grain_map())
         pad_grain_map = np.pad(self.get_grain_map(), pad_width=1)
                 
         for i in range(x):
@@ -5659,12 +5659,13 @@ class Microstructure(SampleData):
     
     def resample(self, resampling_factor, resample_name=None, autodelete=False,
             recompute_geometry=True, verbose=False):
-    """Resample the microstructure by a given factor to create a new one.
+        """
+        Resample the microstructure by a given factor to create a new one.
 
         This method resamples the CellData image group to a new microstructure,
         and adapts the GrainDataTable to the resampled.
 
-        :param int resample_factor
+        :param int resample_factor: the factor used for resolution degradation
         :param str resample_name: the name for the resampled microstructure
             (the default is to append '_resampled' to the initial name).
         :param bool autodelete: a flag to delete the microstructure files

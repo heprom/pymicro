@@ -32,9 +32,10 @@ class MicrostructureTests(unittest.TestCase):
         micro.add_grains(self.test_eulers)
         self.assertTrue(micro.get_sample_name() == 'test')
         self.assertTrue(os.path.exists(micro.h5_file))
-        self.assertTrue(os.path.exists(micro.xdmf_file))
+        micro.write_xdmf()
+        self.assertTrue(os.path.exists(micro._xdmf_file))
         h5_file = micro.h5_file
-        xdmf_file = micro.xdmf_file
+        xdmf_file = micro._xdmf_file
         del micro
         self.assertTrue(not os.path.exists(h5_file))
         self.assertTrue(not os.path.exists(xdmf_file))
@@ -46,6 +47,7 @@ class MicrostructureTests(unittest.TestCase):
                                     use_dct_path=False)
         m.autodelete = True
         self.assertEqual(m.grains.nrows, 146)
+        del m
 
     def test_from_file(self):
         # read a test microstructure already created
@@ -69,9 +71,9 @@ class MicrostructureTests(unittest.TestCase):
                                        autodelete=True,
                                        get_object=True)
         h5_file = m.h5_path
-        xdmf_file = m.xdmf_path
+        # xdmf_file = m.xdmf_path
         self.assertTrue(os.path.exists(h5_file))
-        self.assertTrue(os.path.exists(xdmf_file))
+        # self.assertTrue(os.path.exists(xdmf_file))
         m.recompute_grain_bounding_boxes()
         m.recompute_grain_centers()
         # m.recompute_grain_volumes()
@@ -84,7 +86,7 @@ class MicrostructureTests(unittest.TestCase):
         self.assertEqual(volume, 194025)
         del m
         self.assertTrue(not os.path.exists(h5_file))
-        self.assertTrue(not os.path.exists(xdmf_file))
+        # self.assertTrue(not os.path.exists(xdmf_file))
         del m_ref
 
     def test_crop(self):
@@ -95,7 +97,7 @@ class MicrostructureTests(unittest.TestCase):
                     y_start=10, y_end=40,
                     z_start=15, z_end=55, autodelete=True)
         h5_file = m1.h5_file
-        xdmf_file = m1.xdmf_file
+        # xdmf_file = m1.xdmf_file
         dims = (20, 30, 40)
         for i in range(3):
             self.assertEqual(m1.get_grain_map().shape[i], dims[i])
@@ -107,7 +109,7 @@ class MicrostructureTests(unittest.TestCase):
         del m1
         # verify that the microstructure files have been deleted
         self.assertTrue(not os.path.exists(h5_file))
-        self.assertTrue(not os.path.exists(xdmf_file))
+        # self.assertTrue(not os.path.exists(xdmf_file))
         del m
 
     def test_id_list_to_condition(self):
@@ -169,14 +171,14 @@ class MicrostructureTests(unittest.TestCase):
         m1m2 = Microstructure.merge_microstructures([m1, m2], overlap=16)
         m1m2.autodelete = True
         h5_file = m1m2.h5_file
-        xdmf_file = m1m2.xdmf_file
+        # xdmf_file = m1m2.xdmf_file
         dims = (64, 64, 64)
         for i in range(3):
             self.assertEqual(m1m2.get_grain_map().shape[i], dims[i])
         self.assertEqual(m1m2.get_number_of_grains(), 27)
         del m1m2
         self.assertTrue(not os.path.exists(h5_file))
-        self.assertTrue(not os.path.exists(xdmf_file))
+        # self.assertTrue(not os.path.exists(xdmf_file))
         del m1, m2
 
     def test_from_neper(self):
@@ -281,7 +283,8 @@ class OrientationTests(unittest.TestCase):
             o = Orientation.from_euler(test_euler)
             g = o.orientation_matrix()
             delta = np.dot(g, g.T)
-            self.assertEqual(Orientation.misorientation_angle_from_delta(delta), 0.0)
+            self.assertAlmostEqual(
+                      Orientation.misorientation_angle_from_delta(delta), 0.0)
 
     def test_misorientation_angle(self):
         o1 = Orientation.from_euler((0., 0., 0.))

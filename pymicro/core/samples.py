@@ -156,16 +156,17 @@ class SampleData:
     def __del__(self):
         """Sample Data destructor."""
         self._verbose_print('Deleting DataSample object ')
+        self.write_xdmf()
         self.sync()
         if self.autorepack:
             self.repack_h5file()
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
-        self.write_xdmf()
         if self.autodelete:
             print('{} Autodelete: \n Removing hdf5 file {}'
                   ''.format(self.__class__.__name__, self.h5_file))
             os.remove(self.h5_path)
+            os.remove(self._xdmf_path)
             if os.path.exists(self.h5_path):
                 raise RuntimeError('HDF5 file not removed')
         return

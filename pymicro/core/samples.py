@@ -43,18 +43,12 @@ class SampleData:
     SampleData is a high level API designed to create and interact with
     complex datasets collecting all the data generated for a material sample
     by material scientists (from experiments, numerical simulation or data
-    processing).
+    processing). Each dataset consist of a HDF5 file containing all data and
+    metadata.
 
-    Each dataset consist of a pair of files: one HDF5 file containing all
-    data and metadata, and one XDMF data gathering metadata for all spatially
-    origanized data (grids and fields). The class ensures creation and
-    synchronization of both XDMF and HDF5 files.
-
-    The HDF5 and XDMF data tree structure and content in both files are
-    accessible through the `h5_dataset` and `xdmf_tree` class attributes,
-    that are respectively instances of classes imported from the
-    `Pytables <https://www.pytables.org/index.html>`_ and
-    `lxml <https://lxml.de/>`_ packages.
+    The HDF5 data tree structure is accessible through the `h5_dataset` class
+    attributes, that is an instance of a class from the package
+    `Pytables <https://www.pytables.org/index.html>`_.
 
     .. rubric:: SampleData Naming system
 
@@ -83,7 +77,7 @@ class SampleData:
     .. rubric:: Arguments of the Class constructor
 
     :filename: `str`
-        base_name of HDF5/XDMF files to create/read. A file pair is created if
+        base_name of HDF5 file to create/read. A file pair is created if
         the `filename` do not match any existing file.
     :sample_name: `str`, optional ('')
         name of the sample associated to data (metadata, dataset "title"). If
@@ -96,10 +90,10 @@ class SampleData:
     :verbose: `bool`, optional (False)
         set verbosity flag
     :overwrite_hdf5: `bool`, optional (False)
-        set to `True` to overwrite existing HDF5/XDMF couple of files with the
+        set to `True` to overwrite existing HDF5 file with the
         same `filename`.
     :autodelete: `bool`, optional (False)
-        set to `True` to remove HDF5/XDMF files when deleting SampleData
+        set to `True` to remove HDF5 file when deleting SampleData
         instance.
     :autorepack: `bool`, optional (False)
         if `True`, the HDF5 file is automatically repacked when deleting
@@ -112,9 +106,6 @@ class SampleData:
     :h5_path: full path of the HDF5 dataset file
     :h5_dataset: :py:class:`tables.File` instance associated to the
         `h5_file`
-    :xdmf_file: name of XDMF file associated with `h5_file` (`str`)
-    :xdmf_path: full path of XDMF file (`str`)
-    :xdmf_tree: :py:class:`lxml.etree` XML tree associated with `xdmf_file`
     :autodelete: autodelete flag (`bool`)
     :autorepack: autorepack flag (`bool`)
     :after_file_open_args: command arguments for `after_file_open` (dict)
@@ -135,10 +126,10 @@ class SampleData:
         file_dir = str(path_file.parent)
 
         self.h5_file = filename_tmp + '.h5'
-        self.xdmf_file = filename_tmp + '.xdmf'
+        self._xdmf_file = filename_tmp + '.xdmf'
         self.file_dir = file_dir
         self.h5_path = os.path.join(self.file_dir, self.h5_file)
-        self.xdmf_path = os.path.join(self.file_dir, self.xdmf_file)
+        self._xdmf_path = os.path.join(self.file_dir, self._xdmf_file)
         self._verbose = verbose
         self.autodelete = autodelete
         self.autorepack = autorepack
@@ -170,10 +161,10 @@ class SampleData:
             self.repack_h5file()
         self.h5_dataset.close()
         self._verbose_print('Dataset and Datafiles closed')
+        self.write_xdmf()
         if self.autodelete:
-            print('{} Autodelete: \n Removing hdf5 file {} and xdmf file {}'
-                  ''.format(self.__class__.__name__, self.h5_file,
-                            self.xdmf_file))
+            print('{} Autodelete: \n Removing hdf5 file {}'
+                  ''.format(self.__class__.__name__, self.h5_file))
             os.remove(self.h5_path)
             if os.path.exists(self.h5_path):
                 raise RuntimeError('HDF5 file not removed')
@@ -275,14 +266,14 @@ class SampleData:
     def print_xdmf(self):
         """Print a readable version of xdmf_tree content."""
         self._build_xdmf_tree()
-        print(etree.tostring(self.xdmf_tree, pretty_print=True,
+        print(etree.tostring(self._xdmf_tree, pretty_print=True,
                              encoding='unicode'))
         return
 
     def write_xdmf(self, filename=None):
         """Write xdmf_tree in .xdmf file with suitable XML declaration."""
         self._verbose_print('.... writing xdmf file : {}'
-                            ''.format(self.xdmf_file),
+                            ''.format(self._xdmf_file),
                             line_break=False)
         # Build xdmf tree from dataset content
         self._build_xdmf_tree()
@@ -380,9 +371,6 @@ class SampleData:
             return ''
         if group._v_nchildren == 0:
             return ''
-        else:
-            if not(as_string):
-                print(s)
         for node in group._f_iter_nodes():
             s += self.print_node_info(node._v_pathname, as_string=True,
                                       short=short)
@@ -443,7 +431,7 @@ class SampleData:
             print(s)
             return
 
-    def print_node_attributes(self, node_name, as_string=False):
+    def print_node_attributes(self, nodename, as_string=False):
         """Print the hdf5 attributes (metadata) of an array node.
 
         :param str node_name: Name, Path, Index name or Alias of the HDF5 Node
@@ -452,9 +440,9 @@ class SampleData:
         :return str s: string representation of HDF5 Node compression settings
         """
         s = ''
-        node = self.get_node(node_name)
+        node = self.get_node(nodename)
         if node is None:
-            return f'No group named {node_name}'
+            return f'No group named {nodename}'
         s += str(f' -- {node._v_name} attributes : \n')
         for attr in node._v_attrs._v_attrnamesuser:
             value = node._v_attrs[attr]
@@ -641,8 +629,8 @@ class SampleData:
 
         :param bool Vitables: set to `True` to launch Vitables on the HDF5 file
             of the instance HDF5 dataset.
-        :param bool Paraview: set to `True` to launch Paraview on the XDMF file
-            of the instance.
+        :param bool Paraview: set to `True` to create automatically a XDMF file
+            and launch Paraview to visualize the 2D/3D content in the dataset.
         """
         Pause = True
         self.write_xdmf()
@@ -665,22 +653,22 @@ class SampleData:
             if 'Paraview_path' in keywords:
                 software_cmd = keywords['Paraview_path']
             print('--- Lauching Paraview on file {} ---'.format(
-                   self.xdmf_file))
+                   self._xdmf_file))
             print('Once you will close Paraview, you may resume data'
                   ' management with your SampleData instance.')
-            subprocess.run(args=[software_cmd,self.xdmf_path])
+            subprocess.run(args=[software_cmd,self._xdmf_path])
             Pause = False
         if Pause:
             input('Paused interpreter, you may open {} and {} files with'
                   ' other softwares during this pause.'
                   ' Press <Enter> when you want to resume data management'
-                  ''.format(self.h5_file, self.xdmf_file))
+                  ''.format(self.h5_file, self._xdmf_file))
         self.h5_dataset = tables.File(self.h5_path, mode='r+')
         self._file_exist = True
         self._after_file_open()
         print('File objects {} and {} are opened again.\n You may use this'
               ' SampleData instance normally.'.format(self.h5_file,
-                                                      self.xdmf_file))
+                                                      self._xdmf_file))
         return
 
     def switch_verbosity(self):
@@ -1076,8 +1064,8 @@ class SampleData:
         """Add a field to a grid (Mesh or 2D/3DImage) group from a numpy array.
 
         This methods checks the compatibility of the input field array with the
-        grid dimensionality and geometry, adds it to the HDF5 dataset, and
-        the XDMF file. Metadata describing the field type, dimensionality are
+        grid dimensionality and geometry, adds it to the HDF5 dataset.
+        Metadata describing the field type, dimensionality are
         stored as field HDF node attributes. The path of the field is added to
         the grid Group as a HDF5 attribute.
 
@@ -1891,8 +1879,8 @@ class SampleData:
             in dataset
         :param bool as_numpy: if `True`, returns the Node as a `numpy.array`.
             If `False`, returns the node as a Node or Group object.
-        :return: Return the mesh elements connectivity referenced in the XDMF
-            file as a :py:class:`tables.Node` object or a `numpy.array`
+        :return: Return the mesh elements connectivity referenced for the XDMF
+            format as a :py:class:`tables.Node` object or a `numpy.array`
         """
         elems_path = self.get_attribute('elements_path', meshname)
         return self.get_node(elems_path, as_numpy)
@@ -2296,16 +2284,11 @@ class SampleData:
         """
         attribute = None
         data_path = self._name_or_node_to_path(nodename)
-        if data_path is None:
-            self._verbose_print(' (get_attribute) neither indexname nor'
-                                ' node_path passed, node return aborted')
-        else:
+        if data_path is not None:
             try:
                 attribute = self.h5_dataset.get_node_attr(where=data_path,
                                                           attrname=attrname)
             except AttributeError:
-                # self._verbose_print(' (get_attribute) node {} has no attribute'
-                #                     ' `{}`'.format(nodename,attrname))
                 return None
             if isinstance(attribute, bytes):
                 attribute = attribute.decode()
@@ -2420,7 +2403,7 @@ class SampleData:
         return
 
     def set_voxel_size(self, image_group, voxel_size):
-        """Set voxel size for an HDF5/XDMF image data group.
+        """Set voxel size for an image data group.
 
         The values are registered in the `spacing` Attribute of the 3DImage
         group.
@@ -2674,7 +2657,7 @@ class SampleData:
 
     def rename_node(self, nodename, newname, replace=False,
                     new_indexname=None):
-        """Rename a node in the HDF5 tree, XDMF file and content index.
+        """Rename a node in the HDF5 tree and the content index.
 
         This method do not change the indexname of the node, if one exists.
 
@@ -2759,7 +2742,7 @@ class SampleData:
             print('')
             self._remove_from_index(node_path=Node._v_pathname)
             Node.remove()
-        # synchronize HDF5 and XDMF file with node removal
+        # synchronize HDF5 file with node removal
         self.sync()
         self._verbose_print('Node {} sucessfully removed'.format(name))
         return
@@ -3009,8 +2992,9 @@ class SampleData:
         self._init_xdmf_tree()
         # Generic Data Model initialization
         self._init_data_model()
-        # self._verbose_print('**** FILE CONTENT ****')
-        # self._verbose_print(SampleData.__repr__(self))
+        self._verbose_print('**** FILE CONTENT ****')
+        if self._verbose:
+            self.print_dataset_content(max_depth=2)
         if not self._file_exist:
             # add sample name and description specified at the creation
             self.set_sample_name(sample_name)
@@ -3022,7 +3006,7 @@ class SampleData:
         content_paths, content_type = self.minimal_data_model()
         self.minimal_content = content_paths
         self._init_content_index()
-        self._verbose_print('Minimal data model initialization....')
+        self._verbose_print('Data model initialization....')
         # Determine maximum path level in data model elements
         max_path_level = 0
         for key, value in content_paths.items():
@@ -3069,14 +3053,13 @@ class SampleData:
                 elif content_type[key] == 'field_array':
                     msg = (f'Adding empty field {content_paths[key]} to'
                            f' mesh group {head}')
-                    print(msg)
                     self.add_field(gridname=head, fieldname=tail,
                                    indexname=key)
                 elif content_type[key] == 'string_array':
                     msg = f'Adding empty string array {content_paths[key]}'
                     self.add_string_array(name=tail, location=head,
                                           indexname=key)
-        self._verbose_print('Minimal data model initialization done\n')
+        self._verbose_print('Data model initialization done\n')
         return
 
     def _init_xdmf_tree(self):
@@ -3088,9 +3071,9 @@ class SampleData:
         root = E.root()
         root.tag = 'Xdmf'
         root.set("Version", "2.2")
-        self.xdmf_tree = etree.ElementTree(root)
+        self._xdmf_tree = etree.ElementTree(root)
         # create element Domain as a children of root
-        self.xdmf_tree.getroot().append(etree.Element("Domain"))
+        self._xdmf_tree.getroot().append(etree.Element("Domain"))
         return
 
     def _init_content_index(self):
@@ -3276,7 +3259,7 @@ class SampleData:
         gridNode = self.get_node(gridname)
         name = gridNode._v_name
         grid0 = None
-        for el in self.xdmf_tree.iterfind('.//Grid'):
+        for el in self._xdmf_tree.iterfind('.//Grid'):
             if el.get('Name') == name:
                 grid0 = el
         if time is not None:
@@ -4098,7 +4081,7 @@ class SampleData:
             image_xdmf.append(geometry_xdmf)
 
         # Add Image node to node Domain
-        self.xdmf_tree.getroot()[0].append(image_xdmf)
+        self._xdmf_tree.getroot()[0].append(image_xdmf)
 
         # Add fields to XDMF
         for fieldname, field in image_object.nodeFields.items():
@@ -4134,7 +4117,6 @@ class SampleData:
         elif mesh_type == '3DMesh':
             geometry_xdmf = etree.Element(_tag='Geometry', Type='XYZ')
         # Add geometry DataItem
-        mesh_indexname = self.get_indexname_from_path(mesh_group._v_pathname)
         nodes = self.get_node(mesh_indexname+'_Nodes', as_numpy=False)
         Dim = self._np_to_xdmf_str(nodes.shape)
         geometry_data = etree.Element(_tag='DataItem', Format='HDF',
@@ -4186,17 +4168,22 @@ class SampleData:
             mesh_xdmf.append(geometry_xdmf)
 
         # Add Mesh to node Domain
-        self.xdmf_tree.getroot()[0].append(mesh_xdmf)
+        self._xdmf_tree.getroot()[0].append(mesh_xdmf)
 
         # Add fields
-        for fieldname in Field_index:
-            name = fieldname.decode('utf-8')
-            # For NodeTags or ElTags fields :indexname in FieldIndex
-            # cannot be found by get_node --> try by removing grid indexname
-            if not self.__contains__(name):
-                name = name.split('_',1)[1]
-            data = self.get_field(name, unpad_field=True)
-            self._add_field_to_xdmf(name, data)
+        if Field_index is not None:
+            for fieldname in Field_index:
+                name = fieldname.decode('utf-8')
+                # For NodeTags or ElTags fields :indexname in FieldIndex
+                # cannot be found by get_node --> try by removing grid name
+                if not self.__contains__(name):
+                    name = name.replace(mesh_indexname+'_','')
+                if not self.__contains__(name):
+                    print(f"Could not write field {fieldname.decode('utf-8')} "
+                          " in XDMF file")
+                    continue
+                data = self.get_field(name, unpad_field=True)
+                self._add_field_to_xdmf(name, data)
         return
 
     def _append_field_index(self, gridname, fieldname):
@@ -4261,6 +4248,19 @@ class SampleData:
             raise ValueError(f'Field {fieldname} not found in dataset.')
         Grid_name = self.get_attribute('xdmf_gridname', fieldname)
         Time = self.get_attribute('time', fieldname)
+        if Time is None:
+            # if no time value is provided for the field, the first time
+            # value of the grid is used, if the grid has time values
+            Time_tmp = self.get_attribute('time_list', Grid_name)
+            if Time_tmp is not None: Time = Time_tmp[0]
+        field_dimensionality = self.get_attribute('field_dimensionality',
+                                                  fieldname)
+        # Get the time_serie field name if it exists time_serie_name
+        time_serie_name = self.get_attribute('time_serie_name', fieldname)
+        if time_serie_name is None:
+            attr_name = Node._v_name
+        else:
+            attr_name = time_serie_name
         Xdmf_grid_node = self._find_xdmf_grid(Grid_name, Time)
         field_type = self.get_attribute('field_type', fieldname)
         if field_type == 'Nodal_field':
@@ -4270,14 +4270,6 @@ class SampleData:
         else:
             raise ValueError('unknown field type, should be `Nodal_field`'
                              ' or `Element_field`.')
-        field_dimensionality = self.get_attribute('field_dimensionality',
-                                                  fieldname)
-        # Get the time_serie field name if it exists time_serie_name
-        time_serie_name = self.get_attribute('time_serie_name', fieldname)
-        if time_serie_name is None:
-            attr_name = Node._v_name
-        else:
-            attr_name = time_serie_name
         # create Attribute element
         Attribute_xdmf = etree.Element(_tag='Attribute', Name=attr_name,
                                        AttributeType=field_dimensionality,
@@ -4297,8 +4289,12 @@ class SampleData:
                                        Dimensions=Dimension,
                                        NumberType=NumberType,
                                        Precision=Precision)
-        Attribute_data.text = (self.h5_file + ':'
-                               + self._name_or_node_to_path(fieldname))
+        # get relevat field path
+        field_path = self._name_or_node_to_path(fieldname)
+        vis_path = self.get_attribute('visualisation_field_path', fieldname)
+        if vis_path is not None:
+            field_path = vis_path
+        Attribute_data.text = (self.h5_file + ':' + field_path)
         # if data normalization is used, a intermediate DataItem is created
         # to apply a linear function to the dataitem
         norm = self.get_attribute('data_normalization', fieldname)
@@ -4346,8 +4342,6 @@ class SampleData:
             Attribute_xdmf.append(Attribute_data)
         # add attribute to Grid
         Xdmf_grid_node.append(Attribute_xdmf)
-        self.add_attributes({'xdmf_fieldname': Attribute_xdmf.get('Name')},
-                            fieldname)
         return
 
     def _get_node_class(self, name):
@@ -4430,6 +4424,8 @@ class SampleData:
         s += str('\n GROUP {}\n'.format(gname))
         s += str('=====================\n')
         gparent_name = Group._v_parent._v_name
+        if (gname == "/"):
+            gparent_name = 'None -- Root Group'
         s += str(' -- Parent Group : {}\n'.format(gparent_name))
         s += str(' -- Group attributes : \n')
         for attr in Group._v_attrs._v_attrnamesuser:
@@ -4558,10 +4554,10 @@ class SampleData:
 
     def _write_xml_from_tree(self, filename=None):
         if filename is None:
-            file = self.xdmf_path
+            file = self._xdmf_path
         else:
             file = filename
-        self.xdmf_tree.write(file, xml_declaration=True, pretty_print=True,
+        self._xdmf_tree.write(file, xml_declaration=True, pretty_print=True,
                              doctype='<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd"[]>')
         # correct xml declaration to allow Paraview reader compatibility
         with open(file, 'r') as f:

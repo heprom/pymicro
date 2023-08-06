@@ -109,6 +109,10 @@ class CrystallinePhase:
                 print('warning, elastic constants are inconsistent for this '
                       'symmetry, please update them.')
 
+    def set_name(self, name):
+        """Set name of crystalline phase."""
+        self.name = name
+
     def get_symmetry(self):
         """Returns the type of `Symmetry` of the Lattice."""
         return self.get_lattice().get_symmetry()

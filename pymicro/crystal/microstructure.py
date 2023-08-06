@@ -1765,13 +1765,19 @@ class Microstructure(SampleData):
 
     def __init__(self,
                  filename=None, name='micro', description='empty',
-                 verbose=False, overwrite_hdf5=False, phase=None,
-                 autodelete=False):
+                 verbose=False, overwrite_hdf5=False,
+                 phase=None, autodelete=False):
         if filename is None:
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
         # prepare arguments for after file open
-        after_file_open_args = {'phase': phase}
+        if phase is None:
+            phase = CrystallinePhase()
+        if type(phase) is not list:
+            phase_list = [phase]
+        else:
+            phase_list = phase
+        after_file_open_args = {'phase_list': phase_list}
         # call SampleData constructor
         SampleData.__init__(self, filename=filename, sample_name=name,
                             sample_description=description, verbose=verbose,
@@ -1780,7 +1786,7 @@ class Microstructure(SampleData):
                             after_file_open_args=after_file_open_args)
         return
 
-    def _after_file_open(self, phase=None, **kwargs):
+    def _after_file_open(self, phase_list=None, **kwargs):
         """Initialization code to run after opening a Sample Data file."""
         self.grains = self.get_node('GrainDataTable')
         self.default_compression_options = {'complib': 'zlib', 'complevel': 5}
@@ -1789,10 +1795,10 @@ class Microstructure(SampleData):
                                                        'CellData')
             if self.active_grain_map is None:
                 self.set_active_grain_map()
-            self._init_phase(phase)
+            self._init_phase(phase_list)
         else:
             self.set_active_grain_map()
-            self._init_phase(phase)
+            self._init_phase(phase_list)
         return
 
     def __repr__(self):
@@ -1836,20 +1842,17 @@ class Microstructure(SampleData):
                                     'Phase_data': 'Group'}
         return minimal_content_index_dic, minimal_content_type_dic
 
-    def _init_phase(self, phase):
+    def _init_phase(self, phase_list):
         self._phases = []
-        if phase is None:
-            # create a default crystalline phase
-            phase = CrystallinePhase()
         # if the h5 file does not exist yet, store the phase as metadata
         if not self._file_exist:  #FIXME is this useful?
-            self.add_phase(phase)
+            self.set_phases(phase_list)
         else:
             self.sync_phases()
             # if no phase is there, create one
             if len(self.get_phase_ids_list()) == 0:
                 print('no phase was found in this dataset, adding a default one')
-                self.add_phase(phase)
+                self.add_phase(phase_list[0])
         return
 
     def sync_phases(self):
@@ -1865,7 +1868,7 @@ class Microstructure(SampleData):
             self._phases.append(phase)
         print('%d phases found in the data set' % len(self._phases))
 
-    def set_phase(self, phase):
+    def set_phase(self, phase, id_number=None):
         """Set a phase for the given `phase_id`.
 
         If the phase id does not correspond to one of the existing phase,
@@ -1874,13 +1877,15 @@ class Microstructure(SampleData):
         :param CrystallinePhase phase: the phase to use.
         :param int phase_id:
         """
-        if phase.phase_id > self.get_number_of_phases():
+        if id_number is None:
+            id_number = phase.phase_id
+        if id_number > self.get_number_of_phases():
             print('the phase_id given (%d) does not correspond to any existing '
                   'phase, the phase list has not been modified.')
             return
         d = phase.to_dict()
-        print('setting phase %d with %s' % (phase.phase_id, phase.name))
-        self.add_attributes(d, '/PhaseData/phase_%02d' % phase.phase_id)
+        print('setting phase %d with %s' % (id_number, phase.name))
+        self.add_attributes(d, '/PhaseData/phase_%02d' % id_number)
         self.sync_phases()
 
     def set_phases(self, phase_list):
@@ -2405,11 +2410,11 @@ class Microstructure(SampleData):
     def update_phase_map(self, grain_ids=None):
         """Update the phase map from the grain map.
 
-        This method update the phase map by setting the phase of all 
+        This method update the phase map by setting the phase of all
         voxels of the grains to the appropriate value.
 
-        :param list grain_ids: the list of the grains ids that are 
-            concerned by the update (all grain by default).            
+        :param list grain_ids: the list of the grains ids that are
+            concerned by the update (all grain by default).
         """
         phase_map = self.get_phase_map()
         if not grain_ids:
@@ -2591,7 +2596,7 @@ class Microstructure(SampleData):
         # build a list of grain ids if it is not given
         if grain_ids is None:
             if self.get_number_of_grains() > 0:
-                min_id = max(self.get_grain_ids())
+                min_id = max(self.get_grain_ids()) + 1
             else:
                 min_id = 0
             grain_ids = range(min_id, min_id + len(orientation_list))
@@ -3477,9 +3482,9 @@ class Microstructure(SampleData):
         after the dilation by setting the `update_microstructure_properties`
         parameter to True.
 
-        :param int dilation_steps: the number of dilation steps to 
+        :param int dilation_steps: the number of dilation steps to
             apply to the grain map.
-        :param list dilation_ids: a list to restrict the dilation to 
+        :param list dilation_ids: a list to restrict the dilation to
             the given ids.
         :param str new_map_name: the name to use for the dilated grain map.
         :param bool update_microstructure_properties: a flag to update all
@@ -3966,9 +3971,9 @@ class Microstructure(SampleData):
                 bbox = x_indices, y_indices, z_indices
             except (ValueError, TypeError, IndexError):
                 '''
-                ValueError or TypeError can arise for grains in the data table 
-                that are not in the grain map (None will be returned from 
-                find_objects). IndexError can occur if these grain ids are 
+                ValueError or TypeError can arise for grains in the data table
+                that are not in the grain map (None will be returned from
+                find_objects). IndexError can occur if these grain ids are
                 larger than the maximum id in the grain map.
                 '''
                 print('skipping grain %d' % g['idnumber'])
@@ -5046,7 +5051,7 @@ class Microstructure(SampleData):
             orientations as a rodrigues vector array.
         :param str rod_map_key: the key to access the phase rodrigues vector
             array in the file.
-        :param list roi: specify a region of interest by a list of 6 
+        :param list roi: specify a region of interest by a list of 6
             integers in the form [x1, x2, y1, y2, z1, z2] to crop the grain map.
         :param bool verbose: activate verbose mode.
         :return: a `Microstructure` instance created from the DCT reconstruction.
@@ -5240,8 +5245,8 @@ class Microstructure(SampleData):
             the grains (default is 5 degrees).
         :param float min_ci: minimum confidence index for a pixel to be a valid
             EBSD measurement.
-        :param list phase_list: a list of CrystallinePhase to overwrite the ones 
-            in the file, this is particularly useful for osc files as phases 
+        :param list phase_list: a list of CrystallinePhase to overwrite the ones
+            in the file, this is particularly useful for osc files as phases
             cannot be read from them at the moment.
         :return: a new instance of `Microstructure`.
         """

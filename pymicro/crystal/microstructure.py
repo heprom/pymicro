@@ -3177,14 +3177,20 @@ class Microstructure(SampleData):
                                                 str_format='{:2.1f}'.format)
                 # overwrite labels with name of phases
                 for i in range(len(artists)):
-                    labels[i] = f'{i+1}'
-                plt.legend(artists, labels, handleheight=2, framealpha=1,
-                           bbox_to_anchor=(0, 1.05, 1, 0.2), loc="lower left",
-                           mode="expand", ncol=4, title='Phase',
-                           markerscale=1.5)
+                    labels[i] = f'$\\varphi_{i+1}$'
+                legend = plt.legend(artists, labels, handleheight=2,
+                                framealpha=1, bbox_to_anchor=(0.5, 1.05),
+                                loc="lower center", mode="None", ncol=4,
+                                markerscale=1.5)
+                handles = legend.legendHandles
                 # reduce width off hatches to allow visualization of grain
                 # ids etc...
-                plt.rcParams['hatch.linewidth'] = 0.3
+                for i, handle in enumerate(handles):
+                    handle.set_edgecolor("black") # set_edgecolors
+                    handle.set_facecolor("white") # set_edgecolors
+                    handle.set_hatch(H_list[i])
+                    handle.set_alpha(0.8)
+                plt.rcParams['hatch.linewidth'] = 0.5
         if display:
             plt.show()
         return fig, ax
@@ -5684,3 +5690,6 @@ class Microstructure(SampleData):
 
         merged_micro.sync()
         return merged_micro
+
+    def _view_phases_slice(self):
+        pass

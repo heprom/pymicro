@@ -1803,15 +1803,17 @@ class Microstructure(SampleData):
 
     def __repr__(self):
         """Provide a string representation of the class."""
-        s = '%s\n' % self.__class__.__name__
-        s += '* name: %s\n' % self.get_sample_name()
-        # TODO print phases here
-        s += '* lattice: %s\n' % self.get_lattice()
-        s += '\n'
-        # if self._verbose:
-        #     for g in self.grains:
-        #         s += '* %s' % g.__repr__
-        s += SampleData.__repr__(self)
+        s = '%s' % self.__class__.__name__
+        s += ' "%s"\n' % self.get_sample_name()
+        s += '------------------------------------------------------------\n'
+        s += '* DESCRIPTION: %s\n' % self.get_description()
+        phase_id_list = self.get_phase_ids_list()
+        s += '\n* MATERIAL PHASES: \n'
+        for id in phase_id_list:
+            s += f'\t{self.get_phase(phase_id=id).__repr__()}'
+            s += ' \n'
+        s += '\n* CONTENT: \n'
+        s += self.print_dataset_content(as_string=True, short=True)
         return s
 
     def minimal_data_model(self):
@@ -1845,17 +1847,17 @@ class Microstructure(SampleData):
     def _init_phase(self, phase_list):
         self._phases = []
         # if the h5 file does not exist yet, store the phase as metadata
-        if not self._file_exist:  #FIXME is this useful?
+        if not self._file_exist:
             self.set_phases(phase_list)
         else:
-            self.sync_phases()
+            self.sync_phases(verbose=False)
             # if no phase is there, create one
             if len(self.get_phase_ids_list()) == 0:
                 print('no phase was found in this dataset, adding a default one')
                 self.add_phase(phase_list[0])
         return
 
-    def sync_phases(self):
+    def sync_phases(self, verbose=True):
         """This method sync the _phases attribute with the content of the hdf5
         file.
         """
@@ -1866,7 +1868,8 @@ class Microstructure(SampleData):
             d = self.get_dic_from_attributes('/PhaseData/%s' % child)
             phase = CrystallinePhase.from_dict(d)
             self._phases.append(phase)
-        print('%d phases found in the data set' % len(self._phases))
+        if verbose:
+            print('%d phases found in the data set' % len(self._phases))
 
     def set_phase(self, phase, id_number=None):
         """Set a phase for the given `phase_id`.
@@ -2407,7 +2410,7 @@ class Microstructure(SampleData):
                            indexname='phase_map',
                            compression_options=compression)
 
-    def update_phase_map(self, grain_ids=None):
+    def update_phase_map_from_grains(self, grain_ids=None, phase_id=1):
         """Update the phase map from the grain map.
 
         This method update the phase map by setting the phase of all
@@ -2415,8 +2418,14 @@ class Microstructure(SampleData):
 
         :param list grain_ids: the list of the grains ids that are
             concerned by the update (all grain by default).
+        :param int phase_id: phase Id to set for the list of grains concerned
+            by the update.
         """
         phase_map = self.get_phase_map()
+        # handle case of empty phase map
+        if phase_map is None:
+            map_shape = self.get_attribute('dimension', 'CellData')
+            phase_map = np.zeros(shape=map_shape, dtype=np.int8)
         if not grain_ids:
           grain_ids = self.get_ids_from_grain_map()
         for i, gid in enumerate(grain_ids):
@@ -2426,10 +2435,8 @@ class Microstructure(SampleData):
             this_grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
                                                   bb[1][0]:bb[1][1],
                                                   bb[2][0]:bb[2][1]]
-            #TODO handle multiple phases here
-            phase_map[bb[0][0]:bb[0][1],
-                      bb[1][0]:bb[1][1],
-                      bb[2][0]:bb[2][1]][this_grain_map == gid] = 1
+            phase_map[bb[0][0]:bb[0][1], bb[1][0]:bb[1][1],
+                      bb[2][0]:bb[2][1]][this_grain_map == gid] = phase_id
         print('\n')
         self.set_phase_map(phase_map)
 
@@ -2971,7 +2978,8 @@ class Microstructure(SampleData):
     def view_slice(self, slice=None, plane='XY', color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,
                    axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None,
-                   show_gb=False, unit='pixel', display=True):
+                   show_phases=False, show_gb=False, unit='pixel',
+                   display=True):
         """A simple utility method to show one microstructure slice.
 
         The method extract a 2D orthogonal slice from the microstructure to
@@ -3002,9 +3010,12 @@ class Microstructure(SampleData):
         :param str unit: switch between mm and pixel units.
         :param bool show_gb: show the grain boundaries, works only
             with color='ipf' for now.
+        :param bool show_phases: show the phases from the phase mapby hashing
+            regions on the slice. Works only if the phase map exists.
         :param bool display: if True, the show method is called, otherwise,
             the figure is simply returned.
         """
+        # TODO: refactor method, that has become too large
         if self._is_empty('grain_map'):
             print('Microstructure instance mush have a grain_map field to use '
                   'this method')
@@ -3022,6 +3033,7 @@ class Microstructure(SampleData):
         if slice is None or slice > grain_map.shape[cut_axis] - 1 or slice < 0:
             slice = grain_map.shape[cut_axis] // 2
             print('using slice value %d' % slice)
+        # cut slice of grain map and get grain ids in the slice
         grains_slice = grain_map.take(indices=slice, axis=cut_axis)
         gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
         fig, ax = plt.subplots()
@@ -3063,9 +3075,12 @@ class Microstructure(SampleData):
             for gid in gids:
                 o = self.get_grain(gid).orientation
                 try:
-                    c = o.ipf_color(axis, symmetry=self.get_lattice().get_symmetry(), saturate=True)
+                    c = o.ipf_color(axis,
+                                    symmetry=self.get_lattice().get_symmetry(),
+                                    saturate=True)
                 except ValueError:
-                    print('problem moving to the fundamental zone for rodrigues vector {}'.format(o.rod))
+                    print('problem moving to the fundamental zone for '
+                          'rodrigues vector {}'.format(o.rod))
                     c = np.array([0., 0., 0.])
                 ipf_image[grains_slice == gid] = c
             if show_gb:
@@ -3077,8 +3092,8 @@ class Microstructure(SampleData):
                 plt.imshow(ipf_image.transpose(1, 0, 2),
                            interpolation='nearest', extent=extent)
         else:
-            print('unknown color scheme requested, please chose between {random, '
-                  'grain_ids, schmid, ipf}, returning')
+            print('unknown color scheme requested, please chose between '
+                  '{random, grain_ids, schmid, ipf}, returning')
             return
         ax.xaxis.set_label_position('top')
         plt.xlabel(plane[0] + ' [%s]' % unit)
@@ -3141,6 +3156,35 @@ class Microstructure(SampleData):
                     plt.plot(x, y, '-', linewidth=1, color=color)
                 # prevent axis to move due to traces spanning outside the map
                 plt.axis(extent)
+        if show_phases:
+            if self._is_empty('phase_map'):
+                print('Cannot view phases, phase map not found')
+            else:
+                # get slice of phase map
+                phase_map = self.get_phase_map()
+                phase_slice = phase_map.take(indices=slice, axis=cut_axis)
+                # reverse vertical origin for contour --> not clear why !!!
+                extent = [0, phase_slice.shape[0], 0, phase_slice.shape[1]]
+                # get number of levels
+                n_phases = np.unique(phase_slice).shape[0]
+                # create hatches list  --> set for only 10 phases
+                H_list = [None, '+','x','.','/','\\','-','|','.-','/-']
+                # plot phases as hatched regions
+                cs = plt.contourf(phase_slice.T, colors='black', vmin=0,
+                             levels=n_phases-1, alpha=0.0, hatches=H_list)
+                # build legend for phase hatches
+                artists, labels = cs.legend_elements(variable_name='phase',
+                                                str_format='{:2.1f}'.format)
+                # overwrite labels with name of phases
+                for i in range(len(artists)):
+                    labels[i] = f'{i+1}'
+                plt.legend(artists, labels, handleheight=2, framealpha=1,
+                           bbox_to_anchor=(0, 1.05, 1, 0.2), loc="lower left",
+                           mode="expand", ncol=4, title='Phase',
+                           markerscale=1.5)
+                # reduce width off hatches to allow visualization of grain
+                # ids etc...
+                plt.rcParams['hatch.linewidth'] = 0.3
         if display:
             plt.show()
         return fig, ax
@@ -3516,7 +3560,7 @@ class Microstructure(SampleData):
             self.recompute_grain_volumes()
             # and update the phase map if necessary
             if not self._is_empty('phase_map'):
-                self.update_phase_map()
+                self.update_phase_map_from_grains()
 
     def clean_grain_map(self,  new_map_name='grain_map_clean'):
         """Apply a morphological cleaning treatment to the active grain map.

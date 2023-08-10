@@ -3014,8 +3014,7 @@ class Microstructure(SampleData):
         :param bool show_slip_traces: activate slip traces plot in each grain.
         :param list hkl_planes: the list of planes to plot the slip traces.
         :param str unit: switch between mm and pixel units.
-        :param bool show_gb: show the grain boundaries, works only
-            with color='ipf' for now.
+        :param bool show_gb: show the grain boundaries.
         :param bool show_phases: show the phases from the phase mapby hatching
             regions on the slice. Works only if the phase map exists.
         :param bool display: if True, the show method is called, otherwise,
@@ -3068,10 +3067,8 @@ class Microstructure(SampleData):
                 print('Could not get grain map to plot grain boundaries'
                       ', proceeding... ')
             else:
-                extent = self._set_extent(unit, grains_slice,
-                                          vertical_reverse=False)
-                self._contour_grains(ax, grains_slice, slice_map, extent,
-                                     color)
+                extent = self._set_extent(unit, grains_slice)
+                self._overlay_gb(ax, grains_slice, extent)
         # phases on the map
         if show_phases:
             phase_slice, vmin, vmax = self._get_slice_map("phase_map",
@@ -5795,17 +5792,12 @@ class Microstructure(SampleData):
             # prevent axis to move due to traces spanning outside the map
             plt.axis(extent)
 
-    def _contour_grains(self, ax, grains_slice, map_slice, extent, color):
+    def _overlay_gb(self, ax, grains_slice, extent):
         """Plot grain boundaries in slice view."""
-        n_regions = np.unique(grains_slice).shape[0]
-        ax.contour(grains_slice.T, colors="black", levels=n_regions+1,
-                    extent=extent, linewidths=3, antialiased=True)
-        # from skimage import segmentation
-        # image = segmentation.mark_boundaries(map_slice.T, grains_slice.T,
-        #                                      color=(0, 0, 0))
-        # if color == 'ipf':
-        #     image = image.transpose(1, 0, 2)
-        # ax.imshow(image, extent=extent)
+        from skimage import filters
+        grain_boundaries = filters.roberts(grains_slice) > 0
+        gb_slice = np.ma.masked_where(grain_boundaries == 0, grain_boundaries)
+        ax.imshow(gb_slice.T, extent=extent, cmap='Greys_r')
         return
 
 

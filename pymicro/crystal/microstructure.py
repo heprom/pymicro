@@ -5724,11 +5724,11 @@ class Microstructure(SampleData):
             field = self.get_field(field_name)
             if not self._is_empty(field_name):
                 if self._get_group_type('CellData') == '2DImage':
-                    field_resampled = field[:end_X:scale, :end_Y:scale, :end_Z:scale]
+                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor, :]
                     
                 else:
-                    field_resampled = field[x_start:x_end, y_start:y_end,
-                                       z_start:z_end, ...]
+                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor,
+                                       :end_Z:resampling_factor, :]
                 empty = micro_resampled.get_attribute(attrname='empty',
                                                  nodename='CellData')
                 if empty:

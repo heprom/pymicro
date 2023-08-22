@@ -5697,13 +5697,14 @@ class Microstructure(SampleData):
                 micro_resampled.add_phase(self.get_phase(phase_id=i))
         micro_resampled.default_compression_options = self.default_compression_options
         print('resampling microstructure to %s' % micro_resampled.h5_file)
-        # crop all CellData fields
+        # Resize all CellData fields
         image_group = self.get_node('CellData')
         spacing = self.get_attribute('spacing', 'CellData')
         FIndex_path = '%s/Field_index' % image_group._v_pathname
         field_list = self.get_node(FIndex_path)
- 
+
         dims = self.get_attribute('dimension', 'CellData')
+        # Fields dimensions should be multiples of 2 (AMITEX requirement for Zoom Structural purposes, cf L. Gelebart)
         if len(dims) == 3:
             X, Y, Z = dims
             end_X, end_Y, end_Z = resampling_factor * np.array([X//resampling_factor,
@@ -5712,10 +5713,10 @@ class Microstructure(SampleData):
         elif len(dims) == 2:
             X, Y = dims
             end_X, end_Y = resampling_factor * np.array([X//resampling_factor,
-                                                         Y//resampling_factor])
+                                                        Y//resampling_factor])
         else:
             raise ValueError('CellData should be either 2D or 3D')
-    
+
         resampled_voxel_size = self.get_voxel_size() * resampling_factor  
 
         for name in field_list:
@@ -5724,13 +5725,13 @@ class Microstructure(SampleData):
             field = self.get_field(field_name)
             if not self._is_empty(field_name):
                 if self._get_group_type('CellData') == '2DImage':
-                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor, ...]
-                    
+                    field_resampled = field[::resampling_factor, ::resampling_factor, ...]
+
                 else:
-                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor,
-                                       :end_Z:resampling_factor, ...]
+                    field_resampled = field[::resampling_factor, ::resampling_factor,
+                                    ::resampling_factor, ...]
                 empty = micro_resampled.get_attribute(attrname='empty',
-                                                 nodename='CellData')
+                                                nodename='CellData')
                 if empty:
                     micro_resampled.add_image_from_field(
                         field_array=field_resampled, fieldname=field_name,
@@ -5738,29 +5739,43 @@ class Microstructure(SampleData):
                         spacing=spacing, replace=True)
                 else:
                     micro_resampled.add_field(gridname='CellData',
-                                         fieldname=field_name,
-                                         array=field_resampled, replace=True)
+                                        fieldname=field_name,
+                                        array=field_resampled, replace=True)
                     print(field_resampled.shape)
-                
+
         # update the origin of the image group according to the resampling
         if verbose:
             print('resampled dataset:')
             print(micro_resampled)
         micro_resampled.set_voxel_size('CellData', resampled_voxel_size)
-        micro_resampled.set_active_grain_map(self.active_grain_map)
-        grain_ids = np.unique(self.get_grain_map())
+        print('Updating active grain map')
+        print(micro_resampled.get_grain_map().shape)
+        micro_resampled.set_active_grain_map('CellData_%s' % self.active_grain_map)
+        print(micro_resampled.get_grain_map().shape)
+        micro_resampled.add_grains_in_map()
+        grain_ids = np.unique(micro_resampled.get_grain_map())
+        orientation = []
         for gid in grain_ids:
             if not gid > 0:
                 continue
-            grain = self.grains.read_where('idnumber == gid')
-            micro_resampled.grains.append(grain)
+            orientation.append(self.get_grain(gid).orientation.rod)
+        orientation = np.array(orientation)
+        micro_resampled.set_orientations(orientation)
         micro_resampled.remove_grains_not_in_map()
+        max_grain = micro_resampled.get_grain_ids()[-1]
+        nb_grain = micro_resampled.get_number_of_grains()
+        if max_grain > nb_grain:
+            print('renumbering in progress : %i - %i ' % (max_grain, nb_grain))
+            micro_resampled.renumber_grains()
+            
         print('%d grains in resampled microstructure' % micro_resampled.grains.nrows)
         micro_resampled.grains.flush()
+        
         # recompute the grain geometry
         if recompute_geometry:
             print('updating grain geometry')
             micro_resampled.recompute_grain_bounding_boxes(verbose)
             micro_resampled.recompute_grain_centers(verbose)
             micro_resampled.recompute_grain_volumes(verbose)
+            
         return micro_resampled

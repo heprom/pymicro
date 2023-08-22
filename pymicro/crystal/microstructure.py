@@ -4206,24 +4206,24 @@ class Microstructure(SampleData):
         ext = 'bin' if binary else 'txt'
         grip_id = n_phases   # material id for the grips
         ext_id = n_phases + 1 if add_grips else n_phases # material id for the exterior
-        n1x = open('N1X.%s' % ext, 'w')
-        n1y = open('N1Y.%s' % ext, 'w')
-        n1z = open('N1Z.%s' % ext, 'w')
-        n2x = open('N2X.%s' % ext, 'w')
-        n2y = open('N2Y.%s' % ext, 'w')
-        n2z = open('N2Z.%s' % ext, 'w')
+        n1x = open('%s_N1X.%s' % (self.get_sample_name(), ext), 'w')
+        n1y = open('%s_N1Y.%s' % (self.get_sample_name(), ext), 'w')
+        n1z = open('%s_N1Z.%s' % (self.get_sample_name(), ext), 'w')
+        n2x = open('%s_N2X.%s' % (self.get_sample_name(), ext), 'w')
+        n2y = open('%s_N2Y.%s' % (self.get_sample_name(), ext), 'w')
+        n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'w')
         files = [n1x, n1y, n1z, n2x, n2y, n2z]
         if binary:
             import struct
             for f in files:
                 f.write('%d \ndouble \n' % self.get_number_of_grains())
                 f.close()
-            n1x = open('N1X.%s' % ext, 'ab')
-            n1y = open('N1Y.%s' % ext, 'ab')
-            n1z = open('N1Z.%s' % ext, 'ab')
-            n2x = open('N2X.%s' % ext, 'ab')
-            n2y = open('N2Y.%s' % ext, 'ab')
-            n2z = open('N2Z.%s' % ext, 'ab')
+            n1x = open('%s_N1X.%s' % (self.get_sample_name(), ext), 'ab')
+            n1y = open('%s_N1Y.%s' % (self.get_sample_name(), ext), 'ab')
+            n1z = open('%s_N1Z.%s' % (self.get_sample_name(), ext), 'ab')
+            n2x = open('%s_N2X.%s' % (self.get_sample_name(), ext), 'ab')
+            n2y = open('%s_N2Y.%s' % (self.get_sample_name(), ext), 'ab')
+            n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'ab')
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
                 g = o.orientation_matrix()

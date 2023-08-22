@@ -5740,12 +5740,13 @@ class Microstructure(SampleData):
                     micro_resampled.add_field(gridname='CellData',
                                          fieldname=field_name,
                                          array=field_resampled, replace=True)
+                micro_resampled.set_voxel_size(field_resampled, resampled_voxel_size)
+
         # update the origin of the image group according to the resampling
         if verbose:
             print('resampled dataset:')
             print(micro_resampled)
         micro_resampled.set_active_grain_map(self.active_grain_map)
-        micro_resampled.set_voxel_size(resampled_voxel_size)
         grain_ids = np.unique(micro_resampled.get_grain_map())
         for gid in grain_ids:
             if not gid > 0:

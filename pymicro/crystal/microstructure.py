@@ -3230,15 +3230,15 @@ class Microstructure(SampleData):
     def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
         return micro1.match_grains(micro2, use_grain_ids=use_grain_ids,
                                    verbose=verbose)
-
-    def match_grains(self, micro2, mis_tol=1, use_grain_ids=None, verbose=False):
+        
+    def match_grains(self, m2, mis_tol=1, use_grain_ids=None, use_centers=False, center_tol=0.1, scale_m2=1., offset_m2=None, center_merit=10., verbose=False):
         """Match grains from a second microstructure to this microstructure.
 
         This function try to find pair of grains based on their orientations.
 
         .. warning::
 
-          This function works only for microstructures with the same symmetry.
+        This function works only for microstructures with the same symmetry.
 
         :param micro2: the second instance of `Microstructure` from which
             to match the grains.
@@ -3249,15 +3249,15 @@ class Microstructure(SampleData):
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
         :return tuple: a tuple of three lists holding respectively the matches,
-           the candidates for each match and the grains that were unmatched.
+        the candidates for each match and the grains that were unmatched.
         """
         # TODO : Test
         if not (self.get_lattice().get_symmetry()
-                == micro2.get_lattice().get_symmetry()):
+                == m2.get_lattice().get_symmetry()):
             raise ValueError('warning, microstructure should have the same '
-                             'symmetry, got: {} and {}'.format(
+                            'symmetry, got: {} and {}'.format(
                 self.get_lattice().get_symmetry(),
-                micro2.get_lattice().get_symmetry()))
+                m2.get_lattice().get_symmetry()))
         candidates = []
         matched = []
         unmatched = []  # grain that were not matched within the given tolerance
@@ -3268,28 +3268,42 @@ class Microstructure(SampleData):
                                                 colname='idnumber')
         else:
             grains_to_match = use_grain_ids
-        # look at each grain
+        # look at each grain and compute a figure of merits
         for i, g1 in enumerate(self.grains):
             if not (g1['idnumber'] in grains_to_match):
                 continue
+            c1 = g1['center']
             cands_for_g1 = []
-            best_mis = mis_tol
+            best_merit = mis_tol
+            if use_centers:
+                best_merit *= (center_tol * center_merit)
             best_match = -1
             o1 = Orientation.from_rodrigues(g1['orientation'])
-            for g2 in micro2.grains:
+            for g2 in m2.grains:
+                if use_centers:
+                    c2 = g2['center'] * scale_m2 + offset_m2
+                    if np.linalg.norm(c2 - c1) > center_tol:
+                        continue
                 o2 = Orientation.from_rodrigues(g2['orientation'])
                 # compute disorientation
                 mis, _, _ = o1.disorientation(o2, crystal_structure=sym)
                 misd = np.degrees(mis)
                 if misd < mis_tol:
+                    if use_centers:
+                        center_dif = np.linalg.norm(c2 - c1)
                     if verbose:
                         print('grain %3d -- candidate: %3d, misorientation:'
-                              ' %.2f deg' % (g1['idnumber'], g2['idnumber'],
-                                             misd))
+                            ' %.2f deg' % (g1['idnumber'], g2['idnumber'],
+                                            misd))
+                        if use_centers:
+                            print('center difference: %.2f' % center_dif)
                     # add this grain to the list of candidates
                     cands_for_g1.append(g2['idnumber'])
-                    if misd < best_mis:
-                        best_mis = misd
+                    merit = misd
+                    if use_centers:
+                        merit *= (center_dif * center_merit)
+                    if merit < best_merit:
+                        best_merit = merit
                         best_match = g2['idnumber']
             # add our best match or mark this grain as unmatched
             if best_match > 0:
@@ -3300,7 +3314,7 @@ class Microstructure(SampleData):
         if verbose:
             print('done with matching')
             print('%d/%d grains were matched ' % (len(matched),
-                                                  len(grains_to_match)))
+                                                len(grains_to_match)))
         return matched, candidates, unmatched
 
     def match_orientation(self, orientation, use_grain_ids=None):

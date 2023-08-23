@@ -445,9 +445,19 @@ class OrientationTests(unittest.TestCase):
         self.assertAlmostEqual(mis_angle * 180 / np.pi, 7.24, 2)
 
     def test_compute_mean_orientation(self):
+        # first test two specific orientation with the cubic symmetry
+        o1 = Orientation.from_euler([43.9, 0., 0.])
+        o2 = Orientation.from_euler([45.9, 0., 0.])
+        target_euler = [44.9, 0., 0.]
+        rods = np.array([o1.rod, o2.rod])
+        o = Orientation.compute_mean_orientation(rods)
+        for i in range(3):
+            self.assertEqual(o.euler[i], target_euler[i])
+        # now test with a set of rodrigues vectors
         rods = np.load(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'rods.npy'))
         o = Orientation.compute_mean_orientation(rods)
-        rod = np.array([-0.09655562, 0.09261893, 0.11932359])
+        #rod = np.array([-0.09655562, 0.09261893, 0.11932359])
+        rod = np.array([-0.09655532, 0.09261858, 0.11932329])
         for i in range(3):
             self.assertAlmostEqual(o.rod[i], rod[i])
 

@@ -20,7 +20,7 @@ from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
-from pymicro.crystal.rotation import om2ro, ro2qu
+from pymicro.crystal.rotation import om2ro, ro2qu, qu2om
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
@@ -341,7 +341,10 @@ class Orientation:
         # now compute the mean orientation for each cluster
         mean_rods_syms = np.empty((len(syms), 3), dtype=float)
         for j in range(len(syms)):
-            mean_rods_syms[j] = np.mean(X[kmeans.labels_ == j], axis=0)
+            #mean_rods_syms[j] = np.mean(X[kmeans.labels_ == j], axis=0)
+            mean_quat_syms_j = np.mean(Q[kmeans.labels_ == j], axis=0)
+            mean_quat_syms_j /= np.sqrt(np.sum(mean_quat_syms_j ** 2))
+            mean_rods_syms[j] = om2ro(qu2om(mean_quat_syms_j))
         # find which orientation belongs to the FZ
         if symmetry == Symmetry.cubic:
              index_fz = np.argmax([(np.abs(r).sum() <= 1.0) and
@@ -5608,8 +5611,11 @@ class Microstructure(SampleData):
                     # simply translate the second volume
                     #a_top = np.roll(micros[1].get_field(array_name),
                     #                translation_voxel[:2], (0, 1))
+                    array_to_shift = micros[1].get_field(array_name)
+                    the_shifts = np.zeros_like(array_to_shift.shape)
+                    the_shifts[:len(shifts)] = shifts
                     a_top = ndimage.shift(micros[1].get_field(array_name),
-                                          shifts, order=0, cval=0)
+                                          the_shifts, order=0, cval=0)
 
                 # merging the two arrays
                 shape_array_merged = shape_merged

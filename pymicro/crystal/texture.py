@@ -328,7 +328,7 @@ class PoleFigure:
         ax.axis('off')
         ax.set_title('{%s} direct %s projection' % (self.family, self.proj))
 
-    def create_pf_contour(self, ax=None, ang_step=10):
+    def create_pf_contour(self, ax=None, ang_step=10, cmap='viridis'):
         """Compute the distribution of orientation and plot it using contouring.
 
         This plot the distribution of orientation in the microstructure
@@ -383,9 +383,9 @@ class PoleFigure:
             y = np.sin(yv) * np.sin(xv)
         # close the pole figure by duplicating azimuth=0
         values[:, -1] = values[:, 0]
-        self.plot_pf_contour(ax, x, y, values)
+        self.plot_pf_contour(ax, x, y, values, cmap)
 
-    def plot_pf_contour(self, ax, x, y, values):
+    def plot_pf_contour(self, ax, x, y, values, cmap):
         """Plot the direct pole figure using contours.
 
         .. warning::
@@ -394,7 +394,7 @@ class PoleFigure:
 
         """
         self.plot_pf_background(ax)
-        ax.contourf(x, y, values)
+        ax.contourf(x, y, values, cmap=cmap)
         # ax.plot(x, y, 'ko')
         ax.axis([-1.1, 1.1, -1.1, 1.1])
         ax.axis('off')

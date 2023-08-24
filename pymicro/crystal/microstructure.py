@@ -3284,15 +3284,15 @@ class Microstructure(SampleData):
     def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
         return micro1.match_grains(micro2, use_grain_ids=use_grain_ids,
                                    verbose=verbose)
-
-    def match_grains(self, micro2, mis_tol=1, use_grain_ids=None, verbose=False):
+        
+    def match_grains(self, m2, mis_tol=1, use_grain_ids=None, use_centers=False, center_tol=0.1, scale_m2=1., offset_m2=None, center_merit=10., verbose=False):
         """Match grains from a second microstructure to this microstructure.
 
         This function try to find pair of grains based on their orientations.
 
         .. warning::
 
-          This function works only for microstructures with the same symmetry.
+        This function works only for microstructures with the same symmetry.
 
         :param micro2: the second instance of `Microstructure` from which
             to match the grains.
@@ -3303,15 +3303,15 @@ class Microstructure(SampleData):
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
         :return tuple: a tuple of three lists holding respectively the matches,
-           the candidates for each match and the grains that were unmatched.
+        the candidates for each match and the grains that were unmatched.
         """
         # TODO : Test
         if not (self.get_lattice().get_symmetry()
-                == micro2.get_lattice().get_symmetry()):
+                == m2.get_lattice().get_symmetry()):
             raise ValueError('warning, microstructure should have the same '
-                             'symmetry, got: {} and {}'.format(
+                            'symmetry, got: {} and {}'.format(
                 self.get_lattice().get_symmetry(),
-                micro2.get_lattice().get_symmetry()))
+                m2.get_lattice().get_symmetry()))
         candidates = []
         matched = []
         unmatched = []  # grain that were not matched within the given tolerance
@@ -3322,28 +3322,42 @@ class Microstructure(SampleData):
                                                 colname='idnumber')
         else:
             grains_to_match = use_grain_ids
-        # look at each grain
+        # look at each grain and compute a figure of merits
         for i, g1 in enumerate(self.grains):
             if not (g1['idnumber'] in grains_to_match):
                 continue
+            c1 = g1['center']
             cands_for_g1 = []
-            best_mis = mis_tol
+            best_merit = mis_tol
+            if use_centers:
+                best_merit *= (center_tol * center_merit)
             best_match = -1
             o1 = Orientation.from_rodrigues(g1['orientation'])
-            for g2 in micro2.grains:
+            for g2 in m2.grains:
+                if use_centers:
+                    c2 = g2['center'] * scale_m2 + offset_m2
+                    if np.linalg.norm(c2 - c1) > center_tol:
+                        continue
                 o2 = Orientation.from_rodrigues(g2['orientation'])
                 # compute disorientation
                 mis, _, _ = o1.disorientation(o2, crystal_structure=sym)
                 misd = np.degrees(mis)
                 if misd < mis_tol:
+                    if use_centers:
+                        center_dif = np.linalg.norm(c2 - c1)
                     if verbose:
                         print('grain %3d -- candidate: %3d, misorientation:'
-                              ' %.2f deg' % (g1['idnumber'], g2['idnumber'],
-                                             misd))
+                            ' %.2f deg' % (g1['idnumber'], g2['idnumber'],
+                                            misd))
+                        if use_centers:
+                            print('center difference: %.2f' % center_dif)
                     # add this grain to the list of candidates
                     cands_for_g1.append(g2['idnumber'])
-                    if misd < best_mis:
-                        best_mis = misd
+                    merit = misd
+                    if use_centers:
+                        merit *= (center_dif * center_merit)
+                    if merit < best_merit:
+                        best_merit = merit
                         best_match = g2['idnumber']
             # add our best match or mark this grain as unmatched
             if best_match > 0:
@@ -3354,7 +3368,7 @@ class Microstructure(SampleData):
         if verbose:
             print('done with matching')
             print('%d/%d grains were matched ' % (len(matched),
-                                                  len(grains_to_match)))
+                                                len(grains_to_match)))
         return matched, candidates, unmatched
 
     def match_orientation(self, orientation, use_grain_ids=None):
@@ -4260,24 +4274,24 @@ class Microstructure(SampleData):
         ext = 'bin' if binary else 'txt'
         grip_id = n_phases   # material id for the grips
         ext_id = n_phases + 1 if add_grips else n_phases # material id for the exterior
-        n1x = open('N1X.%s' % ext, 'w')
-        n1y = open('N1Y.%s' % ext, 'w')
-        n1z = open('N1Z.%s' % ext, 'w')
-        n2x = open('N2X.%s' % ext, 'w')
-        n2y = open('N2Y.%s' % ext, 'w')
-        n2z = open('N2Z.%s' % ext, 'w')
+        n1x = open('%s_N1X.%s' % (self.get_sample_name(), ext), 'w')
+        n1y = open('%s_N1Y.%s' % (self.get_sample_name(), ext), 'w')
+        n1z = open('%s_N1Z.%s' % (self.get_sample_name(), ext), 'w')
+        n2x = open('%s_N2X.%s' % (self.get_sample_name(), ext), 'w')
+        n2y = open('%s_N2Y.%s' % (self.get_sample_name(), ext), 'w')
+        n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'w')
         files = [n1x, n1y, n1z, n2x, n2y, n2z]
         if binary:
             import struct
             for f in files:
                 f.write('%d \ndouble \n' % self.get_number_of_grains())
                 f.close()
-            n1x = open('N1X.%s' % ext, 'ab')
-            n1y = open('N1Y.%s' % ext, 'ab')
-            n1z = open('N1Z.%s' % ext, 'ab')
-            n2x = open('N2X.%s' % ext, 'ab')
-            n2y = open('N2Y.%s' % ext, 'ab')
-            n2z = open('N2Z.%s' % ext, 'ab')
+            n1x = open('%s_N1X.%s' % (self.get_sample_name(), ext), 'ab')
+            n1y = open('%s_N1Y.%s' % (self.get_sample_name(), ext), 'ab')
+            n1z = open('%s_N1Z.%s' % (self.get_sample_name(), ext), 'ab')
+            n2x = open('%s_N2X.%s' % (self.get_sample_name(), ext), 'ab')
+            n2y = open('%s_N2Y.%s' % (self.get_sample_name(), ext), 'ab')
+            n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'ab')
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
                 g = o.orientation_matrix()
@@ -5692,3 +5706,147 @@ class Microstructure(SampleData):
 
         merged_micro.sync()
         return merged_micro
+
+    def get_grain_boundaries_map(self, kernel_size=3):
+        """
+        method to compute grain boundaries map using microstructure grain_map
+        """
+        x, y, z = self.get_grain_map().shape
+        grain_boundaries_map = np.zeros_like(self.get_grain_map())
+        pad_grain_map = np.pad(self.get_grain_map(), pad_width=1)
+                
+        for i in range(x):
+            for j in range(y):
+                for k in range(z):
+                    kernel = pad_grain_map[i:i+kernel_size//2+1,
+                                        j:j+kernel_size//2+1,
+                                        k:k+kernel_size//2+1]
+                    mean_kernel = np.mean(kernel)
+                    inten_level = np.abs(grain_map[i, j, k] - mean_kernel)
+                    if inten_level > 0:
+                        grain_boundaries_map[i, j, k] = 1
+
+        return grain_boundaries_map
+    
+    def resample(self, resampling_factor, resample_name=None, autodelete=False,
+            recompute_geometry=True, verbose=False):
+        """
+        Resample the microstructure by a given factor to create a new one.
+
+        This method resamples the CellData image group to a new microstructure,
+        and adapts the GrainDataTable to the resampled.
+
+        :param int resample_factor: the factor used for resolution degradation
+        :param str resample_name: the name for the resampled microstructure
+            (the default is to append '_resampled' to the initial name).
+        :param bool autodelete: a flag to delete the microstructure files
+            on the disk when it is not needed anymore.
+        :param bool recompute_geometry: if `True` (default), recompute the
+            grain centers, volumes, and bounding boxes in the resampled
+            microstructure. Use `False` when using a resample that do not cut
+            grains, for instance when resampling a microstructure within the
+            mask, to avoid the heavy computational cost of the grain geometry
+            data update.
+        :param bool verbose: activate verbose mode.
+        :return: a new `Microstructure` instance with the resampled grain map.
+        """
+        if self._is_empty('grain_map'):
+            print('warning: needs a grain map to resample the microstructure')
+            return
+        # input default values for bounds if not specified
+        if not resample_name:
+            resample_name = self.get_sample_name() + \
+                        (not self.get_sample_name().endswith('_')) * '_' + 'resampled' + \
+                            '_' + str(resampling_factor)
+        print('RESAMPLING: %s' % resample_name)
+        # create new microstructure dataset
+        micro_resampled = Microstructure(name=resample_name, overwrite_hdf5=True,
+                                    phase=self.get_phase(),
+                                    autodelete=autodelete)
+        if self.get_number_of_phases() > 1:
+            for i in range(2, self.get_number_of_phases()):
+                micro_resampled.add_phase(self.get_phase(phase_id=i))
+        micro_resampled.default_compression_options = self.default_compression_options
+        print('resampling microstructure to %s' % micro_resampled.h5_file)
+        # Resize all CellData fields
+        image_group = self.get_node('CellData')
+        spacing = self.get_attribute('spacing', 'CellData')
+        FIndex_path = '%s/Field_index' % image_group._v_pathname
+        field_list = self.get_node(FIndex_path)
+
+        dims = self.get_attribute('dimension', 'CellData')
+        # Fields dimensions should be multiples of 2 (AMITEX requirement for Zoom Structural purposes, cf L. Gelebart)
+        if len(dims) == 3:
+            X, Y, Z = dims
+            end_X, end_Y, end_Z = resampling_factor * np.array([X//resampling_factor,
+                                                                Y//resampling_factor,
+                                                                Z//resampling_factor])
+        elif len(dims) == 2:
+            X, Y = dims
+            end_X, end_Y = resampling_factor * np.array([X//resampling_factor,
+                                                        Y//resampling_factor])
+        else:
+            raise ValueError('CellData should be either 2D or 3D')
+
+        resampled_voxel_size = self.get_voxel_size() * resampling_factor  
+
+        for name in field_list:
+            field_name = name.decode('utf-8')
+            print('resampling field %s' % field_name)
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
+                if self._get_group_type('CellData') == '2DImage':
+                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor, ...]
+
+                else:
+                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor,
+                                    :end_Z:resampling_factor, ...]
+                empty = micro_resampled.get_attribute(attrname='empty',
+                                                nodename='CellData')
+                if empty:
+                    micro_resampled.add_image_from_field(
+                        field_array=field_resampled, fieldname=field_name,
+                        imagename='CellData', location='/',
+                        spacing=spacing, replace=True)
+                else:
+                    micro_resampled.add_field(gridname='CellData',
+                                        fieldname=field_name,
+                                        array=field_resampled, replace=True)
+                    print(field_resampled.shape)
+
+        # update the origin of the image group according to the resampling
+        if verbose:
+            print('resampled dataset:')
+            print(micro_resampled)
+        micro_resampled.set_voxel_size('CellData', resampled_voxel_size)
+        print('Updating active grain map')
+        print(micro_resampled.get_grain_map().shape)
+        micro_resampled.set_active_grain_map('CellData_%s' % self.active_grain_map)
+        print(micro_resampled.get_grain_map().shape)
+        micro_resampled.add_grains_in_map()
+        grain_ids = np.unique(micro_resampled.get_grain_map())
+        orientation = []
+        for gid in grain_ids:
+            if not gid > 0:
+                continue
+            orientation.append(self.get_grain(gid).orientation.rod)
+        orientation = np.array(orientation)
+        micro_resampled.set_orientations(orientation)
+        micro_resampled.remove_grains_not_in_map()
+        max_grain = micro_resampled.get_grain_ids()[-1]
+        nb_grain = micro_resampled.get_number_of_grains()
+        if max_grain > nb_grain:
+            print('renumbering in progress : %i - %i ' % (max_grain, nb_grain))
+            micro_resampled.renumber_grains()
+            
+        print('%d grains in resampled microstructure' % micro_resampled.grains.nrows)
+        micro_resampled.grains.flush()
+        
+        # recompute the grain geometry
+        if recompute_geometry:
+            print('updating grain geometry')
+            micro_resampled.recompute_grain_bounding_boxes(verbose)
+            micro_resampled.recompute_grain_centers(verbose)
+            micro_resampled.recompute_grain_volumes(verbose)
+            
+        return micro_resampled

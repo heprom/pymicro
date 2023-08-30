@@ -2961,7 +2961,7 @@ class Microstructure(SampleData):
             progress = 100 * (1 + i) / len(grain_ids)
             print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
         print('\n')
-        return ipf_map.squeeze()
+        return ipf_map
 
     def view_slice(self, slice=None, plane='XY', color='random', show_mask=True,
                    show_grain_ids=False, highlight_ids=None, slip_system=None,
@@ -4390,7 +4390,7 @@ class Microstructure(SampleData):
                 root.append(exterior)
 
             tree = etree.ElementTree(root)
-            tree.write('mat.xml', xml_declaration=True, pretty_print=True,
+            tree.write('%s_mat.xml' % self.get_sample_name(), xml_declaration=True, pretty_print=True,
                        encoding='UTF-8')
             print('material file written in mat.xml')
 
@@ -4989,8 +4989,6 @@ class Microstructure(SampleData):
         from tqdm import tqdm
         for g in tqdm(m.grains):
             gid = g['idnumber']
-            #progress = 100 * (1 + i) / len(m.grains)
-            print('adding grains: {0:.2f} %'.format(progress), end='\r')
             # use the grain bounding box
             bb = g['bounding_box']
             grain_map = m.get_grain_map()[bb[0][0]:bb[0][1],
@@ -5011,19 +5009,19 @@ class Microstructure(SampleData):
                 if 'IPF001' in f['LabDCT/Data']:
                     IPF001_map = f['LabDCT/Data/IPF001'][()].transpose(2, 1, 0, 3)
                 else:
-                    IPF001_map = micro.create_IPF_map(axis=np.array([0., 0., 1.]))
+                    IPF001_map = m.create_IPF_map(axis=np.array([0., 0., 1.]))
                 m.add_field(gridname='CellData', fieldname='IPF001_map',
                             array=IPF001_map)
                 if 'IPF010' in f['LabDCT/Data']:
                     IPF010_map = f['LabDCT/Data/IPF010'][()].transpose(2, 1, 0, 3)
                 else:
-                    IPF010_map = micro.create_IPF_map(axis=np.array([0., 1., 0.]))
+                    IPF010_map = m.create_IPF_map(axis=np.array([0., 1., 0.]))
                 m.add_field(gridname='CellData', fieldname='IPF010_map',
                             array=IPF010_map)
                 if 'IPF100' in f['LabDCT/Data']:
                     IPF100_map = f['LabDCT/Data/IPF100'][()].transpose(2, 1, 0, 3)
                 else:
-                    IPF100_map = micro.create_IPF_map(axis=np.array([1., 0., 0.]))
+                    IPF100_map = m.create_IPF_map(axis=np.array([1., 0., 0.]))
                 m.add_field(gridname='CellData', fieldname='IPF100_map',
                             array=IPF100_map)
                 del IPF001_map, IPF010_map, IPF100_map
@@ -5655,6 +5653,7 @@ class Microstructure(SampleData):
         method to compute grain boundaries map using microstructure grain_map
         """
         x, y, z = self.get_grain_map().shape
+        grain_map = self.get_grain_map()
         grain_boundaries_map = np.zeros_like(self.get_grain_map())
         pad_grain_map = np.pad(self.get_grain_map(), pad_width=1)
                 

@@ -383,7 +383,7 @@ class PoleFigure:
             y = np.sin(yv) * np.sin(xv)
         # close the pole figure by duplicating azimuth=0
         values[:, -1] = values[:, 0]
-        self.plot_pf_contour(ax, x, y, values, cmap)
+        self.plot_pf_contour(ax, x, y, values, cmap=cmap)
 
     def plot_pf_contour(self, ax, x, y, values, cmap):
         """Plot the direct pole figure using contours.

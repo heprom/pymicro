@@ -252,6 +252,130 @@ def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
     return I
 
 
+def Alexiane_compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1., 0., 0.]),
+                                  use_friedel_pair=False,
+                                  spectrum=None, spectrum_thr=0., r_spot=5, color_field='constant', inverted=False,
+                                  show_direct_beam=False, extract_infos=False, verbose=False):
+    """
+    Compute a transmission Laue pattern. The data array of the given
+    `Detector2d` instance is initialized with the result.
+
+    The incident beam is assumed to be along the X axis: (1, 0, 0) but can be changed to any direction.
+    The crystal can have any orientation using an instance of the `Orientation` class.
+    The `Detector2d` instance holds all the geometry (detector size and position).
+
+    A parameter controls the meaning of the values in the diffraction spots in the image. It can be just a constant
+    value, the diffracted beam energy (in keV) or the intensity as computed by the :py:meth:`diffracted_intensity`
+    method.
+
+    :param orientation: The crystal orientation.
+    :param detector: An instance of the Detector2d class.
+    :param list hkl_planes: A list of the lattice planes to include in the pattern.
+    :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
+    :param bool use_friedel_pair: also consider the Friedel pair of each lattice plane in the list as candidate for diffraction.
+    :param spectrum: A two columns array of the spectrum to use for the calculation.
+    :param float spectrum_thr: The threshold to use to determine if a wave length is contributing or not.
+    :param int r_spot: Size of the spots on the detector in pixel (5 by default)
+    :param str color_field: a traing describing, must be 'constant', 'energy' or 'intensity'
+    :param bool inverted: A flag to control if the pattern needs to be inverted.
+    :param bool show_direct_beam: A flag to control if the direct beam is shown.
+    :param bool verbose: activate verbose mode (False by default).
+    :return: the computed pattern as a numpy array.
+    """
+    # import pandas as pd
+    detector.data = np.zeros(detector.size, dtype=np.float32)
+    # create a small square image for one spot
+    spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=np.uint8)
+    max_val = np.iinfo(np.uint8).max  # 255 here
+    if show_direct_beam:
+        direct_beam_lab = detector.project_along_direction(Xu)
+        direct_beam_pix = detector.lab_to_pixel(direct_beam_lab)[0]
+        add_to_image(detector.data, max_val * 3 * spot, (direct_beam_pix[0], direct_beam_pix[1]))
+    if spectrum is not None:
+        print('using spectrum')
+        # indices = np.argwhere(spectrum[:, 1] > spectrum_thr)
+        E_min = min(spectrum)  # float(spectrum[indices[0], 0])
+        E_max = max(spectrum)  # float(spectrum[indices[-1], 0])
+        lambda_min = lambda_keV_to_nm(E_max)
+        lambda_max = lambda_keV_to_nm(E_min)
+        # if verbose:
+        print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
+
+    infos = []
+    for hkl in hkl_planes:
+        (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=True)
+        print(the_energy, theta)
+        if the_energy < 0:
+            if use_friedel_pair:
+                if verbose:
+                    print('switching to Friedel pair')
+                hkl = hkl.friedel_pair()
+                (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=False)
+            else:
+                continue
+        assert (the_energy >= 0)
+        if spectrum is not None:
+            if the_energy < E_min or the_energy > E_max:
+                # print('skipping reflection {0:s} which would diffract at {1:.1f}'.format(hkl.miller_indices(),
+                # abs(the_energy)))
+                continue
+                # print('including reflection {0:s} which will diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
+        K = diffracted_vector(hkl, orientation, Xu=Xu, use_friedel_pair=False, verbose=verbose)
+        if K is None or np.dot(Xu, K) == 0:
+            continue  # skip diffraction // to the detector
+        d = np.dot((detector.ref_pos - np.array([0., 0., 0.])), detector.w_dir) / np.dot(K, detector.w_dir)
+        print(K, d)
+
+        if d < 0:
+            if verbose:
+                print('skipping diffraction not towards the detector')
+            continue
+        R = detector.project_along_direction(K, origin=[0., 0., 0.])
+        (u, v) = detector.lab_to_pixel(R)[0]
+        print(hkl.miller_indices(), K, R, u, v)
+        if verbose and u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
+            print('* %d.%d.%d reflexion' % hkl.miller_indices())
+            print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], u, v))
+            print('diffracted beam energy is {0:.1f} keV'.format(abs(the_energy)))
+            print('Bragg angle is {0:.2f} deg'.format(abs(theta * 180 / pi)))
+        # mark corresponding pixels on the image detector
+        if color_field == 'constant':
+            add_to_image(detector.data, max_val * spot, (u, v))
+        elif color_field == 'energy':
+            add_to_image(detector.data, abs(the_energy) * spot.astype(float), (u, v))
+        elif color_field == 'intensity':
+            I = diffracted_intensity(hkl, I0=max_val, verbose=verbose)
+            add_to_image(detector.data, I * spot, (u, v))
+        else:
+            raise ValueError('unsupported color_field: %s' % color_field)
+
+        if u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
+            # Get the data of the reflection collected by the detector
+            infos.append((hkl.miller_indices(), the_energy, np.degrees(theta), K, d, R, u, v))
+
+    if inverted:
+        # np.invert works only with integer types
+        print('casting to uint8 and inverting image')
+        # limit maximum to max_val (255) and convert to uint8
+        over = detector.data > 255
+        detector.data[over] = 255
+        detector.data = detector.data.astype(np.uint8)
+        detector.data = np.invert(detector.data)
+
+    # if extract_infos is True:
+    #    df = pd.DataFrame(infos, columns=['hkl', 'keV', '2thetas', 'K', 'd', 'R', 'u', 'v'])
+    #    return detector.data, df
+    # else:
+    #    return detector.data
+    if extract_infos is True:
+        my_infos = infos
+        # df = pd.DataFrame(infos, columns=['hkl', 'keV', '2thetas', 'K', 'd', 'R', 'u', 'v'])
+        # return detector.data, df
+        return detector.data, my_infos
+    else:
+        return detector.data
+
+
 def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1., 0., 0.]), use_friedel_pair=False,
                          spectrum=None, spectrum_thr=0., r_spot=5, color_field='constant', inverted=False,
                          show_direct_beam=False, verbose=False):
@@ -551,24 +675,6 @@ def triplet_indexing(OP, angles_exp, angles_th, tol=1.0, verbose=False):
     return OP_indexed
 
 
-def transformation_matrix(hkl_plane_1, hkl_plane_2, xyz_normal_1, xyz_normal_2):
-    # create the vectors representing this frame in the crystal coordinate system
-    e1_hat_c = hkl_plane_1.normal()
-    e2_hat_c = np.cross(hkl_plane_1.normal(), hkl_plane_2.normal()) / np.linalg.norm(
-        np.cross(hkl_plane_1.normal(), hkl_plane_2.normal()))
-    e3_hat_c = np.cross(e1_hat_c, e2_hat_c)
-    e_hat_c = np.array([e1_hat_c, e2_hat_c, e3_hat_c])
-    # create local frame attached to the indexed crystallographic features in XYZ
-    e1_hat_star = xyz_normal_1
-    e2_hat_star = np.cross(xyz_normal_1, xyz_normal_2) / np.linalg.norm(
-        np.cross(xyz_normal_1, xyz_normal_2))
-    e3_hat_star = np.cross(e1_hat_star, e2_hat_star)
-    e_hat_star = np.array([e1_hat_star, e2_hat_star, e3_hat_star])
-    # now build the orientation matrix
-    orientation_matrix = np.dot(e_hat_c.T, e_hat_star)
-    return orientation_matrix
-
-
 def confidence_index(votes):
     n = np.sum(votes)  # total number of votes
     v1 = max(votes)
@@ -682,7 +788,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, symmet
         # a given indexed triplet allow to construct 3 orientation matrices (which should be identical)
         pos = [[0, 1, 3, 4], [1, 2, 4, 5], [2, 0, 5, 3]]
         for j in range(3):
-            orientation_matrix = transformation_matrix(
+            orientation_matrix = Orientation.transformation_matrix(
                 hkl_planes[normal_indexed[i][pos[j][2]]], hkl_planes[normal_indexed[i][pos[j][3]]],
                 hkl_normals[normal_indexed[i][pos[j][0]]], hkl_normals[normal_indexed[i][pos[j][1]]])
         # move to the fundamental zone

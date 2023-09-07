@@ -81,10 +81,14 @@ class OimScan:
 
     def __init__(self, shape, resolution=(1.0, 1.0)):
         """Create an empty EBSD scan."""
+        print('init with shape', shape)
         self.x_star = 0
         self.y_star = 0
         self.z_star = 0
-        self.working_distance = 0
+        self.working_distance = 0.
+        self.sample_tilt_angle = 0.
+        self.camera_elevation_angle = 0.
+        self.camera_azimuthal_angle = 0.
         self.grid_type = 'SqrGrid'
         self.cols = shape[0]
         self.rows = shape[1]
@@ -266,6 +270,12 @@ class OimScan:
                     scan.z_star = float(tokens[2])
                 elif tokens[1] == 'WorkingDistance':
                     scan.working_distance = float(tokens[2])
+                elif tokens[1] == 'SampleTiltAngle':
+                    scan.sample_tilt_angle = float(tokens[2])
+                elif tokens[1] == 'CameraElevationAngle':
+                    scan.camera_elevation_angle = float(tokens[2])
+                elif tokens[1] == 'CameraAzimuthalAngle':
+                    scan.camera_azimuthal_angle = float(tokens[2])
                 elif tokens[1] == 'Phase' and tokens[2].isdigit():
                     phase = OimPhase(int(tokens[2]))
                     line = f.readline().strip()
@@ -329,6 +339,11 @@ class OimScan:
             scan.iq = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
             scan.ci = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
             scan.phase = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
+            '''
+            if data.shape[1] > 8:
+                print('including SEM signal')
+                scan.sem = np.reshape(data[:, 8], (scan.rows, scan.cols)).T
+            '''
         return scan
 
     @staticmethod
@@ -411,7 +426,9 @@ class OimScan:
         self.x_star = header['Pattern Center Calibration']['x-star'][0]
         self.y_star = header['Pattern Center Calibration']['y-star'][0]
         self.z_star = header['Pattern Center Calibration']['z-star'][0]
-        self.working_distance = header['Camera Elevation Angle'][0]
+        self.working_distance = header['Working Distance'][0]
+        self.camera_elevation_angle = header['Camera Elevation Angle'][0]
+        self.camera_azimuthal_angle = header['Camera Azimuthal Angle'][0]
         self.grid_type = header['Grid Type'][0].decode('utf-8')
         if self.grid_type != 'SqrGrid':
             raise ValueError('only square grid is supported, please convert your scan')
@@ -663,6 +680,68 @@ class OimScan:
                 o_ij = Orientation.from_euler(np.degrees(euler_ij))
                 self.god[i, j] = np.degrees(o.disorientation(o_ij, crystal_structure=sym)[0])
         print('GOD computation progress: 100.00 %')
+
+    def ang_header(self):
+        # compose header
+        header = 'HEADER: Start\n'
+        header += 'TEM_PIXperUM 1.000000\n'
+        header += 'x-star ' + str(self.x_star) + '\n'
+        header += 'y-star ' + str(self.y_star) + '\n'
+        header += 'z-star ' + str(self.z_star) + '\n'
+        header += 'WorkingDistance ' + str(self.working_distance) + '\n'
+        header += 'SampleTiltAngle ' + str(self.sample_tilt_angle) + '\n'
+        header += '\n'
+        for phase in self.phase_list:
+            header += 'Phase ' + str(phase.phase_id) + '\n'
+            header += 'MaterialName ' + phase.name + '\n'
+            header += 'Formula ' + phase.formula + '\n'
+            header += 'Info ' + phase.description + '\n'
+            header += 'Symmetry 43\n'
+            lattice_constants = phase.get_lattice().get_lattice_constants(angstrom=True)
+            constants = '  '.join(['%.3f' % c for c in lattice_constants])
+            header += ('LatticeConstants ' + constants + '\n')
+            header += ('NumberFamilies ' + str(len(phase.hklFamilies)) + '\n')
+            constants = '  '.join(['%.3f' % c for c in phase.elastic_constants])
+            if constants:
+                header += 'ElasticConstants ' + constants + '\n'
+            header += 'Categories'
+            for category in phase.categories:
+                header += ' ' + str(category)
+            header += '\n\n'
+        header += 'GRID: ' + self.grid_type + '\n'
+        header += 'XSTEP: ' + str(self.xStep) + '\n'
+        header += 'YSTEP: ' + str(self.yStep) + '\n'
+        header += 'NCOLS_ODD: ' + str(self.cols) + '\n'
+        header += 'NCOLS_EVEN: ' + str(self.rows - 1) + '\n'
+        header += 'NROWS: ' + str(self.rows) + '\n'
+        header += '\n'
+        header += 'OPERATOR: ' + self.operator + '\n'
+        header += 'SAMPLEID: ' + self.sample_id + '\n'
+        header += 'SCANID: ' + self.scan_id + '\n'
+        header += 'HEADER: End\n'
+        return header
+
+    def to_ang(self, file_name):
+        """Write the data as an .ang ascii file.
+
+        This can be read back into the OIM software.
+
+        :param str file_name: name of the file to write.
+        """
+        # create a single array with all the EBSD data
+        data = np.concatenate((self.euler,
+                               np.reshape(self.x, (self.x.shape[0], self.x.shape[1], 1)),
+                               np.reshape(self.y, (self.y.shape[0], self.y.shape[1], 1)),
+                               np.reshape(self.iq, (self.iq.shape[0], self.iq.shape[1], 1)),
+                               np.reshape(self.ci, (self.ci.shape[0], self.ci.shape[1], 1)),
+                               np.reshape(self.phase, (self.phase.shape[0], self.phase.shape[1], 1))),
+                               axis=2).transpose(1, 0, 2)
+        assert (self.grid_type == 'SqrGrid')
+        data = np.reshape(data, (data.shape[0] * data.shape[1], data.shape[2]))
+        print('now data shape is ', data.shape)
+        #f.write('\n'.join(map(lambda data_line: ' '.join(map(str, data_line)), data)))
+        np.savetxt(file_name, data, header=self.ang_header(), comments='# ', delimiter=' ',
+                   fmt=('%9.5f', '%9.5f', '%9.5f', '%12.5f', '%12.5f', '%.1f', '%6.3f', '%2d'))
 
     def to_h5(self, file_name):
         """Write the EBSD scan as a hdf5 file compatible OIM software (in

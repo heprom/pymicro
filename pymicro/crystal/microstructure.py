@@ -20,7 +20,7 @@ from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
-from pymicro.crystal.rotation import om2ro, ro2qu
+from pymicro.crystal.rotation import om2ro, ro2qu, qu2om
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
@@ -341,7 +341,10 @@ class Orientation:
         # now compute the mean orientation for each cluster
         mean_rods_syms = np.empty((len(syms), 3), dtype=float)
         for j in range(len(syms)):
-            mean_rods_syms[j] = np.mean(X[kmeans.labels_ == j], axis=0)
+            #mean_rods_syms[j] = np.mean(X[kmeans.labels_ == j], axis=0)
+            mean_quat_syms_j = np.mean(Q[kmeans.labels_ == j], axis=0)
+            mean_quat_syms_j /= np.sqrt(np.sum(mean_quat_syms_j ** 2))
+            mean_rods_syms[j] = om2ro(qu2om(mean_quat_syms_j))
         # find which orientation belongs to the FZ
         if symmetry == Symmetry.cubic:
              index_fz = np.argmax([(np.abs(r).sum() <= 1.0) and
@@ -420,6 +423,20 @@ class Orientation:
         """
         om = symmetry.move_rotation_to_FZ(self.orientation_matrix(), verbose=verbose)
         return Orientation(om)
+
+    def rotate_orientation(self, rotation_xyz):
+        """Rotate this grain orientation given the rotation matrix expressed
+        in the laboratory coordinate system.
+
+        :param rotation_xyz: a 3x3 array representing the rotation matrix to apply.
+        :return: a new Orientation instance rotated.
+        """
+        # express the rotation in the crystal frame
+        g = self.orientation_matrix()
+        rotation_cry = np.dot(g, np.dot(rotation_xyz, g.T)).T
+        # apply the rotation and create a new orientation
+        g_rot = np.dot(rotation_cry, g)
+        return Orientation(g_rot)
 
     @staticmethod
     def misorientation_MacKenzie(psi):
@@ -908,6 +925,43 @@ class Orientation:
             n2 = n_components[3][i], n_components[4][i], n_components[5][i]
             orientations.append(Orientation.from_n1n2(n1, n2))
         return orientations
+
+    @staticmethod
+    def transformation_matrix(hkl_1, hkl_2, n_1, n_2):
+        """Compute the orientation matrix from the two known hkl plane 
+        normals.
+        
+        The function build two orthonormal basis, one in the crystal 
+        frame and the other in the sample frame. the orientation matrix 
+        brings the second one into coincidence with first one.
+
+        :param hkl_1: the first `HklPlane` instance.
+        :param hkl_2: the second `HklPlane` instance.
+        :param n_1: a vector normal to the first lattice plane.
+        :param n_2: a vector normal to the second lattice plane.
+        :return: the corresponding 3x3 orientation matrix.
+        """
+        # create the vectors representing this frame in the crystal coordinate system
+        e1_hat_c = hkl_1.normal()
+        e2_hat_c = np.cross(hkl_1.normal(), hkl_2.normal()) / np.linalg.norm(
+            np.cross(hkl_1.normal(), hkl_2.normal()))
+        e3_hat_c = np.cross(e1_hat_c, e2_hat_c)
+        e_hat_c = np.array([e1_hat_c, e2_hat_c, e3_hat_c])
+        # create local frame attached to the indexed crystallographic features in XYZ
+        e1_hat_s = n_1
+        e2_hat_s = np.cross(n_1, n_2) / np.linalg.norm(
+            np.cross(n_1, n_2))
+        e3_hat_s = np.cross(e1_hat_s, e2_hat_s)
+        e_hat_s = np.array([e1_hat_s, e2_hat_s, e3_hat_s])
+        # now build the orientation matrix
+        orientation_matrix = np.dot(e_hat_c.T, e_hat_s)
+        return orientation_matrix
+
+    @staticmethod
+    def from_two_hkl_normals(hkl_1, hkl_2, xyz_normal_1, xyz_normal_2):
+        g = Orientation.transformation_matrix(hkl_1, hkl_2, 
+                                              xyz_normal_1, xyz_normal_2)
+        return Orientation(g)
 
     @staticmethod
     def Zrot2OrientationMatrix(x1=None, x2=None, x3=None):
@@ -3201,69 +3255,97 @@ class Microstructure(SampleData):
         return s
 
     @staticmethod
-    def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
-        return micro1.match_grains(micro2, use_grain_ids=use_grain_ids,
-                                   verbose=verbose)
-
-    def match_grains(self, micro2, mis_tol=1, use_grain_ids=None, verbose=False):
+    def match_grains(m1, m2, **kwargs):
+        return micro1.match_grains(micro2, **kwargs)
+        
+    def match_grains(self, m2, mis_tol=1, 
+                     grains_to_match=None, grains_to_search=None, 
+                     use_centers=False, center_tol=0.1, scale_m2=1., 
+                     offset_m2=None, center_merit=10., verbose=False):
         """Match grains from a second microstructure to this microstructure.
 
-        This function try to find pair of grains based on their orientations.
+        This function try to find pair of grains based on a function of
+        merit based on their orientations. This function can optionnally 
+        use the center of the grains. In this case several paramaters 
+        can be used to adjust the origin of the microstructure, their 
+        scale and the relative merit of the center proximity with 
+        respect to the orientation differences.
 
         .. warning::
 
-          This function works only for microstructures with the same symmetry.
+        This function works only for microstructures with the same symmetry.
 
-        :param micro2: the second instance of `Microstructure` from which
+        :param m2: the second instance of `Microstructure` from which
             to match the grains.
         :param float mis_tol: the tolerance is misorientation to use
             to detect matches (in degrees).
         :param list use_grain_ids: a list of ids to restrict the grains
-            in which to search for matches.
+            of the first microstructure in which to search for matches.
+        :param use_centers verbose: use the grain centers to build the 
+            function of merit.
+        :param float center_tol: the tolerance for 2 grains to be match 
+            together (in mm).
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
         :return tuple: a tuple of three lists holding respectively the matches,
-           the candidates for each match and the grains that were unmatched.
+        the candidates for each match and the grains that were unmatched.
         """
         # TODO : Test
         if not (self.get_lattice().get_symmetry()
-                == micro2.get_lattice().get_symmetry()):
+                == m2.get_lattice().get_symmetry()):
             raise ValueError('warning, microstructure should have the same '
-                             'symmetry, got: {} and {}'.format(
+                            'symmetry, got: {} and {}'.format(
                 self.get_lattice().get_symmetry(),
-                micro2.get_lattice().get_symmetry()))
+                m2.get_lattice().get_symmetry()))
         candidates = []
         matched = []
         unmatched = []  # grain that were not matched within the given tolerance
-        # restrict the grain ids to match if needed
+        # restrict the grain ids to match and to search if needed
         sym = self.get_lattice().get_symmetry()
-        if use_grain_ids is None:
+        if grains_to_match is None:
             grains_to_match = self.get_tablecol(tablename='GrainDataTable',
                                                 colname='idnumber')
-        else:
-            grains_to_match = use_grain_ids
-        # look at each grain
+        if grains_to_search is None:
+            grains_to_search = m2.get_tablecol(tablename='GrainDataTable',
+                                               colname='idnumber')
+        # look at each grain and compute a figure of merits
         for i, g1 in enumerate(self.grains):
             if not (g1['idnumber'] in grains_to_match):
                 continue
+            c1 = g1['center']
             cands_for_g1 = []
-            best_mis = mis_tol
+            best_merit = mis_tol
+            if use_centers:
+                best_merit *= (center_tol * center_merit)
             best_match = -1
             o1 = Orientation.from_rodrigues(g1['orientation'])
-            for g2 in micro2.grains:
+            for g2 in m2.grains:
+                if not (g2['idnumber'] in grains_to_search):
+                    continue
+                if use_centers:
+                    c2 = g2['center'] * scale_m2 + offset_m2
+                    if np.linalg.norm(c2 - c1) > center_tol:
+                        continue
                 o2 = Orientation.from_rodrigues(g2['orientation'])
                 # compute disorientation
                 mis, _, _ = o1.disorientation(o2, crystal_structure=sym)
                 misd = np.degrees(mis)
                 if misd < mis_tol:
+                    if use_centers:
+                        center_dif = np.linalg.norm(c2 - c1)
                     if verbose:
                         print('grain %3d -- candidate: %3d, misorientation:'
-                              ' %.2f deg' % (g1['idnumber'], g2['idnumber'],
-                                             misd))
+                            ' %.2f deg' % (g1['idnumber'], g2['idnumber'],
+                                            misd))
+                        if use_centers:
+                            print('center difference: %.2f' % center_dif)
                     # add this grain to the list of candidates
                     cands_for_g1.append(g2['idnumber'])
-                    if misd < best_mis:
-                        best_mis = misd
+                    merit = misd
+                    if use_centers:
+                        merit *= (center_dif * center_merit)
+                    if merit < best_merit:
+                        best_merit = merit
                         best_match = g2['idnumber']
             # add our best match or mark this grain as unmatched
             if best_match > 0:
@@ -3274,7 +3356,7 @@ class Microstructure(SampleData):
         if verbose:
             print('done with matching')
             print('%d/%d grains were matched ' % (len(matched),
-                                                  len(grains_to_match)))
+                                                len(grains_to_match)))
         return matched, candidates, unmatched
 
     def match_orientation(self, orientation, use_grain_ids=None):
@@ -4180,24 +4262,24 @@ class Microstructure(SampleData):
         ext = 'bin' if binary else 'txt'
         grip_id = n_phases   # material id for the grips
         ext_id = n_phases + 1 if add_grips else n_phases # material id for the exterior
-        n1x = open('N1X.%s' % ext, 'w')
-        n1y = open('N1Y.%s' % ext, 'w')
-        n1z = open('N1Z.%s' % ext, 'w')
-        n2x = open('N2X.%s' % ext, 'w')
-        n2y = open('N2Y.%s' % ext, 'w')
-        n2z = open('N2Z.%s' % ext, 'w')
+        n1x = open('%s_N1X.%s' % (self.get_sample_name(), ext), 'w')
+        n1y = open('%s_N1Y.%s' % (self.get_sample_name(), ext), 'w')
+        n1z = open('%s_N1Z.%s' % (self.get_sample_name(), ext), 'w')
+        n2x = open('%s_N2X.%s' % (self.get_sample_name(), ext), 'w')
+        n2y = open('%s_N2Y.%s' % (self.get_sample_name(), ext), 'w')
+        n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'w')
         files = [n1x, n1y, n1z, n2x, n2y, n2z]
         if binary:
             import struct
             for f in files:
                 f.write('%d \ndouble \n' % self.get_number_of_grains())
                 f.close()
-            n1x = open('N1X.%s' % ext, 'ab')
-            n1y = open('N1Y.%s' % ext, 'ab')
-            n1z = open('N1Z.%s' % ext, 'ab')
-            n2x = open('N2X.%s' % ext, 'ab')
-            n2y = open('N2Y.%s' % ext, 'ab')
-            n2z = open('N2Z.%s' % ext, 'ab')
+            n1x = open('%s_N1X.%s' % (self.get_sample_name(), ext), 'ab')
+            n1y = open('%s_N1Y.%s' % (self.get_sample_name(), ext), 'ab')
+            n1z = open('%s_N1Z.%s' % (self.get_sample_name(), ext), 'ab')
+            n2x = open('%s_N2X.%s' % (self.get_sample_name(), ext), 'ab')
+            n2y = open('%s_N2Y.%s' % (self.get_sample_name(), ext), 'ab')
+            n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'ab')
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
                 g = o.orientation_matrix()
@@ -4954,9 +5036,10 @@ class Microstructure(SampleData):
             phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
             m.set_phase_map(phase_map, voxel_size=spacing)
             m.set_orientation_map(rodrigues_map)
-            completeness_map = f['LabDCT']['Data']['Completeness'][()].transpose(2, 1, 0)
-            m.add_field(gridname='CellData', fieldname='completeness_map',
-                        array=completeness_map)
+            if 'Completeness' in f['LabDCT/Data']:
+                completeness_map = f['LabDCT']['Data']['Completeness'][()].transpose(2, 1, 0)
+                m.add_field(gridname='CellData', fieldname='completeness_map',
+                            array=completeness_map)
 
         # create grain data table infos
         grain_ids = np.unique(grain_map)
@@ -4974,7 +5057,6 @@ class Microstructure(SampleData):
             grain_map = m.get_grain_map()[bb[0][0]:bb[0][1],
                                           bb[1][0]:bb[1][1],
                                           bb[2][0]:bb[2][1]]
-            #x, y, z = np.where(grain_map == gid)
             # assign orientation to this grain
             rods_gid = rodrigues_map[bb[0][0]:bb[0][1],
                                      bb[1][0]:bb[1][1],
@@ -5552,8 +5634,11 @@ class Microstructure(SampleData):
                     # simply translate the second volume
                     #a_top = np.roll(micros[1].get_field(array_name),
                     #                translation_voxel[:2], (0, 1))
+                    array_to_shift = micros[1].get_field(array_name)
+                    the_shifts = np.zeros_like(array_to_shift.shape)
+                    the_shifts[:len(shifts)] = shifts
                     a_top = ndimage.shift(micros[1].get_field(array_name),
-                                          shifts, order=0, cval=0)
+                                          the_shifts, order=0, cval=0)
 
                 # merging the two arrays
                 shape_array_merged = shape_merged
@@ -5882,3 +5967,148 @@ class Microstructure(SampleData):
             handle.set_alpha(0.8)
         plt.rcParams['hatch.linewidth'] = 0.5
         return
+
+    def get_grain_boundaries_map(self, kernel_size=3):
+        """
+        method to compute grain boundaries map using microstructure grain_map
+        """
+        x, y, z = self.get_grain_map().shape
+        grain_boundaries_map = np.zeros_like(self.get_grain_map())
+        pad_grain_map = np.pad(self.get_grain_map(), pad_width=1)
+                
+        for i in range(x):
+            for j in range(y):
+                for k in range(z):
+                    kernel = pad_grain_map[i:i+kernel_size//2+1,
+                                        j:j+kernel_size//2+1,
+                                        k:k+kernel_size//2+1]
+                    mean_kernel = np.mean(kernel)
+                    inten_level = np.abs(grain_map[i, j, k] - mean_kernel)
+                    if inten_level > 0:
+                        grain_boundaries_map[i, j, k] = 1
+
+        return grain_boundaries_map
+    
+    def resample(self, resampling_factor, resample_name=None, autodelete=False,
+            recompute_geometry=True, verbose=False):
+        """
+        Resample the microstructure by a given factor to create a new one.
+
+        This method resamples the CellData image group to a new microstructure,
+        and adapts the GrainDataTable to the resampled.
+
+        :param int resample_factor: the factor used for resolution degradation
+        :param str resample_name: the name for the resampled microstructure
+            (the default is to append '_resampled' to the initial name).
+        :param bool autodelete: a flag to delete the microstructure files
+            on the disk when it is not needed anymore.
+        :param bool recompute_geometry: if `True` (default), recompute the
+            grain centers, volumes, and bounding boxes in the resampled
+            microstructure. Use `False` when using a resample that do not cut
+            grains, for instance when resampling a microstructure within the
+            mask, to avoid the heavy computational cost of the grain geometry
+            data update.
+        :param bool verbose: activate verbose mode.
+        :return: a new `Microstructure` instance with the resampled grain map.
+        """
+        if self._is_empty('grain_map'):
+            print('warning: needs a grain map to resample the microstructure')
+            return
+        # input default values for bounds if not specified
+        if not resample_name:
+            resample_name = self.get_sample_name() + \
+                        (not self.get_sample_name().endswith('_')) * '_' + 'resampled' + \
+                            '_' + str(resampling_factor)
+        print('RESAMPLING: %s' % resample_name)
+        # create new microstructure dataset
+        micro_resampled = Microstructure(name=resample_name, overwrite_hdf5=True,
+                                    phase=self.get_phase(),
+                                    autodelete=autodelete)
+        if self.get_number_of_phases() > 1:
+            for i in range(2, self.get_number_of_phases()):
+                micro_resampled.add_phase(self.get_phase(phase_id=i))
+        micro_resampled.default_compression_options = self.default_compression_options
+        print('resampling microstructure to %s' % micro_resampled.h5_file)
+        # Resize all CellData fields
+        image_group = self.get_node('CellData')
+        spacing = self.get_attribute('spacing', 'CellData')
+        FIndex_path = '%s/Field_index' % image_group._v_pathname
+        field_list = self.get_node(FIndex_path)
+
+        dims = self.get_attribute('dimension', 'CellData')
+        # Fields dimensions should be multiples of 2 (AMITEX requirement for Zoom Structural purposes, cf L. Gelebart)
+        if len(dims) == 3:
+            X, Y, Z = dims
+            end_X, end_Y, end_Z = resampling_factor * np.array([X//resampling_factor,
+                                                                Y//resampling_factor,
+                                                                Z//resampling_factor])
+        elif len(dims) == 2:
+            X, Y = dims
+            end_X, end_Y = resampling_factor * np.array([X//resampling_factor,
+                                                        Y//resampling_factor])
+        else:
+            raise ValueError('CellData should be either 2D or 3D')
+
+        resampled_voxel_size = self.get_voxel_size() * resampling_factor  
+
+        for name in field_list:
+            field_name = name.decode('utf-8')
+            print('resampling field %s' % field_name)
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
+                if self._get_group_type('CellData') == '2DImage':
+                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor, ...]
+
+                else:
+                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor,
+                                    :end_Z:resampling_factor, ...]
+                empty = micro_resampled.get_attribute(attrname='empty',
+                                                nodename='CellData')
+                if empty:
+                    micro_resampled.add_image_from_field(
+                        field_array=field_resampled, fieldname=field_name,
+                        imagename='CellData', location='/',
+                        spacing=spacing, replace=True)
+                else:
+                    micro_resampled.add_field(gridname='CellData',
+                                        fieldname=field_name,
+                                        array=field_resampled, replace=True)
+                    print(field_resampled.shape)
+
+        # update the origin of the image group according to the resampling
+        if verbose:
+            print('resampled dataset:')
+            print(micro_resampled)
+        micro_resampled.set_voxel_size('CellData', resampled_voxel_size)
+        print('Updating active grain map')
+        print(micro_resampled.get_grain_map().shape)
+        micro_resampled.set_active_grain_map('CellData_%s' % self.active_grain_map)
+        print(micro_resampled.get_grain_map().shape)
+        micro_resampled.add_grains_in_map()
+        grain_ids = np.unique(micro_resampled.get_grain_map())
+        orientation = []
+        for gid in grain_ids:
+            if not gid > 0:
+                continue
+            orientation.append(self.get_grain(gid).orientation.rod)
+        orientation = np.array(orientation)
+        micro_resampled.set_orientations(orientation)
+        micro_resampled.remove_grains_not_in_map()
+        max_grain = micro_resampled.get_grain_ids()[-1]
+        nb_grain = micro_resampled.get_number_of_grains()
+        if max_grain > nb_grain:
+            print('renumbering in progress : %i - %i ' % (max_grain, nb_grain))
+            micro_resampled.renumber_grains()
+            
+        print('%d grains in resampled microstructure' % micro_resampled.grains.nrows)
+        micro_resampled.grains.flush()
+        
+        # recompute the grain geometry
+        if recompute_geometry:
+            print('updating grain geometry')
+            micro_resampled.recompute_grain_bounding_boxes(verbose)
+            micro_resampled.recompute_grain_centers(verbose)
+            micro_resampled.recompute_grain_volumes(verbose)
+            
+        return micro_resampled
+

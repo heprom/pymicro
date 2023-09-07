@@ -3281,25 +3281,36 @@ class Microstructure(SampleData):
         return s
 
     @staticmethod
-    def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
-        return micro1.match_grains(micro2, use_grain_ids=use_grain_ids,
-                                   verbose=verbose)
+    def match_grains(m1, m2, **kwargs):
+        return micro1.match_grains(micro2, **kwargs)
         
-    def match_grains(self, m2, mis_tol=1, use_grain_ids=None, use_centers=False, center_tol=0.1, scale_m2=1., offset_m2=None, center_merit=10., verbose=False):
+    def match_grains(self, m2, mis_tol=1, 
+                     grains_to_match=None, grains_to_search=None, 
+                     use_centers=False, center_tol=0.1, scale_m2=1., 
+                     offset_m2=None, center_merit=10., verbose=False):
         """Match grains from a second microstructure to this microstructure.
 
-        This function try to find pair of grains based on their orientations.
+        This function try to find pair of grains based on a function of
+        merit based on their orientations. This function can optionnally 
+        use the center of the grains. In this case several paramaters 
+        can be used to adjust the origin of the microstructure, their 
+        scale and the relative merit of the center proximity with 
+        respect to the orientation differences.
 
         .. warning::
 
         This function works only for microstructures with the same symmetry.
 
-        :param micro2: the second instance of `Microstructure` from which
+        :param m2: the second instance of `Microstructure` from which
             to match the grains.
         :param float mis_tol: the tolerance is misorientation to use
             to detect matches (in degrees).
         :param list use_grain_ids: a list of ids to restrict the grains
-            in which to search for matches.
+            of the first microstructure in which to search for matches.
+        :param use_centers verbose: use the grain centers to build the 
+            function of merit.
+        :param float center_tol: the tolerance for 2 grains to be match 
+            together (in mm).
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
         :return tuple: a tuple of three lists holding respectively the matches,
@@ -3315,13 +3326,14 @@ class Microstructure(SampleData):
         candidates = []
         matched = []
         unmatched = []  # grain that were not matched within the given tolerance
-        # restrict the grain ids to match if needed
+        # restrict the grain ids to match and to search if needed
         sym = self.get_lattice().get_symmetry()
-        if use_grain_ids is None:
+        if grains_to_match is None:
             grains_to_match = self.get_tablecol(tablename='GrainDataTable',
                                                 colname='idnumber')
-        else:
-            grains_to_match = use_grain_ids
+        if grains_to_search is None:
+            grains_to_search = m2.get_tablecol(tablename='GrainDataTable',
+                                               colname='idnumber')
         # look at each grain and compute a figure of merits
         for i, g1 in enumerate(self.grains):
             if not (g1['idnumber'] in grains_to_match):
@@ -3334,6 +3346,8 @@ class Microstructure(SampleData):
             best_match = -1
             o1 = Orientation.from_rodrigues(g1['orientation'])
             for g2 in m2.grains:
+                if not (g2['idnumber'] in grains_to_search):
+                    continue
                 if use_centers:
                     c2 = g2['center'] * scale_m2 + offset_m2
                     if np.linalg.norm(c2 - c1) > center_tol:

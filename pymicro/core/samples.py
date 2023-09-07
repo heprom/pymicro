@@ -2438,7 +2438,6 @@ class SampleData:
             each dimension of the origin of this image group.
         """
         old_origin = self.get_attribute('origin', image_group)
-        print(old_origin is None)
         if old_origin is not None and (len(old_origin) != len(origin)):
             raise ValueError('Dimension mismatch between image group origin'
                              f' {old_origin} and input new origin'

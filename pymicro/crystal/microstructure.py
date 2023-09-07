@@ -1763,6 +1763,10 @@ class Microstructure(SampleData):
     associated to the microstructure and used for all crystallography calculations.
     """
 
+#TODO: include length unit specification
+#TODO: specific Pymicro file extension ?
+#TODO: refactor class
+#TODO: open in protected mode --> no modification of datasets allowed
     def __init__(self,
                  filename=None, name='micro', description='empty',
                  verbose=False, overwrite_hdf5=False,
@@ -1793,18 +1797,28 @@ class Microstructure(SampleData):
         if self._file_exist:
             self.active_grain_map = self.get_attribute('active_grain_map',
                                                        'CellData')
+            self.active_phase_map = self.get_attribute('active_phase_map',
+                                                       'CellData')
             if self.active_grain_map is None:
+                # set active grain map to 'grain_map' if none exist
                 self.set_active_grain_map()
+            if self.active_phase_map is None:
+                # set active phase map to 'phase_map' if none exist
+                self.set_active_phase_map()
             self._init_phase(phase_list)
         else:
             self.set_active_grain_map()
+            self.set_active_phase_map()
             self._init_phase(phase_list)
         return
 
     def __repr__(self):
         """Provide a string representation of the class."""
+        # TODO: print number of grains if available
+        # TODO: print extent of CellData group if available
         s = '%s' % self.__class__.__name__
-        s += ' "%s"\n' % self.get_sample_name()
+        s += ' "%s"\t' % self.get_sample_name()
+        s += ' "File : {%s}"\n' % self.h5_path
         s += '------------------------------------------------------------\n'
         s += '* DESCRIPTION: %s\n' % self.get_description()
         phase_id_list = self.get_phase_ids_list()
@@ -1996,7 +2010,7 @@ class Microstructure(SampleData):
         return self.get_phase(phase_id).get_lattice()
 
     def get_grain_map(self):
-        """Get the grain map as a numpy array.
+        """Get the active grain map as a numpy array.
 
         The grain map is the image constituted by the grain ids or labels.
         Label zero is reserved for the background or unattributed voxels.
@@ -2017,14 +2031,14 @@ class Microstructure(SampleData):
         return grain_map
 
     def get_phase_map(self):
-        """Get the phase map as a numpy array.
+        """Get the active phase map as a numpy array.
 
         The phase map is an array of int where each voxel value tells you what
         is the local material phase with respect to the `phase_list` attribute.
 
         :return: the phase map as a numpy array.
         """
-        phase_map = self.get_field('phase_map')
+        phase_map = self.get_field(self.active_phase_map)
         if self._is_empty('phase_map'):
             phase_map = None
         elif phase_map.ndim == 2:
@@ -2319,7 +2333,7 @@ class Microstructure(SampleData):
         self.get_phase(phase_id)._lattice = lattice
 
     def set_active_grain_map(self, map_name='grain_map'):
-        """Set the active grain map name to input string.
+        """Set the active grain map name.
 
         The `active_grain_map` string attribute is used to locate the array
         when the `get_grain_map` method is called. This allows to have multiple
@@ -2327,6 +2341,17 @@ class Microstructure(SampleData):
         """
         self.active_grain_map = map_name
         self.add_attributes({'active_grain_map': map_name}, 'CellData')
+        return
+
+    def set_active_phase_map(self, map_name='phase_map'):
+        """Set the active phase map name.
+
+        The `active_phase_map` string attribute is used to locate the array
+        when the `get_phase_map` method is called. This allows to have multiple
+        grain maps within a data set.
+        """
+        self.active_phase_map = map_name
+        self.add_attributes({'active_phase_map': map_name}, 'CellData')
         return
 
     def set_grain_map(self, grain_map, voxel_size=None,
@@ -2373,7 +2398,8 @@ class Microstructure(SampleData):
         self.set_active_grain_map(map_name)
         return
 
-    def set_phase_map(self, phase_map, voxel_size=None, compression=None):
+    def set_phase_map(self, phase_map, voxel_size=None, map_name='phase_map',
+                      compression=None):
         """Set the phase map for this microstructure.
 
         :param ndarray phase_map: a 2D or 3D numpy array.
@@ -2399,16 +2425,19 @@ class Microstructure(SampleData):
                     raise ValueError('voxel_size array must have a length '
                                      'equal to grain_map shape')
                 spacing_array = voxel_size
-            self.add_image_from_field(phase_map, 'phase_map',
+            self.add_image_from_field(field_array=phase_map,
+                                      fieldname=map_name,
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
                                       replace=True,
                                       compression_options=compression)
         else:
-            self.add_field(gridname='CellData', fieldname='phase_map',
+            self.add_field(gridname='CellData', fieldname=map_name,
                            array=phase_map, replace=True,
                            indexname='phase_map',
                            compression_options=compression)
+        self.set_active_phase_map(map_name)
+        return
 
     def update_phase_map_from_grains(self, grain_ids=None, phase_id=1):
         """Update the phase map from the grain map.
@@ -2421,6 +2450,7 @@ class Microstructure(SampleData):
         :param int phase_id: phase Id to set for the list of grains concerned
             by the update.
         """
+        # TODO: check existence of gran map
         phase_map = self.get_phase_map()
         # handle case of empty phase map
         if phase_map is None:
@@ -2586,7 +2616,8 @@ class Microstructure(SampleData):
             self.grains.remove_row(int(where))
         return
 
-    def add_grains(self, orientation_list, orientation_type='euler', grain_ids=None):
+    def add_grains(self, orientation_list, orientation_type='euler',
+                   grain_ids=None):
         """Add a list of grains to this microstructure.
 
         This function adds a list of grains represented by their orientation
@@ -2596,7 +2627,7 @@ class Microstructure(SampleData):
 
         :param list orientation_list: a list of values representing the orientations.
         :param str orientation_type: euler or rod for Euler angles (Bunge
-        passive convention) or Rodrigues vectors.
+        passive convention and degrees) or Rodrigues vectors.
         :param list grain_ids: an optional list for the ids of the new grains.
         """
         grain = self.grains.row
@@ -4627,7 +4658,8 @@ class Microstructure(SampleData):
         f.close()
 
     @staticmethod
-    def from_dream3d(file_path, main_key='DataContainers',
+    def from_dream3d(file_path,
+                     main_key='DataContainers',
                      data_container='DataContainer',
                      ensemble_data='EnsembleData',
                      grain_data='FeatureData',
@@ -4672,6 +4704,7 @@ class Microstructure(SampleData):
         :return: a `Microstructure` instance created from the dream3d file.
         """
         head, tail = os.path.split(file_path)
+        tail = tail.strip('.dream3d')
         with h5py.File(file_path, 'r') as f:
             # get information on the material phases
             phases_data_path = '%s/%s/%s' % (main_key, data_container, ensemble_data)
@@ -4684,25 +4717,38 @@ class Microstructure(SampleData):
                 lattice_constants = f[phases_data_path]['LatticeConstants'][()][phase_id]
                 for i in range(3):
                     lattice_constants[i] = lattice_constants[i] / 10  # use nm unit
-                print('found phase with crystal structure %d' % n)
+                # print('found phase with crystal structure %d' % n)
                 l = Lattice.from_parameters(*lattice_constants, symmetry=Symmetry.from_dream3d(n))
                 phase = CrystallinePhase(phase_id=phase_id, name=phase_names[phase_id], lattice=l)
                 phase_list.append(phase)
             # initialize our microstructure
-            micro = Microstructure(name=tail, phase=phase_list[0], overwrite_hdf5=True)
-            if n_phases > 1:
-                micro.set_phases(phase_list)
+            micro = Microstructure(name=tail, phase=phase_list, overwrite_hdf5=True)
+            # if n_phases > 1:
+            #     micro.set_phases(phase_list)
             # now get grain data informations
             grain_data_path = '%s/%s/%s' % (main_key, data_container, grain_data)
             grain_orientations = f[grain_data_path][grain_orientations][()]
-            centroids = f[grain_data_path][grain_centroids][()]
+            # switch to degrees
+            grain_orientations = grain_orientations*(180./np.pi)
+            # suppose that the grains are number from 0 or 1 to Ngrains by
+            # dream3D
+            gids = np.array(range(grain_orientations.shape[0]))
+            try:
+                centroids = f[grain_data_path][grain_centroids][()]
+            except:
+                centroids = None
             if np.array_equal(grain_orientations[0], [0., 0., 0.]):
                 # skip the background
                 grain_orientations = grain_orientations[1:]
-                centroids = centroids[1:]
-            micro.add_grains(grain_orientations, orientation_type=grain_orientations_type)
-            micro.set_centers(centroids)
-            print('%d grains in the data set' % micro.get_number_of_grains())
+                gids = gids[1:]
+                if centroids is not None:
+                    centroids = centroids[1:]
+            micro.add_grains(grain_orientations,
+                             orientation_type=grain_orientations_type,
+                             grain_ids=gids)
+            if centroids is not None:
+                micro.set_centers(centroids)
+            # print('%d grains in the data set' % micro.get_number_of_grains())
             # read voxel size and origin
             geom_path = '%s/%s/_SIMPL_GEOMETRY' % (main_key, data_container)
             voxel_size = f[geom_path]['SPACING'][()]
@@ -4710,11 +4756,11 @@ class Microstructure(SampleData):
             print(voxel_size)
             # now read cell data
             cell_data_path = '%s/%s/%s' % (main_key, data_container, cell_data)
-            grain_ids = f[cell_data_path][grain_ids][:, :, :, 0]
+            grain_ids = f[cell_data_path][grain_ids][:, :, :, 0].transpose()
             cell_data_shape = grain_ids.shape
             print('CellData dimensions:', cell_data_shape)
-            mask = f[cell_data_path][mask][:, :, :, 0]
-            phases = f[cell_data_path][phases][:, :, :, 0]
+            mask = f[cell_data_path][mask][:, :, :, 0].transpose()
+            phases = f[cell_data_path][phases][:, :, :, 0].transpose()
             # now assign these arrays to the microstructure
             micro.set_grain_map(grain_ids, voxel_size=voxel_size)
             micro.set_origin('CellData', origin)
@@ -4749,6 +4795,8 @@ class Microstructure(SampleData):
         else:
             return
 
+# TODO: create ReaderClasses to improve methods factorisation, customization
+#       and readability
     @staticmethod
     def from_neper(neper_file_path):
         """Create a microstructure from a neper tesselation.
@@ -5190,6 +5238,8 @@ class Microstructure(SampleData):
             cannot be read from them at the moment.
         :return: a new instance of `Microstructure`.
         """
+        # TODO: segmentation super slow, need to reconsider the process
+        #       (Dream3D hundreds to thousand times faster)
         # Get name of file and create microstructure instance
         name = os.path.splitext(os.path.basename(file_path))[0]
         micro = Microstructure(name=name, autodelete=False, overwrite_hdf5=True)
@@ -5676,6 +5726,7 @@ class Microstructure(SampleData):
                 print('problem moving to the fundamental zone for '
                       'rodrigues vector {}'.format(o.rod))
                 c = np.array([0., 0., 0.])
+            # print(c)
             ipf_image[grains_slice == gid] = c
         return ipf_image
 
@@ -5699,8 +5750,8 @@ class Microstructure(SampleData):
         """Set length unit to plot grain map in slice view."""
         # extent is used to control size the axes in which the images are
         # plotted by "imshow" or "contourf"
-        if unit not in ['mm', 'pixel']:
-            print('unit must be mm or pixel, defaulting to pixel')
+        if unit not in ['mm','µm', 'pixel']:
+            print('unit must be mm, µm or pixel, defaulting to pixel')
             unit = 'pixel'
         # extent seems to need to be reversed in Y direction for contour plots
         # Why ?? --> used to plot hatched regions with contourf
@@ -5708,7 +5759,7 @@ class Microstructure(SampleData):
             extent = [0, slice_map.shape[0], slice_map.shape[1], 0]
         else:
             extent = [0, slice_map.shape[0], 0, slice_map.shape[1]]
-        if unit == 'mm':
+        if (unit == 'mm') or (unit == 'µm'):
             # work out extent in mm unit
             extent += np.array([-0.5 * slice_map.shape[0],
                                 -0.5 * slice_map.shape[0],

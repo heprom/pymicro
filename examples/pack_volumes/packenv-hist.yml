@@ -1,0 +1,10 @@
+name: packenv
+channels:
+  - defaults
+dependencies:
+  - python=3.8
+  - basictools
+  - lxml
+  - pytables
+  - ipykernel
+prefix: /home/users/jcasagrande/.conda/envs/packenv

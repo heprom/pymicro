@@ -1817,15 +1817,25 @@ class Microstructure(SampleData):
     associated to the microstructure and used for all crystallography calculations.
     """
 
+#TODO: include length unit specification
+#TODO: specific Pymicro file extension ?
+#TODO: refactor class
+#TODO: open in protected mode --> no modification of datasets allowed
     def __init__(self,
                  filename=None, name='micro', description='empty',
-                 verbose=False, overwrite_hdf5=False, phase=None,
-                 autodelete=False):
+                 verbose=False, overwrite_hdf5=False,
+                 phase=None, autodelete=False):
         if filename is None:
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
         # prepare arguments for after file open
-        after_file_open_args = {'phase': phase}
+        if phase is None:
+            phase = CrystallinePhase()
+        if type(phase) is not list:
+            phase_list = [phase]
+        else:
+            phase_list = phase
+        after_file_open_args = {'phase_list': phase_list}
         # call SampleData constructor
         SampleData.__init__(self, filename=filename, sample_name=name,
                             sample_description=description, verbose=verbose,
@@ -1834,32 +1844,44 @@ class Microstructure(SampleData):
                             after_file_open_args=after_file_open_args)
         return
 
-    def _after_file_open(self, phase=None, **kwargs):
+    def _after_file_open(self, phase_list=None, **kwargs):
         """Initialization code to run after opening a Sample Data file."""
         self.grains = self.get_node('GrainDataTable')
         self.default_compression_options = {'complib': 'zlib', 'complevel': 5}
         if self._file_exist:
             self.active_grain_map = self.get_attribute('active_grain_map',
                                                        'CellData')
+            self.active_phase_map = self.get_attribute('active_phase_map',
+                                                       'CellData')
             if self.active_grain_map is None:
+                # set active grain map to 'grain_map' if none exist
                 self.set_active_grain_map()
-            self._init_phase(phase)
+            if self.active_phase_map is None:
+                # set active phase map to 'phase_map' if none exist
+                self.set_active_phase_map()
+            self._init_phase(phase_list)
         else:
             self.set_active_grain_map()
-            self._init_phase(phase)
+            self.set_active_phase_map()
+            self._init_phase(phase_list)
         return
 
     def __repr__(self):
         """Provide a string representation of the class."""
-        s = '%s\n' % self.__class__.__name__
-        s += '* name: %s\n' % self.get_sample_name()
-        # TODO print phases here
-        s += '* lattice: %s\n' % self.get_lattice()
-        s += '\n'
-        # if self._verbose:
-        #     for g in self.grains:
-        #         s += '* %s' % g.__repr__
-        s += SampleData.__repr__(self)
+        # TODO: print number of grains if available
+        # TODO: print extent of CellData group if available
+        s = '%s' % self.__class__.__name__
+        s += ' "%s"\t' % self.get_sample_name()
+        s += ' "File : {%s}"\n' % self.h5_path
+        s += '------------------------------------------------------------\n'
+        s += '* DESCRIPTION: %s\n' % self.get_description()
+        phase_id_list = self.get_phase_ids_list()
+        s += '\n* MATERIAL PHASES: \n'
+        for id in phase_id_list:
+            s += f'\t{self.get_phase(phase_id=id).__repr__()}'
+            s += ' \n'
+        s += '\n* CONTENT: \n'
+        s += self.print_dataset_content(as_string=True, short=True)
         return s
 
     def minimal_data_model(self):
@@ -1890,23 +1912,20 @@ class Microstructure(SampleData):
                                     'Phase_data': 'Group'}
         return minimal_content_index_dic, minimal_content_type_dic
 
-    def _init_phase(self, phase):
+    def _init_phase(self, phase_list):
         self._phases = []
-        if phase is None:
-            # create a default crystalline phase
-            phase = CrystallinePhase()
         # if the h5 file does not exist yet, store the phase as metadata
-        if not self._file_exist:  #FIXME is this useful?
-            self.add_phase(phase)
+        if not self._file_exist:
+            self.set_phases(phase_list)
         else:
-            self.sync_phases()
+            self.sync_phases(verbose=False)
             # if no phase is there, create one
             if len(self.get_phase_ids_list()) == 0:
                 print('no phase was found in this dataset, adding a default one')
-                self.add_phase(phase)
+                self.add_phase(phase_list[0])
         return
 
-    def sync_phases(self):
+    def sync_phases(self, verbose=True):
         """This method sync the _phases attribute with the content of the hdf5
         file.
         """
@@ -1917,9 +1936,10 @@ class Microstructure(SampleData):
             d = self.get_dic_from_attributes('/PhaseData/%s' % child)
             phase = CrystallinePhase.from_dict(d)
             self._phases.append(phase)
-        print('%d phases found in the data set' % len(self._phases))
+        if verbose:
+            print('%d phases found in the data set' % len(self._phases))
 
-    def set_phase(self, phase):
+    def set_phase(self, phase, id_number=None):
         """Set a phase for the given `phase_id`.
 
         If the phase id does not correspond to one of the existing phase,
@@ -1928,13 +1948,15 @@ class Microstructure(SampleData):
         :param CrystallinePhase phase: the phase to use.
         :param int phase_id:
         """
-        if phase.phase_id > self.get_number_of_phases():
+        if id_number is None:
+            id_number = phase.phase_id
+        if id_number > self.get_number_of_phases():
             print('the phase_id given (%d) does not correspond to any existing '
                   'phase, the phase list has not been modified.')
             return
         d = phase.to_dict()
-        print('setting phase %d with %s' % (phase.phase_id, phase.name))
-        self.add_attributes(d, '/PhaseData/phase_%02d' % phase.phase_id)
+        print('setting phase %d with %s' % (id_number, phase.name))
+        self.add_attributes(d, '/PhaseData/phase_%02d' % id_number)
         self.sync_phases()
 
     def set_phases(self, phase_list):
@@ -2042,7 +2064,7 @@ class Microstructure(SampleData):
         return self.get_phase(phase_id).get_lattice()
 
     def get_grain_map(self):
-        """Get the grain map as a numpy array.
+        """Get the active grain map as a numpy array.
 
         The grain map is the image constituted by the grain ids or labels.
         Label zero is reserved for the background or unattributed voxels.
@@ -2063,14 +2085,14 @@ class Microstructure(SampleData):
         return grain_map
 
     def get_phase_map(self):
-        """Get the phase map as a numpy array.
+        """Get the active phase map as a numpy array.
 
         The phase map is an array of int where each voxel value tells you what
         is the local material phase with respect to the `phase_list` attribute.
 
         :return: the phase map as a numpy array.
         """
-        phase_map = self.get_field('phase_map')
+        phase_map = self.get_field(self.active_phase_map)
         if self._is_empty('phase_map'):
             phase_map = None
         elif phase_map.ndim == 2:
@@ -2365,7 +2387,7 @@ class Microstructure(SampleData):
         self.get_phase(phase_id)._lattice = lattice
 
     def set_active_grain_map(self, map_name='grain_map'):
-        """Set the active grain map name to input string.
+        """Set the active grain map name.
 
         The `active_grain_map` string attribute is used to locate the array
         when the `get_grain_map` method is called. This allows to have multiple
@@ -2373,6 +2395,17 @@ class Microstructure(SampleData):
         """
         self.active_grain_map = map_name
         self.add_attributes({'active_grain_map': map_name}, 'CellData')
+        return
+
+    def set_active_phase_map(self, map_name='phase_map'):
+        """Set the active phase map name.
+
+        The `active_phase_map` string attribute is used to locate the array
+        when the `get_phase_map` method is called. This allows to have multiple
+        grain maps within a data set.
+        """
+        self.active_phase_map = map_name
+        self.add_attributes({'active_phase_map': map_name}, 'CellData')
         return
 
     def set_grain_map(self, grain_map, voxel_size=None,
@@ -2419,7 +2452,8 @@ class Microstructure(SampleData):
         self.set_active_grain_map(map_name)
         return
 
-    def set_phase_map(self, phase_map, voxel_size=None, compression=None):
+    def set_phase_map(self, phase_map, voxel_size=None, map_name='phase_map',
+                      compression=None):
         """Set the phase map for this microstructure.
 
         :param ndarray phase_map: a 2D or 3D numpy array.
@@ -2445,27 +2479,37 @@ class Microstructure(SampleData):
                     raise ValueError('voxel_size array must have a length '
                                      'equal to grain_map shape')
                 spacing_array = voxel_size
-            self.add_image_from_field(phase_map, 'phase_map',
+            self.add_image_from_field(field_array=phase_map,
+                                      fieldname=map_name,
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
                                       replace=True,
                                       compression_options=compression)
         else:
-            self.add_field(gridname='CellData', fieldname='phase_map',
+            self.add_field(gridname='CellData', fieldname=map_name,
                            array=phase_map, replace=True,
                            indexname='phase_map',
                            compression_options=compression)
+        self.set_active_phase_map(map_name)
+        return
 
-    def update_phase_map(self, grain_ids=None):
+    def update_phase_map_from_grains(self, grain_ids=None, phase_id=1):
         """Update the phase map from the grain map.
 
-        This method update the phase map by setting the phase of all 
+        This method update the phase map by setting the phase of all
         voxels of the grains to the appropriate value.
 
-        :param list grain_ids: the list of the grains ids that are 
-            concerned by the update (all grain by default).            
+        :param list grain_ids: the list of the grains ids that are
+            concerned by the update (all grain by default).
+        :param int phase_id: phase Id to set for the list of grains concerned
+            by the update.
         """
+        # TODO: check existence of gran map
         phase_map = self.get_phase_map()
+        # handle case of empty phase map
+        if phase_map is None:
+            map_shape = self.get_attribute('dimension', 'CellData')
+            phase_map = np.zeros(shape=map_shape, dtype=np.int8)
         if not grain_ids:
           grain_ids = self.get_ids_from_grain_map()
         for i, gid in enumerate(grain_ids):
@@ -2475,10 +2519,8 @@ class Microstructure(SampleData):
             this_grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
                                                   bb[1][0]:bb[1][1],
                                                   bb[2][0]:bb[2][1]]
-            #TODO handle multiple phases here
-            phase_map[bb[0][0]:bb[0][1],
-                      bb[1][0]:bb[1][1],
-                      bb[2][0]:bb[2][1]][this_grain_map == gid] = 1
+            phase_map[bb[0][0]:bb[0][1], bb[1][0]:bb[1][1],
+                      bb[2][0]:bb[2][1]][this_grain_map == gid] = phase_id
         print('\n')
         self.set_phase_map(phase_map)
 
@@ -2628,7 +2670,8 @@ class Microstructure(SampleData):
             self.grains.remove_row(int(where))
         return
 
-    def add_grains(self, orientation_list, orientation_type='euler', grain_ids=None):
+    def add_grains(self, orientation_list, orientation_type='euler',
+                   grain_ids=None):
         """Add a list of grains to this microstructure.
 
         This function adds a list of grains represented by their orientation
@@ -2638,14 +2681,14 @@ class Microstructure(SampleData):
 
         :param list orientation_list: a list of values representing the orientations.
         :param str orientation_type: euler or rod for Euler angles (Bunge
-        passive convention) or Rodrigues vectors.
+        passive convention and degrees) or Rodrigues vectors.
         :param list grain_ids: an optional list for the ids of the new grains.
         """
         grain = self.grains.row
         # build a list of grain ids if it is not given
         if grain_ids is None:
             if self.get_number_of_grains() > 0:
-                min_id = max(self.get_grain_ids())
+                min_id = max(self.get_grain_ids()) + 1
             else:
                 min_id = 0
             grain_ids = range(min_id, min_id + len(orientation_list))
@@ -3017,10 +3060,12 @@ class Microstructure(SampleData):
         print('\n')
         return ipf_map.squeeze()
 
-    def view_slice(self, slice=None, plane='XY', color='random', show_mask=True,
-                   show_grain_ids=False, highlight_ids=None, slip_system=None,
-                   axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None,
-                   show_gb=False, unit='pixel', display=True):
+    def view_slice(self, map_name='grain_map', slice=None, plane='XY',
+                   color='random', show_mask=True,
+                   show_grain_ids=False, highlight_ids=None, circle_ids=False,
+                   slip_system=None, axis=[0., 0., 1], show_slip_traces=False,
+                   hkl_planes=None, show_phases=False, show_gb=False,
+                   unit='pixel', display=True):
         """A simple utility method to show one microstructure slice.
 
         The method extract a 2D orthogonal slice from the microstructure to
@@ -3033,6 +3078,9 @@ class Microstructure(SampleData):
         annotations are shown can be controlled using the `highlight_ids`
         argument. By default, if present, the mask will be shown.
 
+        :param str map_name: name of field to plot from the CellData image
+            ('grain_map', 'phase_map', 'my_data_field'...). Default is
+            'grain_map'.
         :param int slice: the slice number
         :param str plane: the cut plane, must be one of 'XY', 'YZ' or 'XZ'
         :param str color: a string to chose the colormap from ('random',
@@ -3042,6 +3090,8 @@ class Microstructure(SampleData):
             ids.
         :param list highlight_ids: a list of grain ids to restrict the
             annotations (by default all grains are annotated).
+        :param bool circle_ids: activate larger and circled grain ids
+            annotations.
         :param slip_system: an instance (or a list of instances) of the class
             SlipSystem to compute the Schmid factor.
         :param axis: the unit vector for the load direction to compute
@@ -3049,147 +3099,71 @@ class Microstructure(SampleData):
         :param bool show_slip_traces: activate slip traces plot in each grain.
         :param list hkl_planes: the list of planes to plot the slip traces.
         :param str unit: switch between mm and pixel units.
-        :param bool show_gb: show the grain boundaries, works only
-            with color='ipf' for now.
+        :param bool show_gb: show the grain boundaries.
+        :param bool show_phases: show the phases from the phase mapby hatching
+            regions on the slice. Works only if the phase map exists.
         :param bool display: if True, the show method is called, otherwise,
             the figure is simply returned.
         """
-        if self._is_empty('grain_map'):
-            print('Microstructure instance mush have a grain_map field to use '
-                  'this method')
+        # TODO: too many arguments, needs
+        # get the slice to plot
+        slice_map, vmin, vmax = self._get_slice_map(map_name, plane, slice,
+                                                 color, slip_system, axis=axis)
+        if slice_map is None:
+            print('Could not get slice to visualize, returning. ')
             return
-        allowed_planes = ['YZ', 'XZ', 'XY']
-        try:
-            cut_axis = allowed_planes.index(plane)
-        except ValueError:
-            print('cut plane must be either XY, YZ or XZ')
-            return
-        if unit not in ['mm', 'pixel']:
-            print('unit must be mm or pixel, defaulting to pixel')
-            unit = 'pixel'
-        grain_map = self.get_grain_map()
-        if slice is None or slice > grain_map.shape[cut_axis] - 1 or slice < 0:
-            slice = grain_map.shape[cut_axis] // 2
-            print('using slice value %d' % slice)
-        grains_slice = grain_map.take(indices=slice, axis=cut_axis)
-        gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
+        extent = self._set_extent(unit, slice_map)
+        # prepare figure
         fig, ax = plt.subplots()
-        # assuming origin is upper
-        extent = [0, grains_slice.shape[0], grains_slice.shape[1], 0]
-        if unit == 'mm':
-            # work out extent in mm unit
-            extent += np.array([-0.5 * grains_slice.shape[0],
-                                -0.5 * grains_slice.shape[0],
-                                -0.5 * grains_slice.shape[1],
-                                -0.5 * grains_slice.shape[1]])
-            extent *= self.get_voxel_size()
-        if color == 'random':
-            grain_cmap = Microstructure.rand_cmap(first_is_black=True)
-            ax.imshow(grains_slice.T, cmap=grain_cmap, vmin=0,
-                      interpolation='nearest', extent=extent)
-        elif color == 'grain_ids':
-            ax.imshow(grains_slice.T, cmap='viridis', vmin=0,
-                      interpolation='nearest', extent=extent)
-        elif color == 'schmid':
-            # construct a Schmid factor image
-            schmid_image = np.zeros_like(grains_slice, dtype=float)
-            for gid in gids:
-                o = self.get_grain(gid).orientation
-                if type(slip_system) == list:
-                    # compute max Schmid factor
-                    sf = max(o.compute_all_schmid_factors(
-                        slip_systems=slip_system, load_direction=axis))
-                else:
-                    sf = o.schmid_factor(slip_system, axis)
-                schmid_image[grains_slice == gid] = sf
-            plt.imshow(schmid_image.T, cmap=plt.cm.gray, vmin=0, vmax=0.5,
-                       interpolation='nearest', extent=extent)
-            cb = plt.colorbar()
-            cb.set_label('Schmid factor')
-        elif color == 'ipf':
-            # build IPF image with orientation from the grain data table
-            ipf_image = np.zeros((*grains_slice.shape, 3), dtype=float)
-            for gid in gids:
-                o = self.get_grain(gid).orientation
-                try:
-                    c = o.ipf_color(axis, symmetry=self.get_lattice().get_symmetry(), saturate=True)
-                except ValueError:
-                    print('problem moving to the fundamental zone for rodrigues vector {}'.format(o.rod))
-                    c = np.array([0., 0., 0.])
-                ipf_image[grains_slice == gid] = c
-            if show_gb:
-                from skimage import segmentation
-                ipf_image = segmentation.mark_boundaries(ipf_image, grains_slice,
-                                                         color=(0, 0, 0))
-                plt.imshow(ipf_image.transpose(1, 0, 2), extent=extent)
+        # plot map
+        self._print_slice(ax, slice_map, extent, color, vmin, vmax, unit,
+                         plane)
+        if show_mask:
+            mask_slice, vmin, vmax = self._get_slice_map("mask", plane,
+                                                         slice, color)
+            if mask_slice is None:
+                print('Could not get mask slice, proceeding... ')
             else:
-                plt.imshow(ipf_image.transpose(1, 0, 2),
-                           interpolation='nearest', extent=extent)
-        else:
-            print('unknown color scheme requested, please chose between {random, '
-                  'grain_ids, schmid, ipf}, returning')
-            return
-        ax.xaxis.set_label_position('top')
-        plt.xlabel(plane[0] + ' [%s]' % unit)
-        plt.ylabel(plane[1] + ' [%s]' % unit)
-        if not self._is_empty('mask') and show_mask:
-            from pymicro.view.vol_utils import alpha_cmap
-            mask = self.get_mask().take(indices=slice, axis=cut_axis)
-            plt.imshow(mask.T, cmap=alpha_cmap(opacity=0.3), extent=extent)
-
-        # compute the center of mass of each grain of interest in this slice
-        if show_grain_ids or show_slip_traces:
-            centers = np.zeros((len(gids), 2))
-            sizes = np.zeros(len(gids))
-            for i, gid in enumerate(gids):
-                if highlight_ids and gid not in highlight_ids:
-                    continue
-                sizes[i] = np.sum(grains_slice == gid)
-                centers[i] = ndimage.measurements.center_of_mass(
-                    grains_slice == gid, grains_slice)
-            if unit == 'mm':
-                centers += np.array([-0.5 * grains_slice.shape[0],
-                                     -0.5 * grains_slice.shape[1]])
-                centers *= self.get_voxel_size()
-        # grain id labels
-        if show_grain_ids:
-            for i, gid in enumerate(gids):
-                if highlight_ids and gid not in highlight_ids:
-                    continue
-                plt.annotate('%d' % gids[i], xycoords='data',
-                             xy=(centers[i, 0], centers[i, 1]),
-                             horizontalalignment='center',
-                             verticalalignment='center',
-                             color='k',
-                             fontsize=12)
-        # slip traces on this slice for a set of lattice planes
-        n_int = np.zeros(3)
-        n_int[cut_axis] = 1.
-        view_up = [0, -1, 0]
-        if plane == 'XZ':
-            view_up = [0, 0, -1]
-            n_int[cut_axis] = -1.
-        elif plane == 'YZ':
-            view_up = [0, 0, -1]
-        if show_slip_traces and hkl_planes:
-            for i, gid in enumerate(gids):
-                if highlight_ids and gid not in highlight_ids:
-                    continue
-                g = self.get_grain(gid)
-                for hkl in hkl_planes:
-                    trace = hkl.slip_trace(g.orientation,
-                                           n_int=n_int,
-                                           view_up=view_up,
-                                           trace_size=0.8 * np.sqrt(sizes[i]),
-                                           verbose=False)
-                    if unit == 'mm':
-                        trace *= self.get_voxel_size()
-                    color = 'k'
-                    x = centers[i][0] + np.array([-trace[0] / 2, trace[0] / 2])
-                    y = centers[i][1] + np.array([-trace[1] / 2, trace[1] / 2])
-                    plt.plot(x, y, '-', linewidth=1, color=color)
-                # prevent axis to move due to traces spanning outside the map
-                plt.axis(extent)
+                self._overlay_slice(ax, mask_slice, extent)
+        # specific grain related annotations for grain map
+        if (show_grain_ids or show_slip_traces):
+            # recompute grain map slice : call with random cmap to handle
+            # schid and ipf case
+            grains_slice, vmin, vmax = self._get_slice_map("grain_map",
+                                plane, slice, "random", slip_system, axis=axis)
+            # compute grain ids and grain centers
+            centers, sizes, gids = self._get_slice_grain_centers(grains_slice,
+                                                           unit, highlight_ids)
+            if show_grain_ids:
+                # print grain id on center on each grain
+                self._overlay_ids(ax, centers, gids, highlight_ids, circle_ids)
+            if show_slip_traces and hkl_planes:
+                # print slip traces for desired slip system on each grain
+                # TODO: adapt for multi phase material
+                self._overlay_slip_traces(ax, centers, gids, highlight_ids,
+                                        sizes, hkl_planes, plane, unit, extent)
+        # show grain boundaries on the map
+        if show_gb:
+            # recompute grain map slice : call with random cmap to handle
+            # schid and ipf case
+            grains_slice, vmin, vmax = self._get_slice_map("grain_map",
+                                plane, slice, "random", slip_system, axis=axis)
+            if grains_slice is None:
+                print('Could not get grain map to plot grain boundaries'
+                      ', proceeding... ')
+            else:
+                extent = self._set_extent(unit, grains_slice)
+                self._overlay_gb(ax, grains_slice, extent)
+        # phases on the map
+        if show_phases:
+            phase_slice, vmin, vmax = self._get_slice_map("phase_map",
+                                   plane, slice, color, slip_system)
+            if phase_slice is None:
+                print('Could not get phase slice, proceeding... ')
+            else:
+                extent = self._set_extent(unit, phase_slice,
+                                          vertical_reverse=False)
+                self._hatch_phases(ax, phase_slice, extent)
         if display:
             plt.show()
         return fig, ax
@@ -3559,9 +3533,9 @@ class Microstructure(SampleData):
         after the dilation by setting the `update_microstructure_properties`
         parameter to True.
 
-        :param int dilation_steps: the number of dilation steps to 
+        :param int dilation_steps: the number of dilation steps to
             apply to the grain map.
-        :param list dilation_ids: a list to restrict the dilation to 
+        :param list dilation_ids: a list to restrict the dilation to
             the given ids.
         :param str new_map_name: the name to use for the dilated grain map.
         :param bool update_microstructure_properties: a flag to update all
@@ -3593,7 +3567,7 @@ class Microstructure(SampleData):
             self.recompute_grain_volumes()
             # and update the phase map if necessary
             if not self._is_empty('phase_map'):
-                self.update_phase_map()
+                self.update_phase_map_from_grains()
 
     def clean_grain_map(self,  new_map_name='grain_map_clean'):
         """Apply a morphological cleaning treatment to the active grain map.
@@ -4048,9 +4022,9 @@ class Microstructure(SampleData):
                 bbox = x_indices, y_indices, z_indices
             except (ValueError, TypeError, IndexError):
                 '''
-                ValueError or TypeError can arise for grains in the data table 
-                that are not in the grain map (None will be returned from 
-                find_objects). IndexError can occur if these grain ids are 
+                ValueError or TypeError can arise for grains in the data table
+                that are not in the grain map (None will be returned from
+                find_objects). IndexError can occur if these grain ids are
                 larger than the maximum id in the grain map.
                 '''
                 print('skipping grain %d' % g['idnumber'])
@@ -4766,7 +4740,8 @@ class Microstructure(SampleData):
         f.close()
 
     @staticmethod
-    def from_dream3d(file_path, main_key='DataContainers',
+    def from_dream3d(file_path,
+                     main_key='DataContainers',
                      data_container='DataContainer',
                      ensemble_data='EnsembleData',
                      grain_data='FeatureData',
@@ -4811,6 +4786,7 @@ class Microstructure(SampleData):
         :return: a `Microstructure` instance created from the dream3d file.
         """
         head, tail = os.path.split(file_path)
+        tail = tail.strip('.dream3d')
         with h5py.File(file_path, 'r') as f:
             # get information on the material phases
             phases_data_path = '%s/%s/%s' % (main_key, data_container, ensemble_data)
@@ -4823,25 +4799,38 @@ class Microstructure(SampleData):
                 lattice_constants = f[phases_data_path]['LatticeConstants'][()][phase_id]
                 for i in range(3):
                     lattice_constants[i] = lattice_constants[i] / 10  # use nm unit
-                print('found phase with crystal structure %d' % n)
+                # print('found phase with crystal structure %d' % n)
                 l = Lattice.from_parameters(*lattice_constants, symmetry=Symmetry.from_dream3d(n))
                 phase = CrystallinePhase(phase_id=phase_id, name=phase_names[phase_id], lattice=l)
                 phase_list.append(phase)
             # initialize our microstructure
-            micro = Microstructure(name=tail, phase=phase_list[0], overwrite_hdf5=True)
-            if n_phases > 1:
-                micro.set_phases(phase_list)
+            micro = Microstructure(name=tail, phase=phase_list, overwrite_hdf5=True)
+            # if n_phases > 1:
+            #     micro.set_phases(phase_list)
             # now get grain data informations
             grain_data_path = '%s/%s/%s' % (main_key, data_container, grain_data)
             grain_orientations = f[grain_data_path][grain_orientations][()]
-            centroids = f[grain_data_path][grain_centroids][()]
+            # switch to degrees
+            grain_orientations = grain_orientations*(180./np.pi)
+            # suppose that the grains are number from 0 or 1 to Ngrains by
+            # dream3D
+            gids = np.array(range(grain_orientations.shape[0]))
+            try:
+                centroids = f[grain_data_path][grain_centroids][()]
+            except:
+                centroids = None
             if np.array_equal(grain_orientations[0], [0., 0., 0.]):
                 # skip the background
                 grain_orientations = grain_orientations[1:]
-                centroids = centroids[1:]
-            micro.add_grains(grain_orientations, orientation_type=grain_orientations_type)
-            micro.set_centers(centroids)
-            print('%d grains in the data set' % micro.get_number_of_grains())
+                gids = gids[1:]
+                if centroids is not None:
+                    centroids = centroids[1:]
+            micro.add_grains(grain_orientations,
+                             orientation_type=grain_orientations_type,
+                             grain_ids=gids)
+            if centroids is not None:
+                micro.set_centers(centroids)
+            # print('%d grains in the data set' % micro.get_number_of_grains())
             # read voxel size and origin
             geom_path = '%s/%s/_SIMPL_GEOMETRY' % (main_key, data_container)
             voxel_size = f[geom_path]['SPACING'][()]
@@ -4849,11 +4838,11 @@ class Microstructure(SampleData):
             print(voxel_size)
             # now read cell data
             cell_data_path = '%s/%s/%s' % (main_key, data_container, cell_data)
-            grain_ids = f[cell_data_path][grain_ids][:, :, :, 0]
+            grain_ids = f[cell_data_path][grain_ids][:, :, :, 0].transpose()
             cell_data_shape = grain_ids.shape
             print('CellData dimensions:', cell_data_shape)
-            mask = f[cell_data_path][mask][:, :, :, 0]
-            phases = f[cell_data_path][phases][:, :, :, 0]
+            mask = f[cell_data_path][mask][:, :, :, 0].transpose()
+            phases = f[cell_data_path][phases][:, :, :, 0].transpose()
             # now assign these arrays to the microstructure
             micro.set_grain_map(grain_ids, voxel_size=voxel_size)
             micro.set_origin('CellData', origin)
@@ -4888,6 +4877,8 @@ class Microstructure(SampleData):
         else:
             return
 
+# TODO: create ReaderClasses to improve methods factorisation, customization
+#       and readability
     @staticmethod
     def from_neper(neper_file_path):
         """Create a microstructure from a neper tesselation.
@@ -5056,10 +5047,11 @@ class Microstructure(SampleData):
         m.build_grain_table_from_grain_map()
         # now get each grain orientation from the rodrigues map
         from tqdm import tqdm
+        i = 0
         for g in tqdm(m.grains):
             gid = g['idnumber']
-            #progress = 100 * (1 + i) / len(m.grains)
-            #print('adding grains: {0:.2f} %'.format(progress), end='\r')
+            progress = 100 * (1 + i) / len(m.grains)
+            print('adding grains: {0:.2f} %'.format(progress), end='\r')
             # use the grain bounding box
             bb = g['bounding_box']
             grain_map = m.get_grain_map()[bb[0][0]:bb[0][1],
@@ -5071,6 +5063,7 @@ class Microstructure(SampleData):
                                      bb[2][0]:bb[2][1]][grain_map == gid]
             g['orientation'] = Orientation.compute_mean_rodrigues(rods_gid, symmetry=sym)
             g.update()
+            i = i+1
         m.grains.flush()
 
         if include_ipf_map:
@@ -5079,19 +5072,19 @@ class Microstructure(SampleData):
                 if 'IPF001' in f['LabDCT/Data']:
                     IPF001_map = f['LabDCT/Data/IPF001'][()].transpose(2, 1, 0, 3)
                 else:
-                    IPF001_map = micro.create_IPF_map(axis=np.array([0., 0., 1.]))
+                    IPF001_map = m.create_IPF_map(axis=np.array([0., 0., 1.]))
                 m.add_field(gridname='CellData', fieldname='IPF001_map',
                             array=IPF001_map)
                 if 'IPF010' in f['LabDCT/Data']:
                     IPF010_map = f['LabDCT/Data/IPF010'][()].transpose(2, 1, 0, 3)
                 else:
-                    IPF010_map = micro.create_IPF_map(axis=np.array([0., 1., 0.]))
+                    IPF010_map = m.create_IPF_map(axis=np.array([0., 1., 0.]))
                 m.add_field(gridname='CellData', fieldname='IPF010_map',
                             array=IPF010_map)
                 if 'IPF100' in f['LabDCT/Data']:
                     IPF100_map = f['LabDCT/Data/IPF100'][()].transpose(2, 1, 0, 3)
                 else:
-                    IPF100_map = micro.create_IPF_map(axis=np.array([1., 0., 0.]))
+                    IPF100_map = m.create_IPF_map(axis=np.array([1., 0., 0.]))
                 m.add_field(gridname='CellData', fieldname='IPF100_map',
                             array=IPF100_map)
                 del IPF001_map, IPF010_map, IPF100_map
@@ -5128,7 +5121,7 @@ class Microstructure(SampleData):
             orientations as a rodrigues vector array.
         :param str rod_map_key: the key to access the phase rodrigues vector
             array in the file.
-        :param list roi: specify a region of interest by a list of 6 
+        :param list roi: specify a region of interest by a list of 6
             integers in the form [x1, x2, y1, y2, z1, z2] to crop the grain map.
         :param bool verbose: activate verbose mode.
         :return: a `Microstructure` instance created from the DCT reconstruction.
@@ -5322,11 +5315,13 @@ class Microstructure(SampleData):
             the grains (default is 5 degrees).
         :param float min_ci: minimum confidence index for a pixel to be a valid
             EBSD measurement.
-        :param list phase_list: a list of CrystallinePhase to overwrite the ones 
-            in the file, this is particularly useful for osc files as phases 
+        :param list phase_list: a list of CrystallinePhase to overwrite the ones
+            in the file, this is particularly useful for osc files as phases
             cannot be read from them at the moment.
         :return: a new instance of `Microstructure`.
         """
+        # TODO: segmentation super slow, need to reconsider the process
+        #       (Dream3D hundreds to thousand times faster)
         # Get name of file and create microstructure instance
         name = os.path.splitext(os.path.basename(file_path))[0]
         micro = Microstructure(name=name, autodelete=False, overwrite_hdf5=True)
@@ -5721,6 +5716,258 @@ class Microstructure(SampleData):
         merged_micro.sync()
         return merged_micro
 
+    def _get_slice_map(self, map_name, plane, slice, color, slip_system=None,
+                       axis=[0., 0., 1]):
+        """Get slice of a CellData field for view slice visualization."""
+        vmin=None
+        vmax=None
+        # check map presence
+        if self._is_empty(map_name):
+            msg = (f'Microstructure instance must have a {map_name} field to '
+                    'view it with "view_slice"')
+            print(msg)
+            return None, None, None
+        # check selected plane
+        allowed_planes = ['YZ', 'XZ', 'XY']
+        try:
+            cut_axis = allowed_planes.index(plane)
+        except ValueError:
+            msg = ('cut plane must be either XY, YZ or XZ')
+            print(msg)
+            return None
+        # get right map to plot --> special case for grain and phase map to
+        # get active map
+        if map_name == "grain_map":
+            map_array = self.get_grain_map()
+            vmin = 0
+        elif map_name == "phase_map":
+            map_array = self.get_phase_map()
+        elif map_name == "mask":
+            map_array = self.get_mask()
+        else:
+            map_array = self[map_name]
+        # Check if slice value fits and otherwise computes half size slice
+        if slice is None or slice > map_array.shape[cut_axis] - 1 or slice < 0:
+            slice = map_array.shape[cut_axis] // 2
+            print('using slice value %d' % slice)
+        # cut slice from map
+        map_slice = map_array.take(indices=slice, axis=cut_axis)
+        if map_name == "grain_map":
+            # Compute slice for schmid factor
+            if (color == 'schmid'):
+                map_slice = self._build_schmid_factor_map(map_slice,
+                                                          slip_system, axis)
+                vmin = 0
+                vmax = 0.5
+            # Compute image for IPF
+            if (color == 'ipf'):
+                map_slice = self._build_ipf_map(map_slice, axis)
+        return map_slice, vmin, vmax
+
+    def _get_slice_grain_centers(self, grains_slice, unit, highlight_ids):
+        """Get coordinates of grain centers in slice."""
+        gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
+        centers = np.zeros((len(gids), 2))
+        sizes = np.zeros(len(gids))
+        for i, gid in enumerate(gids):
+            if highlight_ids and gid not in highlight_ids:
+                continue
+            sizes[i] = np.sum(grains_slice == gid)
+            centers[i] = ndimage.measurements.center_of_mass(
+                grains_slice == gid, grains_slice)
+        if unit == 'mm':
+            centers += np.array([-0.5 * grains_slice.shape[0],
+                                 -0.5 * grains_slice.shape[1]])
+            centers *= self.get_voxel_size()
+        return centers, sizes, gids
+
+    def _build_schmid_factor_map(self, grains_slice, slip_system, axis):
+        """Compute Schmid factor map for view slice."""
+        schmid_image = np.zeros_like(grains_slice, dtype=float)
+        # get ids of the grain whose schmid factor must be computed
+        gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
+        for gid in gids:
+            o = self.get_grain(gid).orientation
+            if type(slip_system) == list:
+                # compute max Schmid factor
+                sf = max(o.compute_all_schmid_factors(
+                    slip_systems=slip_system, load_direction=axis))
+            else:
+                sf = o.schmid_factor(slip_system, axis)
+            schmid_image[grains_slice == gid] = sf
+        return schmid_image
+
+    def _build_ipf_map(self, grains_slice, axis):
+        """Compute IPF map for view slice."""
+        ipf_image = np.zeros((*grains_slice.shape, 3), dtype=float)
+        gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
+        for gid in gids:
+            o = self.get_grain(gid).orientation
+            try:
+                c = o.ipf_color(axis,
+                                symmetry=self.get_lattice().get_symmetry(),
+                                saturate=True)
+            except ValueError:
+                print('problem moving to the fundamental zone for '
+                      'rodrigues vector {}'.format(o.rod))
+                c = np.array([0., 0., 0.])
+            # print(c)
+            ipf_image[grains_slice == gid] = c
+        return ipf_image
+
+    def _set_slice_colors(self, color):
+        """Set colormap to plot grain map in slice view."""
+        if color == 'random':
+            cmap = Microstructure.rand_cmap(first_is_black=True)
+        elif (color == 'grain_ids') or (color == 'values'):
+            cmap = 'viridis'
+        elif color == 'schmid':
+            cmap = plt.cm.gray
+        elif color == 'ipf':
+            cmap = None
+        else:
+            print('unknown color scheme requested, please chose between '
+                  '{random, grain_ids, values, schmid, ipf}, returning')
+            return
+        return cmap
+
+    def _set_extent(self, unit, slice_map, vertical_reverse=True):
+        """Set length unit to plot grain map in slice view."""
+        # extent is used to control size the axes in which the images are
+        # plotted by "imshow" or "contourf"
+        if unit not in ['mm','µm', 'pixel']:
+            print('unit must be mm, µm or pixel, defaulting to pixel')
+            unit = 'pixel'
+        # extent seems to need to be reversed in Y direction for contour plots
+        # Why ?? --> used to plot hatched regions with contourf
+        if vertical_reverse:
+            extent = [0, slice_map.shape[0], slice_map.shape[1], 0]
+        else:
+            extent = [0, slice_map.shape[0], 0, slice_map.shape[1]]
+        if (unit == 'mm') or (unit == 'µm'):
+            # work out extent in mm unit
+            extent += np.array([-0.5 * slice_map.shape[0],
+                                -0.5 * slice_map.shape[0],
+                                -0.5 * slice_map.shape[1],
+                                -0.5 * slice_map.shape[1]])
+            extent *= self.get_voxel_size()
+        return extent
+
+    def _print_slice(self, ax, slice_map, extent, color, vmin, vmax, unit,
+                     plane):
+        """Plot slice with viridis color map."""
+        if color == 'ipf':
+            image = slice_map.transpose(1, 0, 2)
+        else:
+            image = slice_map.T
+        cmap = self._set_slice_colors(color)
+        im = ax.imshow(image, cmap=cmap, vmin=vmin, vmax=vmax,
+                       interpolation='nearest', extent=extent)
+        # add color bar if schmid factor plot requested
+        if color == 'schmid':
+            cb = plt.colorbar(im)
+            cb.set_label('Schmid factor')
+        # add axes legend
+        ax.xaxis.set_label_position('top')
+        plt.xlabel(plane[0] + ' [%s]' % unit)
+        plt.ylabel(plane[1] + ' [%s]' % unit)
+        return
+
+    def _overlay_slice(self, ax, slice_map, extent):
+        """Overlay a field over the view slice plot (usually mask)."""
+        from pymicro.view.vol_utils import alpha_cmap
+        ax.imshow(slice_map.T, cmap=alpha_cmap(opacity=0.3), extent=extent)
+
+    def _overlay_ids(self, ax, centers, gids, highlight_ids, circle_ids):
+        """Overlay grain ids on grain map slice view."""
+        if circle_ids:
+            bbox_dic = dict(boxstyle="circle,pad=0.1", fc="white")
+        else:
+            bbox_dic = None
+        for i, gid in enumerate(gids):
+            if highlight_ids and gid not in highlight_ids:
+                continue
+            ax.annotate('%d' % gids[i], xycoords='data',
+                         xy=(centers[i, 0], centers[i, 1]),
+                         horizontalalignment='center',
+                         verticalalignment='center',
+                         color='k', fontsize=12,
+                         bbox=bbox_dic)
+
+    def _overlay_slip_traces(self, ax, centers, gids, highlight_ids, sizes,
+                             hkl_planes, plane, unit, extent):
+        """Overlay slip traces on grain map slice view."""
+        # TODO: adapt for multi phase material
+        # TODO: scale slip traces with surface/slip plane angle ?
+        allowed_planes = ['YZ', 'XZ', 'XY']
+        cut_axis = allowed_planes.index(plane)
+        n_int = np.zeros(3)
+        n_int[cut_axis] = 1.
+        view_up = [0, -1, 0]
+        if plane == 'XZ':
+            view_up = [0, 0, -1]
+            n_int[cut_axis] = -1.
+        elif plane == 'YZ':
+            view_up = [0, 0, -1]
+        for i, gid in enumerate(gids):
+            if highlight_ids and gid not in highlight_ids:
+                continue
+            g = self.get_grain(gid)
+            for hkl in hkl_planes:
+                trace = hkl.slip_trace(g.orientation,
+                                       n_int=n_int,
+                                       view_up=view_up,
+                                       trace_size=0.8 * np.sqrt(sizes[i]),
+                                       verbose=False)
+                if unit == 'mm':
+                    trace *= self.get_voxel_size()
+                color = 'k'
+                x = centers[i][0] + np.array([-trace[0] / 2, trace[0] / 2])
+                y = centers[i][1] + np.array([-trace[1] / 2, trace[1] / 2])
+                ax.plot(x, y, '-', linewidth=1, color=color)
+            # prevent axis to move due to traces spanning outside the map
+            plt.axis(extent)
+
+    def _overlay_gb(self, ax, grains_slice, extent):
+        """Plot grain boundaries in slice view."""
+        from skimage import filters
+        grain_boundaries = filters.roberts(grains_slice) > 0
+        gb_slice = np.ma.masked_where(grain_boundaries == 0, grain_boundaries)
+        ax.imshow(gb_slice.T, extent=extent, cmap='Greys_r')
+        return
+
+
+    def _hatch_phases(self, ax, phase_slice, extent):
+        """Plot phases in slice view by hatching regions from phase map."""
+        # get number of levels
+        n_phases = np.unique(phase_slice).shape[0]
+        # create hatches list  --> set for only 10 phases
+        H_list = [None, '+','x','.','/','\\','-','|','.-','/-']
+        # plot phases as hatched regions
+        cs = ax.contourf(phase_slice.T, colors='black', vmin=0,
+                     levels=n_phases-1, alpha=0.0, hatches=H_list,
+                     extent=extent)
+        # build legend for phase hatches
+        artists, labels = cs.legend_elements(variable_name='phase',
+                                        str_format='{:2.1f}'.format)
+        # overwrite labels with name of phases
+        for i in range(len(artists)):
+            labels[i] = f'$\\varphi_{i+1}$'
+        legend = plt.legend(artists, labels, handleheight=2,
+                        framealpha=1, bbox_to_anchor=(0.5, 1.05),
+                        loc="lower center", mode="None", ncol=4,
+                        markerscale=1.5)
+        handles = legend.legendHandles
+        # reduce width off hatches to allow visualization of grain
+        # ids etc...
+        for i, handle in enumerate(handles):
+            handle.set_edgecolor("black") # set_edgecolors
+            handle.set_facecolor("white") # set_edgecolors
+            handle.set_hatch(H_list[i])
+            handle.set_alpha(0.8)
+        plt.rcParams['hatch.linewidth'] = 0.5
+        return
+
     def get_grain_boundaries_map(self, kernel_size=3):
         """
         method to compute grain boundaries map using microstructure grain_map
@@ -5864,3 +6111,4 @@ class Microstructure(SampleData):
             micro_resampled.recompute_grain_volumes(verbose)
             
         return micro_resampled
+

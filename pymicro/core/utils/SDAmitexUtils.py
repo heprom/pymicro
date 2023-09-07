@@ -236,7 +236,7 @@ class SDAmitexIO():
         # Fill strain dict with output
         for file in eps_files:
             eps_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
-            increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
+            increment = int(incr_pattern.findall(file)[0].strip('.vtk'))
             comp_list = comp_pattern.findall(file)
             if len(comp_list) == 0:
                 # all components are within the same vtk file
@@ -384,7 +384,7 @@ class SDAmitexIO():
         reader.Update()
         # read raw data
         Array = reader.GetOutput().GetCellData().GetArray(0)
-        # spacing = reader.GetOutput().GetSpacing()
+        spacing = reader.GetOutput().GetSpacing()
         dim = reader.GetOutput().GetDimensions()
         output_shape = tuple([i-1 for i in dim])
         data = numpy_support.vtk_to_numpy(Array)
@@ -394,7 +394,46 @@ class SDAmitexIO():
             data = data[output_slice[0,0]:output_slice[0,1],
                         output_slice[1,0]:output_slice[1,1],
                         output_slice[2,0]:output_slice[2,1],...]
-        return data
+        return data, spacing
+    
+    def write_vtk_legacy(array, vtk_path='output', spacing=1,
+                         array_name="mat_id"):
+        """ Writes a vtk legacy file from a numpy array
+
+        :param array: Numpy array to write as binary image
+        :type array: numpy array 
+        :param output_name: path of the vtk file to write
+        :type output_name: string
+
+        """
+        from vtk.util import numpy_support
+        
+        # transform data to vtk data array
+        vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array, order='F'),
+                                                    deep=1)
+        vtk_data_array.SetName(array_name)
+        
+        # Init VTK regular grid 
+        if len(spacing) == 1:
+            voxel_size = np.array([spacing, spacing, spacing])
+        else:
+            voxel_size = spacing
+            
+        grid = vtk.vtkImageData()
+        size = array.shape
+        grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
+        grid.GetCellData().SetScalars(vtk_data_array)
+        grid.SetSpacing(voxel_size[0], voxel_size[1], voxel_size[2])
+        
+        # Init vtk writer and write file
+        writer = vtk.vtkStructuredPointsWriter()
+        writer.SetFileName('%s.vtk' % vtk_path)
+        writer.SetFileTypeToBinary()
+        writer.SetInputData(grid)
+        writer.Write()
+        
+        print(f'File {vtk_path}.vtk written as VTK legacy file')
+        return
 
     @staticmethod
     def get_amitex_tension_test_relevant_slice(init_shape, grip_size=1,

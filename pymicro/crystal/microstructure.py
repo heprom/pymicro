@@ -871,7 +871,7 @@ class Orientation:
         return o
 
     @staticmethod
-    def from_amitex(data_dir='.', binary=True):
+    def from_amitex(data_dir='.', sample_name=None, binary=True):
         """This methods reads the orientations from Amitex files.
 
         The orientation data is read from 6 files: N1X.bin, N1Y.bin, N1Z.bin,
@@ -887,7 +887,11 @@ class Orientation:
         files = ['N1X', 'N1Y', 'N1Z', 'N2X', 'N2Y', 'N2Z']
         if binary:
             for file_name in files:
-                file_name = '%s_%s.bin' % (self.get_sample_name(), file_name)
+                if sample_name:
+                    file_name = '%s_%s.bin' % (sample_name, file_name)
+                else:
+                    file_name = '%s.bin' % file_name
+
                 with open(os.path.join(data_dir, file_name), 'rb') as f:
                     line = f.readline()
                     n = int(line.decode('utf-8').split('\n')[0])
@@ -898,7 +902,10 @@ class Orientation:
         else:
             # using ascii file format
             for file_name in files:
-                file_name = '%s_%s.txt' % (self.get_sample_name(), file_name)
+                if sample_name:
+                    file_name = '%s_%s.txt' % (sample_name, file_name)
+                else:
+                    file_name = '%s.txt' % file_name
                 with open(os.path.join(data_dir, file_name), 'r') as f:
                     n_components.append(np.atleast_1d(np.genfromtxt(file_name)))
                 n = len(n_components[-1])

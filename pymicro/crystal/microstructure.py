@@ -884,9 +884,10 @@ class Orientation:
         """
         orientations = []
         n_components = []
+        files = ['N1X', 'N1Y', 'N1Z', 'N2X', 'N2Y', 'N2Z']
         if binary:
-            for file_name in ['N1X.bin', 'N1Y.bin', 'N1Z.bin',
-                              'N2X.bin', 'N2Y.bin', 'N2Z.bin']:
+            for file_name in files:
+                file_name = '%s_%s.bin' % (self.get_sample_name(), file_name)
                 with open(os.path.join(data_dir, file_name), 'rb') as f:
                     line = f.readline()
                     n = int(line.decode('utf-8').split('\n')[0])
@@ -896,8 +897,8 @@ class Orientation:
                     assert (len(n_components[-1]) == n)
         else:
             # using ascii file format
-            for file_name in ['N1X.txt', 'N1Y.txt', 'N1Z.txt',
-                              'N2X.txt', 'N2Y.txt', 'N2Z.txt']:
+            for file_name in files:
+                file_name = '%s_%s.txt' % (self.get_sample_name(), file_name)
                 with open(os.path.join(data_dir, file_name), 'r') as f:
                     n_components.append(np.atleast_1d(np.genfromtxt(file_name)))
                 n = len(n_components[-1])

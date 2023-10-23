@@ -1700,21 +1700,23 @@ class Grain:
             if verbose:
                 print('thresholding label: %d' % label)
                 print(thresh.GetOutput())
-            edges = vtk.vtkExtractEdges()
-            edges.SetInputConnection(thresh.GetOutputPort())
-            edges.Update()
-            self.SetVtkMesh(edges.GetOutput())
+            #edges = vtk.vtkExtractEdges()
+            #edges.SetInputConnection(thresh.GetOutputPort())
+            #edges.Update()
+            #self.SetVtkMesh(edges.GetOutput())
+            thresh.Update()
+            self.SetVtkMesh(thresh.GetOutput())
 
     def vtk_file_name(self):
-        return 'grain_%d.vtp' % self.id
+        return 'grain_%d.vtu' % self.id
 
     def save_vtk_repr(self, file_name=None):
         import vtk
         if not file_name:
             file_name = self.vtk_file_name()
         print('writting ' + file_name)
-        writer = vtk.vtkXMLPolyDataWriter()
-        #writer = vtk.vtkXMLUnstructuredGridWriter()
+        #writer = vtk.vtkXMLPolyDataWriter()
+        writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(file_name)
         if vtk.vtkVersion().GetVTKMajorVersion() > 5:
             writer.SetInputData(self.vtkmesh)
@@ -1726,8 +1728,8 @@ class Grain:
         import vtk
         if verbose:
             print('reading ' + file_name)
-        #reader = vtk.vtkXMLUnstructuredGridReader()
-        reader = vtk.vtkXMLPolyDataReader()
+        reader = vtk.vtkXMLUnstructuredGridReader()
+        #reader = vtk.vtkXMLPolyDataReader()
         reader.SetFileName(file_name)
         reader.Update()
         self.vtkmesh = reader.GetOutput()
@@ -4753,7 +4755,8 @@ class Microstructure(SampleData):
                      mask='Mask',
                      phases='Phases',
                      orientations='EulerAngles',
-                     orientations_type='euler'
+                     orientations_type='euler',
+                     ipf_color='IPFColor'
                      ):
         """Read a microstructure from a Dream3d hdf5 file.
 
@@ -4842,12 +4845,14 @@ class Microstructure(SampleData):
             cell_data_shape = grain_ids.shape
             print('CellData dimensions:', cell_data_shape)
             mask = f[cell_data_path][mask][:, :, :, 0].transpose()
-            phases = f[cell_data_path][phases][:, :, :, 0].transpose()
             # now assign these arrays to the microstructure
             micro.set_grain_map(grain_ids, voxel_size=voxel_size)
             micro.set_origin('CellData', origin)
             micro.set_mask(mask)
-            micro.set_phase_map(phases)
+            # add phase map array if needed
+            if phases in f[cell_data_path].keys():
+                phase_map = f[cell_data_path][phases][:, :, :, 0].transpose()
+                micro.set_phase_map(phase_map)
             # add voxel wise orientation data
             if orientations in f[cell_data_path].keys():
                 print('adding orientation field from key %s' % orientations)
@@ -4862,6 +4867,10 @@ class Microstructure(SampleData):
                 else:
                     print('warning, only euler and rodrigues type supported at the moment')
                 micro.set_orientation_map(orientation_map)
+            if ipf_color in f[cell_data_path].keys():
+                print('adding IPF color field from key %s' % ipf_color)
+                ipf_map = f[cell_data_path][ipf_color][:, :, :, :].transpose(2, 1, 0, 3)
+                micro.add_field(gridname='CellData', fieldname=ipf_color, array=ipf_map, replace=True)
             del grain_ids, mask, phases,
         return micro
 
@@ -4901,6 +4910,12 @@ class Microstructure(SampleData):
         micro = Microstructure(name=name, filename=filename, overwrite_hdf5=True)
         with open(neper_file_path, 'r', encoding='latin-1') as f:
             line = f.readline()  # ***tesr
+            line = f.readline()  # **format
+            format_tokens = f.readline().strip().split()
+            print(format_tokens)
+            format_version = float(format_tokens[0])
+            if format_version <= 2.0:
+                data_type = format_tokens[1]
             # look for **general
             while True:
                 line = f.readline().strip()  # get rid of unnecessary spaces
@@ -4912,44 +4927,47 @@ class Microstructure(SampleData):
             print(dims)
             voxel_size = np.array(f.readline().split()).astype(float).tolist()
             print(voxel_size)
-            line = f.readline().strip()
+            #line = f.readline().strip()
             origin = np.array([0., 0., 0.])
-            if line.startswith('*origin'):
-                origin = np.array(f.readline().split()).astype(float)
-                print('origin will be set to', origin)
             # look for **cell
             while True:
                 line = f.readline().strip()
+                if line.startswith('*origin'):
+                    origin = np.array(f.readline().split()).astype(float)
+                    print('origin will be set to', origin)
                 if line.startswith('**cell'):
                     break
             n = int(f.readline().strip())
             print('microstructure contains %d grains' % n)
             f.readline()  # *id
             grain_ids = []
-            # look for *ori
+            # read the cell ids
             while True:
                 line = f.readline().strip()
-                if line.startswith('*ori'):
+                if line.startswith('*'):
                     break
                 else:
                     grain_ids.extend(np.array(line.split()).astype(int).tolist())
             print('grain ids are:', grain_ids)
-            oridescriptor = f.readline().strip()  # must be euler-bunge:passive
-            if oridescriptor != 'euler-bunge:passive':
-                print('Wrong orientation descriptor: %s, must be '
-                      'euler-bunge:passive' % oridescriptor)
-            grain = micro.grains.row
-            for i in range(n):
-                euler_angles = np.array(f.readline().split()).astype(float).tolist()
-                print('adding grain %d' % grain_ids[i])
-                grain['idnumber'] = grain_ids[i]
-                grain['orientation'] = Orientation.from_euler(euler_angles).rod
-                grain.append()
-            micro.grains.flush()
+            # current line may be *ori or **data
+            has_ori = 'ori' in line
+            print('has orientation data:', has_ori)
+            if has_ori:
+                oridescriptor = f.readline().strip()  # must be euler-bunge:passive
+                if oridescriptor != 'euler-bunge:passive':
+                    print('Wrong orientation descriptor: %s, must be '
+                          'euler-bunge:passive' % oridescriptor)
+                grain = micro.grains.row
+                for i in range(n):
+                    euler_angles = np.array(f.readline().split()).astype(float).tolist()
+                    print('adding grain %d' % grain_ids[i])
+                    grain['idnumber'] = grain_ids[i]
+                    grain['orientation'] = Orientation.from_euler(euler_angles).rod
+                    grain.append()
+                micro.grains.flush()
             # look for **data and handle *group if present
             phase_ids = None
             while True:
-                line = f.readline().strip()
                 if line.startswith('*group'):
                     print('multi phase sample')
                     phase_ids = []
@@ -4961,7 +4979,12 @@ class Microstructure(SampleData):
                             phase_ids.extend(np.array(line.split()).astype(int).tolist())
                     print('phase ids are:', phase_ids)
                 if line.startswith('**data'):
+                    if format_version > 2.0:
+                        # read the data type
+                        data_type = f.readline().strip()
+                    print('data type is %s' % data_type)
                     break
+                line = f.readline().strip()
             print(f.tell())
             print('reading data from byte %d' % f.tell())
             data = np.fromfile(f, dtype=np.uint16)[:-4]  # leave out the last 4 values

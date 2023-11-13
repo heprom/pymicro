@@ -734,6 +734,19 @@ class Lattice:
             parameters = [a, b, c, alpha, beta, gamma]
         return parameters
 
+    def get_lattice_constants(self, angstrom=False):
+        """Return a list of the 6 elastic constants.
+
+        By default the units are nanometer and degrees.
+
+        :param bool angstrom: if True the lattice length parameters
+        are returned in angtrom.
+        :return: a list of the 6 lattice constants.
+        """
+        a, b, c = self._lengths * 10 if angstrom is True else self._lengths
+        alpha, beta, gamma = self._angles
+        return [a, b, c, alpha, beta, gamma]
+
     def metric_tensor(self):
         """Compute the metric tensor for this lattice."""
         a, b, c = self._lengths
@@ -1270,18 +1283,18 @@ class SlipSystem:
             slip_systems.append(SlipSystem.from_indices((0, 1, 0), (1, 0, 1), lattice))  # G3
             '''
         elif slip_type in ['oct', '111']:
-            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 0, 1), lattice))  # Bd
-            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (0, -1, 1), lattice))  # Ba
-            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 1, 0), lattice))  # Bc
-            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (-1, 0, 1), lattice))  # Db
-            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (0, 1, 1), lattice))  # Dc
-            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (1, 1, 0), lattice))  # Da
-            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (0, -1, 1), lattice))  # Ab
-            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (1, 1, 0), lattice))  # Ad
-            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (1, 0, 1), lattice))  # Ac
-            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (-1, 1, 0), lattice))  # Cb
-            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (1, 0, 1), lattice))  # Ca
-            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (0, 1, 1), lattice))  # Cd
+            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 0, 1), lattice))  # B4 - Bd
+            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (0, -1, 1), lattice))  # B2 - Ba
+            slip_systems.append(SlipSystem.from_indices((1, 1, 1), (-1, 1, 0), lattice))  # B5 - Bc
+            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (-1, 0, 1), lattice))  # D4 - Db
+            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (0, 1, 1), lattice))  # D1 - Dc
+            slip_systems.append(SlipSystem.from_indices((1, -1, 1), (1, 1, 0), lattice))  # D6 - Da
+            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (0, -1, 1), lattice))  # A2 - Ab
+            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (1, 1, 0), lattice))  # A6 - Ad
+            slip_systems.append(SlipSystem.from_indices((-1, 1, 1), (1, 0, 1), lattice))  # A3 - Ac
+            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (-1, 1, 0), lattice))  # C5 - Cb
+            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (1, 0, 1), lattice))  # C3 - Ca
+            slip_systems.append(SlipSystem.from_indices((1, 1, -1), (0, 1, 1), lattice))  # C1 - Cd
         elif slip_type == '112':
             slip_systems.append(SlipSystem.from_indices((1, 1, 2), (1, 1, -1), lattice))
             slip_systems.append(SlipSystem.from_indices((-1, 1, 2), (1, -1, 1), lattice))
@@ -1331,6 +1344,17 @@ class SlipSystem:
                   '112, basal, prism, pyr1_a)' % slip_type)
         return slip_systems
 
+    @staticmethod
+    def schmid_boas_notation():
+        """print the correspondence from miller indices and the Schmid and Boas
+        notation for the 12 octahedral slip systems.
+        """
+        schmid_boas = ['B4', 'B2', 'B5', 'D4', 'D1', 'D6',
+                       'A2', 'A6', 'A3', 'C5', 'C3', 'C1']
+        ss = SlipSystem.get_slip_systems('oct')
+        for (name, s) in zip(schmid_boas, ss):
+            print(name, s)
+
 
 class HklObject:
     """An abstract class to represent an object related to a crystal lattice
@@ -1349,6 +1373,10 @@ class HklObject:
 
     @property
     def lattice(self):
+        return self._lattice
+
+    def get_lattice(self):
+        """Returns the crystal lattice."""
         return self._lattice
 
     def set_lattice(self, lattice):

@@ -3978,7 +3978,7 @@ class SampleData:
         # Get mesh group indexname
         indexname_tmp = self.get_indexname_from_path(mesh_group._v_pathname)
         # Creating topology array
-        data = np.empty((0,),dtype=np.int)
+        data = np.empty((0,),dtype=np.int32)
         for i in range(len(topology_attributes['element_type'])):
             element_type = topology_attributes['element_type'][i]
             elements = mesh_object.elements[element_type]
@@ -3987,7 +3987,7 @@ class SampleData:
                 # If mixed topology, add XDMF element type ID number
                 # before Nodes ID
                 xdmf_code = topology_attributes['Xdmf_elements_code'][i]
-                type_col = np.ones(shape=(data_tmp.shape[0],1), dtype=np.int)
+                type_col = np.ones(shape=(data_tmp.shape[0],1), dtype=np.int32)
                 if element_type == 'bar2':
                     data_tmp = np.concatenate((2*type_col, data_tmp),1)
                 if element_type == 'point1':

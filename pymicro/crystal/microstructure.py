@@ -4530,7 +4530,7 @@ class Microstructure(SampleData):
                            description=zstd_res.dtype, data=zstd_res)
             grain_ids = self.get_grain_ids()
             n_zone_times = int(zstd_res.shape[0] / len(grain_ids))
-            dtype_col = np.dtype([('grain_ID', np.int)])
+            dtype_col = np.dtype([('grain_ID', np.int32)])
             IDs = np.tile(grain_ids, n_zone_times).astype(dtype_col)
             self.add_tablecols(tablename='MechanicalGrainDataTable',
                                description=IDs.dtype, data=IDs)
@@ -5287,7 +5287,7 @@ class Microstructure(SampleData):
             print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
                 progress, gid), end='\r')
             # get the symmetry for this grain
-            phase_grain = scan.phase[np.where(grain_ids == 1)].astype(np.int)
+            phase_grain = scan.phase[np.where(grain_ids == 1)].astype(np.int8)
             assert len(np.unique(phase_grain)) == 1  # all pixel of this grain must have the same phase id by
             # construction
             grain_phase_id = phase_grain[0]

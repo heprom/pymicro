@@ -89,7 +89,7 @@ class Xrd3dForwardSimulation(ForwardSimulation):
         K_vectors = np.array(K_vectors)  # shape (n, 3)
         origins = np.array(origins)
         OR_vectors = detector.project_along_directions(K_vectors, origins)
-        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int32)
         # look at which hkl plane diffracts on the detector within the given margin
         on_det = np.where((-margin < uv[:, 0]) &
                           (uv[:, 0] < detector.get_size_px()[0] + margin) &
@@ -168,7 +168,7 @@ class Xrd3dForwardSimulation(ForwardSimulation):
 
         # with diffraction informations, project them on the detector
         OR_vectors = detector.project_along_directions(K_vectors, origins)
-        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int32)
 
         # now construct a boolean list to select the diffraction spots
         on_det = np.where((0 < uv[:, 0]) &

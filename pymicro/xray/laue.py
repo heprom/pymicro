@@ -84,8 +84,8 @@ def build_list(lattice=None, max_miller=3, extinction=None, max_keV=None):
 
 def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose=False):
     """
-    Compute the ellipsis associated with the given zone axis. 
-    
+    Compute the ellipsis associated with the given zone axis.
+
     The detector is supposed to be normal to the X-axis, but the incident wave vector can be specified.
     All lattice planes sharing this zone axis will diffract along that ellipse.
 
@@ -109,8 +109,8 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     nu = atan2(np.linalg.norm(np.cross(za, detector.w_dir)), np.dot(za, detector.w_dir))
     e = np.sin(nu) / np.cos(psi)  # ellipis excentricity (general case), e reduces to tan(psi) when the incident beam is normal to the detector (nu = psi)
     '''
-    The major axis direction is given by the intersection of the plane defined by ON and OA and by the detector 
-    plane. It does not depends on Xu, like the cone angle. If the detector is perpendicular to the X-axis, 
+    The major axis direction is given by the intersection of the plane defined by ON and OA and by the detector
+    plane. It does not depends on Xu, like the cone angle. If the detector is perpendicular to the X-axis,
     this direction is given by NA. both N and A are located on the major axis.
     '''
     eta = pi / 2 - atan2(NA[1],
@@ -154,8 +154,8 @@ def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose
     data = np.dot(R, data)  # rotate our ellipse
     # move one end of the great axis to the direct beam position
     '''
-    NB: in the general case, point C (intersection of the direct beam and the detector) is on the ellipse 
-    but not lying on the great axis. Point A and N still lie on the major axis, so the translation can be determined. 
+    NB: in the general case, point C (intersection of the direct beam and the detector) is on the ellipse
+    but not lying on the great axis. Point A and N still lie on the major axis, so the translation can be determined.
     '''
     NX = np.linalg.norm(ON) * tan(psi - nu)
     if verbose:
@@ -181,7 +181,7 @@ def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, use_frie
     :param orientation: an instance of the `Orientation` class.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
     :param float min_theta: the minimum considered Bragg angle (in radian).
-    :param bool use_friedel_pair: also consider the Friedel pairs of the lattice plane. 
+    :param bool use_friedel_pair: also consider the Friedel pairs of the lattice plane.
     :param bool verbose: a flag to activate verbose mode.
     :return: the diffraction vector as a numpy array.
     """
@@ -215,17 +215,17 @@ def diffracted_vector(hkl, orientation, Xu=(1., 0., 0.), min_theta=0.1, use_frie
 
 def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
     '''Compute the diffracted intensity.
-    
-    This compute a number representing the diffracted intensity within the kinematical approximation. 
+
+    This compute a number representing the diffracted intensity within the kinematical approximation.
     This number includes many correction factors:
-    
+
      * atomic factor
      * structural factor
      * polarisation factor
      * Debye-Waller factor
      * absorption factor
      * ...
-    
+
     :param HklPlane hkl: the hkl Bragg reflection.
     :param float I0: intensity of the incident beam.
     :param str symbol: string representing the considered lattice.
@@ -258,20 +258,20 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
     """
     Compute a transmission Laue pattern. The data array of the given
     `Detector2d` instance is initialized with the result.
-    
-    The incident beam is assumed to be along the X axis: (1, 0, 0) but can be changed to any direction. 
-    The crystal can have any orientation using an instance of the `Orientation` class. 
+
+    The incident beam is assumed to be along the X axis: (1, 0, 0) but can be changed to any direction.
+    The crystal can have any orientation using an instance of the `Orientation` class.
     The `Detector2d` instance holds all the geometry (detector size and position).
 
-    A parameter controls the meaning of the values in the diffraction spots in the image. It can be just a constant 
-    value, the diffracted beam energy (in keV) or the intensity as computed by the :py:meth:`diffracted_intensity` 
+    A parameter controls the meaning of the values in the diffraction spots in the image. It can be just a constant
+    value, the diffracted beam energy (in keV) or the intensity as computed by the :py:meth:`diffracted_intensity`
     method.
 
     :param orientation: The crystal orientation.
     :param detector: An instance of the Detector2d class.
     :param list hkl_planes: A list of the lattice planes to include in the pattern.
     :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
-    :param bool use_friedel_pair: also consider the Friedel pair of each lattice plane in the list as candidate for diffraction. 
+    :param bool use_friedel_pair: also consider the Friedel pair of each lattice plane in the list as candidate for diffraction.
     :param spectrum: A two columns array of the spectrum to use for the calculation.
     :param float spectrum_thr: The threshold to use to determine if a wave length is contributing or not.
     :param int r_spot: Size of the spots on the detector in pixel (5 by default)
@@ -355,12 +355,12 @@ def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1.
 def gnomonic_projection_point(data, OC=None):
     """compute the gnomonic projection of a given point or series of points in the general case.
 
-    This methods *does not* assumes the incident X-ray beam is along (1, 0, 0). This is accounted for with the 
-    parameter OC which indicates the center of the projection (the incident beam intersection with the detector). 
+    This methods *does not* assumes the incident X-ray beam is along (1, 0, 0). This is accounted for with the
+    parameter OC which indicates the center of the projection (the incident beam intersection with the detector).
     A conditional treatment is done as the projection is is faster to compute in the case of normal incidence.
 
-    The points coordinates are passed along with a single array which must be of size (n, 3) where n is the number of 
-    points. If a single point is used, the data can indifferently be of size (1, 3) or (3). 
+    The points coordinates are passed along with a single array which must be of size (n, 3) where n is the number of
+    points. If a single point is used, the data can indifferently be of size (1, 3) or (3).
 
     :param ndarray data: array of the point(s) coordinates in the laboratory frame, aka OR components.
     :param ndarray OC: coordinates of the center of the gnomonic projection in the laboratory frame.
@@ -398,13 +398,13 @@ def gnomonic_projection_point(data, OC=None):
 
 def gnomonic_projection(detector, pixel_size=None, OC=None, verbose=False):
     """This function carries out the gnomonic projection of the detector image.
-    
+
     The data must be of uint8 type (between 0 and 255) with diffraction spots equals to 255.
-    The function create a new detector instance (think of it as a virtual detector) located at the same position 
+    The function create a new detector instance (think of it as a virtual detector) located at the same position
     as the given detector and with an inverse pixel size. The gnomonic projection is stored into this new detector data.
-    The gnomonic projection of each white pixel (value at 255) is computed. The projection is carried out with respect 
+    The gnomonic projection of each white pixel (value at 255) is computed. The projection is carried out with respect
     to the center detector (ucen, vcen) point.
-    
+
     :param RegArrayDetector2d detector: the detector instance with the data from which to compute the projection.
     :param float pixel_size: pixel size to use in the virtual detector for the gnomonic projection.
     :param tuple OC: coordinates of the center of the gnomonic projection in the laboratory frame.
@@ -437,7 +437,7 @@ def gnomonic_projection(detector, pixel_size=None, OC=None, verbose=False):
     # create the gnom.data array (zeros with pixels set to 1 for gnomonic projection points)
     gnom.data = np.zeros(gnom.size, dtype=np.uint8)
     # uvg_px = gnom.lab_to_pixel(uvg_mm)
-    uvg_px = np.zeros((uvg_mm.shape[0], 2), dtype=np.int)
+    uvg_px = np.zeros((uvg_mm.shape[0], 2), dtype=np.int32)
     for i in range(uvg_mm.shape[0]):
         uvg_px[i, :] = gnom.lab_to_pixel(uvg_mm[i, :])
     # filter out point outside the virtual detector
@@ -886,7 +886,7 @@ class LaueForwardSimulation(ForwardSimulation):
                                                        direction=K_vectors[i_vox * n_hkl + i_hkl])
                       for i_vox in range(n_vox)
                       for i_hkl in range(n_hkl)]  # size nb_vox * n_hkl
-        uv = [detector.lab_to_pixel(OR)[0].astype(np.int)
+        uv = [detector.lab_to_pixel(OR)[0].astype(np.int32)
               for OR in OR_vectors]
         # now construct a boolean list to select the diffraction spots
         if source.min_energy is None and source.max_energy is None:
@@ -934,7 +934,7 @@ class LaueForwardSimulation(ForwardSimulation):
                                                              self.omega)
         origins = np.repeat(positions, len(hkl_planes), axis=0)
         OR_vectors = detector.project_along_directions(K_vectors, origins)
-        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int32)
         # look at which hkl plane diffracts on the detector within the given margin
         on_det = np.where((-margin < uv[:, 0]) &
                           (uv[:, 0] < detector.get_size_px()[0] + margin) &
@@ -989,7 +989,7 @@ class LaueForwardSimulation(ForwardSimulation):
         # with diffraction informations, project them on the detector
         origins = np.repeat(positions, n_hkl, axis=0)
         OR_vectors = detector.project_along_directions(K_vectors, origins)
-        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int32)
 
         # now construct a boolean list to select the diffraction spots
         # FIXME handle case when min and max energies not set

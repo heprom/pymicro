@@ -928,11 +928,11 @@ class Orientation:
 
     @staticmethod
     def transformation_matrix(hkl_1, hkl_2, n_1, n_2):
-        """Compute the orientation matrix from the two known hkl plane 
+        """Compute the orientation matrix from the two known hkl plane
         normals.
-        
-        The function build two orthonormal basis, one in the crystal 
-        frame and the other in the sample frame. the orientation matrix 
+
+        The function build two orthonormal basis, one in the crystal
+        frame and the other in the sample frame. the orientation matrix
         brings the second one into coincidence with first one.
 
         :param hkl_1: the first `HklPlane` instance.
@@ -959,7 +959,7 @@ class Orientation:
 
     @staticmethod
     def from_two_hkl_normals(hkl_1, hkl_2, xyz_normal_1, xyz_normal_2):
-        g = Orientation.transformation_matrix(hkl_1, hkl_2, 
+        g = Orientation.transformation_matrix(hkl_1, hkl_2,
                                               xyz_normal_1, xyz_normal_2)
         return Orientation(g)
 
@@ -2488,7 +2488,6 @@ class Microstructure(SampleData):
         else:
             self.add_field(gridname='CellData', fieldname=map_name,
                            array=phase_map, replace=True,
-                           indexname='phase_map',
                            compression_options=compression)
         self.set_active_phase_map(map_name)
         return
@@ -2721,6 +2720,27 @@ class Microstructure(SampleData):
         euler_list = np.concatenate((phi1, Phi, phi2), axis=1)
         self.add_grains(euler_list, orientation_type='euler', grain_ids=not_in_table)
         return
+
+    def add_grains_attribute(self, attribute_name, data):
+        """Add an attribute and associated data to the GrainDataTable.
+
+        :param str attribute_name: name of the new column in GrainDataTable
+        :param np.array data: data to store in the GrainDataTable. Can be a
+            one or two dimensional array
+        """
+        # check the size of the provided data
+        if data.shape[0] != len(self['GrainDataTable']):
+            raise ValueError('Provided data shape does not match number of '
+                             f'grains ({len(self["GrainDataTable"])})')
+        # if data has correct shape, create description and add column
+        if len(data.shape) > 1:
+            dtype = np.dtype([(attribute_name, data.dtype, data.shape[1:])])
+        else:
+            dtype = np.dtype([(attribute_name, data.dtype)])
+        temp_data = np.empty(shape=data.shape[0], dtype=dtype)
+        temp_data[attribute_name] = data
+        self.add_tablecols('GrainDataTable', dtype, data=temp_data)
+        self.grains = self.get_node('GrainDataTable')
 
     @staticmethod
     def random_texture(n=100, phase=None):
@@ -3257,18 +3277,18 @@ class Microstructure(SampleData):
     @staticmethod
     def match_grains(m1, m2, **kwargs):
         return micro1.match_grains(micro2, **kwargs)
-        
-    def match_grains(self, m2, mis_tol=1, 
-                     grains_to_match=None, grains_to_search=None, 
-                     use_centers=False, center_tol=0.1, scale_m2=1., 
+
+    def match_grains(self, m2, mis_tol=1,
+                     grains_to_match=None, grains_to_search=None,
+                     use_centers=False, center_tol=0.1, scale_m2=1.,
                      offset_m2=None, center_merit=10., verbose=False):
         """Match grains from a second microstructure to this microstructure.
 
         This function try to find pair of grains based on a function of
-        merit based on their orientations. This function can optionnally 
-        use the center of the grains. In this case several paramaters 
-        can be used to adjust the origin of the microstructure, their 
-        scale and the relative merit of the center proximity with 
+        merit based on their orientations. This function can optionnally
+        use the center of the grains. In this case several paramaters
+        can be used to adjust the origin of the microstructure, their
+        scale and the relative merit of the center proximity with
         respect to the orientation differences.
 
         .. warning::
@@ -3281,9 +3301,9 @@ class Microstructure(SampleData):
             to detect matches (in degrees).
         :param list use_grain_ids: a list of ids to restrict the grains
             of the first microstructure in which to search for matches.
-        :param use_centers verbose: use the grain centers to build the 
+        :param use_centers verbose: use the grain centers to build the
             function of merit.
-        :param float center_tol: the tolerance for 2 grains to be match 
+        :param float center_tol: the tolerance for 2 grains to be match
             together (in mm).
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
@@ -3803,6 +3823,81 @@ class Microstructure(SampleData):
         self.set_grain_map(grain_map_renum, self.get_voxel_size(),
                            map_name=map_name)
         return
+
+    def compute_grain_mean(self, gid, fieldname):
+        """Compute the mean over the grain of a specific field.
+
+        The mean value of the field 'fieldname' is computed. The field must be
+        stored on the 'CellData' image group.
+
+        .. warning::
+
+          This function assume the grain bounding box is correct, call
+          `recompute_grain_bounding_boxes()` if this is not the case.
+
+        :param int gid: the grain id to consider.
+        :fieldname str: name or indexname or path of the CellData field to
+                         process
+        :return: the volume of the grain.
+        """
+        # get local grain_map
+        bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
+        grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                         bb[1][0]:bb[1][1],
+                                         bb[2][0]:bb[2][1]]
+        mask = grain_map == np.array(gid)
+        volume_vx = np.sum(mask)
+        if volume_vx == 0:
+            return 0.
+        # print(bb)
+        # get field to process over grain bounding box
+        field = self.get_field(field_name=fieldname)[bb[0][0]:bb[0][1],
+                                                     bb[1][0]:bb[1][1],
+                                                     bb[2][0]:bb[2][1]]
+        # print(field)
+        # compute mean value
+        mean = np.sum(np.multiply(mask, field)) / volume_vx
+        return mean
+
+    def compute_all_grains_mean(self, fieldname, verbose=False):
+        """Compute the mean over each grain of a specific field.
+
+        The mean value of the field 'fieldname' is computed for each grain.
+        The field must be stored on the 'CellData' image group.
+        The resulting array of mean values is stored in the GrainDataTable
+        with the same name + '_mean', and returned by the method.
+
+        .. warning::
+
+          This function assume the grain bounding box is correct, call
+          `recompute_grain_bounding_boxes()` if this is not the case.
+
+        :fieldname str: name or indexname or path of the CellData field to
+                         process
+        :return: the volume of the grain.
+        """
+        if self._is_empty('grain_map'):
+            print('warning: needs a grain map to recompute the volumes '
+                  'of the grains')
+            return
+        mean_name = fieldname + '_mean'
+        field_mean = []
+        for g in self.grains:
+            try:
+                mean = self.compute_grain_mean(g['idnumber'], fieldname)
+                field_mean.append(mean)
+            except ValueError:
+                print('skipping grain %d' % g['idnumber'])
+                continue
+            if verbose:
+                print(f'grain {g["idnumber"]}, computed {fieldname} mean is '
+                      f'{mean}.')
+        field_mean = np.array(field_mean)
+        # add column to GrainDataTable
+        dtype = np.dtype([(mean_name, field_mean.dtype)])
+        data = np.array(field_mean, dtype=dtype)
+        self.add_tablecols('GrainDataTable', dtype, data=data)
+        return field_mean
 
     def compute_grain_volume(self, gid):
         """Compute the volume of the grain given its id.
@@ -5975,7 +6070,7 @@ class Microstructure(SampleData):
         x, y, z = self.get_grain_map().shape
         grain_boundaries_map = np.zeros_like(self.get_grain_map())
         pad_grain_map = np.pad(self.get_grain_map(), pad_width=1)
-                
+
         for i in range(x):
             for j in range(y):
                 for k in range(z):
@@ -5988,7 +6083,7 @@ class Microstructure(SampleData):
                         grain_boundaries_map[i, j, k] = 1
 
         return grain_boundaries_map
-    
+
     def resample(self, resampling_factor, resample_name=None, autodelete=False,
             recompute_geometry=True, verbose=False):
         """
@@ -6049,7 +6144,7 @@ class Microstructure(SampleData):
         else:
             raise ValueError('CellData should be either 2D or 3D')
 
-        resampled_voxel_size = self.get_voxel_size() * resampling_factor  
+        resampled_voxel_size = self.get_voxel_size() * resampling_factor
 
         for name in field_list:
             field_name = name.decode('utf-8')
@@ -6099,16 +6194,16 @@ class Microstructure(SampleData):
         if max_grain > nb_grain:
             print('renumbering in progress : %i - %i ' % (max_grain, nb_grain))
             micro_resampled.renumber_grains()
-            
+
         print('%d grains in resampled microstructure' % micro_resampled.grains.nrows)
         micro_resampled.grains.flush()
-        
+
         # recompute the grain geometry
         if recompute_geometry:
             print('updating grain geometry')
             micro_resampled.recompute_grain_bounding_boxes(verbose)
             micro_resampled.recompute_grain_centers(verbose)
             micro_resampled.recompute_grain_volumes(verbose)
-            
+
         return micro_resampled
 

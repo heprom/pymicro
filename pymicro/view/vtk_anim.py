@@ -223,6 +223,7 @@ class vtkAnimCameraToZ(vtkAnimation):
         vtkAnimation.post_execute(self, iren, event)
 
 
+class vtkAnimCameraToPosition(vtkAnimation):
 
 class vtkZoom(vtkAnimation):
     def __init__(self, t, cam, zoom):

@@ -3,17 +3,11 @@
 <Xdmf xmlns:xi="http://www.w3.org/2003/XInclude" Version="2.2">
   <Domain>
     <Grid Name="CellData" GridType="Uniform">
-      <Topology TopologyType="3DCoRectMesh" Dimensions="655 655   2"/>
+      <Topology TopologyType="3DCoRectMesh" Dimensions="  2 655 655"/>
       <Geometry Type="ORIGIN_DXDYDZ">
         <DataItem Format="XML" Dimensions="3">0. 0. 0.</DataItem>
-        <DataItem Format="XML" Dimensions="3">0.0014  0.0014  0.0014</DataItem>
+        <DataItem Format="XML" Dimensions="3">0.0014 0.0014 0.0014</DataItem>
       </Geometry>
-      <Attribute Name="grain_map" AttributeType="Scalar" Center="Cell">
-        <DataItem Format="HDF" Dimensions="654  654  1" NumberType="Int" Precision="uint8">t5_dct_slice_data.h5:/CellData/grain_map</DataItem>
-      </Attribute>
-      <Attribute Name="mask" AttributeType="Scalar" Center="Cell">
-        <DataItem Format="HDF" Dimensions="654  654  1" NumberType="Int" Precision="uint8">t5_dct_slice_data.h5:/CellData/mask</DataItem>
-      </Attribute>
     </Grid>
   </Domain>
 </Xdmf>

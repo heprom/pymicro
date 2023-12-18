@@ -11,6 +11,9 @@
       <Attribute Name="grain_map" AttributeType="Scalar" Center="Cell">
         <DataItem Format="HDF" Dimensions="40  64  64" NumberType="Int" Precision="uint16">m2_data.h5:/CellData/grain_map</DataItem>
       </Attribute>
+      <Attribute Name="grain_map" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="40  64  64" NumberType="Int" Precision="uint16">m2_data.h5:/CellData/grain_map</DataItem>
+      </Attribute>
       <Attribute Name="CellData_grain_map" AttributeType="Scalar" Center="Cell">
         <DataItem Format="HDF" Dimensions="40  64  64" NumberType="Int" Precision="uint16">m2_data.h5:/CellData/CellData_grain_map</DataItem>
       </Attribute>

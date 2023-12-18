@@ -151,8 +151,8 @@ def eu2ax(euler):
 
 def ax2qu(ax):
     """
-    Compute the quaternion associated the rotation defined by the given
-    (axis, angle) pair.
+    Compute the quaternion associated with the rotation defined by 
+    the given (axis, angle) pair.
 
     :param ax: a 4 component vector composed by the rotation axis
         and the rotation angle (radians).
@@ -161,6 +161,21 @@ def ax2qu(ax):
     if ax[3] < 2 * epsilon:
         return np.array([1.0, 0.0, 0.0, 0.0])
     return np.array([np.cos(0.5 * ax[3]), *(np.sin(0.5 * ax[3]) * ax[:3])])
+
+
+def ax2ro(ax):
+    """
+    Compute the Rodrigues vector associated the rotation defined by 
+    the given (axis, angle) pair.
+
+    :param ax: a 4 component vector composed by the rotation axis
+        and the rotation angle (radians).
+    :return: the corresponding Rodrigues vector.
+    """
+    if abs(ax[3] - np.pi) < epsilon:
+        # handle this case
+        pass
+    return ax[:3] * np.tan(ax[3] / 2)
 
 
 def ro2ax(rod):

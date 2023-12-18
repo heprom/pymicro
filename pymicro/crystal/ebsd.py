@@ -567,6 +567,7 @@ class OimScan:
 
         n_grains = 0
         progress = 0
+        phase_start = self.phase_list[0].phase_id
         for j in range(self.rows):
             for i in range(self.cols):
                 if grain_ids[i, j] >= 0:
@@ -579,7 +580,7 @@ class OimScan:
                 # apply region growing based on the angle misorientation (strong connectivity)
                 while len(candidates) > 0:
                     pixel = candidates.pop()
-                    sym = self.get_phase(1 + int(self.phase[pixel])).get_symmetry()
+                    sym = self.get_phase(phase_start + int(self.phase[pixel])).get_symmetry()
                     # print('* pixel is {}, euler: {}'.format(pixel, np.degrees(euler[pixel])))
                     # get orientation of this pixel
                     o = Orientation.from_euler(np.degrees(self.euler[pixel]))

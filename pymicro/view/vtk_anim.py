@@ -225,6 +225,22 @@ class vtkAnimCameraToZ(vtkAnimation):
 
 class vtkAnimCameraToPosition(vtkAnimation):
 
+    def __init__(self, t, duration, cam, pos):
+        vtkAnimation.__init__(self, t, duration)
+        self.camera = cam
+        self.init_position = self.camera.GetPosition()
+        self.target_position =  pos
+
+    def execute(self, iren, event):
+        do = vtkAnimation.pre_execute(self)
+        if not do: return
+        t1 = self.time_anim_starts
+        t2 = self.time_anim_ends
+        cam_position = self.target_position - (t2 - self.scene.timer_count) / float(t2 - t1) * (self.target_position - self.init_position)
+        self.camera.SetPosition(cam_position)
+        vtkAnimation.post_execute(self, iren, event)
+
+
 class vtkZoom(vtkAnimation):
     def __init__(self, t, cam, zoom):
         vtkAnimation.__init__(self, t)

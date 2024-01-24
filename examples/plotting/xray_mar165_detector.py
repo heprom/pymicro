@@ -17,7 +17,7 @@ mar.bg = HST_read('../data/c1_exptime_bgair_5.raw', data_type=np.uint16, dims=(2
 mar.load_image('../data/c1_exptime_air_5.raw')
 
 image_name = os.path.splitext(__file__)[0] + '.png'
-print 'writting %s' % image_name
+print('writting %s' % image_name)
 plt.imsave(image_name, mar.corr_data, vmin=0, vmax=2000)
 
 from matplotlib import image

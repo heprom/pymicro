@@ -574,6 +574,35 @@ class Orientation:
         """Convenience method to expose the third Euler angle."""
         return self.euler[2]
 
+    def plot(self, lattice=None):
+        """create a figure to plot the orientation.
+
+        Create a 3D representation of a crystal lattice rotated 
+        by this orientation in the (X, Y, Z) local frame.
+        
+        :param Lattice lattice: an optional crystal lattice can be specified.
+        """
+        if lattice is None:
+            lattice = Lattice.cubic(0.5)
+        coords, edge_point_ids = lattice.get_points(origin='mid')
+        # now apply the crystal orientation
+        g = self.orientation_matrix()
+        coords_rot = np.empty_like(coords)
+        for i in range(8):
+            coords_rot[i] = np.dot(g.T, coords[i])
+        # plot the rotated lattice
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        ax.scatter(coords_rot[:, 0], coords_rot[:, 1], coords_rot[:, 2])
+        for i in range(12):
+            ax.plot(coords_rot[edge_point_ids[i, :], 0],
+                    coords_rot[edge_point_ids[i, :], 1],
+                    coords_rot[edge_point_ids[i, :], 2], 'k-')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        plt.show()
+
     def compute_XG_angle(self, hkl, omega, verbose=False):
         """Compute the angle between the scattering vector :math:`\mathbf{G_{l}}`
         and :math:`\mathbf{-X}` the X-ray unit vector at a given angular position :math:`\\omega`.

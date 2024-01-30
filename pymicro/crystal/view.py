@@ -104,6 +104,7 @@ class View_slice:
             # compute grain ids and grain centers
             if not highlight_ids:
                 highlight_ids = np.unique(grains_slice).tolist()
+                highlight_ids.remove(0)
             centers, sizes, highlight_ids = self._get_slice_grain_centers(grains_slice, highlight_ids)
             if show_grain_ids:
                 # print grain id on center on each grain

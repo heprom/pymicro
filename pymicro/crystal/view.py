@@ -103,7 +103,7 @@ class View_slice:
                                 slice, "random", slip_system, axis=axis)
             # compute grain ids and grain centers
             if not highlight_ids:
-                highlight_ids = np.unique(grains_slice)
+                highlight_ids = np.unique(grains_slice).tolist()
             centers, sizes, highlight_ids = self._get_slice_grain_centers(grains_slice, highlight_ids)
             if show_grain_ids:
                 # print grain id on center on each grain
@@ -311,7 +311,6 @@ class View_slice:
         #FIXME adapt for multi phase material
         centers = self.microstructure.get_grain_centers(id_list=highlight_ids)
         sizes = self.microstructure.get_grain_volumes(id_list=highlight_ids)
-        print(centers)
         coords, edge_point_ids = self.microstructure.get_lattice().get_points(origin='mid')
         # list of point ids to draw the cell edges
         edge_point_ids = np.array([[0, 1], [1, 3], [2, 3], [0, 2], 

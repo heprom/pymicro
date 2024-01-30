@@ -2197,7 +2197,7 @@ class Microstructure(SampleData):
         :param list id_list: a non empty list of the grain ids.
         :return: a numpy array containing the grain volumes.
         """
-        if id_list:
+        if id_list is not None:
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['volume']
         else:
@@ -2212,8 +2212,8 @@ class Microstructure(SampleData):
 
         :param list id_list: a non empty list of the grain ids.
         :return: a numpy array containing the grain centers.
-        """
-        if id_list:
+        """ 
+        if id_list is not None:
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['center']
         else:
@@ -2230,7 +2230,7 @@ class Microstructure(SampleData):
         :param list id_list: a non empty list of the grain ids.
         :return: a numpy array containing the grain rodrigues vectors.
         """
-        if id_list:
+        if id_list is not None:
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['orientation']
         else:
@@ -2269,7 +2269,7 @@ class Microstructure(SampleData):
         :return: a numpy array containing the grain bounding boxes.
         :raise: a ValueError if the length of the id list is larger than 256.
         """
-        if id_list:
+        if id_list is not None:
             if len(id_list) > 256:
                 raise(ValueError("the id_list can only have 256 values"))
             condition = Microstructure.id_list_to_condition(id_list)

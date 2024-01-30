@@ -383,17 +383,23 @@ class OimScan:
                 phase = CrystallinePhase(i + 1)
                 phase.name = tokens[2]
                 phase.name = tokens[5]
-
-                sym = Symmetry.from_space_group(int(tokens[4]))
                 lattice_lengths = tokens[0].split(';')
                 lattice_angles = tokens[1].split(';')
+                a, b, c = float(lattice_lengths[0]) / 10, \
+                          float(lattice_lengths[1]) / 10, \
+                          float(lattice_lengths[2]) / 10
+                alpha, beta, gamma = float(lattice_angles[0]), \
+                                     float(lattice_angles[1]), \
+                                     float(lattice_angles[2])
+                try:
+                    sym = Symmetry.from_space_group(int(tokens[4]))
+                except ValueError:
+                    # try to guess the symmetry
+                    sym = Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
+                    print('guessed symmetry from lattice parameters:', sym)
                 # convert lattice constants to nm
-                lattice = Lattice.from_parameters(float(lattice_lengths[0]) / 10,
-                                                  float(lattice_lengths[1]) / 10,
-                                                  float(lattice_lengths[2]) / 10,
-                                                  float(lattice_angles[0]),
-                                                  float(lattice_angles[1]),
-                                                  float(lattice_angles[2]),
+                lattice = Lattice.from_parameters(a, b, c, 
+                                                  alpha, beta, gamma,
                                                   symmetry=sym)
                 phase.set_lattice(lattice)
                 print('adding phase %s' % phase)
@@ -409,14 +415,22 @@ class OimScan:
                 i += 1
             # we have read all the data, now repack everything into the different arrays
             scan.init_arrays()
-            scan.euler[:, :, 0] = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
-            scan.euler[:, :, 1] = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
-            scan.euler[:, :, 2] = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
-            scan.x = np.reshape(data[:, 1], (scan.rows, scan.cols)).T
-            scan.y = np.reshape(data[:, 2], (scan.rows, scan.cols)).T
-            scan.iq = np.reshape(data[:, 9], (scan.rows, scan.cols)).T
-            scan.ci = np.reshape(data[:, 10], (scan.rows, scan.cols)).T
-            scan.phase = np.reshape(data[:, 0], (scan.rows, scan.cols)).T
+            x = data[:, 1]
+            y = data[:, 2]
+            # use x, y values to assign each record to the proper place
+            x_indices = (np.round((x - x.min()) / scan.xStep)).astype(int)
+            y_indices = (np.round((y - y.min()) / scan.yStep)).astype(int)            
+            scan.phase[x_indices, y_indices] = data[:, 0]
+            scan.x[x_indices, y_indices] = data[:, 1]
+            scan.y[x_indices, y_indices] = data[:, 2]
+            scan.euler[x_indices, y_indices, 0] = np.radians(data[:, 5])
+            scan.euler[x_indices, y_indices, 1] = np.radians(data[:, 6])
+            scan.euler[x_indices, y_indices, 2] = np.radians(data[:, 7])
+            scan.iq[x_indices, y_indices] = data[:, 9]
+            scan.ci[x_indices, y_indices] = data[:, 10]
+            if sym is Symmetry.hexagonal:
+                # add a +30 degrees rotation on phi2
+                scan.euler[:, :, 2] += np.radians(30)
         return scan
 
     def read_header(self, header):
@@ -511,7 +525,7 @@ class OimScan:
             for j in range(self.cols):
                 o = Orientation.from_euler(np.degrees(self.euler[j, i]))
                 try:
-                    sym = self.get_phase(1 + int(self.phase[j, i])).get_symmetry()
+                    sym = self.get_phase(int(self.phase[j, i])).get_symmetry()
                     # compute IPF-Z
                     self.ipf001[j, i] = o.ipf_color(axis=np.array([0., 0., 1.]),
                                                     symmetry=sym)
@@ -567,7 +581,7 @@ class OimScan:
 
         n_grains = 0
         progress = 0
-        phase_start = self.phase_list[0].phase_id
+        #phase_start = self.phase_list[0].phase_id
         for j in range(self.rows):
             for i in range(self.cols):
                 if grain_ids[i, j] >= 0:
@@ -580,7 +594,8 @@ class OimScan:
                 # apply region growing based on the angle misorientation (strong connectivity)
                 while len(candidates) > 0:
                     pixel = candidates.pop()
-                    sym = self.get_phase(phase_start + int(self.phase[pixel])).get_symmetry()
+                    #sym = self.get_phase(phase_start + int(self.phase[pixel])).get_symmetry()
+                    sym = self.get_phase(int(self.phase[pixel])).get_symmetry()
                     # print('* pixel is {}, euler: {}'.format(pixel, np.degrees(euler[pixel])))
                     # get orientation of this pixel
                     o = Orientation.from_euler(np.degrees(self.euler[pixel]))
@@ -697,23 +712,27 @@ class OimScan:
             header += 'MaterialName ' + phase.name + '\n'
             header += 'Formula ' + phase.formula + '\n'
             header += 'Info ' + phase.description + '\n'
-            header += 'Symmetry 43\n'
+            header += 'Symmetry ' + Symmetry.to_tsl(phase.get_symmetry()) + '\n'
             lattice_constants = phase.get_lattice().get_lattice_constants(angstrom=True)
             constants = '  '.join(['%.3f' % c for c in lattice_constants])
             header += ('LatticeConstants ' + constants + '\n')
-            header += ('NumberFamilies ' + str(len(phase.hklFamilies)) + '\n')
+            number_families = 0
+            if hasattr(phase, 'hklFamilies'):
+                number_families = len(phase.hklFamilies)
+            header += ('NumberFamilies ' + str(number_families) + '\n')
             constants = '  '.join(['%.3f' % c for c in phase.elastic_constants])
             if constants:
                 header += 'ElasticConstants ' + constants + '\n'
             header += 'Categories'
-            for category in phase.categories:
-                header += ' ' + str(category)
+            if hasattr(phase, 'categories'):
+                for category in phase.categories:
+                    header += ' ' + str(category)
             header += '\n\n'
         header += 'GRID: ' + self.grid_type + '\n'
         header += 'XSTEP: ' + str(self.xStep) + '\n'
         header += 'YSTEP: ' + str(self.yStep) + '\n'
         header += 'NCOLS_ODD: ' + str(self.cols) + '\n'
-        header += 'NCOLS_EVEN: ' + str(self.rows - 1) + '\n'
+        header += 'NCOLS_EVEN: ' + str(self.cols) + '\n'
         header += 'NROWS: ' + str(self.rows) + '\n'
         header += '\n'
         header += 'OPERATOR: ' + self.operator + '\n'

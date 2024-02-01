@@ -61,6 +61,16 @@ class LatticeTests(unittest.TestCase):
         self.assertAlmostEqual(g[2, 1], 0.0)
         self.assertAlmostEqual(g[2, 2], 0.36)
 
+    def test_get_points(self):
+        ni = Lattice.cubic(0.352)
+        coords, edge_points_id = ni.get_points()
+        self.assertEqual(len(coords), 8)
+        self.assertEqual(len(edge_points_id), 12)
+        ti = Lattice.hexagonal(0.295, 0.468)
+        coords, edge_points_id = ti.get_points()
+        self.assertEqual(len(coords), 12)
+        self.assertEqual(len(edge_points_id), 18)
+
 
 class CrystallinePhaseTests(unittest.TestCase):
     def setUp(self):

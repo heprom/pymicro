@@ -579,22 +579,23 @@ class Orientation:
 
         Create a 3D representation of a crystal lattice rotated 
         by this orientation in the (X, Y, Z) local frame.
-        
+
         :param Lattice lattice: an optional crystal lattice can be specified.
         """
         if lattice is None:
             lattice = Lattice.cubic(0.5)
         coords, edge_point_ids = lattice.get_points(origin='mid')
+        print(coords.shape, edge_point_ids.shape)
         # now apply the crystal orientation
         g = self.orientation_matrix()
         coords_rot = np.empty_like(coords)
-        for i in range(8):
+        for i in range(len(coords_rot)):
             coords_rot[i] = np.dot(g.T, coords[i])
         # plot the rotated lattice
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
         ax.scatter(coords_rot[:, 0], coords_rot[:, 1], coords_rot[:, 2])
-        for i in range(12):
+        for i in range(len(edge_point_ids)):
             ax.plot(coords_rot[edge_point_ids[i, :], 0],
                     coords_rot[edge_point_ids[i, :], 1],
                     coords_rot[edge_point_ids[i, :], 2], 'k-')
@@ -1895,7 +1896,6 @@ class Microstructure(SampleData):
             self.set_active_grain_map()
             self.set_active_phase_map()
             self._init_phase(phase_list)
-        return
 
     def __repr__(self):
         """Provide a string representation of the class."""
@@ -1943,7 +1943,7 @@ class Microstructure(SampleData):
                                     'Phase_data': 'Group'}
         return minimal_content_index_dic, minimal_content_type_dic
 
-    def _init_phase(self, phase_list):
+    def _init_phase(self, phase_list) -> None:
         self._phases = []
         # if the h5 file does not exist yet, store the phase as metadata
         if not self._file_exist:
@@ -1954,9 +1954,8 @@ class Microstructure(SampleData):
             if len(self.get_phase_ids_list()) == 0:
                 print('no phase was found in this dataset, adding a default one')
                 self.add_phase(phase_list[0])
-        return
 
-    def sync_phases(self, verbose=True):
+    def sync_phases(self, verbose=True) -> None:
         """This method sync the _phases attribute with the content of the hdf5
         file.
         """
@@ -1970,7 +1969,7 @@ class Microstructure(SampleData):
         if verbose:
             print('%d phases found in the data set' % len(self._phases))
 
-    def set_phase(self, phase, id_number=None):
+    def set_phase(self, phase, id_number=None) -> None:
         """Set a phase for the given `phase_id`.
 
         If the phase id does not correspond to one of the existing phase,
@@ -1990,7 +1989,7 @@ class Microstructure(SampleData):
         self.add_attributes(d, '/PhaseData/phase_%02d' % id_number)
         self.sync_phases()
 
-    def set_phases(self, phase_list):
+    def set_phases(self, phase_list) -> None:
         """Set a list of phases for this microstructure.
 
         The different phases in the list are added in that order.
@@ -2005,7 +2004,7 @@ class Microstructure(SampleData):
         for phase in phase_list:
             self.add_phase(phase)
 
-    def set_phase_elastic_constants(self, elastic_constants, phase_id=1):
+    def set_phase_elastic_constants(self, elastic_constants, phase_id=1) -> None:
         """Set the elastic constants of the given phase.
 
         :param list elastic_constants: the list of elastic constants to use,
@@ -2023,7 +2022,7 @@ class Microstructure(SampleData):
         except ValueError as e:
             print(e)
 
-    def get_number_of_phases(self):
+    def get_number_of_phases(self) -> int:
         """Return the number of phases in this microstructure.
 
         Each crystal phase is stored in a list attribute: `_phases`. Note that
@@ -2034,7 +2033,7 @@ class Microstructure(SampleData):
         """
         return len(self._phases)
 
-    def get_number_of_grains(self, from_grain_map=False):
+    def get_number_of_grains(self, from_grain_map=False) -> int:
         """Return the number of grains in this microstructure.
 
         :param bool from_grain_map: controls if the retrurned number of grains
@@ -2046,7 +2045,7 @@ class Microstructure(SampleData):
         else:
             return self.grains.nrows
 
-    def add_phase(self, phase):
+    def add_phase(self, phase) -> None:
         """Add a new phase to this microstructure.
 
         Before adding this phase, the phase id is set to the corresponding id.
@@ -2066,15 +2065,15 @@ class Microstructure(SampleData):
         self.add_attributes(d, '/PhaseData/phase_%02d' % new_phase_id)
         print('new phase added: %s' % phase.name)
 
-    def get_phase_list(self):
+    def get_phase_list(self) -> list:
         """Return the list of the phases in this microstructure."""
         return self._phases
 
-    def get_phase_ids_list(self):
+    def get_phase_ids_list(self) -> list:
         """Return the list of the phase ids."""
         return [phase.phase_id for phase in self._phases]
 
-    def get_phase(self, phase_id=1):
+    def get_phase(self, phase_id=1) -> CrystallinePhase:
         """Get a crystalline phase.
 
         If no phase_id is given, the first phase is returned.
@@ -2085,7 +2084,7 @@ class Microstructure(SampleData):
         index = self.get_phase_ids_list().index(phase_id)
         return self._phases[index]
 
-    def get_lattice(self, phase_id=1):
+    def get_lattice(self, phase_id=1) -> Lattice:
         """Get the crystallographic lattice associated with this microstructure.
 
         If no phase_id is given, the `Lattice` of the active phase is returned.
@@ -2094,7 +2093,7 @@ class Microstructure(SampleData):
         """
         return self.get_phase(phase_id).get_lattice()
 
-    def get_grain_map(self):
+    def get_grain_map(self) -> np.array:
         """Get the active grain map as a numpy array.
 
         The grain map is the image constituted by the grain ids or labels.

@@ -104,7 +104,8 @@ class View_slice:
             # compute grain ids and grain centers
             if not highlight_ids:
                 highlight_ids = np.unique(grains_slice).tolist()
-                highlight_ids.remove(0)
+                if 0 in highlight_ids:
+                    highlight_ids.remove(0)
             centers, sizes, highlight_ids = self._get_slice_grain_centers(grains_slice, highlight_ids)
             if show_grain_ids:
                 # print grain id on center on each grain
@@ -313,10 +314,6 @@ class View_slice:
         centers = self.microstructure.get_grain_centers(id_list=highlight_ids)
         sizes = self.microstructure.get_grain_volumes(id_list=highlight_ids)
         coords, edge_point_ids = self.microstructure.get_lattice().get_points(origin='mid')
-        # list of point ids to draw the cell edges
-        edge_point_ids = np.array([[0, 1], [1, 3], [2, 3], [0, 2], 
-                                   [4, 5], [5, 7], [6, 7], [4, 6], 
-                                   [0, 4], [1, 5], [2, 6], [3, 7]], dtype=np.uint8)
         #FIXME handle all 3 planes
         if self.plane != 'XY':
             print('lattices can only be plotted in the XY plane for now, skipping this...')
@@ -325,13 +322,13 @@ class View_slice:
             # now apply the crystal orientation
             g = self.microstructure.get_grain(gid).orientation.orientation_matrix()
             coords_rot = np.empty_like(coords)
-            for i in range(8):
+            for i in range(len(coords_rot)):
                 # scale coordinates with the grain size and center on the grain
                 coords_rot[i] = centers[k] + np.sqrt(sizes[k]) * np.dot(g.T, coords[i])
             # scale coords to the proper unit
             if self.unit == 'pixel':
                 coords_rot = coords_rot / self.microstructure.get_voxel_size() + 0.5 * np.array(self.microstructure.get_grain_map().shape)
-            for edge_id in range(12):
+            for edge_id in range(len(edge_point_ids)):
                 ax.plot(coords_rot[edge_point_ids[edge_id, :], 0],
                         coords_rot[edge_point_ids[edge_id, :], 1], 'k-')
         # prevent axis to move due to lines spanning outside the map

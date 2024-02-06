@@ -712,7 +712,7 @@ class OimScan:
             header += 'MaterialName ' + phase.name + '\n'
             header += 'Formula ' + phase.formula + '\n'
             header += 'Info ' + phase.description + '\n'
-            header += 'Symmetry ' + Symmetry.to_tsl(phase.get_symmetry()) + '\n'
+            header += 'Symmetry ' + str(Symmetry.to_tsl(phase.get_symmetry())) + '\n'
             lattice_constants = phase.get_lattice().get_lattice_constants(angstrom=True)
             constants = '  '.join(['%.3f' % c for c in lattice_constants])
             header += ('LatticeConstants ' + constants + '\n')

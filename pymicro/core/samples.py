@@ -1371,9 +1371,7 @@ class SampleData:
                                              filters=Filters,
                                              chunkshape=chunkshape)
         if data is not None:
-            print(data.shape)
             table.append(data)
-            print(table)
             table.flush()
         # add to index
         if indexname is None:
@@ -4196,8 +4194,12 @@ class SampleData:
             Field_index = self.add_string_array(
                 'Field_index', location=grid._v_pathname,
                 indexname=grid_indexname+'_Field_index')
-        test_str = bytes(fieldname,'utf-8')
-        if test_str not in Field_index:
+        # test_str = bytes(fieldname,'utf-8')
+        test_append = True
+        for name in Field_index:
+            if name.decode() == fieldname:
+                test_append = False
+        if test_append:
             Field_index.append([fieldname])
         return
 

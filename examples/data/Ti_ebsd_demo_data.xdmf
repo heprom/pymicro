@@ -23,6 +23,9 @@
       <Attribute Name="euler" AttributeType="Vector" Center="Cell">
         <DataItem Format="HDF" Dimensions="101  101  3" NumberType="Float" Precision="64">Ti_ebsd_demo_data.h5:/CellData/euler</DataItem>
       </Attribute>
+      <Attribute Name="dilated_grain_map" AttributeType="Scalar" Center="Cell">
+        <DataItem Format="HDF" Dimensions="101  101" NumberType="Int" Precision="64">Ti_ebsd_demo_data.h5:/CellData/dilated_grain_map</DataItem>
+      </Attribute>
     </Grid>
   </Domain>
 </Xdmf>

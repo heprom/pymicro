@@ -6,7 +6,7 @@ import numpy as np
 from scipy import ndimage
 from matplotlib import pyplot as plt, cm
 from pymicro.xray.experiment import ForwardSimulation
-from pymicro.crystal.lattice import HklPlane
+from pymicro.crystal.lattice import HklPlane, Symmetry
 from pymicro.xray.xray_utils import lambda_keV_to_nm, radiograph, radiographs
 from pymicro.crystal.microstructure import Grain, Orientation
 from pymicro.file.file_utils import edf_read, edf_write
@@ -214,24 +214,19 @@ class DctForwardSimulation(ForwardSimulation):
         super(DctForwardSimulation, self).__init__('dct', verbose=verbose)
         self.hkl_planes = []
         self.check = 1  # grain id to display infos in verbose mode
+        self.omega_start = 0.
+        self.omega_end = 360.
         self.omegas = None
-        self.reflections = []
+        self.reflexions = []
 
     def set_hkl_planes(self, hkl_planes):
         self.hkl_planes = hkl_planes
 
     def set_diffracting_famillies(self, hkl_list):
         """Set the list of diffracting hk planes using a set of families."""
-        symmetry = self.exp.get_sample().get_material().get_symmetry()
-        hkl_planes = []
-        for hkl in hkl_list:
-            # here we set friedel_pairs to False as we take it into account in the calculation
-            planes = HklPlane.get_family(hkl, friedel_pairs=True, crystal_structure=symmetry)
-            for plane in planes:  # fix the lattice
-                plane.set_lattice(self.exp.get_sample().get_material())
-            hkl_planes.extend(planes)
+        lattice = self.exp.get_sample().get_lattice()
+        hkl_planes = HklPlane.from_families(hkl_list, lattice=lattice, friedel_pairs=True)
         self.set_hkl_planes(hkl_planes)
-
 
     def setup(self, omega_step, grain_ids=None):
         """Setup the forward simulation.
@@ -241,34 +236,42 @@ class DctForwardSimulation(ForwardSimulation):
         """
         assert self.exp.source.min_energy == self.exp.source.max_energy  # monochromatic case
         lambda_keV = self.exp.source.max_energy
-        self.omegas = np.linspace(0.0, 360.0, num=int(360.0 / omega_step), endpoint=False)
-        self.reflections = []
+        sym = self.exp.sample.get_lattice().get_symmetry()
+        self.omegas = np.linspace(self.omega_start, self.omega_end,
+                                  num=int((self.omega_end - self.omega_start) / omega_step), endpoint=False)
+        self.reflexions = []
         for omega in self.omegas:
-            self.reflections.append([])
-        if grain_ids:
-            # make a list of the grains selected for the forward simulation
-            grains = [self.exp.sample.microstructure.get_grain(gid) for gid in grain_ids]
-        else:
-            grains = self.exp.sample.microstructure.grains
-        for g in grains:
+            self.reflexions.append([])
+        if not grain_ids:
+            # list of the grains selected for the forward simulation
+            grain_ids = self.exp.sample.get_grain_ids()
+        for grain_id in grain_ids:
             for plane in self.hkl_planes:
-                (h, k, i, l) = HklPlane.three_to_four_indices(*plane.miller_indices())
+                h, k, l = plane.miller_indices()
+                if sym is Symmetry.hexagonal:
+                    (h, k, i, l) = HklPlane.three_to_four_indices(h, k, l)
                 try:
-                    (w1, w2) = g.dct_omega_angles(plane, lambda_keV, verbose=False)
+                    o = Orientation.from_rodrigues(self.exp.sample.get_grain_rodrigues(id_list=[grain_id])[0])
+                    (w1, w2) = o.dct_omega_angles(plane, lambda_keV, verbose=False)
                 except ValueError:
                     if self.verbose:
-                        print('plane {} does not fulfil the Bragg condition for grain {:d}'.format((h, k, i, l), g.id))
+                        print('plane {} does not fulfil the Bragg condition for grain {:d}'.format((h, k, l), grain_id))
                     continue
                 # add angles for Friedel pairs
                 w3 = (w1 + 180.) % 360
                 w4 = (w2 + 180.) % 360
-                if self.verbose and g.id == self.check:
-                    print('grain %d, angles for plane %d%d%d: w1=%.3f and w2=%.3f | delta=%.1f' % (g.id, h, k, l, w1, w2, w1-w2))
+                if self.verbose and grain_id == self.check:
+                    print('grain %d, angles for plane %d%d%d: w1=%.3f and w2=%.3f | delta=%.1f' % (grain_id, h, k, l, w1, w2, w1-w2))
                     print('(%3d, %3d, %3d, %3d) -- %6.2f & %6.2f' % (h, k, i, l, w1, w2))
-                self.reflections[int(w1 / omega_step)].append([g.id, (h, k, l)])
-                self.reflections[int(w2 / omega_step)].append([g.id, (h, k, l)])
-                self.reflections[int(w3 / omega_step)].append([g.id, (-h, -k, -l)])
-                self.reflections[int(w4 / omega_step)].append([g.id, (-h, -k, -l)])
+                try:
+                    self.reflexions[int(w1 / omega_step)].append([grain_id, (h, k, l)])
+                    self.reflexions[int(w2 / omega_step)].append([grain_id, (h, k, l)])
+                    self.reflexions[int(w3 / omega_step)].append([grain_id, (-h, -k, -l)])
+                    self.reflexions[int(w4 / omega_step)].append([grain_id, (-h, -k, -l)])
+                except IndexError:
+                    # drop reflexions after omega_end
+                    pass
+
 
     def load_grain(self, gid=1):
         print('loading grain from file 4_grains/phase_01/grain_%04d.mat' % gid)
@@ -417,7 +420,6 @@ class DctForwardSimulation(ForwardSimulation):
         stack_sim = self.grain_projections(omegas, gid, hor_flip=hor_flip, ver_flip=ver_flip)
         return self.grain_projection_image(g_uv, stack_sim)
 
-
     def dct_projection(self, omega, include_direct_beam=True, att=5):
         """Function to compute a full DCT projection at a given omega angle.
 
@@ -426,15 +428,15 @@ class DctForwardSimulation(ForwardSimulation):
         :param float att: an attenuation factor used to limit the gray levels in the direct beam.
         :return: the dct projection as a 2D numpy array
         """
-        if len(self.reflections) == 0:
-            print('empty list of reflections, you should run the setup function first')
+        if len(self.reflexions) == 0:
+            print('empty list of reflexions, you should run the setup function first')
             return None
-        grain_ids = self.exp.get_sample().get_grain_ids()
+        grain_ids = self.exp.get_sample().get_grain_map()
         detector = self.exp.get_active_detector()
         lambda_keV = self.exp.source.max_energy
-        lattice = self.exp.get_sample().get_material()
+        lattice = self.exp.get_sample().get_lattice()
         index = np.argmax(self.omegas > omega)
-        dif_grains = self.reflections[index - 1]  # grains diffracting between omegas[index - 1] and omegas[index]
+        dif_grains = self.reflexions[index - 1]  # grains diffracting between omegas[index - 1] and omegas[index]
         # intialize image result
         full_proj = np.zeros(detector.get_size_px(), dtype=np.float)
         lambda_nm = lambda_keV_to_nm(lambda_keV)
@@ -463,7 +465,7 @@ class DctForwardSimulation(ForwardSimulation):
             print('center of mass (voxel): {0}'.format(local_com - 0.5 * np.array(grain_ids.shape)))
             print('center of mass (mm): {0}'.format(g_center_mm))
             # compute scattering vector
-            gt = self.exp.get_sample().get_microstructure().get_grain(gid).orientation_matrix().transpose()
+            gt = self.exp.get_sample().get_grain(gid).orientation_matrix().transpose()
             p = HklPlane(h, k, l, lattice)
             G = np.dot(R, np.dot(gt, p.scattering_vector()))
             K = X + G

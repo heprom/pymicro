@@ -932,7 +932,7 @@ class FE_Element():
            see zUtilityMesh/Declare_geometries.c in the Z-set code
         '''
         if self._type in ['c2d3']:
-            return 4
+            return 3
         if self._type in ['c3d4', 'c3d6', 'c2d4', 'c2d8', 'c3d10_4']:
             return 4
         elif self._type in ['c3d8', 'c3d20r']:

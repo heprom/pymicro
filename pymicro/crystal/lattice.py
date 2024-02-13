@@ -4,7 +4,7 @@ import os
 from pymicro.external import CifFile_module as CifFile
 import enum
 import functools
-from math import sin, cos, gcd
+from math import sin, cos, sqrt, gcd
 import numpy as np
 from numpy import pi, dot, transpose, radians
 from matplotlib import pyplot as plt
@@ -295,6 +295,29 @@ class Symmetry(enum.Enum):
             return Symmetry.monoclinic
         elif tsl_number == 1:
             return Symmetry.triclinic
+        else:
+            return None
+
+    @staticmethod
+    def to_tsl(symmetry):
+        """Convert a type of crystal `Symmetry` in the corresponding TSL number.
+
+        :return: the TSL number for this symmetry.
+        """
+        if symmetry is Symmetry.cubic:
+            return 43
+        elif symmetry is Symmetry.hexagonal:
+            return 62
+        elif symmetry is Symmetry.orthorhombic:
+            return 22
+        elif symmetry is Symmetry.tetragonal:
+            return 42
+        elif symmetry is Symmetry.trigonal:
+            return 32
+        elif symmetry is Symmetry.monoclinic:
+            return 2
+        elif symmetry is Symmetry.triclinic:
+            return 1
         else:
             return None
 
@@ -756,6 +779,69 @@ class Lattice:
                       [a * c * cos(beta), b * c * cos(alpha), c ** 2]])
         #g = self.matrix.dot(self.matrix.T)
         return g
+
+    def get_points(self, origin=(0., 0., 0.)):
+        """Method to get the coordinates of the primitive unit cell.
+        
+        :param origin: the origin
+        :return: the points coordinates and a list of the point ids to draw the edges of the lattice.
+        """
+        (a, b, c) = self._lengths
+        if origin == 'mid':
+            if self.get_symmetry() is not Symmetry.hexagonal:
+                origin = (-a / 2, -b / 2, -c / 2)
+            else:
+                origin = (0., 0., 0.)
+        if isinstance(origin, tuple):
+            origin = np.array(origin)
+
+        if self.get_symmetry() is Symmetry.hexagonal:
+            print('handling hexagonal lattice')
+            # array with the lattice point coordinates
+            coords = np.empty((12, 3), 'f')
+            coords[0, :] = origin + (a, 0., -c / 2)
+            coords[1, :] = origin + (a / 2, a * sqrt(3) / 2, -c / 2)
+            coords[2, :] = origin + (-a / 2, a * sqrt(3) / 2, -c / 2)
+            coords[3, :] = origin + (-a, 0., -c / 2)
+            coords[4, :] = origin + (-a / 2, -a * sqrt(3) / 2, -c / 2)
+            coords[5, :] = origin + (a / 2, -a * sqrt(3) / 2, -c / 2)
+            coords[6, :] = origin + (a, 0., c / 2)
+            coords[7, :] = origin + (a / 2, a * sqrt(3) / 2, c / 2)
+            coords[8, :] = origin + (-a / 2, a * sqrt(3) / 2, c / 2)
+            coords[9, :] = origin + (-a, 0., c / 2)
+            coords[10, :] = origin + (-a / 2, -a * sqrt(3) / 2, c / 2)
+            coords[11, :] = origin + (a / 2, -a * sqrt(3) / 2, c / 2)
+
+            # list of point ids to draw the hexagone cell edges
+            edge_point_ids = np.array([[0, 1], [1, 2], [2, 3], [3, 4],
+                                       [4, 5], [5, 0], [6, 7], [7, 8],
+                                       [8, 9], [9, 10], [10, 11], [11, 6],
+                                       [0, 6], [1, 7], [2, 8],
+                                       [3, 9], [4, 10], [5, 11]],
+                                       dtype=np.uint8)
+
+            return coords, edge_point_ids
+
+        [A, B, C] = self._matrix
+
+        # array with the lattice point coordinates
+        coords = np.empty((8, 3), 'f')
+        coords[0, :] = origin
+        coords[1, :] = origin + A
+        coords[2, :] = origin + B
+        coords[3, :] = origin + A + B
+        coords[4, :] = origin + C
+        coords[5, :] = origin + A + C
+        coords[6, :] = origin + B + C
+        coords[7, :] = origin + A + B + C
+
+        # list of point ids to draw the cell edges
+        edge_point_ids = np.array([[0, 1], [1, 3], [2, 3], [0, 2],
+                                   [4, 5], [5, 7], [6, 7], [4, 6],
+                                   [0, 4], [1, 5], [2, 6], [3, 7]],
+                                   dtype=np.uint8)
+
+        return coords, edge_point_ids
 
     def guess_symmetry(self):
         """Guess the lattice symmetry from the geometry."""

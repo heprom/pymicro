@@ -666,14 +666,15 @@ class PoleFigure:
         plt.show()
 
     @staticmethod
-    def plot(orientations, **kwargs):
+    def plot(orientations, symmetry=Symmetry.cubic, **kwargs):
         """Plot a pole figure (both direct and inverse) for a list of crystal
         orientations.
 
         :param orientations: the list of crystalline
             :py:class:`~pymicro.crystal.microstructure.Orientation` to
             plot.
-        
+        :param Symmetry symmetry: the symmetry to use for constructing 
+        the pole figure.        
         """
         micro = Microstructure(autodelete=True)
         if isinstance(orientations, list):

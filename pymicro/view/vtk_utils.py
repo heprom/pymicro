@@ -457,7 +457,7 @@ def grain_3d(grain, hklplanes=None, show_normal=False, plane_origins=None,
         print(grain.id)
         print(lut.GetTableValue(grain.id)[0:3])
     grain_actor.GetProperty().SetColor(lut.GetTableValue(grain.id)[0:3])
-    #grain_actor.GetProperty().SetOpacity(0.3)
+    grain_actor.GetProperty().SetOpacity(0.3)
     grain_actor.SetMapper(mapper)
     assembly.AddPart(grain_actor)
     if show_orientation:

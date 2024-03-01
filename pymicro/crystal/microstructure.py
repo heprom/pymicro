@@ -5265,12 +5265,13 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None, tol=5., min_ci=0.2, phase_list=None):
+    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, phase_list=None):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
         :param list roi: a list of 4 integers in the form [x1, x2, y1, y2]
             to crop the EBSD scan.
+        :param int ds: integer value to downsample the data.
         :param float tol: the misorientation angle tolerance to segment
             the grains (default is 5 degrees).
         :param float min_ci: minimum confidence index for a pixel to be a valid
@@ -5293,13 +5294,14 @@ class Microstructure(SampleData):
         micro.set_phases(scan.phase_list)
         if roi:
             print('importing data from region {}'.format(roi))
-            scan.cols = roi[1] - roi[0]
-            scan.rows = roi[3] - roi[2]
-            scan.iq = scan.iq[roi[0]:roi[1], roi[2]:roi[3]]
-            scan.ci = scan.ci[roi[0]:roi[1], roi[2]:roi[3]]
-            scan.euler = scan.euler[roi[0]:roi[1], roi[2]:roi[3], :]
+            scan.phase = scan.phase[roi[0]:roi[1]:ds, roi[2]:roi[3]:ds]
+            scan.iq = scan.iq[roi[0]:roi[1]:ds, roi[2]:roi[3]:ds]
+            scan.ci = scan.ci[roi[0]:roi[1]:ds, roi[2]:roi[3]:ds]
+            scan.euler = scan.euler[roi[0]:roi[1]:ds, roi[2]:roi[3]:ds, :]
+            scan.cols = scan.phase.shape[0]
+            scan.rows = scan.phase.shape[1]
         # change the orientation reference frame to XYZ
-        scan.change_orientation_reference_frame()
+        #scan.change_orientation_reference_frame()
         iq = scan.iq
         ci = scan.ci
         euler = scan.euler
@@ -5332,8 +5334,8 @@ class Microstructure(SampleData):
             phase_grain = scan.phase[np.where(grain_ids == 1)].astype(np.int)
             assert len(np.unique(phase_grain)) == 1  # all pixel of this grain must have the same phase id by
             # construction
-            grain_phase_id = phase_grain[0]
-            sym = scan.phase_list[grain_phase_id].get_symmetry()
+            grain_phase_index = [phase.phase_id for phase in scan.phase_list].index(phase_grain[0])
+            sym = scan.phase_list[grain_phase_index].get_symmetry()
             # compute the mean orientation for this grain
             euler_grain = scan.euler[np.where(grain_ids == gid)]
             #euler_grain = np.atleast_2d(euler_grain)  # for one pixel grains

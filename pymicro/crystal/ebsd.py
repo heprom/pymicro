@@ -379,10 +379,10 @@ class OimScan:
             for i in range(n_phases):
                 # read this phase (lengths, angles, name, ?, space group, description)
                 line = f.readline().strip()
-                tokens = line.split()
+                tokens = line.split("\t")
                 phase = CrystallinePhase(i + 1)
                 phase.name = tokens[2]
-                phase.name = tokens[5]
+                phase.description = tokens[7]
                 lattice_lengths = tokens[0].split(';')
                 lattice_angles = tokens[1].split(';')
                 a, b, c = float(lattice_lengths[0]) / 10, \
@@ -578,6 +578,8 @@ class OimScan:
         grain_ids += -1  # mark all pixels as non assigned
         # start by assigning bad pixel to grain 0
         grain_ids[self.ci <= min_ci] = 0
+        # grains with phase 0 are also not taken into account
+        grain_ids[self.phase == 0] = 0
 
         n_grains = 0
         progress = 0

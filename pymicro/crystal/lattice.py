@@ -812,7 +812,12 @@ class Lattice:
             coords[10, :] = origin + (-a / 2, -a * sqrt(3) / 2, c / 2)
             coords[11, :] = origin + (a / 2, -a * sqrt(3) / 2, c / 2)
 
-            # list of point ids to draw the hexagone cell edges
+            # list of points ids defining the faces with normals pointing out
+            faces = [[0, 1, 2, 3, 4, 5, 0], [6, 7, 8, 9, 10, 11, 6],
+                     [0, 1, 7, 6, 0], [1, 2, 8, 7, 1], [2, 3, 9, 8, 2],
+                     [3, 4, 10, 9, 3], [4, 5, 11, 10, 4], [0, 5, 11, 6, 0]]
+
+            # list of point ids to draw the hexagon cell edges
             edge_point_ids = np.array([[0, 1], [1, 2], [2, 3], [3, 4],
                                        [4, 5], [5, 0], [6, 7], [7, 8],
                                        [8, 9], [9, 10], [10, 11], [11, 6],
@@ -820,7 +825,13 @@ class Lattice:
                                        [3, 9], [4, 10], [5, 11]],
                                        dtype=np.uint8)
 
-            return coords, edge_point_ids
+            edges = []
+            for f in faces:
+                for i in range(len(f) - 1):
+                    if [f[i], f[i + 1]] not in edges and [f[i + 1], f[i]] not in edges:
+                        edges.append([f[i], f[i + 1]])
+
+            return coords, edges, faces
 
         [A, B, C] = self._matrix
 
@@ -835,13 +846,22 @@ class Lattice:
         coords[6, :] = origin + B + C
         coords[7, :] = origin + A + B + C
 
+        # list of points ids defining the faces with normals pointing out
+        faces = [[0, 2, 3, 1, 0], [4, 5, 7, 6, 4], [0, 1, 5, 4, 0],
+                 [1, 3, 7, 5, 1], [3, 2, 6, 7, 3], [0, 4, 6, 2, 0]]
+
         # list of point ids to draw the cell edges
         edge_point_ids = np.array([[0, 1], [1, 3], [2, 3], [0, 2],
                                    [4, 5], [5, 7], [6, 7], [4, 6],
                                    [0, 4], [1, 5], [2, 6], [3, 7]],
                                    dtype=np.uint8)
+        edges = []
+        for f in faces:
+            for i in range(len(f) - 1):
+                if [f[i], f[i + 1]] not in edges and [f[i + 1], f[i]] not in edges:
+                    edges.append([f[i], f[i + 1]])
 
-        return coords, edge_point_ids
+        return coords, edges, faces
 
     def guess_symmetry(self):
         """Guess the lattice symmetry from the geometry."""

@@ -14,6 +14,8 @@ class View_slice:
         self.allowed_planes = ['YZ', 'XZ', 'XY']
         self.allowed_annotation = ['grain_ids', 'lattices', 'slip_traces']
         self.annotate = None
+        self.annotate_lattices_params = {'back_faces': True,
+                                         'fill_faces_up': True}
 
     def set_unit(self, unit):
         if unit in self.allowed_units:
@@ -310,27 +312,41 @@ class View_slice:
 
     def _overlay_crystal_lattices(self, ax, centers, highlight_ids, sizes, extent):
         """Overlay crystal lattice on grain map slice view."""
+        par = self.annotate_lattices_params
         #FIXME adapt for multi phase material
         centers = self.microstructure.get_grain_centers(id_list=highlight_ids)
         sizes = self.microstructure.get_grain_volumes(id_list=highlight_ids)
-        coords, edge_point_ids = self.microstructure.get_lattice().get_points(origin='mid')
+        coords, edges, faces = self.microstructure.get_lattice().get_points(origin='mid')
         #FIXME handle all 3 planes
         if self.plane != 'XY':
             print('lattices can only be plotted in the XY plane for now, skipping this...')
             return
+
         for k, gid in enumerate(highlight_ids):
-            # now apply the crystal orientation
+            # apply the crystal orientation
             g = self.microstructure.get_grain(gid).orientation.orientation_matrix()
             coords_rot = np.empty_like(coords)
-            for i in range(len(coords_rot)):
+            for i in range(len(coords)):
                 # scale coordinates with the grain size and center on the grain
                 coords_rot[i] = centers[k] + np.sqrt(sizes[k]) * np.dot(g.T, coords[i])
             # scale coords to the proper unit
             if self.unit == 'pixel':
                 coords_rot = coords_rot / self.microstructure.get_voxel_size() + 0.5 * np.array(self.microstructure.get_grain_map().shape)
-            for edge_id in range(len(edge_point_ids)):
-                ax.plot(coords_rot[edge_point_ids[edge_id, :], 0],
-                        coords_rot[edge_point_ids[edge_id, :], 1], 'k-')
+            
+            normals = np.empty((len(faces), 3), dtype='f')
+            for i in range(len(faces)):
+                face = faces[i]
+                face_coords = coords_rot[face]
+                # for each face, comput the normal
+                normals[i] = np.cross(coords_rot[face[1]] - coords_rot[face[0]],
+                                      coords_rot[face[-2]] - coords_rot[face[-1]])
+                normals[i] /= np.linalg.norm(normals[i])
+                if normals[i, 2] >= 0.:
+                    ax.plot(face_coords[:, 0], face_coords[:, 1], 'k-')
+                    if par['fill_faces_up'] is True:
+                        ax.fill(face_coords[:, 0], face_coords[:, 1], color='gray', alpha=0.5)
+                elif par['back_faces'] is True:
+                    ax.plot(face_coords[:, 0], face_coords[:, 1], 'k', linestyle='dotted')
         # prevent axis to move due to lines spanning outside the map
         plt.axis(extent)
 

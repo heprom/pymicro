@@ -813,9 +813,9 @@ class Lattice:
             coords[11, :] = origin + (a / 2, -a * sqrt(3) / 2, c / 2)
 
             # list of points ids defining the faces with normals pointing out
-            faces = [[0, 1, 2, 3, 4, 5, 0], [6, 7, 8, 9, 10, 11, 6],
+            faces = [[0, 5, 4, 3, 2, 1, 0], [6, 7, 8, 9, 10, 11, 6],
                      [0, 1, 7, 6, 0], [1, 2, 8, 7, 1], [2, 3, 9, 8, 2],
-                     [3, 4, 10, 9, 3], [4, 5, 11, 10, 4], [0, 5, 11, 6, 0]]
+                     [3, 4, 10, 9, 3], [4, 5, 11, 10, 4], [5, 0, 6, 11, 5]]
 
             # list of point ids to draw the hexagon cell edges
             edge_point_ids = np.array([[0, 1], [1, 2], [2, 3], [3, 4],

@@ -326,25 +326,25 @@ class View_slice:
             # apply the crystal orientation
             g = self.microstructure.get_grain(gid).orientation.orientation_matrix()
             coords_rot = np.empty_like(coords)
-            for i in range(len(coords)):
+            for i, coord in enumerate(coords):
                 # scale coordinates with the grain size and center on the grain
-                coords_rot[i] = centers[k] + np.sqrt(sizes[k]) * np.dot(g.T, coords[i])
+                coords_rot[i] = centers[k] + np.sqrt(sizes[k]) * np.dot(g.T, coord)
             # scale coords to the proper unit
             if self.unit == 'pixel':
                 coords_rot = coords_rot / self.microstructure.get_voxel_size() + 0.5 * np.array(self.microstructure.get_grain_map().shape)
             
             normals = np.empty((len(faces), 3), dtype='f')
-            for i in range(len(faces)):
-                face = faces[i]
+            for i, face in enumerate(faces):
                 face_coords = coords_rot[face]
-                # for each face, comput the normal
+                # for each face, compute the normal
                 normals[i] = np.cross(coords_rot[face[1]] - coords_rot[face[0]],
                                       coords_rot[face[-2]] - coords_rot[face[-1]])
                 normals[i] /= np.linalg.norm(normals[i])
-                if normals[i, 2] >= 0.:
-                    ax.plot(face_coords[:, 0], face_coords[:, 1], 'k-')
+                if normals[i, 2] < 0.:
+                    # note: up is -Z
                     if par['fill_faces_up'] is True:
                         ax.fill(face_coords[:, 0], face_coords[:, 1], color='gray', alpha=0.5)
+                    ax.plot(face_coords[:, 0], face_coords[:, 1], 'k-')
                 elif par['back_faces'] is True:
                     ax.plot(face_coords[:, 0], face_coords[:, 1], 'k', linestyle='dotted')
         # prevent axis to move due to lines spanning outside the map

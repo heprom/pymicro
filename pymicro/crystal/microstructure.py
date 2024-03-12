@@ -5265,7 +5265,7 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, phase_list=None):
+    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, phase_list=None, ang_ref_frame=2, grain_ids=None):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
@@ -5287,27 +5287,22 @@ class Microstructure(SampleData):
         name = os.path.splitext(os.path.basename(file_path))[0]
         micro = Microstructure(name=name, autodelete=False, overwrite_hdf5=True)
         from pymicro.crystal.ebsd import OimScan
-        # Read raw EBSD .h5 data file from OIM
-        scan = OimScan.from_file(file_path)
+        # Read raw EBSD file, enforce spatial reference frame for orientation data
+        scan = OimScan.from_file(file_path, crop=(roi, ds),
+                                 use_spatial_ref_frame=True, ang_ref_frame=ang_ref_frame)
         if phase_list:
             scan.phase_list = phase_list
         micro.set_phases(scan.phase_list)
-        if roi:
-            print('importing data from region {}'.format(roi))
-            scan.phase = scan.phase[roi[0]:roi[1]:ds, roi[2]:roi[3]:ds]
-            scan.iq = scan.iq[roi[0]:roi[1]:ds, roi[2]:roi[3]:ds]
-            scan.ci = scan.ci[roi[0]:roi[1]:ds, roi[2]:roi[3]:ds]
-            scan.euler = scan.euler[roi[0]:roi[1]:ds, roi[2]:roi[3]:ds, :]
-            scan.cols = scan.phase.shape[0]
-            scan.rows = scan.phase.shape[1]
-        # change the orientation reference frame to XYZ
-        #scan.change_orientation_reference_frame()
         iq = scan.iq
         ci = scan.ci
         euler = scan.euler
         mask = np.ones_like(iq)
-        # segment the grains
-        grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
+        # check if we use an existing segmentation
+        if grain_ids is None:
+            # segment the grains
+            grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
+        else:
+            print('using existing segmentation, size is ', grain_ids.shape)
         voxel_size = np.array([scan.xStep, scan.yStep])
         micro.set_grain_map(grain_ids, voxel_size)
 

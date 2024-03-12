@@ -2,6 +2,8 @@
 import h5py
 import numpy as np
 import os
+from tqdm import tqdm
+import time
 from pymicro.crystal.microstructure import Orientation
 from pymicro.crystal.lattice import Symmetry, CrystallinePhase, Lattice
 
@@ -26,8 +28,6 @@ class OimPhase(CrystallinePhase):
             where the information is stored.
         :return: a new instance OimPhase.
         """
-        print(h5_phase_path.keys())
-        print(phase_id)
         #assert phase_id == h5_phase_path[phase_id]
         # each phase has the following keys: 'Formula', 'Info', 'Lattice Constant a', 'Lattice Constant alpha',
         # 'Lattice Constant b', 'Lattice Constant beta', 'Lattice Constant c', 'Lattice Constant gamma',
@@ -38,9 +38,17 @@ class OimPhase(CrystallinePhase):
         name_key = [item for item in keys if item.endswith('Name')][0]
         phase.name = h5_phase_path[phase_id][name_key][0].decode('utf-8')
         phase.formula = h5_phase_path[phase_id]['Formula'][0].decode('utf-8')
-        phase.description = h5_phase_path[phase_id]['Info'][0].decode('utf-8')
+        if 'Info' in h5_phase_path[phase_id].keys():
+            phase.description = h5_phase_path[phase_id]['Info'][0].decode('utf-8')
         # create a crystal lattice for this phase
-        sym = Symmetry.from_tsl(h5_phase_path[phase_id]['Symmetry'][0])
+        if 'Symmetry' in h5_phase_path[phase_id]:
+            tsl_sym_id = h5_phase_path[phase_id]['Symmetry'][0]
+        elif 'LGsymID' in h5_phase_path[phase_id]:
+            tsl_sym_id = h5_phase_path[phase_id]['LGsymID'][0]
+        else:
+            # default to cubic
+            tsl_sym_id = 43
+        sym = Symmetry.from_tsl(tsl_sym_id)
         # convert lattice constants to nm
         key_a = [item for item in keys if item.startswith('Lat') and (item.endswith(' A') or item.endswith(' a'))][0]
         key_b = [item for item in keys if item.startswith('Lat') and (item.endswith(' B') or item.endswith(' b'))][0]
@@ -56,7 +64,7 @@ class OimPhase(CrystallinePhase):
         gamma = h5_phase_path[phase_id][key_gamma][0]
         lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
         phase.set_lattice(lattice)
-        hkl_key = [item for item in keys if item.endswith('Families')][0]
+        hkl_key = 'hkl Families'
         for row in h5_phase_path[phase_id][hkl_key]:
             family = OimHklFamily()
             family.hkl = [row[0], row[1], row[2]]
@@ -77,11 +85,18 @@ class OimHklFamily:
 
 
 class OimScan:
-    """OimScan class to handle files from EDAX software OIM."""
+    """OimScan class to handle files from EDAX software OIM.
+    
+    One important feature is the orientation data reference frame 
+    which is handled by a simple integer. This is used to handle 
+    the fact that the orientation data is not necessarily expressed 
+    in the spatial reference frame. 
+    """
 
-    def __init__(self, shape, resolution=(1.0, 1.0)):
+    def __init__(self, shape, resolution=(1.0, 1.0), ref_frame=0):
         """Create an empty EBSD scan."""
         print('init with shape', shape)
+        self.ref_frame = ref_frame
         self.x_star = 0
         self.y_star = 0
         self.z_star = 0
@@ -118,13 +133,14 @@ class OimScan:
         self.phase = np.zeros((self.cols, self.rows), dtype='int')
 
     def crop(self, x_start=None, x_end=None, y_start=None, y_end=None,
-             in_place=True):
+             ds=1, in_place=True):
         """Crop an EBSD scan.
 
         :param int x_start: start value for slicing the first axis (cols).
         :param int x_end: end value for slicing the first axis.
         :param int y_start: start value for slicing the second axis (rows).
         :param int y_end: end value for slicing the second axis.
+        :param int ds: downsampling value.
         :param bool in_place: crop the actual EBSD scan, if False, a new scan
         is returned
         """
@@ -140,33 +156,36 @@ class OimScan:
         if in_place:
             self.cols = x_end - x_start
             self.rows = y_end - y_start
-            self.euler = self.euler[x_start:x_end, y_start:y_end, :]
-            self.x = self.x[x_start:x_end, y_start:y_end]
-            self.y = self.y[x_start:x_end, y_start:y_end]
-            self.iq = self.iq[x_start:x_end, y_start:y_end]
-            self.ci = self.ci[x_start:x_end, y_start:y_end]
-            self.phase = self.phase[x_start:x_end, y_start:y_end]
+            self.euler = self.euler[x_start:x_end:ds, y_start:y_end:ds, :]
+            self.x = self.x[x_start:x_end:ds, y_start:y_end:ds]
+            self.y = self.y[x_start:x_end:ds, y_start:y_end:ds]
+            self.iq = self.iq[x_start:x_end:ds, y_start:y_end:ds]
+            self.ci = self.ci[x_start:x_end:ds, y_start:y_end:ds]
+            self.phase = self.phase[x_start:x_end:ds, y_start:y_end:ds]
             if self.grain_ids is not None:
-                self.grain_ids = self.grain_ids[x_start:x_end, y_start:y_end]
+                self.grain_ids = self.grain_ids[x_start:x_end:ds, y_start:y_end:ds]
+            self.cols = self.phase.shape[0]
+            self.rows = self.phase.shape[1]
         else:
-            crop = OimScan((x_end - x_start, y_end - y_start),
-                           resolution=(self.xStep, self.yStep))
+            crop = OimScan(((x_end - x_start) // ds, 
+                            (y_end - y_start) // ds),
+                           resolution=(ds * self.xStep, ds * self.yStep))
             crop.operator = self.operator
             crop.sample_id = self.sample_id
             crop.scan_id = self.scan_id + 'cropped'
             crop.phase_list = self.phase_list
-            crop.euler = self.euler[x_start:x_end, y_start:y_end, :]
-            crop.x = self.x[x_start:x_end, y_start:y_end]
-            crop.y = self.y[x_start:x_end, y_start:y_end]
-            crop.iq = self.iq[x_start:x_end, y_start:y_end]
-            crop.ci = self.ci[x_start:x_end, y_start:y_end]
-            crop.phase = self.phase[x_start:x_end, y_start:y_end]
+            crop.euler = self.euler[x_start:x_end:ds, y_start:y_end:ds, :]
+            crop.x = self.x[x_start:x_end:ds, y_start:y_end:ds]
+            crop.y = self.y[x_start:x_end:ds, y_start:y_end:ds]
+            crop.iq = self.iq[x_start:x_end:ds, y_start:y_end:ds]
+            crop.ci = self.ci[x_start:x_end:ds, y_start:y_end:ds]
+            crop.phase = self.phase[x_start:x_end:ds, y_start:y_end:ds]
             if self.grain_ids is not None:
-                crop.grain_ids = self.grain_ids[x_start:x_end, y_start:y_end]
+                crop.grain_ids = self.grain_ids[x_start:x_end:ds, y_start:y_end:ds]
             return crop
 
     @staticmethod
-    def from_file(file_path):
+    def from_file(file_path, crop=None, use_spatial_ref_frame=True, ang_ref_frame=2):
         """Create a new EBSD scan by reading a data file.
 
         At present, only hdf5 format is supported.
@@ -177,17 +196,28 @@ class OimScan:
         """
         base_name, ext = os.path.splitext(os.path.basename(file_path))
         print(base_name, ext)
-        if ext in ['.h5', '.hdf5']:
+        if ext in ['.h5', '.oh5', '.hdf5']:
             scan = OimScan.read_h5(file_path)
         elif ext == '.osc':
             scan = OimScan.read_osc(file_path)
         elif ext == '.ang':
-            scan = OimScan.read_ang(file_path)
+            scan = OimScan.read_ang(file_path, ref_frame=ang_ref_frame)
         elif ext == '.ctf':
             scan = OimScan.read_ctf(file_path)
         else:
             raise ValueError('only HDF5, OSC, ANG or CTF formats are '
                              'supported, please convert your scan')
+        if crop is not None:
+            roi, ds = crop
+            if roi is None:
+                roi = [0, scan.cols, 0, scan.rows]
+            print('importing data from region {}'.format(roi))
+            if ds > 1:
+                print('downsampling data by a factor %d' % ds)
+            scan.crop(x_start=roi[0], x_end=roi[1],
+                      y_start=roi[2], y_end=roi[3], ds=ds, in_place=True)
+        if use_spatial_ref_frame and scan.ref_frame > 0:
+            scan.set_orientation_reference_frame_to_lab()
         return scan
 
     @staticmethod
@@ -243,14 +273,19 @@ class OimScan:
         return scan
 
     @staticmethod
-    def read_ang(file_path):
+    def read_ang(file_path, ref_frame=2):
         """Read a scan in ang ascii format.
+
+        :note: The scan reference frame settings is not written 
+        in ang files and must be known by the user. The default 
+        value is set to 2 as this is the most common for OIM data 
+        files.
 
         :raise ValueError: if the grid type in not square.
         :param str file_path: the path to the ang file to read.
         :return: a new instance of OimScan populated with the data from the file.
         """
-        scan = OimScan((0, 0))
+        scan = OimScan((0, 0), ref_frame=ref_frame)
         with open(file_path, 'r') as f:
             # start by parsing the header
             line = f.readline().strip()
@@ -279,7 +314,7 @@ class OimScan:
                 elif tokens[1] == 'Phase' and tokens[2].isdigit():
                     phase = OimPhase(int(tokens[2]))
                     line = f.readline().strip()
-                    phase.name = line.split()[2]
+                    phase.name = line.split('MaterialName')[1].strip()
                     line = f.readline().strip()
                     try:
                         phase.formula = line.split()[2]
@@ -339,12 +374,21 @@ class OimScan:
             scan.iq = np.reshape(data[:, 5], (scan.rows, scan.cols)).T
             scan.ci = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
             scan.phase = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
-            '''
+            # check if we need to fix the phase array
+            OimScan.fix_phase_array(scan)
             if data.shape[1] > 8:
                 print('including SEM signal')
                 scan.sem = np.reshape(data[:, 8], (scan.rows, scan.cols)).T
-            '''
         return scan
+
+    @staticmethod
+    def fix_phase_array(scan):
+        # phase can start at 0 for single phase and at 1 for multiple phase
+        ids_in_phase = np.unique(scan.phase)
+        counts = [np.count_nonzero(scan.phase == value) for value in ids_in_phase]
+        main_value = ids_in_phase[np.argmax(counts)]
+        if (len(scan.phase_list) == 1) and (main_value not in [phase.phase_id for phase in scan.phase_list]):
+            scan.phase += 1
 
     @staticmethod
     def read_ctf(file_path):
@@ -354,7 +398,8 @@ class OimScan:
         :param str file_path: the path to the ctf file to read.
         :return: a new instance of OimScan populated with the data from the file.
         """
-        scan = OimScan((0, 0))
+        scan = OimScan((0, 0), ref_frame=4)
+        print('using ref_frame', scan.ref_frame)
         with open(file_path, 'r') as f:
             # start by parsing the header
             line = f.readline().strip()
@@ -419,7 +464,7 @@ class OimScan:
             y = data[:, 2]
             # use x, y values to assign each record to the proper place
             x_indices = (np.round((x - x.min()) / scan.xStep)).astype(int)
-            y_indices = (np.round((y - y.min()) / scan.yStep)).astype(int)            
+            y_indices = (np.round((y - y.min()) / scan.yStep)).astype(int)
             scan.phase[x_indices, y_indices] = data[:, 0]
             scan.x[x_indices, y_indices] = data[:, 1]
             scan.y[x_indices, y_indices] = data[:, 2]
@@ -428,12 +473,16 @@ class OimScan:
             scan.euler[x_indices, y_indices, 2] = np.radians(data[:, 7])
             scan.iq[x_indices, y_indices] = data[:, 9]
             scan.ci[x_indices, y_indices] = data[:, 10]
-            if sym is Symmetry.hexagonal:
-                # add a +30 degrees rotation on phi2
-                scan.euler[:, :, 2] += np.radians(30)
+            # hexagonal convention in Oxford system is x || b vs x || a in Pymicro
+            for phase in scan.phase_list:
+                if phase.get_symmetry() is Symmetry.hexagonal:
+                    print('hexagonal symmetry, adding 30 degrees rotation around c-axis')
+                    # add a +30 degrees rotation on phi2 for this phase
+                    phase_indices_x, phase_indices_y = np.where(scan.phase == phase.phase_id)
+                    scan.euler[phase_indices_x, phase_indices_y, 2] += np.radians(30)
         return scan
 
-    def read_header(self, header):
+    def read_h5_header(self, header):
         # read the header, it contains the following keys: 'Camera Azimuthal Angle', 'Camera Elevation Angle',
         # 'Coordinate System', 'Grid Type', 'Notes', 'Operator', 'Pattern Center Calibration', 'Phase', 'Sample ID',
         # 'Sample Tilt', 'Scan ID', 'Step X', 'Step Y', 'Working Distance', 'nColumns', 'nRows'
@@ -451,8 +500,12 @@ class OimScan:
         self.xStep = header['Step X'][0]
         self.yStep = header['Step Y'][0]
         self.operator = header['Operator'][0].decode('utf-8')
-        self.sample_id = header['Sample ID'][0].decode('utf-8')
-        self.scan_id = header['Scan ID'][0].decode('utf-8')
+        if 'Sample ID' in header.keys():
+            self.sample_id = header['Sample ID'][0].decode('utf-8')
+        if 'Scan ID' in header.keys():
+            self.scan_id = header['Scan ID'][0].decode('utf-8')
+        self.ref_frame = header['Coordinate System']['ID'][()]
+        print('coordinate system id is %d' % self.ref_frame)
         # get the different phases
         for key in header['Phase'].keys():
             phase = OimPhase.from_OIM_h5(header['Phase'], phase_id=key)
@@ -471,12 +524,15 @@ class OimScan:
         scan = OimScan((0, 0))
         with h5py.File(file_path, 'r') as f:
             if not scan_key:
-                # find out the scan key (the third one)
-                key_list = [key for key in f.keys()]
-                scan_key = key_list[2]
+                # find out the scan key (should be a group)
+                for key in f.keys():
+                    if isinstance(f[key], h5py._hl.group.Group):
+                        scan_key = key
+                        break
+                print('scan_key:', scan_key)
             print('reading EBSD scan %s from file %s' % (scan_key, file_path))
             header = f[scan_key]['EBSD']['Header']
-            scan.read_header(header)
+            scan.read_h5_header(header)
             # now initialize the fields
             scan.init_arrays()
             data = f[scan_key]['EBSD']['Data']
@@ -521,26 +577,30 @@ class OimScan:
         self.ipf001 = np.empty_like(self.euler)
         self.ipf010 = np.empty_like(self.euler)
         self.ipf100 = np.empty_like(self.euler)
-        for i in range(self.rows):
-            for j in range(self.cols):
-                o = Orientation.from_euler(np.degrees(self.euler[j, i]))
+        # compute ipf color for each pixel (ignore non assigned pixels)
+        time.sleep(0.2)  # prevent tqdm from messing in the output
+        for phase in self.phase_list:
+            pid = phase.phase_id
+            indices = np.where(self.phase == pid)
+            # grab crystal symmetry for this phase
+            sym = self.get_phase(pid).get_symmetry()
+            for i, j in tqdm(zip(*indices), total=len(indices[0]),
+                            desc='computing IPF maps for phase %d (%s)' % (pid, sym)):
+                o = Orientation.from_euler(np.degrees(self.euler[i, j]))
                 try:
-                    sym = self.get_phase(int(self.phase[j, i])).get_symmetry()
                     # compute IPF-Z
-                    self.ipf001[j, i] = o.ipf_color(axis=np.array([0., 0., 1.]),
+                    self.ipf001[i, j] = o.ipf_color(axis=np.array([0., 0., 1.]),
                                                     symmetry=sym)
                     # compute IPF-Y
-                    self.ipf010[j, i] = o.ipf_color(axis=np.array([0., 1., 0.]),
+                    self.ipf010[i, j] = o.ipf_color(axis=np.array([0., 1., 0.]),
                                                     symmetry=sym)
                     # compute IPF-X
-                    self.ipf100[j, i] = o.ipf_color(axis=np.array([1., 0., 0.]),
+                    self.ipf100[i, j] = o.ipf_color(axis=np.array([1., 0., 0.]),
                                                     symmetry=sym)
                 except ValueError:
-                    self.ipf001[j, i] = [0., 0., 0.]
-                    self.ipf010[j, i] = [0., 0., 0.]
-                    self.ipf100[j, i] = [0., 0., 0.]
-            progress = 100 * (i + 1) / self.rows
-            print('computing IPF maps: {0:.2f} %'.format(progress), end='\r')
+                    self.ipf001[i, j] = [0., 0., 0.]
+                    self.ipf010[i, j] = [0., 0., 0.]
+                    self.ipf100[i, j] = [0., 0., 0.]
 
     def segment_grains(self, tol=5., min_ci=0.2):
         """Segment the grains based on the euler angle maps.
@@ -629,31 +689,90 @@ class OimScan:
         self.grain_ids = grain_ids
         return grain_ids
 
-    def change_orientation_reference_frame(self):
+    @staticmethod
+    def edax_reference_frame(coord_system_id=2):
+        """Get the transformation matrix to express orientation data in Pymicro's reference frame.
+
+        :param int coord_system_id: the number associated with 
+        the coordinate system used for the acquisition.
+        :return: a 3x3 numpy array defining the transformation.
+        """
+        # here T is the transformation matrix from A1A2A3 to XYZ
+        if coord_system_id == 1:
+            T = np.array([[0., 1., 0.],  # X is A2
+                          [1., 0., 0.],  # Y is A1
+                          [0., 0., -1.]])  # Z is -A3
+        elif coord_system_id == 2:
+            T = np.array([[0., -1., 0.],  # X is -A2
+                          [-1., 0., 0.],  # Y is -A1
+                          [0., 0., -1.]])  # Z is -A3
+        elif coord_system_id == 3:
+            T = np.array([[-1., 0., 0.],  # X is -A1
+                          [0., 1., 0.],  # Y is A2
+                          [0., 0., -1.]])  # Z is -A3
+        elif coord_system_id == 4:
+            T = np.array([[1., 0., 0.],  # X is A1
+                          [0., -1., 0.],  # Y is -A2
+                          [0., 0., -1.]])  # Z is -A3
+        elif coord_system_id == 5:
+            T = np.array([[-1., 0., 0.],  # X is -A1
+                          [0., -1., 0.],  # Y is -A2
+                          [0., 0., 1.]])  # Z is A3
+        elif coord_system_id == 6:
+            T = np.array([[-1., 0., 0.],  # X is -A1
+                          [0., -1., 0.],  # Y is -A2
+                          [0., 0., -1.]])  # Z is -A3
+        else:
+            T = np.eye(3)
+        return T
+
+    def set_orientation_reference_frame_to_lab(self):
+        """Express the orientation data in the XYZ sample frame.
+        
+        After this the attribute `ref_frame` will be zero, and the 
+        orientation data will be consistently written in XYZ sample frame.
+        """
+        print('using spatial reference frame for orientation data')
+        self.set_orientation_reference_frame(target_ref_frame=0)
+
+    def set_orientation_reference_frame(self, target_ref_frame=0):
         """Change the reference frame for orientation data.
 
-        For this we can use a change base matrix
-
-        In OIM, the reference frame for orientation data (euler angles) is
-        termed A1A2A3 and differs from the sample reference frame XYZ. This can
-        be set before the acquisition but the default case is:
+        In OIM (and most of the other EBSD systems), the reference frame 
+        (termed A1A2A3) for orientation data (euler angles here) differs 
+        from the sample reference frame XYZ. This is usually stored in 
+        the scan metadata in the form of a number between 1 and 4. The 
+        default is 2, which corresponds to:
 
         X = -A2, Y = -A1, Z = -A3.
 
-        This methods change the reference frame used for the euler angles.
+        This method changes the reference frame used for the euler angles.
+        """
+        # get the transformation for this reference frame
+        if target_ref_frame != 0:
+            raise ValueError('only support target reference frame = 0 for the moment')
+        T = OimScan.edax_reference_frame(coord_system_id=self.ref_frame)
+        # apply the transformation
+        self._change_orientation_reference_frame(T)
+        self.ref_frame = target_ref_frame
+
+    def _change_orientation_reference_frame(self, T):
+        """Protected method to apply the transformation to change 
+        the reference frame for orientation data.
         """
         # transformation matrix from A1A2A3 to XYZ
-        T = np.array([[0., -1., 0.],  # X is -A2
-                      [-1., 0., 0.],  # Y is -A1
-                      [0., 0., -1.]])  # Z is -A3
-        for j in range(self.rows):
-            for i in range(self.cols):
-                o_tsl = Orientation.from_euler(np.degrees(self.euler[i, j, :]))
-                g_xyz = np.dot(o_tsl.orientation_matrix(), T.T)  # move to XYZ local frame
-                o_xyz = Orientation(g_xyz)
-                self.euler[i, j, :] = np.radians(o_xyz.euler)
-                progress = 100 * (j * self.cols + i) / (self.cols * self.rows)
-            print('changing orientation reference frame progress: {0:.2f} %'.format(progress), end='\r')
+        if T is None:
+            # get the default transformation
+            T = OimScan.edax_reference_frame()
+        # change the orientation for each pixel (ignore non assigned pixels)
+        time.sleep(0.2)  # prevent tqdm from messing in the output
+        indices = np.where(self.phase > 0)
+        for i, j in tqdm(zip(*indices), total=len(indices[0]),
+                         desc='changing orientation reference frame progress'):
+            o_tsl = Orientation.from_euler(np.degrees(self.euler[i, j, :]))
+            g_xyz = np.dot(o_tsl.orientation_matrix(), T.T)  # move to XYZ local frame
+            o_xyz = Orientation(g_xyz)
+            self.euler[i, j, :] = np.radians(o_xyz.euler)
         print('\n')
 
     def compute_god_map(self, id_list=None):
@@ -760,8 +879,7 @@ class OimScan:
                                axis=2).transpose(1, 0, 2)
         assert (self.grid_type == 'SqrGrid')
         data = np.reshape(data, (data.shape[0] * data.shape[1], data.shape[2]))
-        print('now data shape is ', data.shape)
-        #f.write('\n'.join(map(lambda data_line: ' '.join(map(str, data_line)), data)))
+        print('writting ang file %s, data shape is ' % file_name, data.shape)
         np.savetxt(file_name, data, header=self.ang_header(), comments='# ', delimiter=' ',
                    fmt=('%9.5f', '%9.5f', '%9.5f', '%12.5f', '%12.5f', '%.1f', '%6.3f', '%2d'))
 

@@ -329,3 +329,45 @@ def compute_affine_transform(fixed, moving):
     linear_map = np.linalg.inv(variance).dot(covariance).T
     translation = fixed_centroid - linear_map.dot(moving_centroid)
     return translation, linear_map
+
+
+from skimage.transform import PolynomialTransform
+
+def compute_registration(fixed, moving, order=1, verbose=False):
+    """Compute image registration transform.
+    
+    This method compute the transformation to register an image onto 
+    a reference image. The user need to input pair of control points 
+    to compute the transformation (at least 3 pair of points).
+
+    :param ndarray fixed: a (n, 2) array of points in the reference image.
+    :param ndarray moving: a (n, 2) array of points in the image to register.
+    :param int order: the ordre of the transformation to compute (order is 1 
+        by default which corresponds to an affine transform)
+    :param bool verbose: activate verbose mode.
+    """
+
+    n = moving.shape[0]
+    if n < 3:
+        raise(ValueError('you need to specify at least 3 pair of control points'))
+    
+    # internally we work on [y, x] data
+    moving_yx = moving[:, ::-1]
+    fixed_yx = fixed[:, ::-1]
+
+    transform_matrix = PolynomialTransform()
+    transform_matrix.estimate(fixed_yx, moving_yx, order=order)
+
+    # also compute the inverse transformation
+    inv_transform_matrix = PolynomialTransform()
+    inv_transform_matrix.estimate(moving_yx, fixed_yx, order=order)
+
+    if verbose:
+        print(transform_matrix.params)
+        print('mean residual', np.mean(transform_matrix.residuals(fixed_yx, moving_yx)))
+        moved_yx = inv_transform_matrix(moving_yx)
+        for j in range(n):
+            print('point %d will move to (%6.1f, %6.1f) to be compared with (%6.1f, %6.1f)' % 
+                  (j, moved_yx[j, 0], moved_yx[j, 1], fixed_yx[j, 0], fixed_yx[j, 1]))
+
+    return transform_matrix, inv_transform_matrix

@@ -375,20 +375,46 @@ class OimScan:
             scan.ci = np.reshape(data[:, 6], (scan.rows, scan.cols)).T
             scan.phase = np.reshape(data[:, 7], (scan.rows, scan.cols)).T
             # check if we need to fix the phase array
-            OimScan.fix_phase_array(scan)
+            scan.fix_phase_array()
             if data.shape[1] > 8:
                 print('including SEM signal')
                 scan.sem = np.reshape(data[:, 8], (scan.rows, scan.cols)).T
         return scan
 
-    @staticmethod
-    def fix_phase_array(scan):
-        # phase can start at 0 for single phase and at 1 for multiple phase
-        ids_in_phase = np.unique(scan.phase)
-        counts = [np.count_nonzero(scan.phase == value) for value in ids_in_phase]
+    def fix_phase_array(self):
+        """Ensure phase array is consistent.
+        
+        In some acquisition, the phase array can start at 0 (usually for single phase)
+        while indexed points usually start at 1. In Pymicro 0 is reserved for non 
+        indexed points and we must ensure that the phase array is consistent with the 
+        phase id.
+        """
+        ids_in_phase = np.unique(self.phase)
+        counts = [np.count_nonzero(self.phase == value) for value in ids_in_phase]
         main_value = ids_in_phase[np.argmax(counts)]
-        if (len(scan.phase_list) == 1) and (main_value not in [phase.phase_id for phase in scan.phase_list]):
-            scan.phase += 1
+        if (len(self.phase_list) == 1) and (main_value not in [phase.phase_id for phase in self.phase_list]):
+            self.phase += 1
+
+    def delete_phase(self, phase):
+        """Delete a given phase from this scan.
+        
+        :param CrystallinePhase phase: the phase to remove.
+        """
+        try:
+            self.phase_list.remove(phase)
+        except ValueError:
+            print('phase not found in scan, ignoring')
+            return
+        # decrement the phase id of the other phases if needed
+        for p in self.phase_list:
+            if p.phase_id > phase.phase_id:
+                p.phase_id -= 1
+        # update the phase array accordingly
+        for index in np.unique(self.phase):
+            if index < phase.phase_id:
+                continue
+            indices = np.where(self.phase == index)
+            self.phase[indices] = index - 1
 
     @staticmethod
     def read_ctf(file_path):
@@ -912,3 +938,26 @@ class OimScan:
         x = ebsd_data.create_dataset('X Position', data=self.x)
         y = ebsd_data.create_dataset('Y Position', data=self.y)
         f.close()
+
+    def register(self, transform, ref_shape, resolution=None):
+
+        from skimage.transform import warp
+
+        if resolution is None:
+            # keep the actual resolution
+            resolution = self.xStep, self.yStep
+        reg_scan = OimScan(ref_shape, resolution=resolution)
+        reg_scan.sample_id = self.sample_id + ' registered'
+        reg_scan.phase_list = self.phase_list
+        print(reg_scan.iq.dtype)
+
+        for i in range(3):
+            reg_scan.euler[:, :, i] = warp(self.euler[:, :, i], transform, order=0, output_shape=ref_shape)
+        # warning phase must be converted to float representation before using warp
+        reg_scan.phase = warp(self.phase.astype(float), transform, order=0, output_shape=ref_shape).astype(int)
+        reg_scan.ci = warp(self.ci, transform, order=0, output_shape=ref_shape) 
+        reg_scan.iq = warp(self.iq, transform, order=0, output_shape=ref_shape)
+        reg_scan.x = warp(self.x, transform, order=0, output_shape=ref_shape)
+        reg_scan.y = warp(self.y, transform, order=0, output_shape=ref_shape)
+
+        return reg_scan

@@ -355,19 +355,19 @@ def compute_registration(fixed, moving, order=1, verbose=False):
     moving_yx = moving[:, ::-1]
     fixed_yx = fixed[:, ::-1]
 
-    transform_matrix = PolynomialTransform()
-    transform_matrix.estimate(fixed_yx, moving_yx, order=order)
+    transform = PolynomialTransform()
+    transform.estimate(fixed_yx, moving_yx, order=order)
 
     # also compute the inverse transformation
-    inv_transform_matrix = PolynomialTransform()
-    inv_transform_matrix.estimate(moving_yx, fixed_yx, order=order)
+    inv_transform = PolynomialTransform()
+    inv_transform.estimate(moving_yx, fixed_yx, order=order)
 
     if verbose:
-        print(transform_matrix.params)
-        print('mean residual', np.mean(transform_matrix.residuals(fixed_yx, moving_yx)))
-        moved_yx = inv_transform_matrix(moving_yx)
+        print(transform.params)
+        print('mean residual', np.mean(transform.residuals(fixed_yx, moving_yx)))
+        moved_yx = inv_transform(moving_yx)
         for j in range(n):
             print('point %d will move to (%6.1f, %6.1f) to be compared with (%6.1f, %6.1f)' % 
                   (j, moved_yx[j, 0], moved_yx[j, 1], fixed_yx[j, 0], fixed_yx[j, 1]))
 
-    return transform_matrix, inv_transform_matrix
+    return transform, inv_transform

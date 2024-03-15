@@ -2240,7 +2240,7 @@ class Microstructure(SampleData):
 
         :param list id_list: a non empty list of the grain ids.
         :return: a numpy array containing the grain centers.
-        """ 
+        """
         if id_list is not None:
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['center']
@@ -5326,7 +5326,7 @@ class Microstructure(SampleData):
             print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
                 progress, gid), end='\r')
             # get the symmetry for this grain
-            phase_grain = scan.phase[np.where(grain_ids == 1)].astype(np.int)
+            phase_grain = scan.phase[np.where(grain_ids == gid)].astype(np.int)
             assert len(np.unique(phase_grain)) == 1  # all pixel of this grain must have the same phase id by
             # construction
             grain_phase_index = [phase.phase_id for phase in scan.phase_list].index(phase_grain[0])

@@ -43,6 +43,7 @@ class PoleFigure:
             self.microstructure = microstructure
         else:
             self.microstructure = Microstructure()
+        self.selected_ids = None
         self.family = None
         self.poles = []
         self.set_hkl_poles(hkl)
@@ -118,7 +119,10 @@ class PoleFigure:
         elif field_name in ['grain_size', 'volume']:
             self.field = self.microstructure.get_grain_volumes()
         else:
-            if len(field) != self.microstructure.get_number_of_grains():
+            selected_grains = self.selected_ids
+            if self.selected_ids is None:
+                selected_grains = self.microstructure.get_grain_ids()
+            if len(field) != len(selected_grains):
                 raise ValueError('The field must contain exactly one record '
                                  'for each grain in the microstructure')
             self.field = field
@@ -520,8 +524,11 @@ class PoleFigure:
                 col = Orientation.from_rodrigues(
                     grain['orientation']).ipf_color(axis=axis, symmetry=sym)
             else:
+                selected_grains = self.selected_ids
+                if self.selected_ids is None:
+                    selected_grains = self.microstructure.get_grain_ids()
                 # retrieve the position of the grain in the list
-                rank = self.microstructure.get_grain_ids().tolist().index(grain['idnumber'])
+                rank = selected_grains.index(grain['idnumber'])
                 if type(self.lut) is str:
                     # get the color map from pyplot
                     color_map = cm.get_cmap(self.lut, 256)
@@ -586,7 +593,11 @@ class PoleFigure:
         if self.resize_markers:
             # compute the max grain volume to normalize
             volume_max = max(self.microstructure.get_grain_volumes())
-        for grain in self.microstructure.grains:
+        selected_grains = self.selected_ids
+        if self.selected_ids is None:
+            selected_grains = self.microstructure.get_grain_ids()
+        for grain_id in selected_grains:
+            grain = self.microstructure.grains.read_where('(idnumber == %d)' % grain_id)[0]
             g = Orientation.Rodrigues2OrientationMatrix(grain['orientation'])
             if self.resize_markers:
                 kwargs['mksize'] = 0.15 * np.sqrt(grain['volume'] / volume_max) * 1000
@@ -621,8 +632,13 @@ class PoleFigure:
         ax = kwargs.get('ax')
         self.plot_pf_background(ax, labels=False)
         # now plot the sample axis
-        for grain in self.microstructure.grains:
+        selected_grains = self.selected_ids
+        if self.selected_ids is None:
+            selected_grains = self.microstructure.get_grain_ids()
+        for grain_id in selected_grains:
+            grain = self.microstructure.grains.read_where('(idnumber == %d)' % grain_id)[0]
             g = Orientation.Rodrigues2OrientationMatrix(grain['orientation'])
+            g = Orientation.Rodrigues2OrientationMatrix(rod)
             if self.axis == 'Z':
                 axis = self.z
             elif self.axis == 'Y':

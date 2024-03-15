@@ -150,7 +150,7 @@ def recad(data, mini, maxi):
     :param float maxi: value to use as the maximum (will be 255 in the casted array).
     :returns data_uint8: the data array casted to uint8.
     """
-    return (255 * (data.clip(mini, maxi) - mini) / (maxi - mini)).astype(np.uint8)
+    return (255 * (data.clip(mini, maxi) - mini) / float(maxi - mini)).astype(np.uint8)
 
 
 def alpha_cmap(color='red', opacity=1.0):

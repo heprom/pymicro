@@ -173,7 +173,7 @@ class View_slice:
         # Check if slice value fits and otherwise computes half size slice
         if slice is None or slice > map_array.shape[cut_axis] - 1 or slice < 0:
             slice = map_array.shape[cut_axis] // 2
-            print('using slice value %d' % slice)
+            #print('using slice value %d' % slice)
         # cut slice from map
         map_slice = map_array.take(indices=slice, axis=cut_axis)
         if map_name == "grain_map":

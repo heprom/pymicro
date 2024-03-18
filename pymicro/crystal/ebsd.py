@@ -961,3 +961,44 @@ class OimScan:
         reg_scan.y = warp(self.y, transform, order=0, output_shape=ref_shape)
 
         return reg_scan
+
+    @staticmethod
+    def label_OIM_unique_grain_map(file_name):
+        """Process a unique grain file image from OIM to extract a lavbeled image.
+        
+        OIM creates unique grain file with only 16 fixed colors. 
+        These images can be further processed to extract a proper 
+        segmentation labeled from 1 to n with n being the number 
+        of grains.
+
+        :param str file_name: the name of the tif image to process.
+        """
+        from scipy import ndimage
+        from pymicro.external.tifffile import TiffFile
+        
+        # load the image
+        im = TiffFile(file_name).asarray().transpose(1, 0, 2).astype(np.uint16)
+        print(im.shape)
+
+        # list all the colors present in the grain image from OIM
+        colors = [(160,   0,  80), (200, 140,  80), 
+                  (  0, 128, 255), (160,   0, 230), 
+                  (255,   0, 255), (  0, 255,   0), 
+                  (200,  20,  80), (  0,   0, 255), 
+                  (255,   0, 128), (200,  80,  20), 
+                  (  0, 255, 255), (140,  80,  80), 
+                  (255, 255,   0), (255,   0,   0),
+                  (255, 128,   0), (  0, 210, 150)]
+
+        # construct the map by segmenting each color
+        grain_map = np.zeros((im.shape[0], im.shape[1]), dtype=int)
+        for r, g, b in colors:
+            loc = np.where((im[:, :, 0] == r) & (im[:, :, 1] == g) & (im[:, :, 2] == b))
+            imb = np.zeros_like(grain_map)
+            imb[loc] = 1
+            labels, n = ndimage.label(imb)
+            print('found %d labels for color %s' % (n, (r, g, b)))
+            labels[labels > 0] = labels[labels > 0] + grain_map.max()
+            grain_map += labels
+
+        return grain_map

@@ -159,11 +159,8 @@ class Orientation:
     def ipf_color(self, axis=np.array([0., 0., 1.]), symmetry=Symmetry.cubic, saturate=True):
         """Compute the IPF (inverse pole figure) colour for this orientation.
 
-        This method has bee adapted from the DCT code.
-
-        .. note::
-
-          This method coexist with the `get_ipf_colour` for the moment.
+        This method has bee adapted from the DCT code and works for most of 
+        the crystal symmetries.
 
         :param ndarray axis: the direction to use to compute the IPF colour.
         :param Symmetry symmetry: the symmetry operator to use.
@@ -226,40 +223,6 @@ class Orientation:
         if saturate:
             rgb = rgb / rgb.max()
         return rgb
-
-    def get_ipf_colour(self, axis=np.array([0., 0., 1.]), symmetry=Symmetry.cubic):
-        """Compute the IPF (inverse pole figure) colour for this orientation.
-
-        Given a particular axis expressed in the laboratory coordinate system,
-        one can compute the so called IPF colour based on that direction
-        expressed in the crystal coordinate system as :math:`[x_c,y_c,z_c]`.
-        There is only one tuple (u,v,w) such that:
-
-        .. math::
-
-          [x_c,y_c,z_c]=u.[0,0,1]+v.[0,1,1]+w.[1,1,1]
-
-        and it is used to assign the RGB colour.
-
-        :param ndarray axis: the direction to use to compute the IPF colour.
-        :param Symmetry symmetry: the symmetry operator to use.
-        :return tuple: a tuple contining the RGB values.
-        """
-        axis /= np.linalg.norm(axis)
-        # find the axis lying in the fundamental zone
-        for sym in symmetry.symmetry_operators():
-            Osym = np.dot(sym, self.orientation_matrix())
-            Vc = np.dot(Osym, axis)
-            if Vc[2] < 0:
-                Vc *= -1.  # using the upward direction
-            uvw = np.array([Vc[2] - Vc[1], Vc[1] - Vc[0], Vc[0]])
-            uvw /= np.linalg.norm(uvw)
-            uvw /= max(uvw)
-            if (uvw[0] >= 0. and uvw[0] <= 1.0) and (uvw[1] >= 0. and uvw[1] <= 1.0) and (
-                    uvw[2] >= 0. and uvw[2] <= 1.0):
-                # print('found sym for sst')
-                break
-        return uvw
 
     @staticmethod
     def compute_mean_orientation(rods, symmetry=Symmetry.cubic):
@@ -3132,19 +3095,15 @@ class Microstructure(SampleData):
 
     def ipf_cmap(self):
         """
-        Return a colormap with ipf colors.
-
-        .. warning::
-
-          This function works only for a microstructure with the cubic symmetry
-          due to current limitation in the `Orientation` get_ipf_colour method.
+        Return a colormap with ipf colors for each grain.
 
         :return: a color map that can be directly used in pyplot.
         """
-        ipf_colors = np.zeros((4096, 3))
+        ipf_colors = np.zeros((self.get_number_of_grains(), 3))
         for grain in self.grains:
             o = Orientation.from_rodrigues(grain['orientation'])
-            ipf_colors[grain['idnumber'], :] = o.get_ipf_colour()
+            sym = self.get_phase(phase_id=grain['phase']).get_symmetry()
+            ipf_colors[grain['idnumber'], :] = o.ipf_color(symmetry=sym)
         return colors.ListedColormap(ipf_colors)
 
     @staticmethod

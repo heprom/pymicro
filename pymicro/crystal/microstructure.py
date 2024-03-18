@@ -25,6 +25,8 @@ from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
 from math import atan2, pi
+from tqdm import tqdm
+import time
 
 
 class Orientation:
@@ -1828,6 +1830,8 @@ class GrainData(tables.IsDescription):
     orientation = tables.Float32Col(shape=(3,))  # float  (double-precision)
     # Grain Bounding box
     bounding_box = tables.Int32Col(shape=(3, 2))  # Signed 64-bit integer
+    # grain phase id
+    phase = tables.UInt8Col()  # Unsigned 8-bit integer
 
 
 class Microstructure(SampleData):
@@ -5006,7 +5010,6 @@ class Microstructure(SampleData):
         print(grain_ids)
         m.build_grain_table_from_grain_map()
         # now get each grain orientation from the rodrigues map
-        from tqdm import tqdm
         i = 0
         for g in tqdm(m.grains):
             gid = g['idnumber']
@@ -5292,23 +5295,27 @@ class Microstructure(SampleData):
                                  use_spatial_ref_frame=True, ang_ref_frame=ang_ref_frame)
         if phase_list:
             scan.phase_list = phase_list
+        # sort the phase list so that it is not renumbered and consistent with the phase map
+        phase_ids = [phase.phase_id for phase in scan.phase_list]
+        scan.phase_list = np.array(scan.phase_list)[np.argsort(phase_ids)]
         micro.set_phases(scan.phase_list)
         iq = scan.iq
         ci = scan.ci
         euler = scan.euler
-        mask = np.ones_like(iq)
+        mask = (scan.phase > 0).astype(np.uint8)
         # check if we use an existing segmentation
         if grain_ids is None:
             # segment the grains
             grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
         else:
-            print('using existing segmentation, size is ', grain_ids.shape)
+            print('using existing segmentation containing %d grains, size is ' % 
+                  len(np.unique(grain_ids)), grain_ids.shape)
         voxel_size = np.array([scan.xStep, scan.yStep])
         micro.set_grain_map(grain_ids, voxel_size)
+        micro.set_phase_map(scan.phase)
+        micro.set_mask(mask)
 
         # add each array to the data file to the CellData image Group
-        micro.add_field(gridname='CellData', fieldname='mask', array=mask,
-                        replace=True)
         micro.add_field(gridname='CellData', fieldname='iq', array=iq,
                         replace=True)
         micro.add_field(gridname='CellData', fieldname='ci', array=ci,
@@ -5319,33 +5326,29 @@ class Microstructure(SampleData):
         # Fill GrainDataTable
         grains = micro.grains.row
         grain_ids_list = np.unique(grain_ids).tolist()
-        for gid in grain_ids_list:
+        time.sleep(0.2)  # prevent tqdm from messing in the output
+        for gid in tqdm(grain_ids_list, desc='creating new grains'):
             if gid == 0:
                 continue
-            progress = 100 * (1 + grain_ids_list.index(gid)) / len(grain_ids_list)
-            print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
-                progress, gid), end='\r')
-            # get the symmetry for this grain
-            phase_grain = scan.phase[np.where(grain_ids == gid)].astype(np.int)
-            assert len(np.unique(phase_grain)) == 1  # all pixel of this grain must have the same phase id by
-            # construction
+            # get the phase for this grain
+            phase_grain = scan.phase[np.where((grain_ids == gid) & (scan.phase > 0))].astype(int)
+            assert len(np.unique(phase_grain)) == 1  # all indexed pixel of this grain must have the same phase id
             grain_phase_index = [phase.phase_id for phase in scan.phase_list].index(phase_grain[0])
             sym = scan.phase_list[grain_phase_index].get_symmetry()
             # compute the mean orientation for this grain
-            euler_grain = scan.euler[np.where(grain_ids == gid)]
-            #euler_grain = np.atleast_2d(euler_grain)  # for one pixel grains
-            euler_grain = euler_grain
+            euler_grain = scan.euler[np.where((grain_ids == gid) & (scan.phase > 0))]
             rods = Orientation.eu2ro(euler_grain)
             rods = np.atleast_2d(rods)  # for one pixel grains
             o_tsl = Orientation.compute_mean_orientation(rods, symmetry=sym)
             grains['idnumber'] = gid
+            grains['phase'] = scan.phase_list[grain_phase_index].phase_id
             grains['orientation'] = o_tsl.rod
             grains.append()
         micro.grains.flush()
+        print('computing grains geometry')
         micro.recompute_grain_bounding_boxes()
         micro.recompute_grain_centers(verbose=False)
         micro.recompute_grain_volumes(verbose=False)
-        micro.recompute_grain_bounding_boxes(verbose=False)
         micro.sync()
         return micro
 

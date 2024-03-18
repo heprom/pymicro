@@ -2,7 +2,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from scipy import ndimage
 from skimage import filters
-from pymicro.crystal.microstructure import Microstructure
+from pymicro.crystal.microstructure import Microstructure, Orientation
 
 class View_slice:
 
@@ -224,11 +224,11 @@ class View_slice:
         ipf_image = np.zeros((*grains_slice.shape, 3), dtype=float)
         gids = np.intersect1d(np.unique(grains_slice), self.microstructure.get_grain_ids())
         for gid in gids:
-            o = self.microstructure.get_grain(gid).orientation
+            g = self.microstructure.grains.read_where('idnumber==%d' % gid)[0]
+            o = Orientation.from_rodrigues(g['orientation'])
+            sym = self.microstructure.get_phase(phase_id=g['phase']).get_symmetry()
             try:
-                c = o.ipf_color(axis,
-                                symmetry=self.microstructure.get_lattice().get_symmetry(),
-                                saturate=True)
+                c = o.ipf_color(axis, symmetry=sym, saturate=True)
             except ValueError:
                 print('problem moving to the fundamental zone for '
                       'rodrigues vector {}'.format(o.rod))

@@ -2490,7 +2490,7 @@ class Microstructure(SampleData):
         self.set_active_phase_map(map_name)
         return
 
-    def update_phase_map_from_grains(self, grain_ids=None, phase_id=1):
+    def update_phase_map_from_grains(self, grain_ids=None):
         """Update the phase map from the grain map.
 
         This method update the phase map by setting the phase of all
@@ -2501,24 +2501,24 @@ class Microstructure(SampleData):
         :param int phase_id: phase Id to set for the list of grains concerned
             by the update.
         """
-        # TODO: check existence of gran map
+        # TODO: check existence of grain map
         phase_map = self.get_phase_map()
         # handle case of empty phase map
         if phase_map is None:
             map_shape = self.get_attribute('dimension', 'CellData')
-            phase_map = np.zeros(shape=map_shape, dtype=np.int8)
+            phase_map = np.zeros(shape=map_shape, dtype=np.uint8)
         if not grain_ids:
           grain_ids = self.get_ids_from_grain_map()
-        for i, gid in enumerate(grain_ids):
-            progress = 100 * (1 + i) / len(grain_ids)
-            print('updating phase map: {0:.2f} %'.format(progress), end='\r')
-            bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
+        time.sleep(0.2)
+        for gid in tqdm(grain_ids, desc='updating phase map'):
+            g = self.grains.read_where('idnumber == %d' % gid)[0]
+            bb = g['bounding_box']
+            phase_id = g['phase']
             this_grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
                                                   bb[1][0]:bb[1][1],
                                                   bb[2][0]:bb[2][1]]
             phase_map[bb[0][0]:bb[0][1], bb[1][0]:bb[1][1],
                       bb[2][0]:bb[2][1]][this_grain_map == gid] = phase_id
-        print('\n')
         self.set_phase_map(phase_map)
 
     def set_orientation_map(self, orientation_map, compression=None):
@@ -5261,7 +5261,7 @@ class Microstructure(SampleData):
         iq = scan.iq
         ci = scan.ci
         euler = scan.euler
-        mask = (scan.phase > 0).astype(np.uint8)
+        mask = np.ones_like(scan.phase, dtype=np.uint8)
         # check if we use an existing segmentation
         if grain_ids is None:
             # segment the grains

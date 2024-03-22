@@ -1,4 +1,4 @@
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, colors
 import numpy as np
 from scipy import ndimage
 from skimage import filters
@@ -32,10 +32,10 @@ class View_slice:
             print('view plane is', self.plane)
 
     def view_map_slice(self, map_name='grain_map', slice=None,
-                    color='random', show_mask=True, highlight_ids=None,
+                    color='random', show_mask=False, highlight_ids=None,
                     show_grain_ids=False, circle_ids=False, show_lattices=False,
                     slip_system=None, axis=[0., 0., 1], show_slip_traces=False,
-                    hkl_planes=None, show_phases=False, show_gb=False,
+                    hkl_planes=None, show_gb=False,
                     display=True):
         """A simple utility method to show one microstructure slice.
         
@@ -55,7 +55,7 @@ class View_slice:
         :param int slice: the slice number
         :param str plane: the cut plane, must be one of 'XY', 'YZ' or 'XZ'
         :param str color: a string to chose the colormap from ('random',
-            'grain_ids', 'schmid', 'ipf')
+            'grain_ids', 'schmid', 'ipf', 'phase')
         :param bool show_mask: a flag to show the mask by transparency.
         :param list highlight_ids: a list of grain ids to restrict the
             annotations (by default all grains are annotated).
@@ -73,8 +73,6 @@ class View_slice:
         :param list hkl_planes: the list of planes to plot the slip traces.
         :param str unit: switch between mm and pixel units.
         :param bool show_gb: show the grain boundaries.
-        :param bool show_phases: show the phases from the phase mapby hatching
-            regions on the slice. Works only if the phase map exists.
         :param bool display: if True, the show method is called, otherwise,
             the figure is simply returned.
         """
@@ -83,6 +81,7 @@ class View_slice:
         # get the slice to plot
         slice_map, vmin, vmax = self._get_slice_map(map_name, slice,
                                                     color, slip_system, axis=axis)
+        print("vmin, vmax", vmin, vmax)
         if slice_map is None:
             print('Could not get slice to visualize, returning. ')
             return
@@ -133,15 +132,6 @@ class View_slice:
             else:
                 extent = self._set_extent(grains_slice)
                 self._overlay_gb(ax, grains_slice, extent)
-        # phases on the map
-        if show_phases:
-            phase_slice, vmin, vmax = self._get_slice_map("phase_map",
-                                    slice, color, slip_system)
-            if phase_slice is None:
-                print('Could not get phase slice, proceeding... ')
-            else:
-                extent = self._set_extent(phase_slice, vertical_reverse=False)
-                self._hatch_phases(ax, phase_slice, extent)
         if display:
             plt.show()
         return fig, ax
@@ -177,15 +167,20 @@ class View_slice:
         # cut slice from map
         map_slice = map_array.take(indices=slice, axis=cut_axis)
         if map_name == "grain_map":
-            # Compute slice for schmid factor
-            if (color == 'schmid'):
+            # compute slice for schmid factor
+            if color == 'schmid':
                 map_slice = self._build_schmid_factor_map(map_slice,
                                                           slip_system, axis)
                 vmin = 0
                 vmax = 0.5
-            # Compute image for IPF
-            if (color == 'ipf'):
+            # compute image for IPF
+            elif color == 'ipf':
                 map_slice = self._build_ipf_map(map_slice, axis)
+            # compute image for phase
+            elif color == 'phase':
+                map_slice = self._build_phase_map(map_slice)
+                vmin = 0
+                vmax = 10
         return map_slice, vmin, vmax
 
     def _get_slice_grain_centers(self, grains_slice, highlight_ids):
@@ -237,19 +232,32 @@ class View_slice:
             ipf_image[grains_slice == gid] = c
         return ipf_image
 
+    def _build_phase_map(self, grains_slice):
+        """Compute IPF map for view slice."""
+        phase_image = np.zeros_like(grains_slice, dtype=float)
+        gids = np.intersect1d(np.unique(grains_slice), self.microstructure.get_grain_ids())
+        for gid in gids:
+            g = self.microstructure.grains.read_where('idnumber==%d' % gid)[0]
+            phase_image[grains_slice == gid] = g['phase']
+        return phase_image
+
     def _set_slice_colors(self, color):
         """Set colormap to plot grain map in slice view."""
         if color == 'random':
             cmap = Microstructure.rand_cmap(first_is_black=True)
-        elif (color == 'grain_ids') or (color == 'values'):
+        elif color in ['grain_ids', 'values']:
             cmap = 'viridis'
         elif color == 'schmid':
             cmap = plt.cm.gray
         elif color == 'ipf':
             cmap = None
+        elif color == 'phase':
+            phase_colors = np.array(plt.cm.tab10.colors)
+            phase_colors[0] = [0., 0., 0.]  # color background in black
+            cmap = colors.ListedColormap(phase_colors)
         else:
             print('unknown color scheme requested, please chose between '
-                  '{random, grain_ids, values, schmid, ipf}, returning')
+                  '{random, grain_ids, values, schmid, ipf, phase}, returning')
             return
         return cmap
 
@@ -285,6 +293,15 @@ class View_slice:
         if color == 'schmid':
             cb = plt.colorbar(im)
             cb.set_label('Schmid factor')
+        # add legend for phase colors
+        elif color == 'phase':
+            from matplotlib.patches import Patch
+            phase_patches = []
+            phase_colors = plt.cm.tab10.colors
+            for phase_id in self.microstructure.get_phase_ids_list():
+                phase = self.microstructure.get_phase(phase_id)
+                phase_patches.append(Patch(color=phase_colors[phase_id], label=phase.name))
+            plt.legend(handles=phase_patches)
         # add axes legend
         ax.xaxis.set_label_position('top')
         plt.xlabel(self.plane[0] + ' [%s]' % self.unit)

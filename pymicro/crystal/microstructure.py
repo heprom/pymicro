@@ -1794,7 +1794,7 @@ class GrainData(tables.IsDescription):
     # Grain Bounding box
     bounding_box = tables.Int32Col(shape=(3, 2))  # Signed 64-bit integer
     # grain phase id
-    phase = tables.UInt8Col()  # Unsigned 8-bit integer
+    phase = tables.UInt8Col(dflt=1)  # Unsigned 8-bit integer
 
 
 class Microstructure(SampleData):

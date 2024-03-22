@@ -95,7 +95,6 @@ class OimScan:
 
     def __init__(self, shape, resolution=(1.0, 1.0), ref_frame=0):
         """Create an empty EBSD scan."""
-        print('init with shape', shape)
         self.ref_frame = ref_frame
         self.x_star = 0
         self.y_star = 0
@@ -120,7 +119,9 @@ class OimScan:
     def __repr__(self):
         """Provide a string representation of the class."""
         s = 'EBSD scan of size %d x %d' % (self.cols, self.rows)
-        s += '\nspatial resolution: xStep=%.1f, yStep=%.1f' % (self.xStep, self.yStep)
+        s += '\n|- spatial resolution: x={:g}, y={:g}'.format(self.xStep, self.yStep)
+        for phase in self.phase_list:
+            s += '\n|- phase %d (%s)' % (phase.phase_id, phase.get_symmetry())
         return s
 
     def init_arrays(self):
@@ -525,6 +526,8 @@ class OimScan:
         self.rows = header['nRows'][0]
         self.xStep = header['Step X'][0]
         self.yStep = header['Step Y'][0]
+        print(header['Step X'][0], header['Step Y'][0])
+        print(self.xStep, self.yStep)
         self.operator = header['Operator'][0].decode('utf-8')
         if 'Sample ID' in header.keys():
             self.sample_id = header['Sample ID'][0].decode('utf-8')
@@ -975,7 +978,7 @@ class OimScan:
         """
         from scipy import ndimage
         from pymicro.external.tifffile import TiffFile
-        
+
         # load the image
         im = TiffFile(file_name).asarray().transpose(1, 0, 2).astype(np.uint16)
         print(im.shape)

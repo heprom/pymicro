@@ -1921,6 +1921,11 @@ class Microstructure(SampleData):
             if len(self.get_phase_ids_list()) == 0:
                 print('no phase was found in this dataset, adding a default one')
                 self.add_phase(phase_list[0])
+        # for microstructure created without the phase column, it is initialize at 0, fix this
+        if np.array_equal(np.unique(self.grains[:]['phase']), [0]):
+            print('end of _init_phase, fixing phase array')
+            self.set_grain_phases(np.ones_like(self.get_grain_ids()))
+            print(self.grains[:]['phase'])
 
     def sync_phases(self, verbose=True) -> None:
         """This method sync the _phases attribute with the content of the hdf5
@@ -2370,6 +2375,14 @@ class Microstructure(SampleData):
         """ Store grain volumes array in GrainDataTable
         """
         self.set_tablecol('GrainDataTable', 'volume', column=volumes)
+        return
+
+    def set_grain_phases(self, phases):
+        """ Store grain phases array in GrainDataTable
+
+            phases : 1D array of the phase id for each grain.
+        """
+        self.set_tablecol('GrainDataTable', 'phase', column=phases)
         return
 
     def set_lattice(self, lattice, phase_id=1):

@@ -105,7 +105,7 @@ class CrystallinePhase:
         if sym_changed:
             print('symmetry was changed to %s' % self.get_symmetry())
             n = self.get_symmetry().elastic_constants_number()
-            if len(self.elastic_constants) != n:
+            if len(self.elastic_constants) > 0 and len(self.elastic_constants) != n:
                 print('warning, elastic constants are inconsistent for this '
                       'symmetry, please update them.')
 

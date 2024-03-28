@@ -81,7 +81,6 @@ class View_slice:
         # get the slice to plot
         slice_map, vmin, vmax = self._get_slice_map(map_name, slice,
                                                     color, slip_system, axis=axis)
-        print("vmin, vmax", vmin, vmax)
         if slice_map is None:
             print('Could not get slice to visualize, returning. ')
             return

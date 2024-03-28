@@ -291,7 +291,6 @@ class OimScan:
             # start by parsing the header
             line = f.readline().strip()
             while line.startswith('#'):
-                print(line)
                 tokens = line.split()
                 if len(tokens) <= 2:
                     line = f.readline().strip()
@@ -470,11 +469,11 @@ class OimScan:
                     sym = Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
                     print('guessed symmetry from lattice parameters:', sym)
                 # convert lattice constants to nm
-                lattice = Lattice.from_parameters(a, b, c, 
+                lattice = Lattice.from_parameters(a, b, c,
                                                   alpha, beta, gamma,
                                                   symmetry=sym)
                 phase.set_lattice(lattice)
-                print('adding phase %s' % phase)
+                print('adding phase {}'.format(phase))
                 scan.phase_list.append(phase)
             # read the line before the data
             line = f.readline().strip()

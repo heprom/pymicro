@@ -13,13 +13,13 @@ orientation:
 """
 import numpy as np
 import os
-import vtk
+#import vtk
 import h5py
 import math
 from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
-from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
+from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal, OrientationMatrix2Quaternion_bis, Quaternion2OrientationMatrix_bis
 from pymicro.crystal.rotation import om2ro, ro2qu, qu2om
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
@@ -27,6 +27,16 @@ import tables
 from math import atan2, pi
 from tqdm import tqdm
 import time
+
+def Q_product(q1, q2) :
+        r0 = q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3]
+        r1 = q2[0]*q1[1] + q1[2]*q2[3] - q1[3]*q2[2]
+        r2 = q2[0]*q1[2] + q1[3]*q2[1] - q1[1]*q2[3]
+        r3 = q2[0]*q1[3] + q1[1]*q2[2] - q1[2]*q2[1]
+        return np.array([r0, r1, r2, r3])
+
+def Q_conjugate(q) : 
+    return np.array([q[0], -q[1], -q[2], -q[3]])
 
 
 class Orientation:
@@ -57,7 +67,7 @@ class Orientation:
         self._matrix = g
         self.euler = Orientation.OrientationMatrix2Euler(g)
         self.rod = om2ro(g)
-        self.quat = Quaternion(ro2qu(self.rod))
+        self.quat = OrientationMatrix2Quaternion_bis(g, P=1)
 
     def orientation_matrix(self):
         """Returns the orientation matrix in the form of a 3x3 numpy array."""
@@ -525,6 +535,30 @@ class Orientation:
                         the_angle = mis_angle
                         the_axis = mis_axis
                         the_axis_xyz = np.dot(oi.T, the_axis)
+        return the_angle, the_axis, the_axis_xyz
+
+    def Q_disorientation(self, orientation, crystal_structure=Symmetry.triclinic):
+        
+        the_angle = np.pi
+        symmetries = crystal_structure.Q_symmetry_operators()
+        (Q_gA, Q_gB) = (self.quat, orientation.quat)  # nicknames
+        for (Q_g1, Q_g2) in [(Q_gA, Q_gB), (Q_gB, Q_gA)]:
+            for j in range(symmetries.shape[0]):
+                sym_j = symmetries[j]
+                oj = Q_product(Q_g1, sym_j)  # the crystal symmetry operator is left applied
+                for i in range(symmetries.shape[0]):
+                    sym_i = symmetries[i]
+                    oi = Q_product(Q_g2, sym_i)
+                    delta = Quaternion2OrientationMatrix_bis(Q_product(oi, Q_conjugate(oj))) #A modifier pour enlever la conversion
+                    mis_angle = Orientation.misorientation_angle_from_delta(delta)
+                    if mis_angle < the_angle:
+                        # now compute the misorientation axis, should check if it lies in the fundamental zone
+                        mis_axis = Orientation.misorientation_axis_from_delta(delta)
+                        # here we have np.dot(oi.T, mis_axis) = np.dot(oj.T, mis_axis)
+                        # print(mis_axis, mis_angle*180/np.pi, np.dot(oj.T, mis_axis))
+                        the_angle = mis_angle
+                        the_axis = mis_axis
+                        the_axis_xyz = np.dot((Quaternion2OrientationMatrix_bis(oi)).T, the_axis) #A modifier imperativement pour enlever la conversion et le produit matriciel
         return the_angle, the_axis, the_axis_xyz
 
     def phi1(self):

@@ -9,6 +9,90 @@ import numpy as np
 from numpy import pi, dot, transpose, radians
 from matplotlib import pyplot as plt
 
+def OrientationMatrix2Quaternion_bis(g, P=1):
+        q0 = 0.5 * np.sqrt(1 + g[0, 0] + g[1, 1] + g[2, 2])
+        q1 = P * 0.5 * np.sqrt(1 + g[0, 0] - g[1, 1] - g[2, 2])
+        q2 = P * 0.5 * np.sqrt(1 - g[0, 0] + g[1, 1] - g[2, 2])
+        q3 = P * 0.5 * np.sqrt(1 - g[0, 0] - g[1, 1] + g[2, 2])
+
+        if g[2, 1] < g[1, 2]:
+            q1 = q1 * -1
+        elif g[0, 2] < g[2, 0]:
+            q2 = q2 * -1
+        elif g[1, 0] < g[0, 1]:
+            q3 = q3 * -1
+
+        q = np.array([q0, q1, q2, q3])
+        return q
+
+def Quaternion2OrientationMatrix_bis(q):
+        P = -1
+        (q0, q1, q2, q3) = q
+        qbar = q0 ** 2 - q1 ** 2 - q2 ** 2 - q3 ** 2
+        g = np.array([[qbar + 2 * q1 ** 2, 2 * (q1 * q2 - P * q0 * q3), 2 * (q1 * q3 + P * q0 * q2)],
+                      [2 * (q1 * q2 + P * q0 * q3), qbar + 2 * q2 ** 2, 2 * (q2 * q3 - P * q0 * q1)],
+                      [2 * (q1 * q3 - P * q0 * q2), 2 * (q2 * q3 + P * q0 * q1), qbar + 2 * q3 ** 2]])
+        return g
+
+Q_cubic = np.zeros((24, 4), dtype=float)
+Q_cubic[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_cubic[1] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]]))
+Q_cubic[2] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]]))
+Q_cubic[3] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
+Q_cubic[4] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., 1.], [0., 1., 0.], [-1., 0., 0.]]))
+Q_cubic[5] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]]))
+Q_cubic[6] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
+Q_cubic[7] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]]))
+Q_cubic[8] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]))
+Q_cubic[9] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
+Q_cubic[10] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]]))
+Q_cubic[11] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., 1.], [1., 0., 0.], [0., 1., 0.]]))
+Q_cubic[12] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [0., 0., 1.], [1., 0., 0.]]))
+Q_cubic[13] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., -1.], [-1., 0., 0.], [0., 1., 0.]]))
+Q_cubic[14] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [0., 0., 1.], [-1., 0., 0.]]))
+Q_cubic[15] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [0., 0., -1.], [-1., 0., 0.]]))
+Q_cubic[16] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., -1.], [1., 0., 0.], [0., -1., 0.]]))
+Q_cubic[17] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., 1.], [-1., 0., 0.], [0., -1., 0.]]))
+Q_cubic[18] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [0., 0., -1.], [1., 0., 0.]]))
+Q_cubic[19] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]]))
+Q_cubic[20] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 0., 1.], [0., 1., 0.]]))
+Q_cubic[21] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., 1.], [0., -1., 0.], [1., 0., 0.]]))
+Q_cubic[22] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]]))
+Q_cubic[23] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]]))
+
+Q_hex = np.zeros((12, 4), dtype=float)
+s60 = np.sin(60 * np.pi / 180)
+Q_hex[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_hex[1] = OrientationMatrix2Quaternion_bis(np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]]))
+Q_hex[2] = OrientationMatrix2Quaternion_bis(np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]]))
+Q_hex[3] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
+Q_hex[4] = OrientationMatrix2Quaternion_bis(np.array([[-0.5, -s60, 0.], [s60, -0.5, 0.], [0., 0., 1.]]))
+Q_hex[5] = OrientationMatrix2Quaternion_bis(np.array([[0.5, -s60, 0.], [s60, 0.5, 0.], [0., 0., 1.]]))
+Q_hex[6] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
+Q_hex[7] = OrientationMatrix2Quaternion_bis(np.array([[0.5, s60, 0.], [s60, -0.5, 0.], [0., 0., -1.]]))
+Q_hex[8] = OrientationMatrix2Quaternion_bis(np.array([[-0.5, s60, 0.], [s60, 0.5, 0.], [0., 0., -1.]]))
+Q_hex[9] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
+Q_hex[10] = OrientationMatrix2Quaternion_bis(np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]]))
+Q_hex[11] = OrientationMatrix2Quaternion_bis(np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]]))
+
+Q_ortho = np.zeros((4, 4), dtype=float)
+Q_ortho[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_ortho[1] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
+Q_ortho[2] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]]))
+Q_ortho[3] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
+
+Q_tetra = np.zeros((8, 4), dtype=float)
+Q_tetra[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_tetra[1] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]))
+Q_tetra[2] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
+Q_tetra[3] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]]))
+Q_tetra[4] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
+Q_tetra[5] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
+Q_tetra[6] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]]))
+Q_tetra[7] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]]))
+
+Q_tri = np.zeros((1, 4), dtype=float)
+Q_tri[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
 
 class Crystal:
     """
@@ -406,6 +490,95 @@ class Symmetry(enum.Enum):
         elif self is Symmetry.triclinic:
             sym = np.zeros((1, 3, 3), dtype=float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
+        else:
+            raise ValueError('warning, symmetry not supported: %s' % self)
+        return sym
+
+    def Q_symmetry_operators(self, use_miller_bravais=False):
+        """Define the equivalent crystal symmetries. USING QUATERNIONS
+
+        Those come from Randle & Engler, 2000. For instance in the cubic
+        crystal struture, for instance there are 24 equivalent cube orientations.
+
+        :returns array: A numpy array of shape (n, 3, 3) where n is the \
+        number of symmetries of the given crystal structure.
+        """
+        if self is Symmetry.cubic:
+            sym = np.zeros((24, 4), dtype=float)
+            sym[0] = Q_cubic[0]
+            sym[1] = Q_cubic[1]
+            sym[2] = Q_cubic[2]
+            sym[3] = Q_cubic[3]
+            sym[4] = Q_cubic[4]
+            sym[5] = Q_cubic[5]
+            sym[6] = Q_cubic[6]
+            sym[7] = Q_cubic[7]
+            sym[8] = Q_cubic[8]
+            sym[9] = Q_cubic[9]
+            sym[10] = Q_cubic[10]
+            sym[11] = Q_cubic[11]
+            sym[12] = Q_cubic[12]
+            sym[13] = Q_cubic[13]
+            sym[14] = Q_cubic[14]
+            sym[15] = Q_cubic[15]
+            sym[16] = Q_cubic[16]
+            sym[17] = Q_cubic[17]
+            sym[18] = Q_cubic[18]
+            sym[19] = Q_cubic[19]
+            sym[20] = Q_cubic[20]
+            sym[21] = Q_cubic[21]
+            sym[22] = Q_cubic[22]
+            sym[23] = Q_cubic[23]
+        elif self is Symmetry.hexagonal:
+            if use_miller_bravais:
+              # using the Miller-Bravais representation here
+              sym = np.zeros((12, 4, 4), dtype=int)
+              sym[0] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+              sym[1] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
+              sym[2] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+              sym[3] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, -1]])
+              sym[4] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, -1]])
+              sym[5] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, -1]])
+              sym[6] = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+              sym[7] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
+              sym[8] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
+              sym[9] = np.array([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, -1]])
+              sym[10] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, -1]])
+              sym[11] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, -1]])
+            else:
+              sym = np.zeros((12, 4), dtype=float)
+              s60 = np.sin(60 * np.pi / 180)
+              sym[0] = Q_hex[0]
+              sym[1] = Q_hex[1]
+              sym[2] = Q_hex[2]
+              sym[3] = Q_hex[3]
+              sym[4] = Q_hex[4]
+              sym[5] = Q_hex[5]
+              sym[6] = Q_hex[6]
+              sym[7] = Q_hex[7]
+              sym[8] = Q_hex[8]
+              sym[9] = Q_hex[9]
+              sym[10] = Q_hex[10]
+              sym[11] = Q_hex[11]
+        elif self is Symmetry.orthorhombic:
+            sym = np.zeros((4, 4), dtype=float)
+            sym[0] = Q_ortho[0]
+            sym[1] = Q_ortho[1]
+            sym[2] = Q_ortho[2]
+            sym[3] = Q_ortho[3]
+        elif self is Symmetry.tetragonal:
+            sym = np.zeros((8, 4), dtype=float)
+            sym[0] = Q_tetra[0]
+            sym[1] = Q_tetra[1]
+            sym[2] = Q_tetra[2]
+            sym[3] = Q_tetra[3]
+            sym[4] = Q_tetra[4]
+            sym[5] = Q_tetra[5]
+            sym[6] = Q_tetra[6]
+            sym[7] = Q_tetra[7]
+        elif self is Symmetry.triclinic:
+            sym = np.zeros((1, 4), dtype=float)
+            sym[0] = Q_tri[0]
         else:
             raise ValueError('warning, symmetry not supported: %s' % self)
         return sym

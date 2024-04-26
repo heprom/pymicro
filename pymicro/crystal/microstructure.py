@@ -549,8 +549,8 @@ class Orientation:
         """
         if lattice is None:
             lattice = Lattice.cubic(0.5)
-        coords, edge_point_ids = lattice.get_points(origin='mid')
-        print(coords.shape, edge_point_ids.shape)
+        coords, edges, faces = lattice.get_points(origin='mid')
+        print(coords.shape, len(edges), len(faces))
         # now apply the crystal orientation
         g = self.orientation_matrix()
         coords_rot = np.empty_like(coords)
@@ -560,13 +560,17 @@ class Orientation:
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
         ax.scatter(coords_rot[:, 0], coords_rot[:, 1], coords_rot[:, 2])
-        for i in range(len(edge_point_ids)):
-            ax.plot(coords_rot[edge_point_ids[i, :], 0],
-                    coords_rot[edge_point_ids[i, :], 1],
-                    coords_rot[edge_point_ids[i, :], 2], 'k-')
+        for i, face in enumerate(faces):
+            face_coords = coords_rot[face]
+            ax.plot(face_coords[:, 0], face_coords[:, 1], face_coords[:, 2], 'k-')
+        #for i in range(len(edge_point_ids)):
+        #    ax.plot(coords_rot[edge_point_ids[i, :], 0],
+        #            coords_rot[edge_point_ids[i, :], 1],
+        #            coords_rot[edge_point_ids[i, :], 2], 'k-')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
+        ax.view_init(elev=60., azim=45)
         plt.show()
 
     def compute_XG_angle(self, hkl, omega, verbose=False):
@@ -2606,30 +2610,6 @@ class Microstructure(SampleData):
         self.grains.flush()
         return
 
-    def graph(self):
-        """Build the graph of the microstructure.
-
-        The graph has a node per grain and a connection between neighboring
-        grains. The crystal misorientation is attach to each edge.
-
-        :return: the region agency graph.
-        """
-        from skimage.future.graph import RAG
-        print('build region agency graph for this microstructure')
-        # TODO handle multiple symmetries
-        sym = self.get_phase().get_symmetry()
-        rag = RAG(self.get_grain_map(), connectivity=1)
-        # add grain id to each node of the graph
-        for x, d in rag.nodes(data=True):
-            d['grain_id'] = [x]
-        # add misorientation to each edge
-        for x, y, d in rag.edges(data=True):
-            o_x = self.get_grain(x).orientation
-            o_y = self.get_grain(y).orientation
-            mis = np.degrees(o_x.disorientation(o_y, crystal_structure=sym)[0])
-            d['misorientation'] = mis
-        return rag
-
     def remove_grains_not_in_map(self):
         """Remove from GrainDataTable grains that are not in the grain map."""
         _, not_in_map, _ = self.compute_grains_map_table_intersection()
@@ -4032,48 +4012,74 @@ class Microstructure(SampleData):
         self.recompute_grain_volumes()
         return
 
-    def segment_mtr(self, labels_seg=None, mis_thr=20., min_area=500, store=False):
-        """Segment micro-textured regions (MTR).
+    def graph(self):
+        """Create the graph of this microstructure.
 
         This method process a `Microstructure` instance using a Region Adgency
         Graph built with the crystal misorientation between neighbors as weights.
+        The graph has a node per grain and a connection between neighboring
+        grains of the same phase. The misorientation angle is attach to each edge.
+        
+        :return rag: the region adjency graph of this microstructure.
+        """
+        from skimage.future import graph
+
+        print('build the region agency graph for this microstructure')
+        rag = graph.RAG(self.get_grain_map(), connectivity=1)
+
+        # remove node and connections to the background
+        if 0 in rag.nodes:
+            rag.remove_node(0)
+
+        # get the grain infos
+        grain_ids = self.get_grain_ids()
+        rodrigues = self.get_grain_rodrigues()
+        centers = self.get_grain_centers()
+        volumes = self.get_grain_volumes()
+        phases = self.grains[:]['phase']
+        for grain_id, d in rag.nodes(data=True):
+            d['label'] = [grain_id]
+            index = grain_ids.tolist().index(grain_id)
+            d['rod'] = rodrigues[index]
+            d['center'] = centers[index]
+            d['volume'] = volumes[index]
+            d['phase'] = phases[index]
+
+        # assign grain misorientation between neighbors to each edge of the graph
+        for x, y, d in rag.edges(data=True):
+            if rag.nodes[x]['phase'] != rag.nodes[y]['phase']:
+                # skip edge between neighboring grains of different phases
+                continue
+            sym = self.get_phase(phase_id=rag.nodes[x]['phase']).get_symmetry()
+            o_x = Orientation.from_rodrigues(rag.nodes[x]['rod'])
+            o_y = Orientation.from_rodrigues(rag.nodes[y]['rod'])
+            mis = np.degrees(o_x.disorientation(o_y, crystal_structure=sym)[0])
+            d['misorientation'] = mis
+        
+        return rag
+
+    def segment_mtr(self, labels_seg=None, mis_thr=20., min_area=500, store=False):
+        """Segment micro-textured regions (MTR).
+
+        This method process a `Microstructure` instance to segment the MTR
+        with the specified parameters.
 
         :param ndarray labels_seg: a pre-segmentation of the grain map, the full
         grain map will be used if not specified.
         :param float mis_thr: threshold in misorientation used to cut the graph.
         :param int min_area: minimum area used to define a MTR.
-        :param bool store:
+        :param bool store: flag to store the segmented array in the microstructure.
         :return mtr_labels: array with the labels of the segmented regions.
         """
-        import networkx as nx
-        from skimage.future import graph
-
-        if labels_seg is None:
-            labels_seg = self.get_grain_map()
-
-        # create the Region Adgency Graph
-        rag_seg = graph.RAG(labels_seg, connectivity=1)
-
-        # fill key labels to each node, each region corresponds to one grain
-        for grain_id, d in rag_seg.nodes(data=True):
-            d['labels'] = [grain_id]
-
-        # remove node and connections to the background
-        rag_seg.remove_node(0)
-
-        # assign grain misorientation between neighbors to each edge of the graph
-        sym = self.get_phase().get_symmetry()
-        for x, y, d in rag_seg.edges(data=True):
-            o_x = self.get_grain(x).orientation
-            o_y = self.get_grain(y).orientation
-            mis = np.degrees(o_x.disorientation(o_y, crystal_structure=sym)[0])
-            d['weight'] = mis
+        rag_seg = self.graph()
 
         # cut our graph with the misorientation threshold
         rag = rag_seg.copy()
         edges_to_remove = [(x, y) for x, y, d in rag.edges(data=True)
-                           if d['weight'] >= mis_thr]
+                           if d['misorientation'] >= mis_thr]
         rag.remove_edges_from(edges_to_remove)
+
+        import networkx as nx
         comps = nx.connected_components(rag)
         map_array = np.arange(labels_seg.max() + 1, dtype=labels_seg.dtype)
         for i, nodes in enumerate(comps):
@@ -4083,7 +4089,7 @@ class Microstructure(SampleData):
                 # ignore small MTR (simply assign them to label zero)
                 i = 0
             for node in nodes:
-                for label in rag.nodes[node]['labels']:
+                for label in rag.nodes[node]['label']:
                     map_array[label] = i
         mtr_labels = map_array[labels_seg]
         print('%d micro-textured regions were segmented' % len(np.unique(mtr_labels)))
@@ -5240,7 +5246,7 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, phase_list=None, ang_ref_frame=2, grain_ids=None):
+    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, phase_list=None, ref_frame_id=2, grain_ids=None):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
@@ -5264,7 +5270,7 @@ class Microstructure(SampleData):
         from pymicro.crystal.ebsd import OimScan
         # Read raw EBSD file, enforce spatial reference frame for orientation data
         scan = OimScan.from_file(file_path, crop=(roi, ds),
-                                 use_spatial_ref_frame=True, ang_ref_frame=ang_ref_frame)
+                                 use_spatial_ref_frame=True, ref_frame_id=ref_frame_id)
         if phase_list:
             scan.phase_list = phase_list
         # sort the phase list so that it is not renumbered and consistent with the phase map
@@ -5304,8 +5310,14 @@ class Microstructure(SampleData):
                 continue
             # get the phase for this grain
             phase_grain = scan.phase[np.where((grain_ids == gid) & (scan.phase > 0))].astype(int)
-            assert len(np.unique(phase_grain)) == 1  # all indexed pixel of this grain must have the same phase id
-            grain_phase_index = [phase.phase_id for phase in scan.phase_list].index(phase_grain[0])
+            values, counts = np.unique(phase_grain, return_counts=True)
+            if len(counts) == 0:
+                continue
+            grain_phase_id = values[np.argmax(counts)]
+            if len(values) > 1:
+                # all indexed pixel of this grain must have the same phase id
+                print('warning, phase for grain %d is not unique, using value %d' % (gid, grain_phase_id))
+            grain_phase_index = [phase.phase_id for phase in scan.phase_list].index(grain_phase_id)
             sym = scan.phase_list[grain_phase_index].get_symmetry()
             # compute the mean orientation for this grain
             euler_grain = scan.euler[np.where((grain_ids == gid) & (scan.phase > 0))]
@@ -5317,10 +5329,10 @@ class Microstructure(SampleData):
             grains['orientation'] = o_tsl.rod
             grains.append()
         micro.grains.flush()
-        print('computing grains geometry')
-        micro.recompute_grain_bounding_boxes()
-        micro.recompute_grain_centers(verbose=False)
-        micro.recompute_grain_volumes(verbose=False)
+        #print('computing grains geometry')
+        #micro.recompute_grain_bounding_boxes()
+        #micro.recompute_grain_centers(verbose=False)
+        #micro.recompute_grain_volumes(verbose=False)
         micro.sync()
         return micro
 

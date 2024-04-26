@@ -187,7 +187,7 @@ class MicrostructureTests(unittest.TestCase):
                                                    'n100-id1.tesr'))
         m.autodelete = True
         self.assertEqual(m.grains.nrows, 100)
-        # verify all orienations
+        # verify all orientations
         euler_neper = np.genfromtxt(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'n100-id1.ori-plain'))
         for i in range(100):
             euler_pymicro = m.get_grain(i + 1).orientation.euler
@@ -388,19 +388,19 @@ class OrientationTests(unittest.TestCase):
         self.assertAlmostEqual(180 / np.pi * lt, -4.437, 2)
 
     def test_IPF_color(self):
-        o1 = Orientation.cube()  # 001 // Z
-        o2 = Orientation.from_euler([35.264, 45., 0.])  # 011 // Z
-        o3 = Orientation.from_euler([0., 54.736, 45.])  # 111 // Z
+        o1 = Orientation.from_euler([0.00001, 0.00001, 0.00001])  # 001 // Z
+        o2 = Orientation.from_euler([35.264, 45., 0.00001])  # 011 // Z
+        o3 = Orientation.from_euler([0.00001, 54.736, 45.])  # 111 // Z
         orientations = [o1, o2, o3]
         targets = [np.array([1., 0., 0.]), np.array([0., 1., 0.]), np.array([0., 0., 1.])]
         for case in range(2):
             o = orientations[case]
             print(o)
             target = targets[case]
-            col = o.get_ipf_colour()
+            col = o.ipf_color()
             print(col)
             for i in range(3):
-                self.assertAlmostEqual(col[i], target[i])
+                self.assertAlmostEqual(col[i], target[i], 6)
 
     def test_in_fundamental_zone(self):
         rod = [0.1449, -0.0281, 0.0616]

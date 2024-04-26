@@ -186,7 +186,7 @@ class OimScan:
             return crop
 
     @staticmethod
-    def from_file(file_path, crop=None, use_spatial_ref_frame=True, ang_ref_frame=2):
+    def from_file(file_path, crop=None, use_spatial_ref_frame=True, ref_frame_id=2):
         """Create a new EBSD scan by reading a data file.
 
         At present, only hdf5 format is supported.
@@ -202,9 +202,9 @@ class OimScan:
         elif ext == '.osc':
             scan = OimScan.read_osc(file_path)
         elif ext == '.ang':
-            scan = OimScan.read_ang(file_path, ref_frame=ang_ref_frame)
+            scan = OimScan.read_ang(file_path, ref_frame_id=ref_frame_id)
         elif ext == '.ctf':
-            scan = OimScan.read_ctf(file_path)
+            scan = OimScan.read_ctf(file_path, ref_frame_id=ref_frame_id)
         else:
             raise ValueError('only HDF5, OSC, ANG or CTF formats are '
                              'supported, please convert your scan')
@@ -274,7 +274,7 @@ class OimScan:
         return scan
 
     @staticmethod
-    def read_ang(file_path, ref_frame=2):
+    def read_ang(file_path, ref_frame_id=2):
         """Read a scan in ang ascii format.
 
         :note: The scan reference frame settings is not written 
@@ -286,7 +286,7 @@ class OimScan:
         :param str file_path: the path to the ang file to read.
         :return: a new instance of OimScan populated with the data from the file.
         """
-        scan = OimScan((0, 0), ref_frame=ref_frame)
+        scan = OimScan((0, 0), ref_frame=ref_frame_id)
         with open(file_path, 'r') as f:
             # start by parsing the header
             line = f.readline().strip()
@@ -417,14 +417,19 @@ class OimScan:
             self.phase[indices] = index - 1
 
     @staticmethod
-    def read_ctf(file_path):
+    def read_ctf(file_path, ref_frame_id=4):
         """Read a scan in Channel Text File format.
+
+        :note: The scan reference frame settings appears not to be 
+        consistent from one scan to another so the reference frame 
+        can be specified as a parameter. The default value is set 
+        to 4 as this seemss to be the most common for CTF data files.
 
         :raise ValueError: if the job mode is not grid.
         :param str file_path: the path to the ctf file to read.
         :return: a new instance of OimScan populated with the data from the file.
         """
-        scan = OimScan((0, 0), ref_frame=4)
+        scan = OimScan((0, 0), ref_frame=ref_frame_id)
         print('using ref_frame', scan.ref_frame)
         with open(file_path, 'r') as f:
             # start by parsing the header

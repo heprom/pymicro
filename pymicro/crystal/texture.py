@@ -638,7 +638,7 @@ class PoleFigure:
         for grain_id in selected_grains:
             grain = self.microstructure.grains.read_where('(idnumber == %d)' % grain_id)[0]
             g = Orientation.Rodrigues2OrientationMatrix(grain['orientation'])
-            g = Orientation.Rodrigues2OrientationMatrix(rod)
+            #g = Orientation.Rodrigues2OrientationMatrix(rod)
             if self.axis == 'Z':
                 axis = self.z
             elif self.axis == 'Y':

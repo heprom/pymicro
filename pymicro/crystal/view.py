@@ -3,6 +3,7 @@ import numpy as np
 from scipy import ndimage
 from skimage import filters
 from pymicro.crystal.microstructure import Microstructure, Orientation
+import networkx as nx
 
 class View_slice:
 
@@ -434,3 +435,104 @@ class View_slice:
             handle.set_alpha(0.8)
         plt.rcParams['hatch.linewidth'] = 0.5
         return
+
+class View_graph:
+        def __init__(self, 
+                    m: Microstructure, 
+                    min_grain_size: int=20):
+            self.microstructure = m
+            self.min_grain_size = min_grain_size
+            self.G = None
+
+            # Ensure that the microstructure has a grain map (if get_grain_map() is not None, then it has a grain map)
+            assert m.get_grain_map() is not None, 'Microstructure instance must have a grain map to view it with "view_graph"'
+
+            self.grain_ids = np.squeeze(m.get_grain_map())
+            indices = np.indices(self.grain_ids.shape)
+            rows, cols = indices
+
+            # Create a structure to track grain ids and their positions
+            self.rows = rows.flatten()
+            self.cols = cols.flatten()
+            self.grain_ids_flat = self.grain_ids.flatten()
+
+            # Populate grain_sizes dictionary
+            self.grain_sizes = np.bincount(self.grain_ids_flat)
+            self.grain_sizes[0] = 0  # set size of grain ID 0 (background) to 0
+
+        def build_graph(self):
+
+            G = nx.Graph()
+            for i in range(self.grain_ids.shape[0]):       # Rows
+                for j in range(self.grain_ids.shape[1]):   # Columns
+                    grain_id = self.grain_ids[i, j]
+                    if grain_id > 0 and self.grain_sizes[grain_id] >= self.min_grain_size:
+                        G.add_node(grain_id)
+
+                    # Check the neighbor to the right
+                    if j < self.grain_ids.shape[1] - 1:
+                        right_grain_id = self.grain_ids[i, j + 1]
+                        self.add_edge(G, grain_id, right_grain_id, self.grain_sizes)
+
+                    # Check the neighbor below
+                    if i < self.grain_ids.shape[0] - 1:
+                        below_grain_id = self.grain_ids[i + 1, j]
+                        self.add_edge(G, grain_id, below_grain_id, self.grain_sizes)
+
+            self.G = G
+            print("Number of nodes:", G.number_of_nodes())
+            print("Number of edges:", G.number_of_edges())
+            return G
+        
+        def plot(self, 
+                    G:nx.Graph=None, 
+                    arranged: bool=True, 
+                    min_node_size: float=0.1,
+                    with_labels: bool=True,
+                    font_size: int=8,
+                    figsize: tuple=(12, 12),
+                    show: bool=True,
+                    save: bool=False,
+                    save_path: str=None):
+            if G is None:
+                assert self.G is not None, 'Graph must be built first using build_graph() method.'
+                G = self.G
+
+            node_sizes = [self.grain_sizes[grain_id] * min_node_size for grain_id in G.nodes()]
+
+            if arranged:
+                # Generate positions from centroids and draw the graph with centroids
+                centroids = self.get_centroids()
+                pos = {gid: (centroid[1], -centroid[0]) for gid, centroid in centroids.items()}
+            else:
+                pos = nx.spring_layout(G, seed=42)
+
+            plt.figure(figsize=figsize)
+            nx.draw(G, pos, node_size=node_sizes, edge_color='gray', node_color='blue', with_labels=False)
+            node_labels = {node: str(node) for node in G.nodes() if node > 0}
+            if with_labels:
+                nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=font_size)
+            plt.title('Grain Network Visualization with Centroids')
+            if save:
+                plt.savefig(save_path if save_path is not None else 'grain_network.png')
+            if show:
+                plt.show()
+
+
+
+        def add_edge(self, G, node1, node2, grain_sizes):
+            if node1 != node2 and node1 > 0 and node2 > 0 and grain_sizes[node1] >= self.min_grain_size and grain_sizes[node2] >= self.min_grain_size:
+                G.add_edge(node1, node2)
+
+        def get_centroids(self):
+            sum_coords = np.zeros((self.grain_ids.max() + 1, 2), dtype=np.float64)
+            pixel_count = np.zeros(self.grain_ids.max() + 1, dtype=int)
+
+            for idx in range(len(self.grain_ids_flat)):
+                gid = self.grain_ids_flat[idx]
+                if gid > 0:
+                    sum_coords[gid] += [self.rows[idx], self.cols[idx]]
+                    pixel_count[gid] += 1
+
+            centroids = {gid: sum_coords[gid] / count for gid, count in enumerate(pixel_count) if count > 0}
+            return centroids

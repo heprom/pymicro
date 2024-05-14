@@ -3029,25 +3029,23 @@ class Microstructure(SampleData):
         :param axis: the unit vector for the load direction to compute IPF
             colors.
         """
-        dims = list(self.get_grain_map().shape)
-        grain_ids = self.get_grain_ids()
+        grain_map = self.get_grain_map()
+        dims = list(grain_map.shape)
         shape_ipf_map = list(dims) + [3]
-        ipf_map = np.zeros(shape=shape_ipf_map, dtype=float)
-        for i in range(len(grain_ids)):
-            gid = grain_ids[i]
+        ipf_map = np.zeros(shape=shape_ipf_map, dtype=np.float32)
+        for g in tqdm(self.grains, desc='computing IPF map'):
+            gid = g['idnumber']
             # use the bounding box for this grain
-            bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
-            this_grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
-                                                  bb[1][0]:bb[1][1],
-                                                  bb[2][0]:bb[2][1]]
-            o = self.get_grain(gid).orientation
-            rgb = o.ipf_color(axis, symmetry=self.get_lattice().get_symmetry(), saturate=True)
+            bb = g['bounding_box']
+            this_grain_map = grain_map[bb[0][0]:bb[0][1],
+                                       bb[1][0]:bb[1][1],
+                                       bb[2][0]:bb[2][1]]
+            o = Orientation.from_rodrigues(g['orientation'])
+            sym = self.get_phase(g['phase']).get_symmetry()
+            rgb = o.ipf_color(axis, symmetry=sym, saturate=True)
             ipf_map[bb[0][0]:bb[0][1],
                     bb[1][0]:bb[1][1],
                     bb[2][0]:bb[2][1]][this_grain_map == gid] = rgb
-            progress = 100 * (1 + i) / len(grain_ids)
-            print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
-        print('\n')
         return ipf_map.squeeze()
 
     def view_slice(self, **kwargs):
@@ -5023,7 +5021,7 @@ class Microstructure(SampleData):
         m.grains.flush()
 
         if include_ipf_map:
-            print('adding IPF maps')
+            print('adding X, Y and Z-IPF maps')
             with h5py.File(file_path, 'r') as f:
                 if 'IPF001' in f['LabDCT/Data']:
                     IPF001_map = f['LabDCT/Data/IPF001'][()].transpose(2, 1, 0, 3)

@@ -2525,7 +2525,7 @@ class Microstructure(SampleData):
             map_shape = self.get_attribute('dimension', 'CellData')
             phase_map = np.zeros(shape=map_shape, dtype=np.uint8)
         if not grain_ids:
-          grain_ids = self.get_ids_from_grain_map()
+            grain_ids = self.get_ids_from_grain_map()
         time.sleep(0.2)
         for gid in tqdm(grain_ids, desc='updating phase map'):
             g = self.grains.read_where('idnumber == %d' % gid)[0]
@@ -3908,7 +3908,7 @@ class Microstructure(SampleData):
             return
         # find_objects will return a list of N slices, N being the max grain id
         slices = ndimage.find_objects(self.get_grain_map())
-        for g in self.grains:
+        for g in tqdm(self.grains, desc='computing grain bounding boxes'):
             try:
                 g_slice = slices[g['idnumber'] - 1]
                 x_indices = (g_slice[0].start, g_slice[0].stop)
@@ -4928,7 +4928,7 @@ class Microstructure(SampleData):
 
     @staticmethod
     def from_labdct(labdct_file, data_dir='.', name=None, include_ipf_map=False,
-                    grain_map_key='GrainId'):
+                    grain_map_key='GrainId', recompute_mean_orientation=False):
         """Create a microstructure from a DCT reconstruction.
 
         :param str labdct_file: the name of the file containing the labDCT data.
@@ -4966,7 +4966,7 @@ class Microstructure(SampleData):
         # create the microstructure with the phase infos
         m = Microstructure(name=name, overwrite_hdf5=True, phase=phase)
 
-        # load cell data
+        # load LabDCT cell data
         with h5py.File(file_path, 'r') as f:
             spacing = f['LabDCT']['Spacing'][0]
             rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()].transpose(2, 1, 0, 3)
@@ -4983,28 +4983,43 @@ class Microstructure(SampleData):
                 m.add_field(gridname='CellData', fieldname='completeness_map',
                             array=completeness_map)
 
+        # analyze the grain map
+        grain_ids_list = range(1, grain_map.max() + 1)  # ids are consecutive
+        slices = ndimage.find_objects(grain_map)
+        mask = grain_map > 0
+        sizes = ndimage.sum(mask, grain_map, grain_ids_list)
+
         # create grain data table infos
-        grain_ids = np.unique(grain_map)
-        print(grain_ids)
-        m.build_grain_table_from_grain_map()
-        # now get each grain orientation from the rodrigues map
-        i = 0
-        for g in tqdm(m.grains):
-            gid = g['idnumber']
-            progress = 100 * (1 + i) / len(m.grains)
-            print('adding grains: {0:.2f} %'.format(progress), end='\r')
-            # use the grain bounding box
-            bb = g['bounding_box']
-            grain_map = m.get_grain_map()[bb[0][0]:bb[0][1],
-                                          bb[1][0]:bb[1][1],
-                                          bb[2][0]:bb[2][1]]
-            # assign orientation to this grain
-            rods_gid = rodrigues_map[bb[0][0]:bb[0][1],
-                                     bb[1][0]:bb[1][1],
-                                     bb[2][0]:bb[2][1]][grain_map == gid]
-            g['orientation'] = Orientation.compute_mean_rodrigues(rods_gid, symmetry=sym)
-            g.update()
-            i = i+1
+        grain = m.grains.row
+        for i in tqdm(range(len(grain_ids_list)), desc='adding grains to the microstructure'):
+            gid = grain_ids_list[i]
+            # use the bounding box for this grain
+            g_slice = slices[i]
+            x_indices = (g_slice[0].start, g_slice[0].stop)
+            y_indices = (g_slice[1].start, g_slice[1].stop)
+            z_indices = (g_slice[2].start, g_slice[2].stop)
+            bb = x_indices, y_indices, z_indices
+            this_grain_map = grain_map[bb[0][0]:bb[0][1],
+                                    bb[1][0]:bb[1][1],
+                                    bb[2][0]:bb[2][1]]
+            # here orientations are constant per grain, grab the first voxel for each grain
+            indices = np.where(this_grain_map == gid)
+            rod = rodrigues_map[bb[0][0] + indices[0][0],
+                                bb[1][0] + indices[1][0],
+                                bb[2][0] + indices[2][0], :]
+            # grain center
+            grain_data_bin = (this_grain_map == gid).astype(np.uint8)
+            local_com = ndimage.measurements.center_of_mass(grain_data_bin) + \
+                        np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
+            com = spacing * (np.array(bb)[:, 0] + local_com - 0.5 * np.array(grain_map.shape))
+
+            # create new grain in the data table
+            grain['idnumber'] = gid
+            grain['orientation'] = rod
+            grain['bounding_box'] = bb
+            grain['center'] = com
+            grain['volume'] = sizes[i] * spacing ** 3
+            grain.append()
         m.grains.flush()
 
         if include_ipf_map:

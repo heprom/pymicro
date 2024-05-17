@@ -4020,7 +4020,10 @@ class Microstructure(SampleData):
         
         :return rag: the region adjency graph of this microstructure.
         """
-        from skimage.future import graph
+        try:
+            from skimage.future import graph
+        except ImportError:
+            from skimage import graph
 
         print('build the region agency graph for this microstructure')
         rag = graph.RAG(self.get_grain_map(), connectivity=1)

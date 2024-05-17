@@ -655,7 +655,7 @@ class TaylorModel:
         self.L = np.array([[-0.5, 0.0, 0.0], [0.0, -0.5, 0.0], [0.0, 0.0, 1.0]])  # velocity gradient
 
     def compute_step(self, g, check=True):
-        Wc = np.zeros((3, 3), dtype=np.float)
+        Wc = np.zeros((3, 3), dtype=np.float64)
         # compute Schmid factors
         SF = []
         for s in self.slip_systems:
@@ -669,7 +669,7 @@ class TaylorModel:
         # now we need to solve: L = gam1*m1 + gam2*m2+ ...
         iu = np.triu_indices(3)  # indices of the upper part of a 3x3 matrix
         L = self.L[iu][:5]  # form a vector with the velocity gradient components
-        M = np.zeros((5, self.nact), dtype=np.float)
+        M = np.zeros((5, self.nact), dtype=np.float64)
         for i in range(len(ss_rank)):
             s = self.slip_systems[ss_rank[i]]
             m = g.orientation.slip_system_orientation_tensor(s)
@@ -696,7 +696,7 @@ class TaylorModel:
         print('dgammas (LST) =', dgammas)
         if check:
             # check consistency
-            Lcheck = np.zeros((3, 3), dtype=np.float)
+            Lcheck = np.zeros((3, 3), dtype=np.float64)
             for i in range(len(ss_rank)):
                 s = self.slip_systems[ss_rank[i]]
                 ms = g.orientation.slip_system_orientation_tensor(s)

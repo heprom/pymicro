@@ -278,7 +278,7 @@ class SampleDataTests(unittest.TestCase):
     def test_BasicTools_binding(self):
         """Test BasicTools to SampleData to BasicTools."""
         # create mesh of triangles
-        myMesh = UMCT.CreateSquare(dimensions=[3, 3], ofTris=True)
+        myMesh = UMCT.CreateSquare(dimensions=[3, 3], ofTriangles=True)
         # get into a SampleData instance
         sample = SampleData(filename='square', verbose=False, autodelete=True)
         sample.add_mesh(mesh_object=myMesh, meshname='BT_mesh', indexname='BTM',

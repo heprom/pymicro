@@ -3855,7 +3855,7 @@ class Microstructure(SampleData):
                            description=zstd_res.dtype, data=zstd_res)
             grainIDs = self.get_grain_ids()
             N_zone_times = int(zstd_res.shape[0]/ len(grainIDs))
-            dtype_col = np.dtype([('grain_ID', np.int)])
+            dtype_col = np.dtype([('grain_ID', np.int32)])
             IDs = np.tile(grainIDs, N_zone_times).astype(dtype_col)
             self.add_tablecols(tablename='MechanicalGrainDataTable',
                                description=IDs.dtype, data=IDs)

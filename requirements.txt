@@ -8,4 +8,8 @@ h5py
 lxml
 tables
 networkx
--e git+https://gitlab.com/drti/basic-tools.git#egg=basictools
+tqdm
+scikit-image 
+scikit-learn
+pytest 
+-e git+https://github.com/basileMarchand/basictools-frozen.git#egg=basictoolsfrozen

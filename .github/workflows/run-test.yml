@@ -1,9 +1,9 @@
 name: run-test
 
+## run for all branches
+
 on:
   push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:

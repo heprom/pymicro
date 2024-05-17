@@ -27,6 +27,10 @@ from BasicTools.Containers.UnstructuredMesh import (UnstructuredMesh,
 import BasicTools.Containers.UnstructuredMeshCreationTools as UMCT
 from BasicTools.Containers.MeshBase import MeshBase
 from BasicTools.IO.XdmfTools import XdmfName,XdmfNumber
+from BasicTools.IO.UniversalReader import ReadMesh, InitAllReaders
+
+InitAllReaders()
+
 # Import variables for XDMF binding
 from pymicro.core.global_variables import (XDMF_FIELD_TYPE,
                                            XDMF_IMAGE_GEOMETRY,
@@ -3376,7 +3380,8 @@ class SampleData:
         if name_or_node is None:
             return None
         # name_or_node is a string or else
-        name_tmp = os.path.join('/', name_or_node)
+        name_tmp = f"{'/' if not str(name_or_node).startswith('/') else ''}{name_or_node}"
+
         if self.h5_dataset.__contains__(name_tmp):
             # name is a path in hdf5 tree data
             path = name_tmp
@@ -4284,6 +4289,13 @@ class SampleData:
         elif (np.issubdtype(field.dtype, np.integer)):
             NumberType = 'Int'
             Precision = str(field.dtype).strip('int')
+
+        else:
+            # BM : I  am not sure ... 
+            return 
+            
+    
+            
         Attribute_data = etree.Element(_tag='DataItem', Format='HDF',
                                        Dimensions=Dimension,
                                        NumberType=NumberType,

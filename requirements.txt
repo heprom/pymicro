@@ -1,9 +1,11 @@
 numpy
 scipy
 scikit-image
+scikit-learn
 matplotlib
 vtk
 h5py
 lxml
 tables
+networkx
 -e git+https://gitlab.com/drti/basic-tools.git#egg=basictools

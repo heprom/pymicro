@@ -42,8 +42,7 @@ class SDAmitexIO():
     """
 
     @staticmethod
-    def load_std(std_path, start=None, step=None, stop=None,
-                 Int_var_names=dict()):
+    def load_std(std_path, start=None, step=None, stop=None, int_var_names={}):
         """Return content of a .m/z/std file  as Numpy structured array.
 
         Allow to read a standard output file of Amitex_fftp: .std, .mstd
@@ -58,18 +57,20 @@ class SDAmitexIO():
         :type step: int
         :param stop: index of the last row to read
         :type stop: int
-        :return: Results, Numpy structured array containing the output values
+        :param dict int_var_names: a dictionary containing the name of the
+        internal variable.
+        :return: results, Numpy structured array containing the output values
             in .std file: the array fields are 'time', 'sigma' (Cauchy stress),
             'epsilon' (small strains tensor), 'sigma_rms' and 'epsilon_rms'
             root mean square of tensors over the unit cell, 'N_iterations'
             number of iterations of the FFT algorithm to reach convergence at
             each increment.
-        :rtype:
+        :rtype: numpy structured array
         """
         finite_strain=False
         std_lines = []
         p = Path(std_path).absolute()
-        # get pattern to find out which internal variables values are outputed
+        # get pattern to find out which internal variables values are present
         # (for .zstd only)
         pattern = re.compile('variable interne \d+')
         idx_pattern = re.compile('\d+e')
@@ -90,8 +91,8 @@ class SDAmitexIO():
                             suffix = '_std'
                         varInt_number = int(pattern.findall(l)[0].split()[2])
                         varInt_index = int(idx_pattern.findall(l)[0][:-1])
-                        if varInt_number in Int_var_names:
-                            name = f'{Int_var_names[varInt_number]}'+suffix
+                        if varInt_number in int_var_names:
+                            name = f'{int_var_names[varInt_number]}' + suffix
                             varInt_names[name] = varInt_index - 1
                         else:
                             name = f'varInt_{varInt_number}'+suffix
@@ -106,52 +107,52 @@ class SDAmitexIO():
             dtype_description.append((key, np.double, (1,)))
         dt = np.dtype(dtype_description)
         # fill results array for each time step
-        N_rows = len(std_lines)
-        Results = np.empty(shape=(N_rows,), dtype=dt)
+        n_rows = len(std_lines)
+        results = np.empty(shape=(n_rows,), dtype=dt)
         if finite_strain:
-            for t in range(N_rows):
+            for t in range(n_rows):
                 # load standard outputs
-                Results[t]['time'] = std_lines[t][0]
-                Results[t]['sigma'] = std_lines[t][[1,2,3,4,6,5]]
-                # Results[t]['boussinesq'] = std_lines[t][[7,8,9,10,14,13,11,15,
+                results[t]['time'] = std_lines[t][0]
+                results[t]['sigma'] = std_lines[t][[1, 2, 3, 4, 6, 5]]
+                # results[t]['boussinesq'] = std_lines[t][[7,8,9,10,14,13,11,15,
                 #                                          12]]
-                # Results[t]['GL_strain'] = std_lines[t][[16,17,18,19,21,20]]
-                Results[t]['grad_u'] = std_lines[t][[22,23,24,25,29,28,26,30,
-                                                     27]]
-                Results[t]['sigma_rms'] = std_lines[t][[31,32,33,34,36,35]]
-                # Results[t]['boussinesq_rms'] = std_lines[t][[37,38,39,40,44,43,
+                # results[t]['GL_strain'] = std_lines[t][[16,17,18,19,21,20]]
+                results[t]['grad_u'] = std_lines[t][[22, 23, 24, 25, 29,
+                                                     28, 26, 30, 27]]
+                results[t]['sigma_rms'] = std_lines[t][[31, 32, 33, 34, 36, 35]]
+                # results[t]['boussinesq_rms'] = std_lines[t][[37,38,39,40,44,43,
                 #                                              41,45,42]]
-                # Results[t]['GL_strain_rms'] = std_lines[t][[46,47,48,49,51,50]]
-                Results[t]['grad_u_rms'] = std_lines[t][[52,53,54,55,59,58,56,
-                                                         60,57]]
+                # results[t]['GL_strain_rms'] = std_lines[t][[46,47,48,49,51,50]]
+                results[t]['grad_u_rms'] = std_lines[t][[52, 53, 54, 55, 59,
+                                                         58, 56, 60, 57]]
                 for key, value in varInt_names.items():
-                    Results[t][key] = std_lines[t][value]
+                    results[t][key] = std_lines[t][value]
         else:
-            for t in range(N_rows):
-                Results[t]['time'] = std_lines[t][0]
-                Results[t]['sigma'][0:3] = std_lines[t][[1,2,3]]
-                Results[t]['sigma'][3:6] = 0.5*std_lines[t][[4,6,5]]
-                Results[t]['epsilon'][0:3] = std_lines[t][[7,8,9]]
-                Results[t]['epsilon'][3:6] = 0.5*std_lines[t][[10,12,11]]
-                Results[t]['sigma_rms'][0:3] = std_lines[t][[13,14,15]]
-                Results[t]['sigma_rms'][3:6] = 0.5*std_lines[t][[16,18,17]]
-                Results[t]['epsilon_rms'][0:3] = std_lines[t][[19,20,21]]
-                Results[t]['epsilon_rms'][3:6] = 0.5*std_lines[t][[22,24,23]]
+            for t in range(n_rows):
+                results[t]['time'] = std_lines[t][0]
+                results[t]['sigma'][0:3] = std_lines[t][[1,2,3]]
+                results[t]['sigma'][3:6] = 0.5*std_lines[t][[4,6,5]]
+                results[t]['epsilon'][0:3] = std_lines[t][[7,8,9]]
+                results[t]['epsilon'][3:6] = 0.5*std_lines[t][[10,12,11]]
+                results[t]['sigma_rms'][0:3] = std_lines[t][[13,14,15]]
+                results[t]['sigma_rms'][3:6] = 0.5*std_lines[t][[16,18,17]]
+                results[t]['epsilon_rms'][0:3] = std_lines[t][[19,20,21]]
+                results[t]['epsilon_rms'][3:6] = 0.5*std_lines[t][[22,24,23]]
                 for key, value in varInt_names.items():
-                    Results[t][key] = std_lines[t][value]
+                    results[t][key] = std_lines[t][value]
 
         if start is None:
             start = 0
         if stop is None:
-            stop = N_rows
+            stop = n_rows
         if step is None:
             step = 1
-        return Results[start:stop:step]
+        return results[start:stop:step]
 
     @staticmethod
     def load_amitex_output_fields(vtk_basename, grip_size=0, ext_size=0,
-                                   grip_dim=2, Boussinesq_stress=False,
-                                   Int_var_names=dict()):
+                                  grip_dim=2, boussinesq_stress=False,
+                                  Int_var_names=dict()):
         """Return stress/strain fields as numpy tensors from Amitex vtk output.
 
         This method loads stress, strain and internal variables output fields
@@ -160,11 +161,11 @@ class SDAmitexIO():
         infinitesimal strain hypothesis. It loads, by default, the Cauchy
         Stress and the Green-Lagrange strain tensor for a finite strain
         simulation. If requested, the Boussinesq (PKI) stress tensor can be
-        outputed.
+        output.
 
         :param vtk_basename: Basename of vtk stress/Strain fields to load.
             Fields names are outputed by Amitex with the following structure:
-            'basename' + '_field_component' + '_increment' + '.vtk'.
+            'base_name' + '_field_component' + '_increment' + '.vtk'.
         :type vtk_basename: str
         :param int grip_size: Width in voxels of the material layer used in
             simulation unit cell for tension grips
@@ -172,7 +173,7 @@ class SDAmitexIO():
             simulate free surfaces.
         :param int grip_dim: Dimension along which the tension test has been
             simulated (0:x, 1:y, 2:z)
-        :param bool Boussinesq_stress: if `True`, return the Boussinesq stress
+        :param bool boussinesq_stress: if `True`, return the Boussinesq stress
             tensor fields for finite strain simulations instead of the Cauchy
             stress tensor.
         :return Stress: Cauchy stress tensors dict read from output or
@@ -235,7 +236,7 @@ class SDAmitexIO():
         # Fill strain dict with output
         for file in eps_files:
             eps_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
-            increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
+            increment = int(incr_pattern.findall(file)[0].strip('.vtk'))
             comp_list = comp_pattern.findall(file)
             if len(comp_list) == 0:
                 # all components are within the same vtk file
@@ -274,7 +275,7 @@ class SDAmitexIO():
             Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
                 init_shape=sig_tmp.shape, grip_size=grip_size, grip_dim=grip_dim,
                 ext_size=ext_size)
-            if finite_strain and Boussinesq_stress:
+            if finite_strain and boussinesq_stress:
                 sig_shape = (Sl[0,1] - Sl[0,0], Sl[1,1] - Sl[1,0],
                              Sl[2,1] - Sl[2,0], 9)
             else:
@@ -297,7 +298,7 @@ class SDAmitexIO():
                 component = int(comp_list[0].strip('sig')) - 1
                 # change component to comply to pymicro convention
                 component = SDAmitexIO.get_sd_comp_from_amitex_comp(
-                                component, finite_strain and Boussinesq_stress)
+                                component, finite_strain and boussinesq_stress)
                 Stress_dict[increment][...,component] = sig_tmp
             else:
                 raise ValueError(f' Vtk file {file} name has an invalid'
@@ -371,7 +372,7 @@ class SDAmitexIO():
         :type output_slice: numpy array (3,2)
         :return: Return a dict. of the amitex_fftp output fields stored in
             the vtk. file, whose keys are the field names.
-        :rtype: dict( 'fieldname':np.double array)
+        :rtype: dict( 'field_name':np.double array)
         """
         # local imports
         from vtk.util import numpy_support
@@ -383,7 +384,7 @@ class SDAmitexIO():
         reader.Update()
         # read raw data
         Array = reader.GetOutput().GetCellData().GetArray(0)
-        # spacing = reader.GetOutput().GetSpacing()
+        spacing = reader.GetOutput().GetSpacing()
         dim = reader.GetOutput().GetDimensions()
         output_shape = tuple([i-1 for i in dim])
         data = numpy_support.vtk_to_numpy(Array)
@@ -393,7 +394,46 @@ class SDAmitexIO():
             data = data[output_slice[0,0]:output_slice[0,1],
                         output_slice[1,0]:output_slice[1,1],
                         output_slice[2,0]:output_slice[2,1],...]
-        return data
+        return data, spacing
+    
+    def write_vtk_legacy(array, vtk_path='output', spacing=1,
+                         array_name="mat_id"):
+        """ Writes a vtk legacy file from a numpy array
+
+        :param array: Numpy array to write as binary image
+        :type array: numpy array 
+        :param output_name: path of the vtk file to write
+        :type output_name: string
+
+        """
+        from vtk.util import numpy_support
+        
+        # transform data to vtk data array
+        vtk_data_array = numpy_support.numpy_to_vtk(np.ravel(array, order='F'),
+                                                    deep=1)
+        vtk_data_array.SetName(array_name)
+        
+        # Init VTK regular grid 
+        if len(spacing) == 1:
+            voxel_size = np.array([spacing, spacing, spacing])
+        else:
+            voxel_size = spacing
+            
+        grid = vtk.vtkImageData()
+        size = array.shape
+        grid.SetExtent(0, size[0], 0, size[1], 0, size[2])
+        grid.GetCellData().SetScalars(vtk_data_array)
+        grid.SetSpacing(voxel_size[0], voxel_size[1], voxel_size[2])
+        
+        # Init vtk writer and write file
+        writer = vtk.vtkStructuredPointsWriter()
+        writer.SetFileName('%s.vtk' % vtk_path)
+        writer.SetFileTypeToBinary()
+        writer.SetInputData(grid)
+        writer.Write()
+        
+        print(f'File {vtk_path}.vtk written as VTK legacy file')
+        return
 
     @staticmethod
     def get_amitex_tension_test_relevant_slice(init_shape, grip_size=1,

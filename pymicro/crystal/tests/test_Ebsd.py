@@ -20,7 +20,8 @@ class EbsdTests(unittest.TestCase):
                 self.scan.euler[i * 5:(i + 1) * 5, j * 5:(j + 1) * 5, 0] = phi1
                 self.scan.euler[i * 5:(i + 1) * 5, j * 5:(j + 1) * 5, 1] = Phi
                 self.scan.euler[i * 5:(i + 1) * 5, j * 5:(j + 1) * 5, 2] = phi2
-        self.scan.ci = 1.0  # mark all pixels as good
+        self.scan.ci += 1.0  # mark all pixels as good
+        self.scan.phase += 1  # mark all pixels as belonging to phase 1
         self.scan.euler.shape
 
     def test_segment_grains(self):

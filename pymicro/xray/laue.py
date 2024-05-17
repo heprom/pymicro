@@ -5,6 +5,7 @@ from math import cos, sin, tan, atan2, pi
 from pymicro.crystal.lattice import HklPlane, Symmetry, HklDirection, HklObject
 from pymicro.crystal.microstructure import Orientation
 from pymicro.xray.xray_utils import lambda_nm_to_keV, lambda_keV_to_nm
+from pymicro.xray.experiment import ForwardSimulation, Experiment
 from pymicro.xray.dct import add_to_image
 import os
 
@@ -37,35 +38,48 @@ def select_lambda(hkl, orientation, Xu=(1., 0., 0.), verbose=False):
     return the_energy, theta
 
 
-def build_list(lattice=None, max_miller=3, extinction=None, Laue_extinction=False, max_keV=120.):
-    hklplanes = []
+def build_list(lattice=None, max_miller=3, extinction=None, max_keV=None):
+    """Build a list of lattice planes.
+
+    This function build a list of `HklPlane` instances.
+
+    :param Lattice lattice: the crystal lattice associated with the planes.
+    :param int max_miller: the maximum miller index to consider.
+    :param bool extinction: a flag to consider extinction rule when building
+    the list (only FCC and BCC available).
+    :param float max_keV: if specified, only add a plane if it respects
+    the Ewald condition.
+    :return: a list of the hkl planes.
+    """
+    hkl_planes = []
     indices = range(-max_miller, max_miller + 1)
     for h in indices:
         for k in indices:
             for l in indices:
+                hkl = HklPlane(h, k, l, lattice)
                 if h == k == l == 0:  # skip (0, 0, 0)
                     continue
-                if not extinction :
-                    hklplanes.append(HklPlane(h, k, l, lattice))
-                if extinction == 'FCC':
+                if max_keV:
+                    # check the Ewald condition
+                    lambda_min = lambda_keV_to_nm(max_keV)
+                    if hkl.interplanar_spacing() > lambda_min / 2:
+                        continue
+                if not extinction:
+                    hkl_planes.append(hkl)
+                elif extinction == 'FCC':
                     # take plane if only all odd or all even hkl indices
-                    if (h % 2 == 0 and k % 2 == 0 and l % 2 == 0) or (h % 2 == 1 and k % 2 == 1 and l % 2 == 1):
-                        hklplanes.append(HklPlane(h, k, l, lattice))
-                if extinction == 'BCC':
+                    if (h % 2 == 0 and k % 2 == 0 and l % 2 == 0) or \
+                            (h % 2 == 1 and k % 2 == 1 and l % 2 == 1):
+                        hkl_planes.append(hkl)
+                elif extinction == 'BCC':
                     # take plane only if the sum indices is even
-                    if ((h**2 + k**2 + l**2) % 2 == 0):
-                        hklplanes.append(HklPlane(h, k, l, lattice))
-    if Laue_extinction is True:
-        lam_min = lambda_keV_to_nm(max_keV)
-        val = 2. * lattice._lengths[0] / lam_min # lattice have to be cubic !
-        print('Limit value is %d' % val)
-        for hkl in hklplanes:
-            (h, k, l) = hkl.miller_indices()
-            test = h ** 2 + k ** 2 + l ** 2
-            if val < test: # TODO check the test
-                hklplanes.remove(HklPlane(h, k, l, lattice))
-
-    return hklplanes
+                    if (h + k + l) % 2 == 0:
+                        hkl_planes.append(hkl)
+                elif extinction == 'HCP':
+                    # take plane only if l is even and h + 2k is not a multiple of 3
+                    if l % 2 == 0 and not (h + k) % 3 == 0:
+                        hkl_planes.append(hkl)
+    return hkl_planes
 
 
 def compute_ellipsis(orientation, detector, uvw, Xu=(1., 0., 0.), n=101, verbose=False):
@@ -236,6 +250,130 @@ def diffracted_intensity(hkl, I0=1.0, symbol='Ni', verbose=False):
         print('q=%f in nm^-1 -> fa=%.3f' % (q, fa))
         print('intensity:', I)
     return I
+
+
+def Alexiane_compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1., 0., 0.]),
+                                  use_friedel_pair=False,
+                                  spectrum=None, spectrum_thr=0., r_spot=5, color_field='constant', inverted=False,
+                                  show_direct_beam=False, extract_infos=False, verbose=False):
+    """
+    Compute a transmission Laue pattern. The data array of the given
+    `Detector2d` instance is initialized with the result.
+
+    The incident beam is assumed to be along the X axis: (1, 0, 0) but can be changed to any direction.
+    The crystal can have any orientation using an instance of the `Orientation` class.
+    The `Detector2d` instance holds all the geometry (detector size and position).
+
+    A parameter controls the meaning of the values in the diffraction spots in the image. It can be just a constant
+    value, the diffracted beam energy (in keV) or the intensity as computed by the :py:meth:`diffracted_intensity`
+    method.
+
+    :param orientation: The crystal orientation.
+    :param detector: An instance of the Detector2d class.
+    :param list hkl_planes: A list of the lattice planes to include in the pattern.
+    :param Xu: The unit vector of the incident X-ray beam (default along the X-axis).
+    :param bool use_friedel_pair: also consider the Friedel pair of each lattice plane in the list as candidate for diffraction.
+    :param spectrum: A two columns array of the spectrum to use for the calculation.
+    :param float spectrum_thr: The threshold to use to determine if a wave length is contributing or not.
+    :param int r_spot: Size of the spots on the detector in pixel (5 by default)
+    :param str color_field: a traing describing, must be 'constant', 'energy' or 'intensity'
+    :param bool inverted: A flag to control if the pattern needs to be inverted.
+    :param bool show_direct_beam: A flag to control if the direct beam is shown.
+    :param bool verbose: activate verbose mode (False by default).
+    :return: the computed pattern as a numpy array.
+    """
+    # import pandas as pd
+    detector.data = np.zeros(detector.size, dtype=np.float32)
+    # create a small square image for one spot
+    spot = np.ones((2 * r_spot + 1, 2 * r_spot + 1), dtype=np.uint8)
+    max_val = np.iinfo(np.uint8).max  # 255 here
+    if show_direct_beam:
+        direct_beam_lab = detector.project_along_direction(Xu)
+        direct_beam_pix = detector.lab_to_pixel(direct_beam_lab)[0]
+        add_to_image(detector.data, max_val * 3 * spot, (direct_beam_pix[0], direct_beam_pix[1]))
+    if spectrum is not None:
+        print('using spectrum')
+        # indices = np.argwhere(spectrum[:, 1] > spectrum_thr)
+        E_min = min(spectrum)  # float(spectrum[indices[0], 0])
+        E_max = max(spectrum)  # float(spectrum[indices[-1], 0])
+        lambda_min = lambda_keV_to_nm(E_max)
+        lambda_max = lambda_keV_to_nm(E_min)
+        # if verbose:
+        print('energy bounds: [{0:.1f}, {1:.1f}] keV'.format(E_min, E_max))
+
+    infos = []
+    for hkl in hkl_planes:
+        (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=True)
+        print(the_energy, theta)
+        if the_energy < 0:
+            if use_friedel_pair:
+                if verbose:
+                    print('switching to Friedel pair')
+                hkl = hkl.friedel_pair()
+                (the_energy, theta) = select_lambda(hkl, orientation, Xu=Xu, verbose=False)
+            else:
+                continue
+        assert (the_energy >= 0)
+        if spectrum is not None:
+            if the_energy < E_min or the_energy > E_max:
+                # print('skipping reflection {0:s} which would diffract at {1:.1f}'.format(hkl.miller_indices(),
+                # abs(the_energy)))
+                continue
+                # print('including reflection {0:s} which will diffract at {1:.1f}'.format(hkl.miller_indices(), abs(the_energy)))
+        K = diffracted_vector(hkl, orientation, Xu=Xu, use_friedel_pair=False, verbose=verbose)
+        if K is None or np.dot(Xu, K) == 0:
+            continue  # skip diffraction // to the detector
+        d = np.dot((detector.ref_pos - np.array([0., 0., 0.])), detector.w_dir) / np.dot(K, detector.w_dir)
+        print(K, d)
+
+        if d < 0:
+            if verbose:
+                print('skipping diffraction not towards the detector')
+            continue
+        R = detector.project_along_direction(K, origin=[0., 0., 0.])
+        (u, v) = detector.lab_to_pixel(R)[0]
+        print(hkl.miller_indices(), K, R, u, v)
+        if verbose and u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
+            print('* %d.%d.%d reflexion' % hkl.miller_indices())
+            print('diffracted beam will hit the detector at (%.3f, %.3f) mm or (%d, %d) pixels' % (R[1], R[2], u, v))
+            print('diffracted beam energy is {0:.1f} keV'.format(abs(the_energy)))
+            print('Bragg angle is {0:.2f} deg'.format(abs(theta * 180 / pi)))
+        # mark corresponding pixels on the image detector
+        if color_field == 'constant':
+            add_to_image(detector.data, max_val * spot, (u, v))
+        elif color_field == 'energy':
+            add_to_image(detector.data, abs(the_energy) * spot.astype(float), (u, v))
+        elif color_field == 'intensity':
+            I = diffracted_intensity(hkl, I0=max_val, verbose=verbose)
+            add_to_image(detector.data, I * spot, (u, v))
+        else:
+            raise ValueError('unsupported color_field: %s' % color_field)
+
+        if u >= 0 and u < detector.size[0] and v >= 0 and v < detector.size[1]:
+            # Get the data of the reflection collected by the detector
+            infos.append((hkl.miller_indices(), the_energy, np.degrees(theta), K, d, R, u, v))
+
+    if inverted:
+        # np.invert works only with integer types
+        print('casting to uint8 and inverting image')
+        # limit maximum to max_val (255) and convert to uint8
+        over = detector.data > 255
+        detector.data[over] = 255
+        detector.data = detector.data.astype(np.uint8)
+        detector.data = np.invert(detector.data)
+
+    # if extract_infos is True:
+    #    df = pd.DataFrame(infos, columns=['hkl', 'keV', '2thetas', 'K', 'd', 'R', 'u', 'v'])
+    #    return detector.data, df
+    # else:
+    #    return detector.data
+    if extract_infos is True:
+        my_infos = infos
+        # df = pd.DataFrame(infos, columns=['hkl', 'keV', '2thetas', 'K', 'd', 'R', 'u', 'v'])
+        # return detector.data, df
+        return detector.data, my_infos
+    else:
+        return detector.data
 
 
 def compute_Laue_pattern(orientation, detector, hkl_planes=None, Xu=np.array([1., 0., 0.]), use_friedel_pair=False,
@@ -537,24 +675,6 @@ def triplet_indexing(OP, angles_exp, angles_th, tol=1.0, verbose=False):
     return OP_indexed
 
 
-def transformation_matrix(hkl_plane_1, hkl_plane_2, xyz_normal_1, xyz_normal_2):
-    # create the vectors representing this frame in the crystal coordinate system
-    e1_hat_c = hkl_plane_1.normal()
-    e2_hat_c = np.cross(hkl_plane_1.normal(), hkl_plane_2.normal()) / np.linalg.norm(
-        np.cross(hkl_plane_1.normal(), hkl_plane_2.normal()))
-    e3_hat_c = np.cross(e1_hat_c, e2_hat_c)
-    e_hat_c = np.array([e1_hat_c, e2_hat_c, e3_hat_c])
-    # create local frame attached to the indexed crystallographic features in XYZ
-    e1_hat_star = xyz_normal_1
-    e2_hat_star = np.cross(xyz_normal_1, xyz_normal_2) / np.linalg.norm(
-        np.cross(xyz_normal_1, xyz_normal_2))
-    e3_hat_star = np.cross(e1_hat_star, e2_hat_star)
-    e_hat_star = np.array([e1_hat_star, e2_hat_star, e3_hat_star])
-    # now build the orientation matrix
-    orientation_matrix = np.dot(e_hat_c.T, e_hat_star)
-    return orientation_matrix
-
-
 def confidence_index(votes):
     n = np.sum(votes)  # total number of votes
     v1 = max(votes)
@@ -668,7 +788,7 @@ def index(hkl_normals, hkl_planes, tol_angle=0.5, tol_disorientation=1.0, symmet
         # a given indexed triplet allow to construct 3 orientation matrices (which should be identical)
         pos = [[0, 1, 3, 4], [1, 2, 4, 5], [2, 0, 5, 3]]
         for j in range(3):
-            orientation_matrix = transformation_matrix(
+            orientation_matrix = Orientation.transformation_matrix(
                 hkl_planes[normal_indexed[i][pos[j][2]]], hkl_planes[normal_indexed[i][pos[j][3]]],
                 hkl_normals[normal_indexed[i][pos[j][0]]], hkl_normals[normal_indexed[i][pos[j][1]]])
         # move to the fundamental zone
@@ -760,17 +880,18 @@ def diffracting_normals_vector(gnom):
 
     return hkl_normals
 
-from pymicro.xray.experiment import ForwardSimulation, Experiment
 
 class LaueForwardSimulation(ForwardSimulation):
     """Class to represent a Forward Simulation."""
 
     def __init__(self, verbose=False):
-        super(LaueForwardSimulation, self).__init__('laue', verbose=verbose)
+        ForwardSimulation.__init__(self, 'laue', verbose=verbose)
         self.hkl_planes = []
+        # omega: rotation angle (degrees) around the vertical axis.
+        self.omega = 0.
         self.max_miller = 5
         self.use_energy_limits = False
-        self.exp = Experiment()
+        self.exp = None
 
     def set_experiment(self, experiment):
         """Attach an X-ray experiment to this simulation."""
@@ -788,52 +909,70 @@ class LaueForwardSimulation(ForwardSimulation):
         pass
 
     @staticmethod
-    def fsim_laue(orientation, hkl_planes, positions, source_position):
-        """Simulate Laue diffraction conditions based on a crystal orientation, a set of lattice planes and physical
-        positions.
+    def fsim_laue(orientation, hkl_planes, positions, source_position, omega):
+        """Simulate Laue diffraction conditions based on a crystal orientation,
+        a set of lattice planes and physical positions.
 
-        This function is the work horse of the forward model. It uses a set of HklPlane instances and the voxel
-        coordinates to compute the diffraction quantities.
+        This function is the work horse of the forward model. It uses a set of
+        HklPlane instances and the voxel coordinates to compute the diffraction
+        quantities.
 
         :param Orientation orientation: the crystal orientation.
         :param list hkl_planes: a list of `HklPlane` instances.
         :param list positions: a list of (x, y, z) positions.
         :param tuple source_position: a (x, y, z) tuple describing the source position.
+        :param omega: rotation angle (degrees) around the vertical axis.
         """
         n_hkl = len(hkl_planes)
         n_vox = len(positions)
         gt = orientation.orientation_matrix().transpose()
 
-        # here we use list comprehension to avoid for loops
-        d_spacings = [hkl.interplanar_spacing() for hkl in hkl_planes]  # size n_hkl
-        G_vectors = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
-        Gs_vectors = [gt.dot(Gc) for Gc in G_vectors]  # size n_hkl, with 3 elements items
-        Xu_vectors = [(pos - source_position) / np.linalg.norm(pos - source_position)
-                      for pos in positions]  # size n_vox
-        thetas = [np.arccos(np.dot(Xu, Gs / np.linalg.norm(Gs))) - np.pi / 2
-                  for Xu in Xu_vectors
-                  for Gs in Gs_vectors]  # size n_vox * n_hkl
-        the_energies = [lambda_nm_to_keV(2 * d_spacings[i_hkl] * np.sin(thetas[i_Xu * n_hkl + i_hkl]))
-                        for i_Xu in range(n_vox)
-                        for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-        X_vectors = [np.array(Xu_vectors[i_Xu]) / 1.2398 * the_energies[i_Xu * n_hkl + i_hkl]
-                     for i_Xu in range(n_vox)
-                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-        K_vectors = [X_vectors[i_Xu * n_hkl + i_hkl] + Gs_vectors[i_hkl]
-                     for i_Xu in range(n_vox)
-                     for i_hkl in range(n_hkl)]  # size n_vox * n_hkl
-        return Xu_vectors, thetas, the_energies, X_vectors, K_vectors
+        # here we use vectorized code to speed things up
+        d_spacings = [hkl.interplanar_spacing() for hkl in hkl_planes]
+        d_spacings = np.repeat(d_spacings, n_vox, axis=0).reshape((n_hkl, n_vox)).T.ravel()
 
-    def fsim_grain(self, gid=1):
-        self.grain = self.exp.get_sample().get_microstructure().get_grain(gid)
+        # compute G vectors
+        G_hkl = [hkl.scattering_vector() for hkl in hkl_planes]  # size n_hkl, with 3 elements items
+        G = np.matmul(np.array(G_hkl), gt.T)
+        if omega != 0.:
+            omegar = omega * np.pi / 180
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                          [np.sin(omegar), np.cos(omegar), 0],
+                          [0, 0, 1]])
+            G = np.matmul(G, R.T)
+        G_vectors = np.repeat(G, n_vox, axis=0).reshape((n_hkl, n_vox, 3)) \
+            .transpose(1, 0, 2).reshape((n_hkl * n_vox, 3))
+
+        # now compute X vectors, Bragg angles and energies
+        G /= np.linalg.norm(G, axis=1).reshape((G.shape[0], 1))
+        X = positions - source_position
+        X /= np.linalg.norm(X, axis=1).reshape((X.shape[0], 1))
+        thetas = (np.arccos(np.matmul(X, G.T)) - np.pi / 2).ravel()  # size n_vox * n_hkl
+        the_energies = 1.2398 / (2 * d_spacings * np.sin(thetas))
+        X_vectors = np.repeat(X, n_hkl, axis=0) / 1.2398 * the_energies.reshape((the_energies.shape[0], 1))
+
+        # compute diffraction vectors and project them on the detector
+        K_vectors = X_vectors + G_vectors
+
+        # return all the diffraction informations
+        return thetas, the_energies, X_vectors, K_vectors
+
+    def fsim_grain_legacy(self, gid=1):
+        """Forward diffraction simulation for a given grain.
+
+        This method is the legacy code, it works well but is slow due to the
+        numerous for loops involved. It is recommended to use the `fsim_grain`
+        instead.
+        """
         sample = self.exp.get_sample()
-        lattice = sample.get_microstructure().get_lattice()
+        self.grain = sample.get_grain(gid)
+        lattice = sample.get_lattice()
         source = self.exp.get_source()
         detector = self.exp.get_active_detector()
         data = np.zeros_like(detector.data)
         if self.verbose:
             print('Forward Simulation for grain %d' % self.grain.id)
-        sample.geo.discretize_geometry(grain_id=self.grain.id)
+        self.sample_geo.discretize_geometry(grain_id=self.grain.id)
         # we use either the hkl planes for this grain or the ones defined for the whole simulation
         if hasattr(self.grain, 'hkl_planes') and len(self.grain.hkl_planes) > 0:
             print('using hkl from the grain')
@@ -844,10 +983,11 @@ class LaueForwardSimulation(ForwardSimulation):
                 self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
             hkl_planes = self.hkl_planes
         n_hkl = len(hkl_planes)
-        positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
+        self.sample_geo.discretize_geometry(grain_id=gid)
+        positions = self.sample_geo.get_positions()  # size n_vox, with 3 elements items
         n_vox = len(positions)
         Xu_vectors, thetas, the_energies, X_vectors, K_vectors = LaueForwardSimulation.fsim_laue(
-            self.grain.orientation, hkl_planes, positions, source.position)
+            self.grain.orientation, hkl_planes, positions, source.position, self.omega)
         OR_vectors = [detector.project_along_direction(origin=positions[i_vox],
                                                        direction=K_vectors[i_vox * n_hkl + i_hkl])
                       for i_vox in range(n_vox)
@@ -873,21 +1013,126 @@ class LaueForwardSimulation(ForwardSimulation):
                 data[uv[k][0], uv[k][1]] += 1
         return data
 
+    def select_hkl_planes(self, hkl_planes, gid=1, margin=10):
+        """Filter the list of hkl planes to keep only the ones diffracting
+        on the detector.
+
+        :param list hkl_planes: the list of hkl plane to filter.
+        :param int gid: the grain id to use.
+        :param int margin: a pixel margin to take into account.
+        :return: the list of hkl planes diffraction on the detector within
+        the margin.
+        """
+        sample = self.exp.get_sample()
+        detector = self.exp.get_active_detector()
+        positions = sample.get_grain_centers(id_list=[gid])
+        if self.omega != 0.:
+            # rotate grain centers
+            omegar = self.omega * np.pi / 180
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                          [np.sin(omegar), np.cos(omegar), 0],
+                          [0, 0, 1]])
+            positions = np.dot(R, positions.T).T
+        _, _, _, K_vectors = LaueForwardSimulation.fsim_laue(sample.get_grain(gid).orientation,
+                                                             hkl_planes,
+                                                             positions,
+                                                             self.exp.get_source().position,
+                                                             self.omega)
+        origins = np.repeat(positions, len(hkl_planes), axis=0)
+        OR_vectors = detector.project_along_directions(K_vectors, origins)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+        # look at which hkl plane diffracts on the detector within the given margin
+        on_det = np.where((-margin < uv[:, 0]) &
+                          (uv[:, 0] < detector.get_size_px()[0] + margin) &
+                          (-margin < uv[:, 1]) &
+                          (uv[:, 1] < detector.get_size_px()[1] + margin))
+        print('%d diffraction planes on the detector among %d' % (len(on_det[0]), len(uv)))
+        hkl_planes_dif = [hkl_planes[i] for i in on_det[0]]
+        return hkl_planes_dif
+
+    def fsim_grain(self, gid=1):
+        """Forward simulation for a given grain.
+
+        Optimized version with matrix multiplication.
+
+        :param int gid: the grain id number to simulate.
+        """
+        sample = self.exp.get_sample()
+        self.grain = sample.get_grain(gid)
+        lattice = sample.get_lattice()
+        source = self.exp.get_source()
+        detector = self.exp.get_active_detector()
+        data = np.zeros_like(detector.data)
+        if self.verbose:
+            print('Forward Simulation for grain %d' % self.grain.id)
+        self.sample_geo.discretize_geometry(grain_id=self.grain.id)
+
+        # we use either the hkl planes for this grain or the ones defined for the whole simulation
+        if hasattr(self.grain, 'hkl_planes') and len(self.grain.hkl_planes) > 0:
+            print('using hkl from the grain')
+            hkl_planes = [HklPlane(h, k, l, lattice) for (h, k, l) in self.grain.hkl_planes]
+        else:
+            if len(self.hkl_planes) == 0:
+                print('warning: no reflection defined for this simulation, using all planes with max miller=%d' % self.max_miller)
+                self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
+            hkl_planes = self.hkl_planes
+        # preprocess hkl planes by filtering out the ones not diffracting close to the detector
+        hkl_planes = self.select_hkl_planes(hkl_planes, gid=gid)
+        n_hkl = len(hkl_planes)
+        print('after filtering we have %d hkl planes for this grain' % n_hkl)
+        if n_hkl == 0:
+            return data
+        positions = self.sample_geo.get_positions()  # size n_vox, with 3 elements items
+        if self.omega != 0.:
+            omegar = self.omega * np.pi / 180
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])
+            positions = np.dot(R, positions.T).T
+
+        # call the fsim_laue function
+        thetas, the_energies, X_vectors, K_vectors = LaueForwardSimulation.fsim_laue(
+            self.grain.orientation, hkl_planes, positions, source.position, self.omega)
+
+        # with diffraction informations, project them on the detector
+        origins = np.repeat(positions, n_hkl, axis=0)
+        OR_vectors = detector.project_along_directions(K_vectors, origins)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+
+        # now construct a boolean list to select the diffraction spots
+        # FIXME handle case when min and max energies not set
+        on_det = np.where((0 < uv[:, 0]) &
+                          (uv[:, 0] < detector.get_size_px()[0]) &
+                          (0 < uv[:, 1]) &
+                          (uv[:, 1] < detector.get_size_px()[1]) &
+                          (source.min_energy < the_energies) &
+                          (the_energies < source.max_energy))
+        if self.verbose:
+            print('%d diffraction events on the detector among %d' % (len(on_det[0]), len(uv)))
+
+        # now sum the counts on the detector individual pixels
+        for spot in uv[on_det]:
+            data[spot[0], spot[1]] += 1
+        return data
+
     def fsim(self):
-        """run the forward simulation.
+        """Run the forward simulation.
 
         If the sample has a CAD type of geometry, a single grain (the first from the list) is assumed. In the other
         cases all the grains from the microstructure are used. In particular, if the microstructure has a grain map,
         it can be used to carry out an extended sample simulation.
         """
+        import time
+        t0 = time.time()
         full_data = np.zeros_like(self.exp.get_active_detector().data)
-        micro = self.exp.get_sample().get_microstructure()
+        sample = self.exp.get_sample()
         # for cad geometry we assume only one grain (the first in the list)
-        if self.exp.get_sample().geo.geo_type == 'cad':
-            full_data += self.fsim_grain(gid=micro.grains[0].id)
+        if self.sample_geo.geo_type == 'cad':
+            full_data += self.fsim_grain(gid=sample.grains[0]['idnumber'])
         else:
             # in the other cases, we use all the grains defined in the microstructure
-            for grain in micro.grains:
-                full_data += self.fsim_grain(gid=grain.id)
+            for grain_id in sample.get_grain_ids():
+                full_data += self.fsim_grain(gid=grain_id)
+        if self.verbose:
+            duration = int(time.time() - t0)
+            print('forward simulation duration: {:d} seconds'.format(duration))
         return full_data
 

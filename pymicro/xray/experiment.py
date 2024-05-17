@@ -3,7 +3,7 @@ from json import JSONEncoder
 import numpy as np
 import os
 from pymicro.xray.detectors import Detector2d, RegArrayDetector2d
-from pymicro.crystal.lattice import Lattice, Symmetry
+from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase
 from pymicro.crystal.microstructure import Microstructure, Grain, Orientation
 
 
@@ -13,20 +13,44 @@ class ForwardSimulation:
     def __init__(self, sim_type, verbose=False):
         self.sim_type = sim_type
         self.verbose = verbose
+        self.sample_geo = ObjectGeometry(geo_type='point')
         self.exp = Experiment()
+
+    def set_sample_geo_type(self, geo_type='point'):
+        """Set the type of geometry to consider for this sample.
+
+        The Forward simulation models can use different geometry types depending
+        on the results expected and also on the sample associated with the
+        experiment.
+
+        :param str geo_type: a string describing the sample geometry, must be
+            one of 'point', 'array', 'cad'.
+        """
+        if geo_type not in ['point', 'cad', 'array']:
+            raise ValueError('parameter geo_type must be point, array or cad.')
+        self.sample_geo.set_type('array')
+        if geo_type == 'array' and hasattr(self.exp, 'sample') \
+                and not self.exp.get_sample()._is_empty('grain_map'):
+            self.sample_geo.set_array(self.exp.get_sample().get_grain_map(),
+                                      self.exp.get_sample().get_voxel_size())
 
     def set_experiment(self, experiment):
         """Attach an X-ray experiment to this simulation."""
         self.exp = experiment
+
+    def set_sample(self, sample):
+        """Set the sample for the experiment """
+        self.exp.set_sample(sample)
 
 
 class XraySource:
     """Class to represent a X-ray source."""
 
     def __init__(self, position=None):
+        self.position = np.array([0., 0., 0.])
         self.set_position(position)
-        self._min_energy = None
-        self._max_energy = None
+        self._min_energy = 0.
+        self._max_energy = 450.
 
     def set_position(self, position):
         if position is None:
@@ -167,7 +191,7 @@ class ObjectGeometry:
          to set the cad geometry must be the path to the STL file.
         """
         if self.geo_type == 'point':
-            self.positions = np.array(self.origin)
+            self.positions = np.array(self.origin).reshape((1, len(self.origin)))
         elif self.geo_type == 'array':
             vx, vy, vz = self.array.shape  # number of voxels
             print(vx, vy, vz)
@@ -197,33 +221,28 @@ class ObjectGeometry:
             self.positions = xyz[np.where(is_in.ravel())]
 
 
-class Sample:
+class Sample(Microstructure):
     """Class to describe a material sample.
 
-    A sample is made by a given material (that may have multiple phases), has a name and a position in the experimental
-    local frame. A sample also has a geometry (just a point by default), that may be used to discretize the volume
-    in space or display it in 3D.
+    A sample extends the Microstructure class to combine all material constants
+    such as crystal lattice parameters, crystal symmetrie and the geometrical
+    description of the sample with grain, phase and orientation maps.
 
-    .. note::
-
-      For the moment, the material is simply a crystal lattice.
+    A sample also has a geometry (which can be just a point), and a position in
+    real space.
     """
 
-    def __init__(self, name=None, position=None, geo=None, material=None, microstructure=None):
-        self.name = name
-        self.data_dir = '.'
+    def __init__(self, filename=None, name=None, material=None, position=None,
+                 geo=None, overwrite_hdf5=False):
+        if filename is None and name is None:
+            # Create random name to avoid opening another microstructure with
+            # same file name when initializing another sample
+            randint = str(np.random.randint(1, 10000 + 1))
+            name = 'tmp_micro_' + randint
+        Microstructure.__init__(self, filename=filename, name=name,
+                                phase=material, overwrite_hdf5=overwrite_hdf5)
         self.set_position(position)
-        self.set_geometry(geo)
-        self.set_material(material)
-        self.set_microstructure(microstructure)
-        self.grain_ids_path = None
-
-    def set_name(self, name):
-        """Set the sample name.
-
-        :param str name: The sample name.
-        """
-        self.name = name
+        #self.set_geometry(geo)
 
     def set_position(self, position):
         """Set the sample reference position.
@@ -234,24 +253,15 @@ class Sample:
             position = (0., 0., 0.)
         self.position = np.array(position)
 
-    def set_geometry(self, geo):
-        """Set the geometry of this sample.
-
-        :param ObjectGeometry geo: A vector (tuple or array form) describing the sample position.
-        """
-        if geo is None:
-            geo = ObjectGeometry()
-        assert isinstance(geo, ObjectGeometry) is True
-        self.geo = geo
-
     def get_material(self):
-        return self.material
+        return self.get_phase()
 
     def set_material(self, material):
         if material is None:
-            material = Lattice.cubic(1.0)
-        self.material = material
+            material = CrystallinePhase()
+        self.set_phase(material)
 
+    '''
     def get_microstructure(self):
         return self.microstructure
 
@@ -263,20 +273,21 @@ class Sample:
             microstructure = Microstructure(name='tmp_micro_'+randint,
                                             autodelete=True, verbose=True)
         self.microstructure = microstructure
+    '''
+
     def has_grains(self):
         """Method to see if a sample has at least one grain in the microstructure.
 
         :return: True if the sample has at east one grain, False otherwise."""
-        return self.microstructure.grains.nrows > 0
+        return self.grains.nrows > 0
 
-    def get_grain_ids(self):
-        return self.microstructure.grain_map
 
 class Experiment:
     """Class to represent an actual or a virtual X-ray experiment.
 
-    A cartesian coordinate system (X, Y, Z) is associated with the experiment. By default X is the direction of X-rays
-    and the sample is placed at the origin (0, 0, 0).
+    A cartesian coordinate system (X, Y, Z) is associated with the experiment.
+    By default X is the direction of X-rays and the sample is placed at the
+    origin (0, 0, 0).
     """
 
     def __init__(self):
@@ -336,11 +347,10 @@ class Experiment:
         :param bool set_result_to_detector: if True, the result is assigned to the current detector.
         :param fs: An instance of `ForwardSimulation` or its derived class.
         """
+        fs.set_experiment(self)
         if fs.sim_type == 'laue':
-            fs.set_experiment(self)
             result = fs.fsim()
         elif fs.sim_type == 'dct':
-            fs.set_experiment(self)
             result = fs.dct_projection()
         else:
             print('wrong type of simulation: %s' % fs.sim_type)
@@ -363,51 +373,59 @@ class Experiment:
 
     @staticmethod
     def load(file_path='experiment.txt'):
+        """Load an experimental configuration from a text file."""
         with open(file_path, 'r') as f:
+            # load all the json file content in a dictionary
             dict_exp = json.load(f)
-        name = dict_exp['Sample']['Name']
-        sample = Sample(name=name)
-        sample.data_dir = dict_exp['Sample']['Data Dir']
-        sample.set_position(dict_exp['Sample']['Position'])
-        if 'Geometry' in dict_exp['Sample']:
-            sample_geo = ObjectGeometry()
-            sample_geo.set_type(dict_exp['Sample']['Geometry']['Type'])
-            sample.set_geometry(sample_geo)
-        if 'Material' in dict_exp['Sample']:
-            a, b, c = dict_exp['Sample']['Material']['Lengths']
-            alpha, beta, gamma = dict_exp['Sample']['Material']['Angles']
-            centering = dict_exp['Sample']['Material']['Centering']
-            symmetry = Symmetry.from_string(dict_exp['Sample']['Material']['Symmetry'])
-            material = Lattice.from_parameters(a, b, c, alpha, beta, gamma, centering=centering, symmetry=symmetry)
-            sample.set_material(material)
-        if 'Microstructure' in dict_exp['Sample']:
-            micro = Microstructure(name= dict_exp[
-                                          'Sample']['Microstructure']['Name'],
-                                   filename=os.path.dirname(file_path))
-            # crystal lattice
-            if 'Lattice' in dict_exp['Sample']['Microstructure']:
-                a, b, c = dict_exp['Sample']['Microstructure']['Lattice']['Lengths']
-                alpha, beta, gamma = dict_exp['Sample']['Microstructure']['Lattice']['Angles']
-                centering = dict_exp['Sample']['Microstructure']['Lattice']['Centering']
-                symmetry = Symmetry.from_string(dict_exp['Sample']['Microstructure']['Lattice']['Symmetry'])
-                lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, centering=centering, symmetry=symmetry)
-                micro.set_lattice(lattice)
-            grain = micro.grains.row
-            for i in range(len(dict_exp['Sample']['Microstructure']['Grains'])):
-                dict_grain = dict_exp['Sample']['Microstructure']['Grains'][i]
-                grain['idnumber'] = int(dict_grain['Id'])
-                euler = dict_grain['Orientation']['Euler Angles (degrees)']
-                grain['orientation'] = Orientation.from_euler(euler).rod
-                grain['center'] = np.array(dict_grain['Position'])
-                grain['volume'] = dict_grain['Volume']
-#                if 'hkl_planes' in dict_grain:
-#                    grain.hkl_planes = dict_grain['hkl_planes']
-                grain.append()
-            micro.grains.flush()
-            sample.set_microstructure(micro)
-            sample.microstructure.autodelete = True
-        # lazy behaviour, we load only the grain_ids path, the actual array is loaded in memory if needed
-        sample.grain_ids_path = dict_exp['Sample']['Grain Ids Path']
+
+        # case where we load an existing sample/microstructure
+        if 'Path' in dict_exp['Sample']:
+            sample_path = dict_exp['Sample']['Path']
+            print('loading existing microstructure: %s' % sample_path)
+            sample = Sample(sample_path)
+
+        # build the sample from information in the file
+        else:
+            name = dict_exp['Sample']['Name']
+            sample = Sample(name=name)
+            sample.data_dir = dict_exp['Sample']['Data Dir']
+            sample.set_position(dict_exp['Sample']['Position'])
+            if 'Geometry' in dict_exp['Sample']:
+                sample_geo = ObjectGeometry()
+                sample_geo.set_type(dict_exp['Sample']['Geometry']['Type'])
+                sample.set_geometry(sample_geo)
+            if 'Material' in dict_exp['Sample']:
+                a, b, c = dict_exp['Sample']['Material']['Lengths']
+                alpha, beta, gamma = dict_exp['Sample']['Material']['Angles']
+                centering = dict_exp['Sample']['Material']['Centering']
+                symmetry = Symmetry.from_string(dict_exp['Sample']['Material']['Symmetry'])
+                material = Lattice.from_parameters(a, b, c, alpha, beta, gamma, centering=centering, symmetry=symmetry)
+                sample.set_material(material)
+            if 'Microstructure' in dict_exp['Sample']:
+                # build microstructure from information in the file
+                # crystal lattice
+                if 'Lattice' in dict_exp['Sample']['Microstructure']:
+                    a, b, c = dict_exp['Sample']['Microstructure']['Lattice']['Lengths']
+                    alpha, beta, gamma = dict_exp['Sample']['Microstructure']['Lattice']['Angles']
+                    centering = dict_exp['Sample']['Microstructure']['Lattice']['Centering']
+                    symmetry = Symmetry.from_string(dict_exp['Sample']['Microstructure']['Lattice']['Symmetry'])
+                    lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, centering=centering, symmetry=symmetry)
+                    sample.set_lattice(lattice)
+                grain = sample.grains.row
+                for i in range(len(dict_exp['Sample']['Microstructure']['Grains'])):
+                    dict_grain = dict_exp['Sample']['Microstructure']['Grains'][i]
+                    grain['idnumber'] = int(dict_grain['Id'])
+                    euler = dict_grain['Orientation']['Euler Angles (degrees)']
+                    grain['orientation'] = Orientation.from_euler(euler).rod
+                    grain['center'] = np.array(dict_grain['Position'])
+                    grain['volume'] = dict_grain['Volume']
+    #                if 'hkl_planes' in dict_grain:
+    #                    grain.hkl_planes = dict_grain['hkl_planes']
+                    grain.append()
+                sample.grains.flush()
+                sample.autodelete = True
+
+        # now build the experiment
         exp = Experiment()
         exp.set_sample(sample)
         source = XraySource()
@@ -440,10 +458,10 @@ class Experiment:
 class ExperimentEncoder(json.JSONEncoder):
 
     def default(self, o):
-        if isinstance(o, ObjectGeometry):
-            dict_geo = {}
-            dict_geo['Type'] = o.geo_type
-            return dict_geo
+        #if isinstance(o, ObjectGeometry):
+        #    dict_geo = {}
+        #    dict_geo['Type'] = o.geo_type
+        #    return dict_geo
         if isinstance(o, Lattice):
             dict_lattice = {}
             dict_lattice['Angles'] = o._angles.tolist()
@@ -453,13 +471,16 @@ class ExperimentEncoder(json.JSONEncoder):
             return dict_lattice
         if isinstance(o, Sample):
             dict_sample = {}
+            dict_sample['Path'] = o.h5_path
+            dict_sample['Position'] = o.position.tolist()
+            '''
+            dict_sample['Geometry'] = o.geo
             dict_sample['Name'] = o.name
             dict_sample['Data Dir'] = o.data_dir
-            dict_sample['Position'] = o.position.tolist()
-            dict_sample['Geometry'] = o.geo
             dict_sample['Material'] = o.material
             dict_sample['Microstructure'] = o.microstructure
             dict_sample['Grain Ids Path'] = o.grain_ids_path
+            '''
             return dict_sample
         if isinstance(o, RegArrayDetector2d):
             dict_det = {}

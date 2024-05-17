@@ -941,10 +941,10 @@ def crystal_3d(crystal, origin=(0., 0., 0.), m=1, n=1, p=1, \
     return assembly
 
 
-def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
-               sphereRadius=0.05, tubeRadius=0.02, sphereColor=black, tubeColor=grey, \
+def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1,
+               sphereRadius=0.05, tubeRadius=0.02, sphereColor=black, tubeColor=grey,
                crystal_orientation=None, show_atoms=True, show_edges=True, cell_clip=False):
-    '''
+    """
     Create the 3D representation of a crystal lattice.
 
     The lattice edges are shown using a vtkTubeFilter and the atoms are
@@ -987,7 +987,7 @@ def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
     :param bool show_edges: Control if the eges of the lattice are shown (default: True).
     :param bool cell_clip: Clip the lattice points glyphs by the cell (default: False).
     :return: The method return a vtk assembly combining lattice edges and vertices.
-    '''
+    """
     (a, b, c) = lattice._lengths
     if origin == 'mid':
         origin = (m * a / 2, n * b / 2, p * c / 2)
@@ -995,7 +995,8 @@ def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
     edges = lattice_edges(grid, tubeRadius=tubeRadius * min(lattice._lengths), tubeColor=tubeColor)
     vertices = lattice_vertices(grid, sphereRadius=sphereRadius * min(lattice._lengths), sphereColor=sphereColor)
     assembly = vtk.vtkAssembly()
-    if show_edges: assembly.AddPart(edges)
+    if show_edges:
+        assembly.AddPart(edges)
     if show_atoms:
         if cell_clip:
             # use boolean operation
@@ -1026,7 +1027,7 @@ def lattice_3d(lattice, origin=(0., 0., 0.), m=1, n=1, p=1, \
     # finally, apply crystal orientation to the lattice
     apply_translation_to_actor(assembly, -np.array(origin))
     # assembly.SetOrigin(origin)#m*a/2, n*b/2, p*c/2)
-    if crystal_orientation != None:
+    if crystal_orientation is not None:
         apply_orientation_to_actor(assembly, crystal_orientation)
     return assembly
 
@@ -1071,7 +1072,7 @@ def lattice_3d_with_planes(lattice, hklplanes, plane_origins=None, plane_colors=
     (a, b, c) = lattice._lengths
     if plane_origins:
         assert len(plane_origins) == len(hklplanes)
-    elif kwargs['origin'] == 'mid':
+    elif 'origin' in kwargs and kwargs['origin'] == 'mid':
         origin = (a / 2, b / 2, c / 2)
     else:
         origin = (0., 0., 0.)

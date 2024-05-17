@@ -82,7 +82,7 @@ class SDZsetMesher(SDZset):
         :param input_meshfile: Name of .geof mesh file to use as Zset input.
             If `inputmesh` is `None`, the file must exist and be a valid .geof
             meshfile for Zset. If `inputmesh` is not `None`, then the mesh data
-            refered by `meshname` in the SampleData instance will be written
+            refered by `mesh_name` in the SampleData instance will be written
             as a .geof mesh file `meshfilename.geof`.
             Defaults to `./input.geof`
         :type input_meshfile: str, optional
@@ -518,7 +518,7 @@ class SDImageMesher():
         multiphase image: a voxelized/pixelized field of integers identifying
         the different phases of a microstructure. Then, the mesh is stored in
         the Mesher SampleData instance at the desired location with the
-        desired meshname and Indexname.
+        desired mesh_name and Indexname.
 
         Depending on the dimensionality of the image (2D or 3D), a 2D or 3D
         mesher is called.
@@ -557,7 +557,7 @@ class SDImageMesher():
         :param bool bin_fields_from_sets: If `True`, stores all Node and
             Element Sets in mesh_object as binary fields (1 on Set, 0 else)
         :param bool replace: if `True`, overwrites pre-existing Mesh group
-            with the same `meshname` to add the new mesh.
+            with the same `mesh_name` to add the new mesh.
         :param dict mesher_opt: Optional dictionary of mesher options to
             specify various mesh caracteristics. Possible keys:values opts are:
                 * 'MEM': float memory (in Mb) to reserve for the mesh
@@ -614,7 +614,7 @@ class SDImageMesher():
         multiphase image: a voxelized/pixelized field of integers identifying
         the different phases of a microstructure. Then, the mesh is stored in
         the Mesher SampleData instance at the desired location with the
-        desired meshname and Indexname.
+        desired mesh_name and Indexname.
 
         The meshing procedure involves the construction of a surface mesh that
         is conformant with the phase boundaries in the image. The space
@@ -651,7 +651,7 @@ class SDImageMesher():
         :param bool bin_fields_from_sets: If `True`, stores all Node and
             Element Sets in mesh_object as binary fields (1 on Set, 0 else)
         :param bool replace: if `True`, overwrites pre-existing Mesh group
-            with the same `meshname` to add the new mesh.
+            with the same `mesh_name` to add the new mesh.
         :param dict mesher_opt: Optional dictionary of mesher options to
             specify various mesh caracteristics. Possible keys:values opts are:
                 * 'MEM': float memory (in Mb) to reserve for the mesh
@@ -719,7 +719,7 @@ class SDImageMesher():
                                location=location, replace=replace,
                                bin_fields_from_sets=bin_fields_from_sets)
         if elset_id_field:
-            self.data.create_elset_ids_field(meshname=meshname)
+            self.data.create_elset_ids_field(mesh_name=meshname)
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
         # Resize mesh to Image domain
@@ -750,7 +750,7 @@ class SDImageMesher():
         multiphase image: a voxelized/pixelized field of integers identifying
         the different phases of a microstructure. Then, the mesh is stored in
         the Mesher SampleData instance at the desired location with the
-        desired meshname and Indexname.
+        desired mesh_name and Indexname.
 
         The meshing procedure involves the detection and discretization of the
         boundaries in the 2D image. The space between boundary elements is then
@@ -783,7 +783,7 @@ class SDImageMesher():
         :param bool bin_fields_from_sets: If `True`, stores all Node and
             Element Sets in mesh_object as binary fields (1 on Set, 0 else)
         :param bool replace: if `True`, overwrites pre-existing Mesh group
-            with the same `meshname` to add the new mesh.
+            with the same `mesh_name` to add the new mesh.
         :param dict mesher_opt: Optional dictionary of mesher options to
             specify various mesh caracteristics. Possible keys:values opts are:
                 * 'LS': Line sampling ratio. This ratio is the average number
@@ -844,7 +844,7 @@ class SDImageMesher():
                             indexname=indexname, location=location,
                             bin_fields_from_sets=bin_fields_from_sets)
         if elset_id_field:
-            self.data.create_elset_ids_field(meshname=meshname)
+            self.data.create_elset_ids_field(mesh_name=meshname)
         # Remove tmp mesh files
         shutil.rmtree(OUT_DIR)
         # Resize mesh to Image domain

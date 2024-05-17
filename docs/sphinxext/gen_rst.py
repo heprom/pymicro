@@ -180,7 +180,9 @@ def generate_dir_rst(dir, fhindex, example_dir, out_dir, plot_anim):
         print('***** found file', fname)
         if fname == '__init__.py' or fname.endswith('data'):
             continue
-        if fname.endswith('SampleDataUserGuide'):
+        if fname.endswith('UserGuide'):
+            continue
+        if fname.endswith('__pycache__'):
             continue
         if os.path.isdir(os.path.join(src_dir, fname)):
             print('***** this is a directory, going in...')

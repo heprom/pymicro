@@ -6,10 +6,206 @@ import numpy as np
 from scipy import ndimage
 from matplotlib import pyplot as plt, cm
 from pymicro.xray.experiment import ForwardSimulation
-from pymicro.crystal.lattice import HklPlane
+from pymicro.crystal.lattice import HklPlane, Symmetry
 from pymicro.xray.xray_utils import lambda_keV_to_nm, radiograph, radiographs
 from pymicro.crystal.microstructure import Grain, Orientation
+from pymicro.file.file_utils import edf_read, edf_write
 
+
+class Xrd3dForwardSimulation(ForwardSimulation):
+    """Class to represent a 3DXRD Forward Simulation."""
+
+    def __init__(self, verbose=False):
+        ForwardSimulation.__init__(self, '3dxrd', verbose=verbose)
+        self.hkl_planes = []
+        self.max_miller = 5
+        self.energy_keV = 40.
+        self.omega = 0.  # rotation angle in deg
+        self.integration_range = 1.  # deg
+        self.exp = None
+
+    def set_experiment(self, experiment):
+        """Attach an X-ray experiment to this simulation."""
+        self.exp = experiment
+
+    def set_energy_keV(self, energy_keV):
+        """Set the energy of the 3DXRD experiment."""
+        self.energy_keV = energy_keV
+
+    def set_hkl_planes(self, hkl_planes):
+        self.hkl_planes = hkl_planes
+
+    def setup(self, include_grains=None):
+        """Setup the forward simulation."""
+        pass
+
+    def select_hkl_planes(self, hkl_planes, gid=1, margin=10):
+        """Filter the list of hkl planes to keep only the ones diffracting
+        on the detector.
+
+        :param list hkl_planes: the list of hkl plane to filter.
+        :param int gid: the grain id to use.
+        :param int margin: a pixel margin to take into account.
+        :return: the list of hkl planes diffraction on the detector within
+        the margin.
+        """
+        lambda_nm = lambda_keV_to_nm(self.energy_keV)
+        X = np.array([1., 0., 0.]) / lambda_nm
+        sample = self.exp.get_sample()
+        grain_orientation = sample.get_grain(gid).orientation
+        gt = grain_orientation.orientation_matrix().transpose()
+        detector = self.exp.get_active_detector()
+        position = sample.get_grain_centers(id_list=[gid])[0]
+        hkl_planes_dif = []
+        omegas = []
+        G_vectors = []
+        K_vectors = []
+        origins = []
+        for hkl_plane in hkl_planes:
+            try:
+                w1, w2 = grain_orientation.dct_omega_angles(hkl_plane,
+                                                            self.energy_keV,
+                                                            verbose=False)
+            except ValueError:
+                # skip this plane
+                continue
+            for omega in [w1, w2]:
+                if self.omega < omega < (self.omega + self.integration_range):
+                    hkl_planes_dif.append(hkl_plane)
+                    omegas.append(omega)
+                    omegar = omega * np.pi / 180
+                    # grain diffracting at this angle with this hkl plane
+                    R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                                  [np.sin(omegar), np.cos(omegar), 0],
+                                  [0, 0, 1]])
+                    G = np.dot(R, np.dot(gt, hkl_plane.scattering_vector()))
+                    G_vectors.append(G)
+                    K = X + G
+                    K_vectors.append(K)
+                    # add the origin of this diffraction event as the center of the grain at this angle
+                    origins.append(np.dot(R, position))
+        print('%d diffraction vectors at this omega angle' % len(K_vectors))
+        G_vectors = np.array(G_vectors)  # shape (n, 3)
+        K_vectors = np.array(K_vectors)  # shape (n, 3)
+        origins = np.array(origins)
+        OR_vectors = detector.project_along_directions(K_vectors, origins)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+        # look at which hkl plane diffracts on the detector within the given margin
+        on_det = np.where((-margin < uv[:, 0]) &
+                          (uv[:, 0] < detector.get_size_px()[0] + margin) &
+                          (-margin < uv[:, 1]) &
+                          (uv[:, 1] < detector.get_size_px()[1] + margin))
+        print('%d diffraction planes on the detector among %d' % (len(on_det[0]), len(uv)))
+        hkl_planes_dif = [hkl_planes_dif[i] for i in on_det[0]]
+        omegas_dif = [omegas[i] for i in on_det[0]]
+        '''
+        print(hkl_planes_dif)
+        print([G_vectors[i] for i in on_det[0]])
+        print([K_vectors[i] for i in on_det[0]])
+        print([origins[i] for i in on_det[0]])
+        print([uv[i] for i in on_det[0]])
+        '''
+        return hkl_planes_dif, omegas_dif
+
+    def fsim_grain(self, gid=1):
+        """Forward simulation for a given grain.
+
+        Optimized version with matrix multiplication.
+
+        :param int gid: the grain id number to simulate.
+        """
+        #TODO move this to some relevant place
+        from pymicro.xray.laue import build_list
+        lambda_nm = lambda_keV_to_nm(self.energy_keV)
+        X = np.array([1., 0., 0.]) / lambda_nm
+        sample = self.exp.get_sample()
+        grain_orientation = sample.get_grain(gid).orientation
+        gt = grain_orientation.orientation_matrix().transpose()
+        lattice = sample.get_lattice()
+        detector = self.exp.get_active_detector()
+        if self.verbose:
+            print('Forward Simulation for grain %d' % gid)
+        sample.geo.discretize_geometry(grain_id=gid)
+
+        if len(self.hkl_planes) == 0:
+            print('warning: no reflection defined for this simulation, using all planes with max miller=%d' % self.max_miller)
+            self.set_hkl_planes(build_list(lattice=lattice, max_miller=self.max_miller))
+        # preprocess hkl planes by filtering out the ones not diffracting close to the detector
+        hkl_planes_dif, omegas_dif = self.select_hkl_planes(self.hkl_planes, gid=gid)
+        n_hkl_dif = len(hkl_planes_dif)
+        print('after filtering we have %d hkl planes for this grain' % n_hkl_dif)
+        positions = sample.geo.get_positions()  # size n_vox, with 3 elements items
+        n_vox = positions.shape[0]
+
+        # look at diffraction events for each position
+        # we will create arrays origins and K_vectors with size n_vox * n_hkl_dif
+        K_vectors = np.empty((n_hkl_dif * n_vox, 3), dtype=float)
+        origins = np.empty((n_hkl_dif * n_vox, 3), dtype=float)
+
+        for i_hkl in range(n_hkl_dif):
+            # here we assume a constant orientation per grain
+            hkl_plane = hkl_planes_dif[i_hkl]
+            omega = omegas_dif[i_hkl]
+            omegar = omega * np.pi / 180
+            # grain diffracting at this angle with this hkl plane
+            R = np.array([[np.cos(omegar), -np.sin(omegar), 0],
+                          [np.sin(omegar), np.cos(omegar), 0],
+                          [0, 0, 1]])
+            G = np.dot(R, np.dot(gt, hkl_plane.scattering_vector()))
+            K = X + G
+            for i_vox in range(n_vox):
+                index = i_vox * n_hkl_dif + i_hkl
+                K_vectors[index] = K
+                # origin is the voxel position at this angle
+                position = positions[i_vox, :]
+                origins[index] = np.dot(R, position)
+
+        # call the fsim_3dxrd function for vectorized code
+        '''
+        omegas, origins, G_vectors = Xrd3dForwardSimulation.fsim_laue(
+            grain_orientation, hkl_planes, positions)
+        '''
+
+        # with diffraction informations, project them on the detector
+        OR_vectors = detector.project_along_directions(K_vectors, origins)
+        uv = detector.lab_to_pixel(OR_vectors).astype(np.int)
+
+        # now construct a boolean list to select the diffraction spots
+        on_det = np.where((0 < uv[:, 0]) &
+                          (uv[:, 0] < detector.get_size_px()[0]) &
+                          (0 < uv[:, 1]) &
+                          (uv[:, 1] < detector.get_size_px()[1]))
+        if self.verbose:
+            print('%d diffraction events on the detector among %d' % (len(on_det[0]), len(uv)))
+
+        # now sum the counts on the detector individual pixels
+        data = np.zeros_like(detector.data)
+        for spot in uv[on_det]:
+            data[spot[0], spot[1]] += 1
+        return data, uv, on_det
+
+    def fsim(self):
+        """run the forward simulation.
+
+        If the sample has a CAD type of geometry, a single grain (the first from the list) is assumed. In the other
+        cases all the grains from the microstructure are used. In particular, if the microstructure has a grain map,
+        it can be used to carry out an extended sample simulation.
+        """
+        import time
+        t0 = time.time()
+        full_data = np.zeros_like(self.exp.get_active_detector().data)
+        sample = self.exp.get_sample()
+        # for cad geometry we assume only one grain (the first in the list)
+        if sample.geo.geo_type == 'cad':
+            full_data += self.fsim_grain(gid=sample.grains[0]['idnumber'])
+        else:
+            # in the other cases, we use all the grains defined in the microstructure
+            for grain_id in sample.get_grain_ids():
+                full_data += self.fsim_grain(gid=grain_id)
+        if self.verbose:
+            duration = int(time.time() - t0)
+            print('forward simulation duration: {:d} seconds'.format(duration))
+        return full_data
 
 class DctForwardSimulation(ForwardSimulation):
     """Class to represent a Forward Simulation."""
@@ -18,24 +214,19 @@ class DctForwardSimulation(ForwardSimulation):
         super(DctForwardSimulation, self).__init__('dct', verbose=verbose)
         self.hkl_planes = []
         self.check = 1  # grain id to display infos in verbose mode
+        self.omega_start = 0.
+        self.omega_end = 360.
         self.omegas = None
-        self.reflections = []
+        self.reflexions = []
 
     def set_hkl_planes(self, hkl_planes):
         self.hkl_planes = hkl_planes
 
     def set_diffracting_famillies(self, hkl_list):
         """Set the list of diffracting hk planes using a set of families."""
-        symmetry = self.exp.get_sample().get_material().get_symmetry()
-        hkl_planes = []
-        for hkl in hkl_list:
-            # here we set include_friedel_pairs to False as we take it into account in the calculation
-            planes = HklPlane.get_family(hkl, include_friedel_pairs=True, crystal_structure=symmetry)
-            for plane in planes:  # fix the lattice
-                plane.set_lattice(self.exp.get_sample().get_material())
-            hkl_planes.extend(planes)
+        lattice = self.exp.get_sample().get_lattice()
+        hkl_planes = HklPlane.from_families(hkl_list, lattice=lattice, friedel_pairs=True)
         self.set_hkl_planes(hkl_planes)
-
 
     def setup(self, omega_step, grain_ids=None):
         """Setup the forward simulation.
@@ -45,34 +236,42 @@ class DctForwardSimulation(ForwardSimulation):
         """
         assert self.exp.source.min_energy == self.exp.source.max_energy  # monochromatic case
         lambda_keV = self.exp.source.max_energy
-        self.omegas = np.linspace(0.0, 360.0, num=int(360.0 / omega_step), endpoint=False)
-        self.reflections = []
+        sym = self.exp.sample.get_lattice().get_symmetry()
+        self.omegas = np.linspace(self.omega_start, self.omega_end,
+                                  num=int((self.omega_end - self.omega_start) / omega_step), endpoint=False)
+        self.reflexions = []
         for omega in self.omegas:
-            self.reflections.append([])
-        if grain_ids:
-            # make a list of the grains selected for the forward simulation
-            grains = [self.exp.sample.microstructure.get_grain(gid) for gid in grain_ids]
-        else:
-            grains = self.exp.sample.microstructure.grains
-        for g in grains:
+            self.reflexions.append([])
+        if not grain_ids:
+            # list of the grains selected for the forward simulation
+            grain_ids = self.exp.sample.get_grain_ids()
+        for grain_id in grain_ids:
             for plane in self.hkl_planes:
-                (h, k, i, l) = HklPlane.three_to_four_indices(*plane.miller_indices())
+                h, k, l = plane.miller_indices()
+                if sym is Symmetry.hexagonal:
+                    (h, k, i, l) = HklPlane.three_to_four_indices(h, k, l)
                 try:
-                    (w1, w2) = g.dct_omega_angles(plane, lambda_keV, verbose=False)
+                    o = Orientation.from_rodrigues(self.exp.sample.get_grain_rodrigues(id_list=[grain_id])[0])
+                    (w1, w2) = o.dct_omega_angles(plane, lambda_keV, verbose=False)
                 except ValueError:
                     if self.verbose:
-                        print('plane {} does not fulfil the Bragg condition for grain {:d}'.format((h, k, i, l), g.id))
+                        print('plane {} does not fulfil the Bragg condition for grain {:d}'.format((h, k, l), grain_id))
                     continue
                 # add angles for Friedel pairs
                 w3 = (w1 + 180.) % 360
                 w4 = (w2 + 180.) % 360
-                if self.verbose and g.id == self.check:
-                    print('grain %d, angles for plane %d%d%d: w1=%.3f and w2=%.3f | delta=%.1f' % (g.id, h, k, l, w1, w2, w1-w2))
+                if self.verbose and grain_id == self.check:
+                    print('grain %d, angles for plane %d%d%d: w1=%.3f and w2=%.3f | delta=%.1f' % (grain_id, h, k, l, w1, w2, w1-w2))
                     print('(%3d, %3d, %3d, %3d) -- %6.2f & %6.2f' % (h, k, i, l, w1, w2))
-                self.reflections[int(w1 / omega_step)].append([g.id, (h, k, l)])
-                self.reflections[int(w2 / omega_step)].append([g.id, (h, k, l)])
-                self.reflections[int(w3 / omega_step)].append([g.id, (-h, -k, -l)])
-                self.reflections[int(w4 / omega_step)].append([g.id, (-h, -k, -l)])
+                try:
+                    self.reflexions[int(w1 / omega_step)].append([grain_id, (h, k, l)])
+                    self.reflexions[int(w2 / omega_step)].append([grain_id, (h, k, l)])
+                    self.reflexions[int(w3 / omega_step)].append([grain_id, (-h, -k, -l)])
+                    self.reflexions[int(w4 / omega_step)].append([grain_id, (-h, -k, -l)])
+                except IndexError:
+                    # drop reflexions after omega_end
+                    pass
+
 
     def load_grain(self, gid=1):
         print('loading grain from file 4_grains/phase_01/grain_%04d.mat' % gid)
@@ -221,7 +420,6 @@ class DctForwardSimulation(ForwardSimulation):
         stack_sim = self.grain_projections(omegas, gid, hor_flip=hor_flip, ver_flip=ver_flip)
         return self.grain_projection_image(g_uv, stack_sim)
 
-
     def dct_projection(self, omega, include_direct_beam=True, att=5):
         """Function to compute a full DCT projection at a given omega angle.
 
@@ -230,15 +428,15 @@ class DctForwardSimulation(ForwardSimulation):
         :param float att: an attenuation factor used to limit the gray levels in the direct beam.
         :return: the dct projection as a 2D numpy array
         """
-        if len(self.reflections) == 0:
-            print('empty list of reflections, you should run the setup function first')
+        if len(self.reflexions) == 0:
+            print('empty list of reflexions, you should run the setup function first')
             return None
-        grain_ids = self.exp.get_sample().get_grain_ids()
+        grain_ids = self.exp.get_sample().get_grain_map()
         detector = self.exp.get_active_detector()
         lambda_keV = self.exp.source.max_energy
-        lattice = self.exp.get_sample().get_material()
+        lattice = self.exp.get_sample().get_lattice()
         index = np.argmax(self.omegas > omega)
-        dif_grains = self.reflections[index - 1]  # grains diffracting between omegas[index - 1] and omegas[index]
+        dif_grains = self.reflexions[index - 1]  # grains diffracting between omegas[index - 1] and omegas[index]
         # intialize image result
         full_proj = np.zeros(detector.get_size_px(), dtype=np.float64)
         lambda_nm = lambda_keV_to_nm(lambda_keV)
@@ -267,7 +465,7 @@ class DctForwardSimulation(ForwardSimulation):
             print('center of mass (voxel): {0}'.format(local_com - 0.5 * np.array(grain_ids.shape)))
             print('center of mass (mm): {0}'.format(g_center_mm))
             # compute scattering vector
-            gt = self.exp.get_sample().get_microstructure().get_grain(gid).orientation_matrix().transpose()
+            gt = self.exp.get_sample().get_grain(gid).orientation_matrix().transpose()
             p = HklPlane(h, k, l, lattice)
             G = np.dot(R, np.dot(gt, p.scattering_vector()))
             K = X + G
@@ -590,6 +788,62 @@ def tt_rock(scan_name, data_dir='.', n_topo=-1, mask=None, dark_factor=1.):
 
     return tt_rock
 
+
+def tt_stack_h5(scan_name, data_dir='.', save_edf=False, n_angles=90,
+                data_key='7.1/measurement/frelon16', dark=None):
+    """Build a topotomography stack from raw detector images.
+
+    The number of image to sum for a topograph must be specified
+    using the variable `n_topo`.
+
+    :param str scan_name: the name of the scan to process.
+    :param str data_dir: the path to the data folder.
+    :param bool save_edf: flag to save the tt stack as an EDF file.
+    :param int n_angles: the number of angles in the acquisition.
+    :param str data_key: a string to access the data within the h5 file.
+    :param array dark: image to use as dark correction.
+    """
+    import h5py
+
+    # parse the info file
+    h5_path = os.path.join(data_dir, scan_name, '%s.h5' % scan_name)
+    f = h5py.File(h5_path, 'r')
+    print('loading data from file %s...' % h5_path)
+    data = f[data_key][()]
+    # check number of images
+    if data.shape[0] % n_angles != 0:
+        print('warning, number of images not consistent : %d total images for '
+              '%d topograph' % (data.shape[0], n_angles))
+        return None
+    else:
+        n_topo = int(data.shape[0] / n_angles)
+    print('number of frames to sum for a topograph = %d' % n_topo)
+    if dark is None:
+        # create a reference image with the median over the first of each topograph
+        dark = np.median(data[::2 * n_topo, :, :], axis=0)
+    data = data - dark
+    # print check dark level
+    print('dark level: %.1f' % np.mean(data[::n_angles, :, :]))
+    infos = {}
+    infos['TOMO_N'] = n_angles
+    infos['Dim_1'] = data.shape[1]
+    infos['Dim_2'] = data.shape[2]
+    print(infos)
+
+    # build the stack by combining individual images
+    data = data.reshape((n_topo, infos['TOMO_N'], infos['Dim_1'], infos['Dim_2']))
+    tt_stack = np.sum(data, axis=1)
+    del data
+    print(tt_stack[0].shape)
+    tt_stack = tt_stack.transpose((2, 1, 0))
+    f.close()
+    print('\ndone')
+
+    # save the data as edf if needed
+    if save_edf:
+        edf_write(tt_stack, os.path.join(data_dir, '%s_stack.edf' % scan_name))
+    return tt_stack
+
 def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.):
     """Build a topotomography stack from raw detector images.
 
@@ -603,7 +857,6 @@ def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.)
     :param int n_topo: the number of images to sum for a topograph.
     :param float dark_factor: a multiplicative factor for the dark image.
     """
-    from pymicro.file.file_utils import edf_read, edf_write
     if n_topo < 0:
         import glob
         # figure out the number of frames per topograph n_topo
@@ -650,3 +903,100 @@ def tt_stack(scan_name, data_dir='.', save_edf=False, n_topo=-1, dark_factor=1.)
     if save_edf:
         edf_write(tt_stack, os.path.join(data_dir, '%sstack.edf' % scan_name))
     return tt_stack
+
+
+def tt_sim_rc(micro, gid, hkl_tt, T=None, lambda_keV=40.0, omega_step=4.0,
+              base_tilt_range=0.5):
+    """Compute the complete topotomography rocking curve for a given grain.
+
+    This method compute the $I_$\omega$(\Theta)$ rocking curve by analyzing
+    the lattice rotation field of a grain and computing the diffracting
+    conditions of the selected reflection. For each $\omega$ value in [0, 360],
+    the scattering vector is rotated by the base tilt around the mean Bragg
+    angle. Each voxel will then contribute to the rocking curve depending on
+    its orientation.
+
+    :param Microstructure micro: The microstructure to study.
+    :param int gid: the id of the selected grain.
+    :param HklPlane hkl_tt: the selected reflection.
+    :param np.ndarray T: the diffractometer transformation matrix.
+    :param float lambda_keV: the X-ray wavelength in keV units.
+    :param float omega_step: the angular $\omega$ step.
+    :param float base_tilt_range: the base tilt range in degrees.
+    :return: a tuple with 3 numpy arrays: the values of omega, the base tilt
+    values and the simulated rocking curve.
+    """
+    from math import cos, sin
+    grain = micro.get_grain(gid)
+    sym = micro.get_lattice().get_symmetry()  # should get the phase id
+    o_xyz = grain.orientation.move_to_FZ(symmetry=sym)
+    ut, lt = o_xyz.topotomo_tilts(hkl_tt, T, verbose=True)
+    # compute the S and T tilt matrices (constant for this grain and this hkl_tt)
+    U = np.array([[1, 0, 0], [0, cos(ut), -sin(ut)], [0, sin(ut), cos(ut)]])
+    L = np.array([[cos(lt), 0, sin(lt)], [0, 1, 0], [-sin(lt), 0, cos(lt)]])
+    S = np.dot(L, U)
+
+    # grab all the orientation data for this grain
+    if micro._is_empty('orientation_map'):
+        print('warning: an orientation map is needed to compute the topotomography rocking curve')
+        return
+    grain_map = np.squeeze(micro.get_grain_map())
+    orientation_map = np.squeeze(micro.get_orientation_map())
+    rod_gid = orientation_map[grain_map == gid]
+    print('%d orientation data points in this grain' % len(rod_gid))
+    # now transform all orientation data for this grain to the fundamental zone
+    rod_gid_fz = np.empty_like(rod_gid)
+    for i in range(len(rod_gid)):
+        g = Orientation.from_rodrigues(rod_gid[i]).orientation_matrix()
+        g_fz = sym.move_rotation_to_FZ(g, verbose=False)
+        o_fz = Orientation(g_fz)
+        rod_gid_fz[i] = o_fz.rod
+
+    # find the diffracting condition for each voxel
+    omegas = np.arange(0, 360 + omega_step, omega_step)
+    base_tilt_step = 0.01
+    base_tilt_values = np.arange(-base_tilt_range, base_tilt_range
+                                 + base_tilt_step, base_tilt_step)
+    rc_sim = np.empty((len(omegas), len(rod_gid_fz)))
+    lambda_nm = 1.2398 / lambda_keV
+    theta = hkl_tt.bragg_angle(lambda_keV, verbose=False)
+    X = np.array([1., 0., 0.]) / lambda_nm
+    print('norm of X', np.linalg.norm(X))
+
+    for j in range(len(omegas)):
+        # pick a value for omega
+        omega = omegas[j]
+        omegar = np.radians(omega)
+        R = np.array([[cos(omegar), -sin(omegar), 0], [sin(omegar), cos(omegar), 0], [0, 0, 1]])
+
+        for i in range(len(rod_gid_fz)):
+            # grab the i-th pixel of this grain
+            o_i = Orientation.from_rodrigues(rod_gid_fz[i])
+
+            # apply the different rotation to the sample
+            gt = o_i.orientation_matrix().transpose()
+            Gs = np.dot(gt, hkl_tt.scattering_vector())  # grain orientation
+            Gs = np.dot(T.T, Gs)  # diffractometer offsets
+            Gt = np.dot(S, Gs)  # topotomo tilts
+            Gl = np.dot(R, Gt)  # omega rotation
+
+            # scan the base tilt angle (no need to offset by theta here)
+            hkl_normal_tilted = np.zeros((len(base_tilt_values), 3))
+            norm_K = np.zeros(len(base_tilt_values))
+            for k, base_tilt in enumerate(base_tilt_values):
+                base_tilt = theta + np.radians(base_tilt)
+                BT = np.array([[cos(-base_tilt), 0, sin(-base_tilt)], [0, 1, 0],
+                               [-sin(-base_tilt), 0, cos(-base_tilt)]])  # base tilt
+                hkl_normal_tilted[k] = np.dot(BT, Gl)
+                K = X + hkl_normal_tilted[k]
+                norm_K[k] = np.linalg.norm(K)
+
+            # to find the diffraction condition, it is equivalent
+            # to search when norm(K) is equal to norm(X) or to
+            # search for a zero x-component of the tilted scattering vector
+            rc_sim[j, i] = base_tilt_values[np.argmin(np.abs(norm_K - np.linalg.norm(X)))]
+            # rc_sim[j, i] = base_tilt_values[np.argmin(np.abs(hkl_normal_tilted[:, 0]))]
+        progress = 100 * (1 + j) / len(omegas)
+        print('simulating topotomography rocking curve: {0:.2f} %'.format(progress), end='\r')
+    return omegas, base_tilt_values, rc_sim
+

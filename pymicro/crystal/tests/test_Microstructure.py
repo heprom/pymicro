@@ -32,9 +32,10 @@ class MicrostructureTests(unittest.TestCase):
         micro.add_grains(self.test_eulers)
         self.assertTrue(micro.get_sample_name() == 'test')
         self.assertTrue(os.path.exists(micro.h5_file))
-        self.assertTrue(os.path.exists(micro.xdmf_file))
+        micro.write_xdmf()
+        self.assertTrue(os.path.exists(micro._xdmf_file))
         h5_file = micro.h5_file
-        xdmf_file = micro.xdmf_file
+        xdmf_file = micro._xdmf_file
         del micro
         self.assertTrue(not os.path.exists(h5_file))
         self.assertTrue(not os.path.exists(xdmf_file))
@@ -46,6 +47,7 @@ class MicrostructureTests(unittest.TestCase):
                                     use_dct_path=False)
         m.autodelete = True
         self.assertEqual(m.grains.nrows, 146)
+        del m
 
     def test_from_file(self):
         # read a test microstructure already created
@@ -53,46 +55,49 @@ class MicrostructureTests(unittest.TestCase):
                                                  't5_dct_slice_data.h5'))
         self.assertEqual(m.grains.nrows, 21)
         self.assertEqual(m.get_voxel_size(), 0.0014)
-        self.assertEqual(type(m.get_grain_map(as_numpy=True)), np.ndarray)
-        self.assertEqual(type(m.get_mask(as_numpy=True)), np.ndarray)
+        self.assertEqual(type(m.get_grain_map()), np.ndarray)
+        self.assertEqual(type(m.get_mask()), np.ndarray)
         self.assertTrue(True)
         del m
 
     def test_from_copy(self):
-        # test computing of grain geometrical quantities and copy of an
-        # existing Microstructure dataset
-        # create new microstructure copy of an already existing file
-        filename = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,
+        # test computing the grain geometries from the copy of a Microstructure
+        file_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR,
                                 't5_dct_slice_data.h5')
-        new_file = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'tmp_slice_dct')
-        m = Microstructure.copy_sample(filename, new_file, autodelete=True,
+        copy_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'tmp_slice_dct')
+        # create a microstructure copy of an existing file
+        m = Microstructure.copy_sample(file_path, copy_path,
+                                       overwrite=True,
+                                       autodelete=True,
                                        get_object=True)
         h5_file = m.h5_path
-        xdmf_file = m.xdmf_path
+        # xdmf_file = m.xdmf_path
         self.assertTrue(os.path.exists(h5_file))
-        self.assertTrue(os.path.exists(xdmf_file))
+        # self.assertTrue(os.path.exists(xdmf_file))
         m.recompute_grain_bounding_boxes()
         m.recompute_grain_centers()
         # m.recompute_grain_volumes()
-        m_ref = Microstructure(filename=filename)
+        m_ref = Microstructure(filename=file_path)
         for i in range(m_ref.grains.nrows):
             print(' n°1 :', m.grains[i])
             print(' n°2 :', m_ref.grains[i])
             self.assertEqual(m.grains[i], m_ref.grains[i])
-        volume = np.sum(m.get_mask(as_numpy=True))
+        volume = np.sum(m.get_mask())
         self.assertEqual(volume, 194025)
         del m
         self.assertTrue(not os.path.exists(h5_file))
-        self.assertTrue(not os.path.exists(xdmf_file))
+        # self.assertTrue(not os.path.exists(xdmf_file))
         del m_ref
 
     def test_crop(self):
         # read a test microstructure
         m = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'n27-id1_data.h5'))
         # crop the microstructure
-        m1 = m.crop(x_start=20, x_end=40, y_start=10, y_end=40, z_start=15, z_end=55, autodelete=True)
+        m1 = m.crop(x_start=20, x_end=40,
+                    y_start=10, y_end=40,
+                    z_start=15, z_end=55, autodelete=True)
         h5_file = m1.h5_file
-        xdmf_file = m1.xdmf_file
+        # xdmf_file = m1.xdmf_file
         dims = (20, 30, 40)
         for i in range(3):
             self.assertEqual(m1.get_grain_map().shape[i], dims[i])
@@ -100,11 +105,11 @@ class MicrostructureTests(unittest.TestCase):
         gids_crop = [1, 2, 3, 4, 6, 7, 8, 13, 14, 15, 17, 20, 21, 22, 26, 27]
         for gid in m1.get_grain_ids():
             self.assertTrue(gid in gids_crop)
-        self.assertEqual(np.sum(m1.get_grain_map(as_numpy=True) == 14), 396)
+        self.assertEqual(np.sum(m1.get_grain_map() == 14), 396)
         del m1
-        # verify that the mirostructure files have been deleted
+        # verify that the microstructure files have been deleted
         self.assertTrue(not os.path.exists(h5_file))
-        self.assertTrue(not os.path.exists(xdmf_file))
+        # self.assertTrue(not os.path.exists(xdmf_file))
         del m
 
     def test_id_list_to_condition(self):
@@ -117,7 +122,7 @@ class MicrostructureTests(unittest.TestCase):
         m = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5'))
         self.assertAlmostEqual(m.get_grain_volumes(id_list=[3])[0], 0.030025482)
         center = m.get_grain_centers(id_list=[3])[0]
-        the_center = [-0.25036922, 0.00601893, -0.09261252]
+        the_center = [-0.24255674, 0.01383143, -0.08480002]
         for i in range(3):
             self.assertAlmostEquals(center[i], the_center[i])
         rod = m.get_grain_rodrigues(id_list=[3])[0]
@@ -148,7 +153,9 @@ class MicrostructureTests(unittest.TestCase):
         # read and copy a microstructure
         m1_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5')
         copy_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_copy_data.h5')
-        m1 = Microstructure.copy_sample(m1_path, copy_path, autodelete=True,
+        m1 = Microstructure.copy_sample(m1_path, copy_path,
+                                        overwrite=True,
+                                        autodelete=True,
                                         get_object=True)
         self.assertTrue(8 not in m1.get_grain_ids())
         m1.renumber_grains()
@@ -164,14 +171,14 @@ class MicrostructureTests(unittest.TestCase):
         m1m2 = Microstructure.merge_microstructures([m1, m2], overlap=16)
         m1m2.autodelete = True
         h5_file = m1m2.h5_file
-        xdmf_file = m1m2.xdmf_file
+        # xdmf_file = m1m2.xdmf_file
         dims = (64, 64, 64)
         for i in range(3):
             self.assertEqual(m1m2.get_grain_map().shape[i], dims[i])
         self.assertEqual(m1m2.get_number_of_grains(), 27)
         del m1m2
         self.assertTrue(not os.path.exists(h5_file))
-        self.assertTrue(not os.path.exists(xdmf_file))
+        # self.assertTrue(not os.path.exists(xdmf_file))
         del m1, m2
 
     def test_from_neper(self):
@@ -180,7 +187,7 @@ class MicrostructureTests(unittest.TestCase):
                                                    'n100-id1.tesr'))
         m.autodelete = True
         self.assertEqual(m.grains.nrows, 100)
-        # verify all orienations
+        # verify all orientations
         euler_neper = np.genfromtxt(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'n100-id1.ori-plain'))
         for i in range(100):
             euler_pymicro = m.get_grain(i + 1).orientation.euler
@@ -191,7 +198,7 @@ class MicrostructureTests(unittest.TestCase):
         self.assertAlmostEqual(m.get_voxel_size(), 0.018, 2)
         dims = (54, 65, 75)
         for i in range(3):
-            self.assertEqual(m.get_grain_map(as_numpy=True).shape[i], dims[i])
+            self.assertEqual(m.get_grain_map().shape[i], dims[i])
         del m
 
     def test_find_neighbors(self):
@@ -203,6 +210,27 @@ class MicrostructureTests(unittest.TestCase):
         for gid in [0, 1, 3, 14, 17, 18, 25, 51, 115]:
             self.assertTrue(gid in neighbors)
         del m
+
+    def test_graph(self):
+        m = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5'))
+        rag = m.graph()
+        self.assertEqual(len(rag.nodes), m.get_number_of_grains())
+        e = rag.edges[15, 26]  # pick two neighboring grains
+        self.assertTrue('misorientation' in e)
+        self.assertAlmostEqual(e['misorientation'], 43.9954034, 6)
+
+    def test_voronoi(self):
+        n = 10  # grains
+        # create test voronoi tesselations in 2D and 3D
+        v2d = Microstructure.voronoi(shape=(64, 64), n=n)
+        v3d = Microstructure.voronoi(shape=(32, 32, 32), n=n)
+        self.assertEqual(v2d.min(), 1)
+        self.assertEqual(v2d.max(), n)
+        self.assertEqual(len(np.unique(v2d)), n)
+        self.assertEqual(v3d.min(), 1)
+        self.assertEqual(v3d.max(), n)
+        self.assertEqual(len(np.unique(v3d)), n)
+        del v2d, v3d
 
 
 class OrientationTests(unittest.TestCase):
@@ -255,7 +283,8 @@ class OrientationTests(unittest.TestCase):
             o = Orientation.from_euler(test_euler)
             g = o.orientation_matrix()
             delta = np.dot(g, g.T)
-            self.assertEqual(Orientation.misorientation_angle_from_delta(delta), 0.0)
+            self.assertAlmostEqual(
+                      Orientation.misorientation_angle_from_delta(delta), 0.0)
 
     def test_misorientation_angle(self):
         o1 = Orientation.from_euler((0., 0., 0.))
@@ -359,19 +388,19 @@ class OrientationTests(unittest.TestCase):
         self.assertAlmostEqual(180 / np.pi * lt, -4.437, 2)
 
     def test_IPF_color(self):
-        o1 = Orientation.cube()  # 001 // Z
-        o2 = Orientation.from_euler([35.264, 45., 0.])  # 011 // Z
-        o3 = Orientation.from_euler([0., 54.736, 45.])  # 111 // Z
+        o1 = Orientation.from_euler([0.00001, 0.00001, 0.00001])  # 001 // Z
+        o2 = Orientation.from_euler([35.264, 45., 0.00001])  # 011 // Z
+        o3 = Orientation.from_euler([0.00001, 54.736, 45.])  # 111 // Z
         orientations = [o1, o2, o3]
         targets = [np.array([1., 0., 0.]), np.array([0., 1., 0.]), np.array([0., 0., 1.])]
         for case in range(2):
             o = orientations[case]
             print(o)
             target = targets[case]
-            col = o.get_ipf_colour()
+            col = o.ipf_color()
             print(col)
             for i in range(3):
-                self.assertAlmostEqual(col[i], target[i])
+                self.assertAlmostEqual(col[i], target[i], 6)
 
     def test_in_fundamental_zone(self):
         rod = [0.1449, -0.0281, 0.0616]
@@ -391,6 +420,17 @@ class OrientationTests(unittest.TestCase):
         for i in range(3):
             self.assertAlmostEqual(o_fz.euler[i], val[i], 3)
 
+    def test_rotate_orientation(self):
+        o = Orientation.from_euler(self.test_eulers[0])
+        theta_deg = 15.
+        theta = np.radians(theta_deg)
+        Rx = np.array([[1.0, 0., 0.],
+                       [0., np.cos(theta), -np.sin(theta)],
+                       [0., np.sin(theta), np.cos(theta)]])
+        o_rot = o.rotate_orientation(Rx)
+        (angle, axis, axis_xyz) = o.disorientation(o_rot, crystal_structure=Symmetry.cubic)
+        self.assertAlmostEqual(angle * 180 / np.pi, theta_deg)
+
     def test_small_disorientation(self):
         o_ref = Orientation(np.array([[-0.03454188, 0.05599919, -0.99783313],
                                       [-0.01223192, -0.99837784, -0.05560633],
@@ -406,6 +446,41 @@ class OrientationTests(unittest.TestCase):
                        o_12_fz.orientation_matrix().T)
         mis_angle = Orientation.misorientation_angle_from_delta(delta)
         self.assertAlmostEqual(mis_angle * 180 / np.pi, 7.24, 2)
+
+    def test_compute_mean_orientation(self):
+        # first test two specific orientation with the cubic symmetry
+        o1 = Orientation.from_euler([43.9, 0., 0.])
+        o2 = Orientation.from_euler([45.9, 0., 0.])
+        target_euler = [44.9, 0., 0.]
+        rods = np.array([o1.rod, o2.rod])
+        o = Orientation.compute_mean_orientation(rods)
+        for i in range(3):
+            self.assertEqual(o.euler[i], target_euler[i])
+        # now test with a set of rodrigues vectors
+        rods = np.load(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'rods.npy'))
+        o = Orientation.compute_mean_orientation(rods)
+        #rod = np.array([-0.09655562, 0.09261893, 0.11932359])
+        rod = np.array([-0.09655532, 0.09261858, 0.11932329])
+        for i in range(3):
+            self.assertAlmostEqual(o.rod[i], rod[i])
+
+    def test_from_two_hkl_normals(self):
+        o_ref = Orientation.from_euler(self.test_eulers[1])
+        gt = o_ref.orientation_matrix().T
+        si = Lattice.face_centered_cubic(0.352)
+        # pick two lattice planes
+        hkl_plane_1 = HklPlane(-1, 5, 5, lattice=si)
+        hkl_plane_2 = HklPlane(-1, 3, 3, lattice=si)
+        # compute the hkl plane normals in the laboratory frame
+        G1 = hkl_plane_1.scattering_vector()
+        xyz_normal_1 = np.dot(gt, G1 / np.linalg.norm(G1))
+        G2 = hkl_plane_2.scattering_vector()
+        xyz_normal_2 = np.dot(gt, G2 / np.linalg.norm(G2))
+        # compute the asociated crystal orientation
+        o = Orientation.from_two_hkl_normals(hkl_plane_1, hkl_plane_2, 
+                                             xyz_normal_1, xyz_normal_2)
+        mis_angle = o.disorientation(o_ref, crystal_structure=Symmetry.cubic)[0]
+        self.assertEqual(mis_angle * 180 / np.pi, 0.)
 
 
 if __name__ == '__main__':

@@ -12,4 +12,4 @@ tqdm
 scikit-image 
 scikit-learn
 pytest 
--e git+https://github.com/basileMarchand/basictools-frozen.git#egg=basictoolsfrozen
+BasicToolsFrozen

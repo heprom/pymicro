@@ -8,7 +8,6 @@ __version__ = '0.5.3'
 
 import pathlib as pl 
 import os 
-import requests
 
 DATASET_SOURCE = "https://raw.githubusercontent.com/heprom/pymicro-data/main"
 
@@ -27,6 +26,7 @@ def download_data( fname, cache=True):
         data_file.parent.mkdir(parents=True, exist_ok=True)
         url = f"{DATASET_SOURCE}/{fname}"
         print(f"Downloading {url} to {data_file}")
+        import requests # pylint: disable=import-outside-toplevel
         response = requests.get(url)
         if response.status_code != 200:
             raise ValueError(f"Could not download {url}")

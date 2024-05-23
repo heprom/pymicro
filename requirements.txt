@@ -11,5 +11,6 @@ networkx
 tqdm
 scikit-image 
 scikit-learn
+requests
 pytest 
 BasicToolsFrozen

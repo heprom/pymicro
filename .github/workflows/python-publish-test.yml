@@ -9,7 +9,6 @@
 name: Test Upload Python Package
 
 on:
-  push:
   release:
     types: [published]
   workflow_dispatch:

@@ -36,3 +36,17 @@ def download_data( fname, cache=True):
     else:
         print(f"Use cached file {data_file}")
     return data_file
+
+def dowload_datadir():
+    """Download the data directory
+
+    Returns:
+        pl.Path: the path to the data directory
+    """
+    data_home = get_cache_dir()
+    fpath = download_data("inventory.txt", cache=False)
+    with fpath.open() as fid:
+        for line in fid:
+            fname = line.strip()
+            download_data(fname)
+    return data_home

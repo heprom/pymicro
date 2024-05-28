@@ -5085,8 +5085,11 @@ class Microstructure(SampleData):
         """
         if data_dir == '.':
             data_dir = os.getcwd()
+        if isinstance(data_dir, Path):
+            data_dir = str(data_dir)
         if data_dir.endswith(os.sep):
             data_dir = data_dir[:-1]
+        
         scan = data_dir.split(os.sep)[-1]
         print('creating microstructure for DCT scan %s' % scan)
         filename = os.path.join(data_dir, scan)

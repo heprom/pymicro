@@ -1107,7 +1107,7 @@ class SampleData:
             raise tables.NodeError('{} is not a grid, cannot add a field data'
                                    ' array in this group.'.format(gridname))
         # Get storage location for field data array
-        if (location is None) and replace:
+        if replace and location is None:
             # if replace, try to get the parent node of the possibly
             # existing node to replace
             node_field = self.get_node(fieldname)

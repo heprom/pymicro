@@ -2872,6 +2872,78 @@ class Microstructure(SampleData):
                            location='CellData')
         return orientation_map
 
+    def add_grain_lattices_representation(self):
+        """Add a mesh with one cell per grain representing the crystal lattices.
+
+        This function create a mesh with one cell per grain. Each cell is a hexahedron
+        shaped as the crystal lattice and sclaed by the grain size. A scalar field 
+        of the grain ids is also attached to the mesh.
+
+        :note: The case of hexagonal lattice is handled by putting together 3 hexahedrons 
+        to build a hexagonal prism since the VTK_HEXAGONAL_PRISM topology is not presently
+        supported by the XDMF format.
+        """
+        lattice = self.get_phase().get_lattice()
+        coords, edges, faces = lattice.get_points(origin='mid', handle_hexagonal=False)
+        grain_ids = self.get_grain_ids()
+        sizes = self.get_grain_volumes()
+        centers = self.get_grain_centers()
+        n = self.get_number_of_grains()
+
+        # local function to insert a new cell representing one lattice
+        def insert_grain_lattice_cell(grid, id_offset, om, coords, center, size):
+            coords_rot = np.empty_like(coords)
+            assert len(coords) == 8
+            Ids = vtk.vtkIdList()
+            hexahedron_order = [0, 1, 3, 2, 4, 5, 7, 6]
+            for k, coord in enumerate(coords):
+                # scale coordinates with the grain size and center on the grain
+                coords_rot[k] = center + np.sqrt(size) * np.dot(om.T, coord)
+                points.InsertNextPoint(coords_rot[k])
+                Ids.InsertNextId(id_offset + hexahedron_order[k])                        
+            grid.InsertNextCell(vtk.VTK_HEXAHEDRON, Ids)
+
+        # vtkPoints instance for all the vertices
+        points = vtk.vtkPoints()
+        # vtkUnstructuredGrid instance for all the cells
+        grid = vtk.vtkUnstructuredGrid()
+        grid.SetPoints(points)
+        if lattice.get_symmetry() is Symmetry.hexagonal:
+            grid.Allocate(3 * n, 1)
+        else:
+            grid.Allocate(n, 1)
+        id_offset = 0
+
+        for g in tqdm(self.grains, desc='creating lattice cell for all grains'):
+            gid = g['idnumber']
+            center = g['center']
+            size = g['volume']
+            om = self.get_grain(gid).orientation.orientation_matrix()
+            insert_grain_lattice_cell(grid, id_offset, om, coords, center, size)
+            id_offset += len(coords)
+            if lattice.get_symmetry() is Symmetry.hexagonal:
+                # handle hexagonal case by creating 3 hexahedrons
+                euler = self.get_grain(gid).orientation.euler
+                om = Orientation.from_euler(euler + np.array([0., 0. , 120.])).orientation_matrix()
+                insert_grain_lattice_cell(grid, id_offset, om, coords, center, size)
+                id_offset += len(coords)
+                om = Orientation.from_euler(euler + np.array([0., 0. , 240.])).orientation_matrix()
+                insert_grain_lattice_cell(grid, id_offset, om, coords, center, size)
+                id_offset += len(coords)
+
+        from vtk.util import numpy_support
+        grain_ids_array = numpy_support.numpy_to_vtk(grain_ids)
+        if lattice.get_symmetry() is Symmetry.hexagonal:
+            grain_ids_array = numpy_support.numpy_to_vtk(np.repeat(grain_ids, 3))
+        grain_ids_array.SetName('grain_ids')
+        grid.GetCellData().AddArray(grain_ids_array)
+
+        # now add the created mesh to the microstructure
+        from BasicTools.Containers import vtkBridge
+        mesh = vtkBridge.VtkToMesh(grid)
+        self.add_mesh(mesh_object=mesh, location='/MeshData', meshname='grain_lattices',
+                      indexname='mesh_grain_lattices', replace=True)
+        
     def fz_grain_orientation_data(self, grain_id, plot=True, move_to_fz=True):
         """Plot the orientation data for this grain.
 
@@ -4939,6 +5011,9 @@ class Microstructure(SampleData):
             in the microstructure fields.
         :param str grain_map_key: string defining the path to the grain map
             (GrainId by default).
+        :param bool recompute_mean_orientation: it True, the orientation of 
+            each grain is computed from the rodrigues map (this may take a 
+            long time).
         :return: a `Microstructure` instance created from the labDCT
             reconstruction file.
         """
@@ -5028,19 +5103,22 @@ class Microstructure(SampleData):
                 else:
                     IPF001_map = m.create_IPF_map(axis=np.array([0., 0., 1.]))
                 m.add_field(gridname='CellData', fieldname='IPF001_map',
-                            array=IPF001_map)
+                            array=IPF001_map, 
+                            compression_options=m.default_compression_options)
                 if 'IPF010' in f['LabDCT/Data']:
                     IPF010_map = f['LabDCT/Data/IPF010'][()].transpose(2, 1, 0, 3)
                 else:
                     IPF010_map = m.create_IPF_map(axis=np.array([0., 1., 0.]))
                 m.add_field(gridname='CellData', fieldname='IPF010_map',
-                            array=IPF010_map)
+                            array=IPF010_map, 
+                            compression_options=m.default_compression_options)
                 if 'IPF100' in f['LabDCT/Data']:
                     IPF100_map = f['LabDCT/Data/IPF100'][()].transpose(2, 1, 0, 3)
                 else:
                     IPF100_map = m.create_IPF_map(axis=np.array([1., 0., 0.]))
                 m.add_field(gridname='CellData', fieldname='IPF100_map',
-                            array=IPF100_map)
+                            array=IPF100_map, 
+                            compression_options=m.default_compression_options)
                 del IPF001_map, IPF010_map, IPF100_map
         return m
 

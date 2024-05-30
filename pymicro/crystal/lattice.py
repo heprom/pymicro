@@ -780,10 +780,11 @@ class Lattice:
         #g = self.matrix.dot(self.matrix.T)
         return g
 
-    def get_points(self, origin=(0., 0., 0.)):
+    def get_points(self, origin=(0., 0., 0.), handle_hexagonal=True):
         """Method to get the coordinates of the primitive unit cell.
         
         :param origin: the origin
+        :param bool handle_hexagonal: if True, a full hexagonal lattice is described, if false only the primitive cell.
         :return: the points coordinates and a list of the point ids to draw the edges of the lattice.
         """
         (a, b, c) = self._lengths
@@ -795,7 +796,7 @@ class Lattice:
         if isinstance(origin, tuple):
             origin = np.array(origin)
 
-        if self.get_symmetry() is Symmetry.hexagonal:
+        if self.get_symmetry() is Symmetry.hexagonal and handle_hexagonal:
             print('handling hexagonal lattice')
             # array with the lattice point coordinates
             coords = np.empty((12, 3), 'f')

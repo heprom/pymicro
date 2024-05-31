@@ -64,14 +64,15 @@ class OimPhase(CrystallinePhase):
         gamma = h5_phase_path[phase_id][key_gamma][0]
         lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
         phase.set_lattice(lattice)
-        hkl_key = 'hkl Families'
-        for row in h5_phase_path[phase_id][hkl_key]:
-            family = OimHklFamily()
-            family.hkl = [row[0], row[1], row[2]]
-            family.useInIndexing = row[4]
-            family.diffractionIntensity = row[3]
-            family.showBands = row[5]
-            phase.hklFamilies.append(family)
+        hkl_key = 'hkl  Families'
+        if hkl_key in h5_phase_path[phase_id].keys():
+            for row in h5_phase_path[phase_id][hkl_key]:
+                family = OimHklFamily()
+                family.hkl = [row[0], row[1], row[2]]
+                family.useInIndexing = row[4]
+                family.diffractionIntensity = row[3]
+                family.showBands = row[5]
+                phase.hklFamilies.append(family)
         phase.categories = [0, 0, 0, 0, 0]
         return phase
 
@@ -607,9 +608,9 @@ class OimScan:
           This function is not vectorized and will be slow for large EBSD maps.
 
         """
-        self.ipf001 = np.empty_like(self.euler)
-        self.ipf010 = np.empty_like(self.euler)
-        self.ipf100 = np.empty_like(self.euler)
+        self.ipf001 = np.zeros_like(self.euler)
+        self.ipf010 = np.zeros_like(self.euler)
+        self.ipf100 = np.zeros_like(self.euler)
         # compute ipf color for each pixel (ignore non assigned pixels)
         time.sleep(0.2)  # prevent tqdm from messing in the output
         for phase in self.phase_list:

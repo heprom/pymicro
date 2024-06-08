@@ -1854,9 +1854,9 @@ class Microstructure(SampleData):
 #TODO: refactor class
 #TODO: open in protected mode --> no modification of datasets allowed
     def __init__(self,
-                 filename=None, name='micro', description='empty',
-                 verbose=False, overwrite_hdf5=False,
-                 phase=None, autodelete=False):
+                filename=None, name='micro', description='empty',
+                verbose=False, overwrite_hdf5=False,
+                phase=None, autodelete=False):
         if filename is None:
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
@@ -1882,9 +1882,9 @@ class Microstructure(SampleData):
         self.default_compression_options = {'complib': 'zlib', 'complevel': 5}
         if self._file_exist:
             self.active_grain_map = self.get_attribute('active_grain_map',
-                                                       'CellData')
+                                                        'CellData')
             self.active_phase_map = self.get_attribute('active_phase_map',
-                                                       'CellData')
+                                                        'CellData')
             if self.active_grain_map is None:
                 # set active grain map to 'grain_map' if none exist
                 self.set_active_grain_map()
@@ -4775,28 +4775,29 @@ class Microstructure(SampleData):
 
     @staticmethod
     def from_dream3d(file_path,
-                     main_key='DataContainers',
-                     data_container='DataContainer',
-                     ensemble_data='EnsembleData',
-                     grain_data='FeatureData',
-                     grain_orientations='AvgEulerAngles',
-                     grain_orientations_type='euler',
-                     grain_centroids='Centroids',
-                     cell_data='CellData',
-                     grain_ids='FeatureIds',
-                     mask='Mask',
-                     phases='Phases',
-                     orientations='EulerAngles',
-                     orientations_type='euler',
-                     ipf_color='IPFColor'
-                     ):
+                    main_key='DataContainers',
+                    data_container='DataContainer',
+                    phase_data='EnsembleData',
+                    phases_names='PhaseName',
+                    grain_data='FeatureData',
+                    grain_orientations='AvgEulerAngles',
+                    grain_orientations_type='euler',
+                    grain_centroids='Centroids',
+                    cell_data='CellData',
+                    grain_ids='FeatureIds',
+                    mask='Mask',
+                    phases='Phases',
+                    orientations='EulerAngles',
+                    orientations_type='euler',
+                    ipf_color='IPFColor'
+                    ):
         """Read a microstructure from a Dream3d hdf5 file.
 
         :param str file_path: the path to the hdf5 file to read.
         :param str main_key: the string describing the main key group.
         :param str data_container: the string describing the data container
             group in the file.
-        :param str ensemble_data: the string describing the ensemble data group
+        :param str phase_data: the string describing the ensemble data group
             in the file.
         :param str grain_data: the string describing the grain data group in the
             hdf5 file.
@@ -4824,19 +4825,24 @@ class Microstructure(SampleData):
         tail = tail.strip('.dream3d')
         with h5py.File(file_path, 'r') as f:
             # get information on the material phases
-            phases_data_path = '%s/%s/%s' % (main_key, data_container, ensemble_data)
-            phase_names = f[phases_data_path]['MaterialName'][()]
-            n_phases = len(phase_names) - 1  # skip background
+            phases_data_path = '%s/%s/%s' % (main_key, data_container, phase_data)
+            ph_names = f[phases_data_path][phases_names][()]
+            n_phases = len(ph_names) - 1  # skip background
             phase_list = []
             for i_phase in range(n_phases):
                 phase_id = i_phase + 1
-                n = int(f[phases_data_path]['CrystalStructures'][()][phase_id])
-                lattice_constants = f[phases_data_path]['LatticeConstants'][()][phase_id]
-                for i in range(3):
-                    lattice_constants[i] = lattice_constants[i] / 10  # use nm unit
-                # print('found phase with crystal structure %d' % n)
-                l = Lattice.from_parameters(*lattice_constants, symmetry=Symmetry.from_dream3d(n))
-                phase = CrystallinePhase(phase_id=phase_id, name=phase_names[phase_id], lattice=l)
+                try:
+                    n = int(f[phases_data_path]['CrystalStructures'][()][phase_id])
+                    print('found phase with crystal structure %d' % n)
+                    lattice_constants = f[phases_data_path]['LatticeConstants'][()][phase_id]
+                    for i in range(3):
+                        lattice_constants[i] = lattice_constants[i] / 10  # use nm unit
+                    l = Lattice.from_parameters(*lattice_constants, symmetry=Symmetry.from_dream3d(n))
+                except:
+                    # no lattice parameters found in dream3D file 
+                    print('No crystal structure data found. Adding default cubic phase')
+                    l = Lattice.cubic(1.0)
+                phase = CrystallinePhase(phase_id=phase_id, name=ph_names[phase_id], lattice=l)
                 phase_list.append(phase)
             # initialize our microstructure
             micro = Microstructure(name=tail, phase=phase_list, overwrite_hdf5=True)
@@ -4861,8 +4867,8 @@ class Microstructure(SampleData):
                 if centroids is not None:
                     centroids = centroids[1:]
             micro.add_grains(grain_orientations,
-                             orientation_type=grain_orientations_type,
-                             grain_ids=gids)
+                            orientation_type=grain_orientations_type,
+                            grain_ids=gids)
             if centroids is not None:
                 micro.set_centers(centroids)
             # print('%d grains in the data set' % micro.get_number_of_grains())
@@ -4876,11 +4882,13 @@ class Microstructure(SampleData):
             grain_ids = f[cell_data_path][grain_ids][:, :, :, 0].transpose()
             cell_data_shape = grain_ids.shape
             print('CellData dimensions:', cell_data_shape)
-            mask = f[cell_data_path][mask][:, :, :, 0].transpose()
             # now assign these arrays to the microstructure
             micro.set_grain_map(grain_ids, voxel_size=voxel_size)
             micro.set_origin('CellData', origin)
-            micro.set_mask(mask)
+            # add mask array if needed 
+            if mask in f[cell_data_path].keys():
+                mask = f[cell_data_path][mask][:, :, :, 0].transpose()
+                micro.set_mask(mask)
             # add phase map array if needed
             if phases in f[cell_data_path].keys():
                 phase_map = f[cell_data_path][phases][:, :, :, 0].transpose()
@@ -4911,10 +4919,10 @@ class Microstructure(SampleData):
                     get_object=False, dst_name=None, autodelete=False):
         """ Initiate a new SampleData object and files from existing one"""
         SampleData.copy_sample(src_micro_file, dst_micro_file, overwrite,
-                               new_sample_name=dst_name)
+                                new_sample_name=dst_name)
         if get_object:
             return Microstructure(filename=dst_micro_file,
-                                  autodelete=autodelete)
+                                    autodelete=autodelete)
         else:
             return
 

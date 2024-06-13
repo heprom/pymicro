@@ -704,7 +704,7 @@ class OimScan:
                     for neighbor in neighbor_list:
                         # check misorientation
                         o_neighbor = Orientation.from_euler(np.degrees(self.euler[neighbor]))
-                        mis, _, _ = o.disorientation(o_neighbor, crystal_structure=sym)
+                        mis, _, _ = o.Q_disorientation(o_neighbor, crystal_structure=sym)
                         if mis * 180 / np.pi < tol:
                             # add to this grain
                             grain_ids[neighbor] = n_grains

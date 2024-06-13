@@ -6,27 +6,12 @@ import enum
 import functools
 from math import sin, cos, sqrt, gcd
 import numpy as np
-from numpy import pi, dot, transpose, radians
+from numpy import pi, dot, transpose, radians, linalg
 from matplotlib import pyplot as plt
-
-def OrientationMatrix2Quaternion_bis(g, P=1):
-        q0 = 0.5 * np.sqrt(1 + g[0, 0] + g[1, 1] + g[2, 2])
-        q1 = P * 0.5 * np.sqrt(1 + g[0, 0] - g[1, 1] - g[2, 2])
-        q2 = P * 0.5 * np.sqrt(1 - g[0, 0] + g[1, 1] - g[2, 2])
-        q3 = P * 0.5 * np.sqrt(1 - g[0, 0] - g[1, 1] + g[2, 2])
-
-        if g[2, 1] < g[1, 2]:
-            q1 = q1 * -1
-        elif g[0, 2] < g[2, 0]:
-            q2 = q2 * -1
-        elif g[1, 0] < g[0, 1]:
-            q3 = q3 * -1
-
-        q = np.array([q0, q1, q2, q3])
-        return q
+from pymicro.crystal.rotation import om2ro, ro2qu, qu2om, om2qu
 
 def Quaternion2OrientationMatrix_bis(q):
-        P = -1
+        P = 1
         (q0, q1, q2, q3) = q
         qbar = q0 ** 2 - q1 ** 2 - q2 ** 2 - q3 ** 2
         g = np.array([[qbar + 2 * q1 ** 2, 2 * (q1 * q2 - P * q0 * q3), 2 * (q1 * q3 + P * q0 * q2)],
@@ -35,64 +20,64 @@ def Quaternion2OrientationMatrix_bis(q):
         return g
 
 Q_cubic = np.zeros((24, 4), dtype=float)
-Q_cubic[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
-Q_cubic[1] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]]))
-Q_cubic[2] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]]))
-Q_cubic[3] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
-Q_cubic[4] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., 1.], [0., 1., 0.], [-1., 0., 0.]]))
-Q_cubic[5] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]]))
-Q_cubic[6] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
-Q_cubic[7] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]]))
-Q_cubic[8] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]))
-Q_cubic[9] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
-Q_cubic[10] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]]))
-Q_cubic[11] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., 1.], [1., 0., 0.], [0., 1., 0.]]))
-Q_cubic[12] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [0., 0., 1.], [1., 0., 0.]]))
-Q_cubic[13] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., -1.], [-1., 0., 0.], [0., 1., 0.]]))
-Q_cubic[14] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [0., 0., 1.], [-1., 0., 0.]]))
-Q_cubic[15] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [0., 0., -1.], [-1., 0., 0.]]))
-Q_cubic[16] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., -1.], [1., 0., 0.], [0., -1., 0.]]))
-Q_cubic[17] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., 1.], [-1., 0., 0.], [0., -1., 0.]]))
-Q_cubic[18] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [0., 0., -1.], [1., 0., 0.]]))
-Q_cubic[19] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]]))
-Q_cubic[20] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 0., 1.], [0., 1., 0.]]))
-Q_cubic[21] = OrientationMatrix2Quaternion_bis(np.array([[0., 0., 1.], [0., -1., 0.], [1., 0., 0.]]))
-Q_cubic[22] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]]))
-Q_cubic[23] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]]))
+Q_cubic[0] = om2qu(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_cubic[1] = om2qu(np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]]))
+Q_cubic[2] = om2qu(np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]]))
+Q_cubic[3] = om2qu(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
+Q_cubic[4] = om2qu(np.array([[0., 0., 1.], [0., 1., 0.], [-1., 0., 0.]]))
+Q_cubic[5] = om2qu(np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]]))
+Q_cubic[6] = om2qu(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
+Q_cubic[7] = om2qu(np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]]))
+Q_cubic[8] = om2qu(np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]))
+Q_cubic[9] = om2qu(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
+Q_cubic[10] = om2qu(np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]]))
+Q_cubic[11] = om2qu(np.array([[0., 0., 1.], [1., 0., 0.], [0., 1., 0.]]))
+Q_cubic[12] = om2qu(np.array([[0., 1., 0.], [0., 0., 1.], [1., 0., 0.]]))
+Q_cubic[13] = om2qu(np.array([[0., 0., -1.], [-1., 0., 0.], [0., 1., 0.]]))
+Q_cubic[14] = om2qu(np.array([[0., -1., 0.], [0., 0., 1.], [-1., 0., 0.]]))
+Q_cubic[15] = om2qu(np.array([[0., 1., 0.], [0., 0., -1.], [-1., 0., 0.]]))
+Q_cubic[16] = om2qu(np.array([[0., 0., -1.], [1., 0., 0.], [0., -1., 0.]]))
+Q_cubic[17] = om2qu(np.array([[0., 0., 1.], [-1., 0., 0.], [0., -1., 0.]]))
+Q_cubic[18] = om2qu(np.array([[0., -1., 0.], [0., 0., -1.], [1., 0., 0.]]))
+Q_cubic[19] = om2qu(np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]]))
+Q_cubic[20] = om2qu(np.array([[-1., 0., 0.], [0., 0., 1.], [0., 1., 0.]]))
+Q_cubic[21] = om2qu(np.array([[0., 0., 1.], [0., -1., 0.], [1., 0., 0.]]))
+Q_cubic[22] = om2qu(np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]]))
+Q_cubic[23] = om2qu(np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]]))
 
 Q_hex = np.zeros((12, 4), dtype=float)
 s60 = np.sin(60 * np.pi / 180)
-Q_hex[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
-Q_hex[1] = OrientationMatrix2Quaternion_bis(np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]]))
-Q_hex[2] = OrientationMatrix2Quaternion_bis(np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]]))
-Q_hex[3] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
-Q_hex[4] = OrientationMatrix2Quaternion_bis(np.array([[-0.5, -s60, 0.], [s60, -0.5, 0.], [0., 0., 1.]]))
-Q_hex[5] = OrientationMatrix2Quaternion_bis(np.array([[0.5, -s60, 0.], [s60, 0.5, 0.], [0., 0., 1.]]))
-Q_hex[6] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
-Q_hex[7] = OrientationMatrix2Quaternion_bis(np.array([[0.5, s60, 0.], [s60, -0.5, 0.], [0., 0., -1.]]))
-Q_hex[8] = OrientationMatrix2Quaternion_bis(np.array([[-0.5, s60, 0.], [s60, 0.5, 0.], [0., 0., -1.]]))
-Q_hex[9] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
-Q_hex[10] = OrientationMatrix2Quaternion_bis(np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]]))
-Q_hex[11] = OrientationMatrix2Quaternion_bis(np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]]))
+Q_hex[0] = om2qu(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_hex[1] = om2qu(np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]]))
+Q_hex[2] = om2qu(np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]]))
+Q_hex[3] = om2qu(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
+Q_hex[4] = om2qu(np.array([[-0.5, -s60, 0.], [s60, -0.5, 0.], [0., 0., 1.]]))
+Q_hex[5] = om2qu(np.array([[0.5, -s60, 0.], [s60, 0.5, 0.], [0., 0., 1.]]))
+Q_hex[6] = om2qu(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
+Q_hex[7] = om2qu(np.array([[0.5, s60, 0.], [s60, -0.5, 0.], [0., 0., -1.]]))
+Q_hex[8] = om2qu(np.array([[-0.5, s60, 0.], [s60, 0.5, 0.], [0., 0., -1.]]))
+Q_hex[9] = om2qu(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
+Q_hex[10] = om2qu(np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]]))
+Q_hex[11] = om2qu(np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]]))
 
 Q_ortho = np.zeros((4, 4), dtype=float)
-Q_ortho[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
-Q_ortho[1] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
-Q_ortho[2] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]]))
-Q_ortho[3] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
+Q_ortho[0] = om2qu(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_ortho[1] = om2qu(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
+Q_ortho[2] = om2qu(np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]]))
+Q_ortho[3] = om2qu(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
 
 Q_tetra = np.zeros((8, 4), dtype=float)
-Q_tetra[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
-Q_tetra[1] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]))
-Q_tetra[2] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
-Q_tetra[3] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]]))
-Q_tetra[4] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
-Q_tetra[5] = OrientationMatrix2Quaternion_bis(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
-Q_tetra[6] = OrientationMatrix2Quaternion_bis(np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]]))
-Q_tetra[7] = OrientationMatrix2Quaternion_bis(np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]]))
+Q_tetra[0] = om2qu(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_tetra[1] = om2qu(np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]))
+Q_tetra[2] = om2qu(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
+Q_tetra[3] = om2qu(np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]]))
+Q_tetra[4] = om2qu(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
+Q_tetra[5] = om2qu(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
+Q_tetra[6] = om2qu(np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]]))
+Q_tetra[7] = om2qu(np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]]))
 
 Q_tri = np.zeros((1, 4), dtype=float)
-Q_tri[0] = OrientationMatrix2Quaternion_bis(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
+Q_tri[0] = om2qu(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
 
 class Crystal:
     """
@@ -103,6 +88,9 @@ class Crystal:
      * one of the 14 Bravais lattice
      * a point basis (or motif)
     """
+
+    def fun_test():
+        return Q_hex
 
     def __init__(self, lattice, basis=None, basis_labels=None, basis_sizes=None, basis_colors=None):
         """

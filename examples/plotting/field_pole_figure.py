@@ -1,6 +1,8 @@
 from pymicro.crystal.microstructure import *
 from pymicro.crystal.texture import *
-from pymicro.examples import PYMICRO_EXAMPLES_DATA_DIR
+
+from pymicro import get_examples_data_dir # import file directory path
+PYMICRO_EXAMPLES_DATA_DIR = get_examples_data_dir() # get the file directory path
 
 from matplotlib import pyplot as plt, colors, colorbar, cm
 import pathlib as pl 

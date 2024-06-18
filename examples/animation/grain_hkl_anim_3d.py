@@ -6,7 +6,8 @@ from pymicro.view.vtk_anim import vtkAnimationScene, vtkRotateActorAroundZAxis
 from pymicro.crystal.lattice import HklPlane
 from pymicro.crystal.microstructure import Orientation, Grain
 
-from pymicro.examples import PYMICRO_EXAMPLES_DATA_DIR
+from pymicro import get_examples_data_dir # import file directory path
+PYMICRO_EXAMPLES_DATA_DIR = get_examples_data_dir() # get the file directory path
 
 data_dir = PYMICRO_EXAMPLES_DATA_DIR
 scan = 'grain1_112x112x121_uint8.raw'

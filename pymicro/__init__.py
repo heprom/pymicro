@@ -50,3 +50,24 @@ def dowload_datadir():
             fname = line.strip()
             download_data(fname)
     return data_home
+
+PYMICRO_ROOT_DIR = pl.Path(__file__).parent.parent
+
+def get_examples_data_dir(download_if_required=True) -> pl.Path:
+    """Get the path to the examples data directory
+
+    Returns:
+        pl.Path: the path to the examples data directory
+    """
+    
+    data_home = os.environ.get("PYMICRO_DATA", pl.Path.home() / ".pymicro_data")
+    if data_home.exists():
+        PYMICRO_EXAMPLES_DATA_DIR = pl.Path(data_home)
+    elif download_if_required:
+        PYMICRO_EXAMPLES_DATA_DIR = dowload_datadir()
+    else:
+        raise ValueError("Examples data directory does not exist, please specify environment variable PYMICRO_DATA or download the data directory")
+            
+    return PYMICRO_EXAMPLES_DATA_DIR
+
+PYMICRO_XRAY_DATA_DIR = os.path.join(PYMICRO_ROOT_DIR, 'pymicro', 'xray', 'data')

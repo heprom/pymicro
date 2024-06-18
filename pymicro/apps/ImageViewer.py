@@ -8,8 +8,8 @@ from matplotlib.figure import Figure
 import matplotlib.image as mpimg
 
 from matplotlib.backend_bases import key_press_handler
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QHBoxLayout, QVBoxLayout, QComboBox, QLabel, QCheckBox
 from PyQt5.QtCore import Qt

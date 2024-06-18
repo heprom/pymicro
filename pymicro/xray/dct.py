@@ -438,7 +438,7 @@ class DctForwardSimulation(ForwardSimulation):
         index = np.argmax(self.omegas > omega)
         dif_grains = self.reflexions[index - 1]  # grains diffracting between omegas[index - 1] and omegas[index]
         # intialize image result
-        full_proj = np.zeros(detector.get_size_px(), dtype=np.float)
+        full_proj = np.zeros(detector.get_size_px(), dtype=np.float64)
         lambda_nm = lambda_keV_to_nm(lambda_keV)
         omegar = omega * np.pi / 180
         R = np.array([[np.cos(omegar), -np.sin(omegar), 0], [np.sin(omegar), np.cos(omegar), 0], [0, 0, 1]])

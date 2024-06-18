@@ -27,6 +27,10 @@ from BasicTools.Containers.UnstructuredMesh import (UnstructuredMesh,
 import BasicTools.Containers.UnstructuredMeshCreationTools as UMCT
 from BasicTools.Containers.MeshBase import MeshBase
 from BasicTools.IO.XdmfTools import XdmfName,XdmfNumber
+from BasicTools.IO.UniversalReader import ReadMesh, InitAllReaders
+
+InitAllReaders()
+
 # Import variables for XDMF binding
 from pymicro.core.global_variables import (XDMF_FIELD_TYPE,
                                            XDMF_IMAGE_GEOMETRY,
@@ -1756,6 +1760,7 @@ class SampleData:
         mesh_object = UnstructuredMesh()
         # Get mesh nodes
         mesh_object.nodes = self.get_mesh_nodes(meshname, as_numpy)
+        print(mesh_object.nodes.flags)
         # No mesh ID for now --> create mesh Ids
         mesh_object.originalIDNodes = self.get_mesh_nodesID(meshname, as_numpy)
         # Get node tags
@@ -1942,12 +1947,12 @@ class SampleData:
                                      ''.format(element_type[i]))
                 if get_eltype_connectivity == element_type[i]:
                     return local_connect[:,id_offset:]
-                Elements.connectivity = local_connect[:,id_offset:]
+                Elements.connectivity = np.ascontiguousarray(local_connect[:,id_offset:])
                 Elements.cpt = Nelems[i]
                 offset = Nvalues
             elif Topology == 'Uniform':
-                Elements.connectivity = connectivity.reshape((Nelems[i],
-                                                              Nnode_per_el))
+                Elements.connectivity = np.ascontiguousarray(connectivity.reshape((Nelems[i],
+                                                              Nnode_per_el)))
                 Elements.cpt = Nelems[i]
                 if get_eltype_connectivity == element_type[i]:
                     return Elements.connectivity
@@ -3282,7 +3287,8 @@ class SampleData:
         if name_or_node is None:
             return None
         # name_or_node is a string or else
-        name_tmp = ('/%s' % name_or_node).replace('//', '/')
+        name_tmp = f"{'/' if not str(name_or_node).startswith('/') else ''}{name_or_node}"
+
         if self.h5_dataset.__contains__(name_tmp):
             # name is a path in hdf5 tree data
             path = name_tmp
@@ -3978,7 +3984,7 @@ class SampleData:
         # Get mesh group indexname
         indexname_tmp = self.get_indexname_from_path(mesh_group._v_pathname)
         # Creating topology array
-        data = np.empty((0,),dtype=np.int)
+        data = np.empty((0,),dtype=np.int32)
         for i in range(len(topology_attributes['element_type'])):
             element_type = topology_attributes['element_type'][i]
             elements = mesh_object.elements[element_type]
@@ -3987,7 +3993,7 @@ class SampleData:
                 # If mixed topology, add XDMF element type ID number
                 # before Nodes ID
                 xdmf_code = topology_attributes['Xdmf_elements_code'][i]
-                type_col = np.ones(shape=(data_tmp.shape[0],1), dtype=np.int)
+                type_col = np.ones(shape=(data_tmp.shape[0],1), dtype=np.int32)
                 if element_type == 'bar2':
                     data_tmp = np.concatenate((2*type_col, data_tmp),1)
                 if element_type == 'point1':
@@ -4285,6 +4291,13 @@ class SampleData:
         elif np.issubdtype(field.dtype, np.integer):
             NumberType = 'Int'
             Precision = str(field.dtype).strip('int')
+
+        else:
+            # BM : I  am not sure ... 
+            return 
+            
+    
+            
         Attribute_data = etree.Element(_tag='DataItem', Format='HDF',
                                        Dimensions=Dimension,
                                        NumberType=NumberType,

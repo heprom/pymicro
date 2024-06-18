@@ -160,7 +160,7 @@ if not 'READTHEDOCS' in os.environ.keys():  # if building locally
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {}
-html_theme_options['canonical_url'] = 'http://pymicro.readthedocs.io/en/latest/'
+html_theme_options['canonical_url'] = 'https://pymicro.readthedocs.io/en/latest/'
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".

@@ -12,3 +12,7 @@ include pymicro/crystal/cif/*
 
 # Include the x-ray data files
 include pymicro/xray/data/*
+
+include requirements.txt 
+
+include requirements-docs.txt

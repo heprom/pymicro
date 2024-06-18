@@ -561,7 +561,7 @@ def gnomonic_projection(detector, pixel_size=None, OC=None, verbose=False):
     # create the gnom.data array (zeros with pixels set to 1 for gnomonic projection points)
     gnom.data = np.zeros(gnom.size, dtype=np.uint8)
     # uvg_px = gnom.lab_to_pixel(uvg_mm)
-    uvg_px = np.zeros((uvg_mm.shape[0], 2), dtype=np.int)
+    uvg_px = np.zeros((uvg_mm.shape[0], 2), dtype=np.int32)
     for i in range(uvg_mm.shape[0]):
         uvg_px[i, :] = gnom.lab_to_pixel(uvg_mm[i, :])
     # filter out point outside the virtual detector
@@ -992,7 +992,7 @@ class LaueForwardSimulation(ForwardSimulation):
                                                        direction=K_vectors[i_vox * n_hkl + i_hkl])
                       for i_vox in range(n_vox)
                       for i_hkl in range(n_hkl)]  # size nb_vox * n_hkl
-        uv = [detector.lab_to_pixel(OR)[0].astype(np.int)
+        uv = [detector.lab_to_pixel(OR)[0].astype(np.int32)
               for OR in OR_vectors]
         # now construct a boolean list to select the diffraction spots
         if source.min_energy is None and source.max_energy is None:

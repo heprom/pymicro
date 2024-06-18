@@ -331,7 +331,7 @@ class Symmetry(enum.Enum):
         number of symmetries of the given crystal structure.
         """
         if self is Symmetry.cubic:
-            sym = np.zeros((24, 3, 3), dtype=float)
+            sym = np.zeros((24, 3, 3), dtype=np.float64)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
             sym[1] = np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]])
             sym[2] = np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]])
@@ -359,7 +359,7 @@ class Symmetry(enum.Enum):
         elif self is Symmetry.hexagonal:
             if use_miller_bravais:
               # using the Miller-Bravais representation here
-              sym = np.zeros((12, 4, 4), dtype=int)
+              sym = np.zeros((12, 4, 4), dtype=np.int32)
               sym[0] = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
               sym[1] = np.array([[0, 0, 1, 0], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
               sym[2] = np.array([[0, 1, 0, 0], [0, 0, 1, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
@@ -373,8 +373,8 @@ class Symmetry(enum.Enum):
               sym[10] = np.array([[0, 0, -1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, -1]])
               sym[11] = np.array([[0, -1, 0, 0], [0, 0, -1, 0], [-1, 0, 0, 0], [0, 0, 0, -1]])
             else:
-              sym = np.zeros((12, 3, 3), dtype=float)
-              s60 = sin(60 * np.pi / 180)
+              sym = np.zeros((12, 3, 3), dtype=np.float64)
+              s60 = np.sin(60 * np.pi / 180)
               sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
               sym[1] = np.array([[0.5, s60, 0.], [-s60, 0.5, 0.], [0., 0., 1.]])
               sym[2] = np.array([[-0.5, s60, 0.], [-s60, -0.5, 0.], [0., 0., 1.]])
@@ -388,13 +388,13 @@ class Symmetry(enum.Enum):
               sym[10] = np.array([[-0.5, -s60, 0.], [-s60, 0.5, 0.], [0., 0., -1.]])
               sym[11] = np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]])
         elif self is Symmetry.orthorhombic:
-            sym = np.zeros((4, 3, 3), dtype=float)
+            sym = np.zeros((4, 3, 3), dtype=np.float64)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
             sym[1] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
             sym[2] = np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]])
             sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
         elif self is Symmetry.tetragonal:
-            sym = np.zeros((8, 3, 3), dtype=float)
+            sym = np.zeros((8, 3, 3), dtype=np.float64)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
             sym[1] = np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])
             sym[2] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
@@ -404,7 +404,7 @@ class Symmetry(enum.Enum):
             sym[6] = np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]])
             sym[7] = np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])
         elif self is Symmetry.triclinic:
-            sym = np.zeros((1, 3, 3), dtype=float)
+            sym = np.zeros((1, 3, 3), dtype=np.float64)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
         else:
             raise ValueError('warning, symmetry not supported: %s' % self)

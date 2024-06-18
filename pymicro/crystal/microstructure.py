@@ -4092,7 +4092,10 @@ class Microstructure(SampleData):
         
         :return rag: the region adjency graph of this microstructure.
         """
-        from skimage.future import graph
+        try:
+            from skimage.future import graph
+        except ImportError:
+            from skimage import graph
 
         print('build the region agency graph for this microstructure')
         rag = graph.RAG(self.get_grain_map(), connectivity=1)
@@ -4603,7 +4606,7 @@ class Microstructure(SampleData):
                            description=zstd_res.dtype, data=zstd_res)
             grain_ids = self.get_grain_ids()
             n_zone_times = int(zstd_res.shape[0] / len(grain_ids))
-            dtype_col = np.dtype([('grain_ID', np.int)])
+            dtype_col = np.dtype([('grain_ID', np.int32)])
             IDs = np.tile(grain_ids, n_zone_times).astype(dtype_col)
             self.add_tablecols(tablename='MechanicalGrainDataTable',
                                description=IDs.dtype, data=IDs)
@@ -5160,8 +5163,11 @@ class Microstructure(SampleData):
         """
         if data_dir == '.':
             data_dir = os.getcwd()
+        if isinstance(data_dir, Path):
+            data_dir = str(data_dir)
         if data_dir.endswith(os.sep):
             data_dir = data_dir[:-1]
+        
         scan = data_dir.split(os.sep)[-1]
         print('creating microstructure for DCT scan %s' % scan)
         filename = os.path.join(data_dir, scan)

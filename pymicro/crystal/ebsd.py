@@ -64,14 +64,15 @@ class OimPhase(CrystallinePhase):
         gamma = h5_phase_path[phase_id][key_gamma][0]
         lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
         phase.set_lattice(lattice)
-        hkl_key = 'hkl Families'
-        for row in h5_phase_path[phase_id][hkl_key]:
-            family = OimHklFamily()
-            family.hkl = [row[0], row[1], row[2]]
-            family.useInIndexing = row[4]
-            family.diffractionIntensity = row[3]
-            family.showBands = row[5]
-            phase.hklFamilies.append(family)
+        hkl_key = 'hkl  Families'
+        if hkl_key in h5_phase_path[phase_id].keys():
+            for row in h5_phase_path[phase_id][hkl_key]:
+                family = OimHklFamily()
+                family.hkl = [row[0], row[1], row[2]]
+                family.useInIndexing = row[4]
+                family.diffractionIntensity = row[3]
+                family.showBands = row[5]
+                phase.hklFamilies.append(family)
         phase.categories = [0, 0, 0, 0, 0]
         return phase
 
@@ -493,12 +494,18 @@ class OimScan:
             scan.init_arrays()
             x = data[:, 1]
             y = data[:, 2]
+            # the x and y arrays describe a regular grid
+            x_values = np.linspace(x.min(), x.max(), scan.cols)
+            y_values = np.linspace(y.min(), y.max(), scan.rows)
+            print('x values between', x_values.min(), x_values.max())
+            print('y values between', y_values.min(), y_values.max())
+            scan.x, scan.y = np.meshgrid(x_values, y_values, indexing='ij')
             # use x, y values to assign each record to the proper place
             x_indices = (np.round((x - x.min()) / scan.xStep)).astype(int)
             y_indices = (np.round((y - y.min()) / scan.yStep)).astype(int)
             scan.phase[x_indices, y_indices] = data[:, 0]
-            scan.x[x_indices, y_indices] = data[:, 1]
-            scan.y[x_indices, y_indices] = data[:, 2]
+            #scan.x[x_indices, y_indices] = data[:, 1]
+            #scan.y[x_indices, y_indices] = data[:, 2]
             scan.euler[x_indices, y_indices, 0] = np.radians(data[:, 5])
             scan.euler[x_indices, y_indices, 1] = np.radians(data[:, 6])
             scan.euler[x_indices, y_indices, 2] = np.radians(data[:, 7])
@@ -607,9 +614,9 @@ class OimScan:
           This function is not vectorized and will be slow for large EBSD maps.
 
         """
-        self.ipf001 = np.empty_like(self.euler)
-        self.ipf010 = np.empty_like(self.euler)
-        self.ipf100 = np.empty_like(self.euler)
+        self.ipf001 = np.zeros_like(self.euler)
+        self.ipf010 = np.zeros_like(self.euler)
+        self.ipf100 = np.zeros_like(self.euler)
         # compute ipf color for each pixel (ignore non assigned pixels)
         time.sleep(0.2)  # prevent tqdm from messing in the output
         for phase in self.phase_list:
@@ -962,10 +969,16 @@ class OimScan:
             reg_scan.euler[:, :, i] = warp(self.euler[:, :, i], transform, order=0, output_shape=ref_shape)
         # warning phase must be converted to float representation before using warp
         reg_scan.phase = warp(self.phase.astype(float), transform, order=0, output_shape=ref_shape).astype(int)
-        reg_scan.ci = warp(self.ci, transform, order=0, output_shape=ref_shape) 
+        reg_scan.ci = warp(self.ci, transform, order=0, output_shape=ref_shape)
         reg_scan.iq = warp(self.iq, transform, order=0, output_shape=ref_shape)
-        reg_scan.x = warp(self.x, transform, order=0, output_shape=ref_shape)
-        reg_scan.y = warp(self.y, transform, order=0, output_shape=ref_shape)
+        # the new x and y arrays describe a regular grid
+        x_values = np.linspace(0., (reg_scan.cols - 1) * reg_scan.xStep, reg_scan.cols)
+        y_values = np.linspace(0., (reg_scan.rows - 1) * reg_scan.yStep, reg_scan.rows)
+        reg_scan.x, reg_scan.y = np.meshgrid(x_values, y_values, indexing='ij') 
+
+        # also maintain registered version of previous x and y to compare
+        reg_scan.x_reg = warp(self.x, transform, order=0, output_shape=ref_shape)
+        reg_scan.y_reg = warp(self.y, transform, order=0, output_shape=ref_shape)
 
         return reg_scan
 

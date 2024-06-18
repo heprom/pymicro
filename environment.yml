@@ -6,12 +6,13 @@ dependencies:
   # Needed to run pymicro and examples
   - python=3.8
   - numpy 
-  - scipy
+  - scipy>1.5.0
   - scikit-image 
   - pooch 
   - tifffile
   - matplotlib
   - vtk
+  - tqdm
   - h5py
   - lxml
   - pytables

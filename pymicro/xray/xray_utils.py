@@ -4,6 +4,7 @@ from skimage.transform import radon
 from math import *
 from config import PYMICRO_XRAY_DATA_DIR
 
+
 class Element:
     """A class to represent a chemical element described by its name, symbol and density."""
 
@@ -61,6 +62,7 @@ elements = {3: Element('Lithium', 'Li', 0.533),
             48: Element('Cadmium', 'Cd', 8.65),
             49: Element('Indium', 'In', 7.31),
             50: Element('Tin', 'Sn', 7.265),
+            73: Element('Tantalum', 'Ta', 16.4),
             74: Element('Tungsten', 'W', 19.3),
             82: Element('Lead', 'Pb', 11.330),
             83: Element('Bismuth', 'Bi', 9.747)
@@ -204,11 +206,11 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
         # apply Beer-Lambert
         trans = 100 * np.exp(-mu_rho[:, 1] * rho * t / 10)
         plt.plot(energy, trans, '-', linewidth=3, markersize=10, label=legstr % (mat, t))
-    # bound the energy to (1, 200)
+    # bound the energy to (1, 300)
     if energy_lim[0] < 1:
         energy_lim[0] = 1
-    if energy_lim[1] > 200:
-        energy_lim[1] = 200
+    if energy_lim[1] > 300:
+        energy_lim[1] = 300
     plt.xlim(energy_lim)
     plt.grid()
     plt.legend(loc='upper left')
@@ -220,6 +222,7 @@ def plot_xray_trans(mat='Al', ts=[1.0], rho=None, energy_lim=[1, 100], legfmt='%
     else:
         plt.savefig('xray_trans_' + mat + '.png')
 
+
 def radiograph(data, omega):
     """Compute a single radiograph of a 3D object using the radon transform.
 
@@ -229,6 +232,7 @@ def radiograph(data, omega):
     """
     projection = radiographs(data, [omega])
     return projection[:, :, 0]
+
 
 def radiographs(data, omegas):
     """Compute the radiographs of a 3D object using the radon transform.
@@ -245,7 +249,7 @@ def radiographs(data, omegas):
     if type(omegas) is list:
         omegas = np.array(omegas)
     width = int(np.ceil(max(data.shape[0], data.shape[1]) * 2 ** 0.5))
-    projections = np.zeros((width, np.shape(data)[2], len(omegas)), dtype=np.float)
+    projections = np.zeros((width, np.shape(data)[2], len(omegas)), dtype=np.float64)
     for z in range(np.shape(data)[2]):
         a = radon(data[:, :, z], -omegas, circle=False)  # - 90  # the 90 seems to come from the radon function itself
         projections[:, z, :] = a[:, :]

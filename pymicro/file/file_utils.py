@@ -4,7 +4,7 @@ import struct
 
 
 def read_image_sequence(data_dir, prefix, num_images, start_index=0, image_format='png', zero_padding=0, crop=None, verbose=False):
-    '''Read a series of images into a list of numpy arrays.
+    """Read a series of images into a list of numpy arrays.
     
     :param str data_dir: directory where the image files are located.
     :param str prefix: a string to construct the image file names.
@@ -15,7 +15,7 @@ def read_image_sequence(data_dir, prefix, num_images, start_index=0, image_forma
     :param list crop: bounds to crop the images (None by default) 
     :param bool verbose: activate verbose mode (False by default).
     :return: the list of the images read from the disk.
-    '''
+    """
     # build the numbering pattern
     pat = '0%dd' % zero_padding
     fmt = '{0:s}{1:' + pat + '}.{2:s}'
@@ -176,7 +176,7 @@ def numpy_to_esrf_datatype(data_type):
     }.get(data_type, 'UnsignedShort')
 
 
-def edf_write(data, file_name, header_size=1024):
+def edf_write(data, file_name, header_size=1024, verbose=True):
     """Write a binary edf file with the appropriate header.
 
     This function write a (x,y,z) 3D dataset to the disk.
@@ -186,14 +186,13 @@ def edf_write(data, file_name, header_size=1024):
     :param ndarray data: the data array to write to the file.
     :param str file_name: the file name to use.
     :param int header_size: the size of te header (a multiple of 512).
+    :param bool verbose: verbose flag to trigger some text information output.
     """
     # get current time
     from time import gmtime, strftime
     today = strftime('%d-%b-%Y', gmtime())
     size = np.shape(data)
-    print('data size in pixels is ', size)
     nbytes = np.prod(size) * data.dtype.itemsize
-    print('opening', file_name, 'for writing')
     # craft an ascii header of the appropriate size
     f = open(file_name, 'wb')
     head = '{\n'
@@ -201,7 +200,10 @@ def edf_write(data, file_name, header_size=1024):
     head += 'Image          = 1 ;\n'
     head += 'ByteOrder      = LowByteFirst ;\n'
     head += 'DataType       = %13s;\n' % numpy_to_esrf_datatype(data.dtype)
-    print('using data type %s' % numpy_to_esrf_datatype(data.dtype))
+    if verbose:
+        print('data size in pixels is ', size)
+        print('opening', file_name, 'for writing')
+        print('using data type %s' % numpy_to_esrf_datatype(data.dtype))
     head += 'Dim_1          = %4s;\n' % size[0]
     if len(size) > 1: head += 'Dim_2          = %4s;\n' % size[1]
     if len(size) > 2: head += 'Dim_3          = %4s;\n' % size[2]
@@ -221,41 +223,53 @@ def edf_write(data, file_name, header_size=1024):
     f.close()
 
 
-def HST_info(info_file):
-    """Read the given info file and returns a dictionary containing the data size and type.
-    
+def HST_info(info_path):
+    """Read the given info file and returns a dictionary containing some meta data.
+
+    The info file is a simple ascii file used to store basic meta data on
+    tomographic reconstruction such as the volume size (NUM_X, NUM_Y, NUM_Z)
+    and sometimes data type. Depending on how the file was generated it may
+    contain additional information.
+
     .. note::
     
        The first line of the file must begin by ! PyHST or directly by NUM_X. 
        Also note that if the data type is not specified, it will not be present in the dictionary.
     
-    :param str info_file: path to the ascii file to read.
-    :return: a dictionary with the values for x_dim, y_dim, z_dim and data_type if needed.
+    :param str info_path: path to the ascii file to read.
+    :return: a dictionary with the all the values stored in the info file.
     """
     info_values = {}
-    f = open(info_file, 'r')
-    # the first line must contain PyHST or NUM_X
-    line = f.readline()
-    if line.startswith('! PyHST'):
-        # read an extra line
+    with open(info_path, 'r') as f:
+        # the first line must contain PyHST or NUM_X
         line = f.readline()
-    elif line.startswith('NUM_X'):
-        pass
-    else:
-        sys.exit('The file does not seem to be a PyHST info file')
-    info_values['x_dim'] = int(line.split()[2])
-    info_values['y_dim'] = int(f.readline().split()[2])
-    info_values['z_dim'] = int(f.readline().split()[2])
-    try:
-        info_values['data_type'] = f.readline().split()[2]
-    except IndexError:
-        pass
+        if line.startswith('! PyHST'):
+            # read an extra line
+            line = f.readline()
+        elif line.startswith('NUM_X'):
+            pass
+        else:
+            sys.exit('The file does not seem to be a PyHST info file')
+        while line:
+            tokens = line.split()
+            try:
+                if tokens[0] in ['NUM_X', 'NUM_Y', 'NUM_Z']:
+                    value = int(tokens[2])
+                elif tokens[0] in ['BYTEORDER', 'DATA_TYPE']:
+                    value = tokens[2]
+                else:
+                    value = float(tokens[2])
+                info_values[tokens[0]] = value
+            except IndexError:
+                print('skipping this line')
+                pass
+            line = f.readline()
     return info_values
 
 
 def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
              header_size=0, autoparse_filename=False, dims=None, mmap=False, pack_binary=False):
-    '''Read a volume file stored as a concatenated stack of binary images.
+    """Read a volume file stored as a concatenated stack of binary images.
 
     The volume size must be specified by dims=(nx, ny, nz) unless an associated
     .info file is present in the same location to determine the volume
@@ -285,7 +299,7 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
     :param tuple dims: a tuple containing the array dimensions.
     :param bool mmap: activate the memory mapping mode.
     :param bool pack_binary: this flag should be true when reading a file written with the binary packing mode.
-    '''
+    """
     if autoparse_filename:
         s_type = scan_name[:-4].split('_')[-1]
         data_type = np.dtype(s_type)
@@ -295,13 +309,13 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
             print('auto parsing filename: data type is set to', data_type)
     if dims is None:
         infos = HST_info(scan_name + '.info')
-        [nx, ny, nz] = [infos['x_dim'], infos['y_dim'], infos['z_dim']]
-        if 'data_type' in infos:
-            if infos['data_type'] == 'PACKED_BINARY':
+        [nx, ny, nz] = [infos['NUM_X'], infos['NUM_Y'], infos['NUM_Z']]
+        if 'DATA_TYPE' in infos:
+            if infos['DATA_TYPE'] == 'PACKED_BINARY':
                 pack_binary = True
                 data_type = np.uint8
             else:
-                data_type = np.dtype(infos['data_type'].lower())  # overwrite defaults with .info file value
+                data_type = np.dtype(infos['DATA_TYPE'].lower())  # overwrite defaults with .info file value
     else:
         (nx, ny, nz) = dims
     if zrange is None:
@@ -333,21 +347,21 @@ def HST_read(scan_name, zrange=None, data_type=np.uint8, verbose=False,
 
 
 def rawmar_read(image_name, size, verbose=False):
-    '''Read a square 2D image plate MAR image.
+    """Read a square 2D image plate MAR image.
 
     These binary images are typically obtained from the marcvt utility.
 
     .. note::
 
        This method assume Big endian byte order.
-    '''
+    """
     data = HST_read(image_name, dims=(1, size, size), header=4600,
                     data_type=np.uint16, verbose=verbose)[:, :, 0]
     return data
 
 
 def HST_write(data, file_name, mode='w', verbose=True, pack_binary=False):
-    '''Write data as a raw binary file.
+    """Write data as a raw binary file.
 
     This function write a (x,y,z) 3D dataset to the disk. The actual data type is used, you can convert your data array 
     on the fly using data.astype if you want to change the type. 
@@ -362,8 +376,8 @@ def HST_write(data, file_name, mode='w', verbose=True, pack_binary=False):
     :param char mode: file write mode, change to 'a' to append to a file.
     :param bool verbose: flag to activate verbose mode.
     :param bool pack_binary: flag to activate binary packing.
-    '''
-    if data.dtype == np.bool:
+    """
+    if data.dtype == bool:
         print('casting bool array to uint8, you may consider using binary packing to save disk space.')
         data = data.astype(np.uint8)
     (nx, ny, nz) = data.shape
@@ -396,7 +410,7 @@ def HST_write(data, file_name, mode='w', verbose=True, pack_binary=False):
 
 
 def recad_vol(vol_filename, min, max, verbose=False):
-    '''Recad a 32 bit vol file into 8 bit raw file.
+    """Recad a 32 bit vol file into 8 bit raw file.
 
     This function reads a 3D volume file into a numpy float32 array and
     applies the `recad` function with the [min, max] range. The result is
@@ -419,10 +433,10 @@ def recad_vol(vol_filename, min, max, verbose=False):
     **max**: value to use as the maximum (will be 255 in the casted array).
 
     **verbose**: activate verbose mode (False by default).
-    '''
+    """
     prefix = vol_filename[:-4]
     infos = HST_info(vol_filename + '.info')
-    vol_size = [infos['x_dim'], infos['y_dim'], infos['z_dim']]
+    vol_size = [infos['NUM_X'], infos['NUM_Y'], infos['NUM_Z']]
     data = HST_read(vol_filename, type=np.float32)
     data_uint8 = recad(data, min, max)
     if verbose:
@@ -449,14 +463,14 @@ def recad_vol(vol_filename, min, max, verbose=False):
 
 
 def Vtk_write(data, fname):
-    '''Write a data array into old style (V3.0) VTK format.
+    """Write a data array into old style (V3.0) VTK format.
 
     An ascii header is written to which the binary data is appended.
 
     .. note::
 
        The header assumes uint8 data type.
-    '''
+    """
     (nz, ny, nx) = data.shape
     print('opening', fname, 'for writing')
     print('volume size is %d x %d x %d' % (nx, ny, nz))

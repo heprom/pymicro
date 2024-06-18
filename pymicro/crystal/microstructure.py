@@ -4,7 +4,7 @@ crystallographic granular microstructure such as mostly present in
 metallic materials.
 
 It contains several classes which are used to describe a microstructure
-composed of several grains, each one having its own crystallographic
+composed of multiple grains, each one having its own crystallographic
 orientation:
 
  * :py:class:`~pymicro.crystal.microstructure.Microstructure`
@@ -20,10 +20,13 @@ from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
+from pymicro.crystal.rotation import om2ro, ro2qu, qu2om
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
 from math import atan2, pi
+from tqdm import tqdm
+import time
 
 
 class Orientation:
@@ -53,8 +56,8 @@ class Orientation:
         g = np.array(matrix, dtype=np.float64).reshape((3, 3))
         self._matrix = g
         self.euler = Orientation.OrientationMatrix2Euler(g)
-        self.rod = Orientation.OrientationMatrix2Rodrigues(g)
-        self.quat = Orientation.OrientationMatrix2Quaternion(g, P=1)
+        self.rod = om2ro(g)
+        self.quat = Quaternion(ro2qu(self.rod))
 
     def orientation_matrix(self):
         """Returns the orientation matrix in the form of a 3x3 numpy array."""
@@ -65,8 +68,8 @@ class Orientation:
         s = 'Crystal Orientation \n-------------------'
         s += '\norientation matrix = \n %s' % self._matrix.view()
         s += '\nEuler angles (degrees) = (%8.3f,%8.3f,%8.3f)' % (self.phi1(), self.Phi(), self.phi2())
-        s += '\nRodrigues vector = %s' % self.OrientationMatrix2Rodrigues(self._matrix)
-        s += '\nQuaternion = %s' % self.OrientationMatrix2Quaternion(self._matrix, P=1)
+        s += '\nRodrigues vector = %s' % self.rod
+        s += '\nQuaternion = %s' % self.quat
         return s
 
     def to_crystal(self, v):
@@ -79,14 +82,14 @@ class Orientation:
         """
         if v.size not in [3, 9]:
             raise ValueError('input arg must be a 3 components vector '
-                             'or a 3x3 matrix, got %d vlaues' % v.size)
+                             'or a 3x3 matrix, got %d values' % v.size)
         g = self.orientation_matrix()
         if v.size == 3:
             # input is vector
             return np.dot(g, v)
         else:
             # input is 3x3 matrix
-            return np.dot(g, np.got(v, g.T))
+            return np.dot(g, np.dot(v, g.T))
 
     def to_sample(self, v):
         """Transform a vector or a matrix from the crystal frame to the sample
@@ -98,14 +101,14 @@ class Orientation:
         """
         if v.size not in [3, 9]:
             raise ValueError('input arg must be a 3 components vector '
-                             'or a 3x3 matrix, got %d vlaues' % v.size)
+                             'or a 3x3 matrix, got %d values' % v.size)
         g = self.orientation_matrix()
         if v.size == 3:
             # input is vector
             return np.dot(g.T, v)
         else:
             # input is 3x3 matrix
-            return np.dot(g.T, np.got(v, g))
+            return np.dot(g.T, np.dot(v, g))
 
     @staticmethod
     def cube():
@@ -156,15 +159,13 @@ class Orientation:
     def ipf_color(self, axis=np.array([0., 0., 1.]), symmetry=Symmetry.cubic, saturate=True):
         """Compute the IPF (inverse pole figure) colour for this orientation.
 
-        This method has bee adapted from the DCT code.
-
-        .. note::
-
-          This method coexist with the `get_ipf_colour` for the moment.
+        This method has bee adapted from the DCT code and works for most of 
+        the crystal symmetries.
 
         :param ndarray axis: the direction to use to compute the IPF colour.
         :param Symmetry symmetry: the symmetry operator to use.
-        :return bool saturate: a flag to saturate the RGB values.
+        :param bool saturate: a flag to saturate the RGB values.
+        :return: the IPF colour in RGB form.
         """
         axis /= np.linalg.norm(axis)
         Vc = np.dot(self.orientation_matrix(), axis)
@@ -192,6 +193,20 @@ class Orientation:
             angleB = Vc_phi  # blue color proportional to phi
             minAngleB = 0
             maxAngleB = 30
+        elif symmetry is Symmetry.tetragonal:
+            angleR = 90 - Vc_psi  # red color proportional to (90 - psi)
+            minAngleR = 0
+            maxAngleR = 90
+            angleB = Vc_phi  # blue color proportional to phi
+            minAngleB = 0
+            maxAngleB = 45
+        elif symmetry is Symmetry.orthorhombic:
+            angleR = 90 - Vc_psi  # red color proportional to (90 - psi)
+            minAngleR = 0
+            maxAngleR = 90
+            angleB = Vc_phi  # blue color proportional to phi
+            minAngleB = 0
+            maxAngleB = 90
         else:
             raise(ValueError('unsupported crystal symmetry to compute IPF color'))
         # find the axis lying in the fundamental zone
@@ -209,48 +224,24 @@ class Orientation:
             rgb = rgb / rgb.max()
         return rgb
 
-    def get_ipf_colour(self, axis=np.array([0., 0., 1.]), symmetry=Symmetry.cubic):
-        """Compute the IPF (inverse pole figure) colour for this orientation.
-
-        Given a particular axis expressed in the laboratory coordinate system,
-        one can compute the so called IPF colour based on that direction
-        expressed in the crystal coordinate system as :math:`[x_c,y_c,z_c]`.
-        There is only one tuple (u,v,w) such that:
-
-        .. math::
-
-          [x_c,y_c,z_c]=u.[0,0,1]+v.[0,1,1]+w.[1,1,1]
-
-        and it is used to assign the RGB colour.
-
-        :param ndarray axis: the direction to use to compute the IPF colour.
-        :param Symmetry symmetry: the symmetry operator to use.
-        :return tuple: a tuple contining the RGB values.
-        """
-        axis /= np.linalg.norm(axis)
-        # find the axis lying in the fundamental zone
-        for sym in symmetry.symmetry_operators():
-            Osym = np.dot(sym, self.orientation_matrix())
-            Vc = np.dot(Osym, axis)
-            if Vc[2] < 0:
-                Vc *= -1.  # using the upward direction
-            uvw = np.array([Vc[2] - Vc[1], Vc[1] - Vc[0], Vc[0]])
-            uvw /= np.linalg.norm(uvw)
-            uvw /= max(uvw)
-            if (uvw[0] >= 0. and uvw[0] <= 1.0) and (uvw[1] >= 0. and uvw[1] <= 1.0) and (
-                    uvw[2] >= 0. and uvw[2] <= 1.0):
-                # print('found sym for sst')
-                break
-        return uvw
-
     @staticmethod
     def compute_mean_orientation(rods, symmetry=Symmetry.cubic):
         """Compute the mean orientation.
 
         This function computes a mean orientation from several data points
-        representing orientations. Each orientation is first moved to the
-        fundamental zone, then the corresponding Rodrigues vectors can be
-        averaged to compute the mean orientation.
+        representing orientations by averaging the corresponding Rodrigues
+        vector. One caveat with this averaging method is if the vectors belong
+        to different asymmetric domains, the mean orientation will be wrong.
+
+        To avoid this, we compute all equivalent rotation for all data points
+        and then use kmeans clustering to separate all points. We do this using
+        quaternions to avoid arbitrarily large rodrigues vectors when the
+        rotation angle approaches pi (this would make the clustering algorithm
+        fail). The number of clusters is known to be equal to the number of
+        symmetry operators.
+
+        A mean orientation is then computed for each cluster and the one which
+        belongs to the fundamental zone is returned.
 
         :param ndarray rods: a (n, 3) shaped array containing the Rodrigues
         vectors of the orientations.
@@ -258,14 +249,79 @@ class Orientation:
         to their fundamental zone (cubic by default)
         :returns: the mean orientation as an `Orientation` instance.
         """
-        rods_fz = np.empty_like(rods)
+        rod_sym_mean = Orientation.compute_mean_rodrigues(rods, symmetry=symmetry)
+        return Orientation.from_rodrigues(rod_sym_mean)
+
+    @staticmethod
+    def compute_mean_rodrigues(rods, symmetry=Symmetry.cubic):
+        """Compute the mean orientation as a rodrigues vector.
+
+        This function computes a mean orientation from several data points
+        representing orientations by averaging the corresponding Rodrigues
+        vector. One caveat with this averaging method is if the vectors belong
+        to different asymmetric domains, the mean orientation will be wrong.
+
+        To avoid this, we compute all equivalent rotation for all data points
+        and then use kmeans clustering to separate all points. We do this using
+        quaternions to avoid arbitrarily large rodrigues vectors when the
+        rotation angle approaches pi (this would make the clustering algorithm
+        fail). The number of clusters is known to be equal to the number of
+        symmetry operators.
+
+        A mean orientation is then computed for each cluster and the one which
+        belongs to the fundamental zone is returned.
+
+        :param ndarray rods: a (n, 3) shaped array containing the Rodrigues
+        vectors of the orientations.
+        :param `Symmetry` symmetry: the symmetry used to move orientations
+        to their fundamental zone (cubic by default)
+        :returns: the mean orientation as a rodrigues vector.
+        """
+        rods = np.atleast_2d(rods)
+        # omit nan values from the calculation
+        rods = rods[~np.prod(np.isnan(rods), 1).astype(bool)]
+        syms = symmetry.symmetry_operators()
+
+        # apply all symmetries to compute Rodrigues vectors
+        rods_syms = np.zeros((len(syms), len(rods), 3), dtype=float)
         for i in range(len(rods)):
             g = Orientation.from_rodrigues(rods[i]).orientation_matrix()
-            g_fz = symmetry.move_rotation_to_FZ(g, verbose=False)
-            o_fz = Orientation(g_fz)
-            rods_fz[i] = o_fz.rod
-        mean_orientation = Orientation.from_rodrigues(np.mean(rods_fz, axis=0))
-        return mean_orientation
+            # apply all symmetries
+            g_syms = np.dot(syms, g)
+            for j in range(len(syms)):
+                # compute the rodrigues vector for each symmetry
+                rods_syms[j, i] = Orientation(g_syms[j]).rod
+
+        # we now apply kmeans clustering in quaternion space
+        X = rods_syms.reshape((len(syms) * len(rods), 3))
+        Q = np.empty((len(X), 4), dtype=float)
+        for i in range(len(X)):
+            Q[i] = ro2qu(X[i])
+        # we need to initialize the centroid with one point in each zone
+        from sklearn.cluster import KMeans
+        kmeans = KMeans(n_clusters=len(syms),  # number of clusters = nb of symmetry operators
+                        init=Q[::len(rods)],  # explicit centroids
+                        n_init=1).fit(Q)
+
+        # now compute the mean orientation for each cluster
+        mean_rods_syms = np.empty((len(syms), 3), dtype=float)
+        for j in range(len(syms)):
+            #mean_rods_syms[j] = np.mean(X[kmeans.labels_ == j], axis=0)
+            mean_quat_syms_j = np.mean(Q[kmeans.labels_ == j], axis=0)
+            mean_quat_syms_j /= np.sqrt(np.sum(mean_quat_syms_j ** 2))
+            mean_rods_syms[j] = om2ro(qu2om(mean_quat_syms_j))
+        # find which orientation belongs to the FZ
+        if symmetry == Symmetry.cubic:
+             index_fz = np.argmax([(np.abs(r).sum() <= 1.0) and
+                                   (np.abs(r).max() <= 2 ** 0.5 - 1)
+                                   for r in mean_rods_syms])
+        elif symmetry == Symmetry.hexagonal:
+            index_fz = np.argmax([Orientation.fzDihedral(r, 6)
+                                  for r in mean_rods_syms])
+        else:
+            raise (ValueError('unsupported crystal symmetry: %s' % symmetry))
+
+        return mean_rods_syms[index_fz]
 
     @staticmethod
     def fzDihedral(rod, n):
@@ -333,6 +389,20 @@ class Orientation:
         om = symmetry.move_rotation_to_FZ(self.orientation_matrix(), verbose=verbose)
         return Orientation(om)
 
+    def rotate_orientation(self, rotation_xyz):
+        """Rotate this grain orientation given the rotation matrix expressed
+        in the laboratory coordinate system.
+
+        :param rotation_xyz: a 3x3 array representing the rotation matrix to apply.
+        :return: a new Orientation instance rotated.
+        """
+        # express the rotation in the crystal frame
+        g = self.orientation_matrix()
+        rotation_cry = np.dot(g, np.dot(rotation_xyz, g.T)).T
+        # apply the rotation and create a new orientation
+        g_rot = np.dot(rotation_cry, g)
+        return Orientation(g_rot)
+
     @staticmethod
     def misorientation_MacKenzie(psi):
         """Return the fraction of the misorientations corresponding to the
@@ -392,8 +462,8 @@ class Orientation:
 
         Compute the angle associated with this misorientation matrix :math:`\\Delta g`.
         It is defined as :math:`\\omega = \\arccos(\\text{trace}(\\Delta g)/2-1)`.
-        To avoid float rounding error, the argument is rounded to 1.0 if it is
-        within 1 and 1 plus 32 bits floating point precison.
+        To avoid float rounding point error, the value of :math:`\\cos\\omega`
+        is clipped to [-1.0, 1.0].
 
         .. note::
 
@@ -405,10 +475,7 @@ class Orientation:
         :param delta: The 3x3 misorientation matrix.
         :returns float: the misorientation angle in radians.
         """
-        cw = 0.5 * (delta.trace() - 1)
-        if cw > 1. and cw - 1. < 10 * np.finfo('float32').eps:
-            # print('cw=%.20f, rounding to 1.' % cw)
-            cw = 1.
+        cw = np.clip(0.5 * (delta.trace() - 1), -1., 1.)
         omega = np.arccos(cw)
         return omega
 
@@ -437,6 +504,8 @@ class Orientation:
             (sample coordinates).
         """
         the_angle = np.pi
+        the_axis = np.array([0., 0., 1.])
+        the_axis_xyz = np.array([0., 0., 1.])
         symmetries = crystal_structure.symmetry_operators()
         (gA, gB) = (self.orientation_matrix(), orientation.orientation_matrix())  # nicknames
         for (g1, g2) in [(gA, gB), (gB, gA)]:
@@ -459,16 +528,50 @@ class Orientation:
         return the_angle, the_axis, the_axis_xyz
 
     def phi1(self):
-        """Convenience methode to expose the first Euler angle."""
+        """Convenience method to expose the first Euler angle."""
         return self.euler[0]
 
     def Phi(self):
-        """Convenience methode to expose the second Euler angle."""
+        """Convenience method to expose the second Euler angle."""
         return self.euler[1]
 
     def phi2(self):
-        """Convenience methode to expose the third Euler angle."""
+        """Convenience method to expose the third Euler angle."""
         return self.euler[2]
+
+    def plot(self, lattice=None):
+        """create a figure to plot the orientation.
+
+        Create a 3D representation of a crystal lattice rotated 
+        by this orientation in the (X, Y, Z) local frame.
+
+        :param Lattice lattice: an optional crystal lattice can be specified.
+        """
+        if lattice is None:
+            lattice = Lattice.cubic(0.5)
+        coords, edges, faces = lattice.get_points(origin='mid')
+        print(coords.shape, len(edges), len(faces))
+        # now apply the crystal orientation
+        g = self.orientation_matrix()
+        coords_rot = np.empty_like(coords)
+        for i in range(len(coords_rot)):
+            coords_rot[i] = np.dot(g.T, coords[i])
+        # plot the rotated lattice
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        ax.scatter(coords_rot[:, 0], coords_rot[:, 1], coords_rot[:, 2])
+        for i, face in enumerate(faces):
+            face_coords = coords_rot[face]
+            ax.plot(face_coords[:, 0], face_coords[:, 1], face_coords[:, 2], 'k-')
+        #for i in range(len(edge_point_ids)):
+        #    ax.plot(coords_rot[edge_point_ids[i, :], 0],
+        #            coords_rot[edge_point_ids[i, :], 1],
+        #            coords_rot[edge_point_ids[i, :], 2], 'k-')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.view_init(elev=60., azim=45)
+        plt.show()
 
     def compute_XG_angle(self, hkl, omega, verbose=False):
         """Compute the angle between the scattering vector :math:`\mathbf{G_{l}}`
@@ -770,6 +873,96 @@ class Orientation:
         return o
 
     @staticmethod
+    def from_n1n2(n1, n2):
+        """Create an orientation instance from the two vectors used in
+        Amitex_FFTP which are the first two rows of the orientation matrix.
+
+        :param np.array n1: the first vector describing the orientation.
+        :param np.array n2: the second vector describing the orientation.
+        :return: an instance of the `Orientation` class.
+        """
+        n3 = np.cross(n1, n2)  # third row
+        g = np.array([n1, n2, n3])  # orientation matrix
+        o = Orientation(g)
+        return o
+
+    @staticmethod
+    def from_amitex(data_dir='.', binary=True):
+        """This methods reads the orientations from Amitex files.
+
+        The orientation data is read from 6 files: N1X.bin, N1Y.bin, N1Z.bin,
+        N2X.bin, N2Y.bin and N2Z.bin (in binary format). The bin extension is
+        replaced by txt for the ascii format.
+
+        :param str data_dir: the folder where the orientation files are located.
+        :param bool binary: use binary format (True by default).
+        :return: a list containing instances of the `Orientation` class.
+        """
+        orientations = []
+        n_components = []
+        if binary:
+            for file_name in ['N1X.bin', 'N1Y.bin', 'N1Z.bin',
+                              'N2X.bin', 'N2Y.bin', 'N2Z.bin']:
+                with open(os.path.join(data_dir, file_name), 'rb') as f:
+                    line = f.readline()
+                    n = int(line.decode('utf-8').split('\n')[0])
+                    print('%d entries in file %s' % (n, file_name))
+                    line = f.readline()
+                    n_components.append(np.frombuffer(f.read(), dtype='>d'))
+                    assert (len(n_components[-1]) == n)
+        else:
+            # using ascii file format
+            for file_name in ['N1X.txt', 'N1Y.txt', 'N1Z.txt',
+                              'N2X.txt', 'N2Y.txt', 'N2Z.txt']:
+                with open(os.path.join(data_dir, file_name), 'r') as f:
+                    n_components.append(np.atleast_1d(np.genfromtxt(file_name)))
+                n = len(n_components[-1])
+
+        # now we have the data, construct the orientations
+        for i in range(n):
+            n1 = n_components[0][i], n_components[1][i], n_components[2][i]
+            n2 = n_components[3][i], n_components[4][i], n_components[5][i]
+            orientations.append(Orientation.from_n1n2(n1, n2))
+        return orientations
+
+    @staticmethod
+    def transformation_matrix(hkl_1, hkl_2, n_1, n_2):
+        """Compute the orientation matrix from the two known hkl plane 
+        normals.
+        
+        The function build two orthonormal basis, one in the crystal 
+        frame and the other in the sample frame. the orientation matrix 
+        brings the second one into coincidence with first one.
+
+        :param hkl_1: the first `HklPlane` instance.
+        :param hkl_2: the second `HklPlane` instance.
+        :param n_1: a vector normal to the first lattice plane.
+        :param n_2: a vector normal to the second lattice plane.
+        :return: the corresponding 3x3 orientation matrix.
+        """
+        # create the vectors representing this frame in the crystal coordinate system
+        e1_hat_c = hkl_1.normal()
+        e2_hat_c = np.cross(hkl_1.normal(), hkl_2.normal()) / np.linalg.norm(
+            np.cross(hkl_1.normal(), hkl_2.normal()))
+        e3_hat_c = np.cross(e1_hat_c, e2_hat_c)
+        e_hat_c = np.array([e1_hat_c, e2_hat_c, e3_hat_c])
+        # create local frame attached to the indexed crystallographic features in XYZ
+        e1_hat_s = n_1
+        e2_hat_s = np.cross(n_1, n_2) / np.linalg.norm(
+            np.cross(n_1, n_2))
+        e3_hat_s = np.cross(e1_hat_s, e2_hat_s)
+        e_hat_s = np.array([e1_hat_s, e2_hat_s, e3_hat_s])
+        # now build the orientation matrix
+        orientation_matrix = np.dot(e_hat_c.T, e_hat_s)
+        return orientation_matrix
+
+    @staticmethod
+    def from_two_hkl_normals(hkl_1, hkl_2, xyz_normal_1, xyz_normal_2):
+        g = Orientation.transformation_matrix(hkl_1, hkl_2, 
+                                              xyz_normal_1, xyz_normal_2)
+        return Orientation(g)
+
+    @staticmethod
     def Zrot2OrientationMatrix(x1=None, x2=None, x3=None):
         """Compute the orientation matrix from the rotated coordinates given
         in the .inp file for Zebulon's computations.
@@ -961,7 +1154,8 @@ class Orientation:
     @staticmethod
     def Axis2OrientationMatrix(axis, angle):
         """
-        Compute the (passive) orientation matrix associated the rotation defined by the given (axis, angle) pair.
+        Compute the (passive) orientation matrix associated the rotation
+        defined by the given (axis, angle) pair.
 
         :param axis: the rotation axis.
         :param angle: the rotation angle (degrees).
@@ -980,6 +1174,22 @@ class Orientation:
                        (1 - c) * axis[1] * axis[2] - s * axis[0],
                        c + (1 - c) * axis[2] ** 2]])
         return g
+
+    @staticmethod
+    def Axis2Quaternion(axis, angle, P=1):
+        """
+        Compute the quaternion associated the rotation defined by the given
+        (axis, angle) pair.
+
+        :param axis: the rotation axis.
+        :param angle: the rotation angle (degrees).
+        :param int P: convention (1 for active, -1 for passive)
+        :return: the corresponding Quaternion.
+        """
+        omega = np.radians(angle)
+        axis /= np.linalg.norm(axis)
+        q = Quaternion([np.cos(0.5 * omega), *(-P * np.sin(0.5 * omega) * axis)], convention=P)
+        return q
 
     @staticmethod
     def Euler2Axis(euler):
@@ -1039,10 +1249,10 @@ class Orientation:
 
     @staticmethod
     def eu2ro(euler):
-        """Transform a series of euler angles into rodrigues vectors.
+        """Transform a series of euler angles into Rodrigues vectors.
 
         :param ndarray euler: the (n, 3) shaped array of Euler angles (radians).
-        :returns: a (n, 3) array with the rodrigues vectors.
+        :returns: a (n, 3) array with the Rodrigues vectors.
         """
         if euler.ndim != 2 or euler.shape[1] != 3:
             raise ValueError('Wrong shape for the euler array: %s -> should be (n, 3)' % euler.shape)
@@ -1077,13 +1287,13 @@ class Orientation:
         :param euler: The triplet of the Euler angles (in degrees).
         :return g: The 3x3 orientation matrix.
         """
-        (rphi1, rPhi, rphi2) = np.radians(euler)
-        c1 = np.cos(rphi1)
-        s1 = np.sin(rphi1)
-        c = np.cos(rPhi)
-        s = np.sin(rPhi)
-        c2 = np.cos(rphi2)
-        s2 = np.sin(rphi2)
+        phi1, Phi, phi2 = np.radians(euler)
+        c1 = np.cos(phi1)
+        s1 = np.sin(phi1)
+        c = np.cos(Phi)
+        s = np.sin(Phi)
+        c2 = np.cos(phi2)
+        s2 = np.sin(phi2)
 
         # rotation matrix g
         g11 = c1 * c2 - s1 * s2 * c
@@ -1297,25 +1507,38 @@ class Orientation:
         q = 0.5 * (np.outer(l_rot, n_rot) - np.outer(n_rot, l_rot))
         return q
 
-    def schmid_factor(self, slip_system, load_direction=[0., 0., 1]):
+    def schmid_factor(self, slip_system, load_direction=[0., 0., 1],
+                      unidirectional=False):
         """Compute the Schmid factor for this crystal orientation and the
         given slip system.
+
+        .. note::
+
+          The Schmid factor is usually regarded as positive (dislocation slip
+          can happend in both shear directions), because of this, the absolute
+          value of the dot product is returned. In some case, is can be useful
+          to compute the unidirectional value of the Schmid factor, in this
+          case, set the unidirectional parameter to True.
 
         :param slip_system: a `SlipSystem` instance.
         :param load_direction: a unit vector describing the loading direction
             (default: vertical axis [0, 0, 1]).
-        :return float: a number between 0 ad 0.5.
+        :param bool unidirectional: if True, a positive value is not enforced.
+        :return float: a number between 0 ad 0.5 (or -0.5 and 0.5 with the
+        unidirectional option).
         """
+        t = load_direction / np.linalg.norm(load_direction)
         plane = slip_system.get_slip_plane()
         gt = self.orientation_matrix().transpose()
         n_rot = np.dot(gt, plane.normal())  # plane.normal() is a unit vector
         slip = slip_system.get_slip_direction().direction()
         slip_rot = np.dot(gt, slip)
-        schmid_factor = np.abs(np.dot(n_rot, load_direction) *
-                               np.dot(slip_rot, load_direction))
+        schmid_factor = np.dot(n_rot, t) * np.dot(slip_rot, t)
+        if not unidirectional:
+            schmid_factor = abs(schmid_factor)
         return schmid_factor
 
-    def compute_all_schmid_factors(self, slip_systems,
+    def compute_all_schmid_factors(self, slip_systems, unidirectional=False,
                                    load_direction=[0., 0., 1], verbose=False):
         """Compute all Schmid factors for this crystal orientation and the
         given list of slip systems.
@@ -1324,12 +1547,13 @@ class Orientation:
             the Schmid factor values.
         :param load_direction: a unit vector describing the loading direction
             (default: vertical axis [0, 0, 1]).
+        :param bool unidirectional: if True, a positive value is not enforced.
         :param bool verbose: activate verbose mode.
         :return list: a list of the schmid factors.
         """
         schmid_factor_list = []
         for ss in slip_systems:
-            sf = self.schmid_factor(ss, load_direction)
+            sf = self.schmid_factor(ss, load_direction, unidirectional)
             if verbose:
                 print('Slip system: %s, Schmid factor is %.3f' % (ss, sf))
             schmid_factor_list.append(sf)
@@ -1365,7 +1589,9 @@ class Grain:
 
     A grain has a constant crystallographic `Orientation` and a grain id. The
     center attribute is the center of mass of the grain in world coordinates.
-    The volume of the grain is expressed in pixel/voxel unit.
+    The volume of the grain is normally expressed in mm unit especially when
+    working in relation with a `Microstructure` instance; if the unit has not
+    been set, the volume is then given in pixel/voxel unit.
     """
 
     def __init__(self, grain_id, grain_orientation):
@@ -1470,10 +1696,14 @@ class Grain:
                 thresh.SetInputData(grid)
             else:
                 thresh.SetInput(grid)
-            thresh.Update()
             if verbose:
                 print('thresholding label: %d' % label)
                 print(thresh.GetOutput())
+            #edges = vtk.vtkExtractEdges()
+            #edges.SetInputConnection(thresh.GetOutputPort())
+            #edges.Update()
+            #self.SetVtkMesh(edges.GetOutput())
+            thresh.Update()
             self.SetVtkMesh(thresh.GetOutput())
 
     def vtk_file_name(self):
@@ -1484,6 +1714,7 @@ class Grain:
         if not file_name:
             file_name = self.vtk_file_name()
         print('writting ' + file_name)
+        #writer = vtk.vtkXMLPolyDataWriter()
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(file_name)
         if vtk.vtkVersion().GetVTKMajorVersion() > 5:
@@ -1497,6 +1728,7 @@ class Grain:
         if verbose:
             print('reading ' + file_name)
         reader = vtk.vtkXMLUnstructuredGridReader()
+        #reader = vtk.vtkXMLPolyDataReader()
         reader.SetFileName(file_name)
         reader.Update()
         self.vtkmesh = reader.GetOutput()
@@ -1565,6 +1797,8 @@ class GrainData(tables.IsDescription):
     orientation = tables.Float32Col(shape=(3,))  # float  (double-precision)
     # Grain Bounding box
     bounding_box = tables.Int32Col(shape=(3, 2))  # Signed 64-bit integer
+    # grain phase id
+    phase = tables.UInt8Col(dflt=1)  # Unsigned 8-bit integer
 
 
 class Microstructure(SampleData):
@@ -1582,19 +1816,29 @@ class Microstructure(SampleData):
     attributes such as id, orientations (in form of rodrigues vectors), volume
     and bounding box.
 
-    A crystal `Lattice` is also associated to the microstructure and used in
-    all crystallography calculations.
+    A list of `CrystallinePhase` instances (each on with its `Lattice`) is also
+    associated to the microstructure and used for all crystallography calculations.
     """
 
+#TODO: include length unit specification
+#TODO: specific Pymicro file extension ?
+#TODO: refactor class
+#TODO: open in protected mode --> no modification of datasets allowed
     def __init__(self,
                  filename=None, name='micro', description='empty',
-                 verbose=False, overwrite_hdf5=False, phase=None,
-                 autodelete=False):
+                 verbose=False, overwrite_hdf5=False,
+                 phase=None, autodelete=False):
         if filename is None:
             # only add '_' if not present at the end of name
             filename = name + (not name.endswith('_')) * '_' + 'data'
         # prepare arguments for after file open
-        after_file_open_args = {'phase':phase}
+        if phase is None:
+            phase = CrystallinePhase()
+        if type(phase) is not list:
+            phase_list = [phase]
+        else:
+            phase_list = phase
+        after_file_open_args = {'phase_list': phase_list}
         # call SampleData constructor
         SampleData.__init__(self, filename=filename, sample_name=name,
                             sample_description=description, verbose=verbose,
@@ -1603,34 +1847,43 @@ class Microstructure(SampleData):
                             after_file_open_args=after_file_open_args)
         return
 
-    def _after_file_open(self, phase=None, **kwargs):
+    def _after_file_open(self, phase_list=None, **kwargs):
         """Initialization code to run after opening a Sample Data file."""
         self.grains = self.get_node('GrainDataTable')
+        self.default_compression_options = {'complib': 'zlib', 'complevel': 5}
         if self._file_exist:
             self.active_grain_map = self.get_attribute('active_grain_map',
                                                        'CellData')
+            self.active_phase_map = self.get_attribute('active_phase_map',
+                                                       'CellData')
             if self.active_grain_map is None:
+                # set active grain map to 'grain_map' if none exist
                 self.set_active_grain_map()
-            self._init_phase(phase)
-            if not hasattr(self, 'active_phase_id'):
-                self.active_phase_id = 1
+            if self.active_phase_map is None:
+                # set active phase map to 'phase_map' if none exist
+                self.set_active_phase_map()
+            self._init_phase(phase_list)
         else:
             self.set_active_grain_map()
-            self._init_phase(phase)
-            self.active_phase_id = 1
-        return
+            self.set_active_phase_map()
+            self._init_phase(phase_list)
 
     def __repr__(self):
         """Provide a string representation of the class."""
-        s = '%s\n' % self.__class__.__name__
-        s += '* name: %s\n' % self.get_sample_name()
-        # TODO print phases here
-        s += '* lattice: %s\n' % self.get_lattice()
-        s += '\n'
-        # if self._verbose:
-        #     for g in self.grains:
-        #         s += '* %s' % g.__repr__
-        s += SampleData.__repr__(self)
+        # TODO: print number of grains if available
+        # TODO: print extent of CellData group if available
+        s = '%s' % self.__class__.__name__
+        s += ' "%s"\t' % self.get_sample_name()
+        s += ' "File : {%s}"\n' % self.h5_path
+        s += '------------------------------------------------------------\n'
+        s += '* DESCRIPTION: %s\n' % self.get_description()
+        phase_id_list = self.get_phase_ids_list()
+        s += '\n* MATERIAL PHASES: \n'
+        for id in phase_id_list:
+            s += f'\t{self.get_phase(phase_id=id).__repr__()}'
+            s += ' \n'
+        s += '\n* CONTENT: \n'
+        s += self.print_dataset_content(as_string=True, short=True)
         return s
 
     def minimal_data_model(self):
@@ -1661,23 +1914,24 @@ class Microstructure(SampleData):
                                     'Phase_data': 'Group'}
         return minimal_content_index_dic, minimal_content_type_dic
 
-    def _init_phase(self, phase):
+    def _init_phase(self, phase_list) -> None:
         self._phases = []
-        if phase is None:
-            # create a default crystalline phase
-            phase = CrystallinePhase()
         # if the h5 file does not exist yet, store the phase as metadata
-        if not self._file_exist:  #FIXME is this useful?
-            self.add_phase(phase)
+        if not self._file_exist:
+            self.set_phases(phase_list)
         else:
-            self.sync_phases()
+            self.sync_phases(verbose=False)
             # if no phase is there, create one
             if len(self.get_phase_ids_list()) == 0:
-                print('no phase was found in this dataset, adding a defualt one')
-                self.add_phase(phase)
-        return
+                print('no phase was found in this dataset, adding a default one')
+                self.add_phase(phase_list[0])
+        # for microstructure created without the phase column, it is initialize at 0, fix this
+        if np.array_equal(np.unique(self.grains[:]['phase']), [0]):
+            print('end of _init_phase, fixing phase array')
+            self.set_grain_phases(np.ones_like(self.get_grain_ids()))
+            print(self.grains[:]['phase'])
 
-    def sync_phases(self):
+    def sync_phases(self, verbose=True) -> None:
         """This method sync the _phases attribute with the content of the hdf5
         file.
         """
@@ -1686,12 +1940,12 @@ class Microstructure(SampleData):
         phase_group = self.get_node('/PhaseData')
         for child in phase_group._v_children:
             d = self.get_dic_from_attributes('/PhaseData/%s' % child)
-            #print(d)
             phase = CrystallinePhase.from_dict(d)
             self._phases.append(phase)
-        #print('%d phases found in the data set' % len(self._phases))
+        if verbose:
+            print('%d phases found in the data set' % len(self._phases))
 
-    def set_phase(self, phase):
+    def set_phase(self, phase, id_number=None) -> None:
         """Set a phase for the given `phase_id`.
 
         If the phase id does not correspond to one of the existing phase,
@@ -1700,16 +1954,18 @@ class Microstructure(SampleData):
         :param CrystallinePhase phase: the phase to use.
         :param int phase_id:
         """
-        if phase.phase_id > self.get_number_of_phases():
+        if id_number is None:
+            id_number = phase.phase_id
+        if id_number > self.get_number_of_phases():
             print('the phase_id given (%d) does not correspond to any existing '
                   'phase, the phase list has not been modified.')
             return
         d = phase.to_dict()
-        print('setting phase %d with %s' % (phase.phase_id, phase.name))
-        self.add_attributes(d, '/PhaseData/phase_%02d' % phase.phase_id)
+        print('setting phase %d with %s' % (id_number, phase.name))
+        self.add_attributes(d, '/PhaseData/phase_%02d' % id_number)
         self.sync_phases()
 
-    def set_phases(self, phase_list):
+    def set_phases(self, phase_list) -> None:
         """Set a list of phases for this microstructure.
 
         The different phases in the list are added in that order.
@@ -1724,7 +1980,25 @@ class Microstructure(SampleData):
         for phase in phase_list:
             self.add_phase(phase)
 
-    def get_number_of_phases(self):
+    def set_phase_elastic_constants(self, elastic_constants, phase_id=1) -> None:
+        """Set the elastic constants of the given phase.
+
+        :param list elastic_constants: the list of elastic constants to use,
+        this has to be in agreement with the symmetry of the phase.
+        :param int phase_id: the id of the phase to use.
+        :raise ValueError: if the elastic constants do not match the phase
+        symmetry.
+        """
+        phase = self.get_phase(phase_id)
+        print('assigning elastic constants %s to phase %s' %
+              (elastic_constants, phase.name))
+        try:
+            phase.set_elastic_constants(elastic_constants)
+            self.set_phase(phase)
+        except ValueError as e:
+            print(e)
+
+    def get_number_of_phases(self) -> int:
         """Return the number of phases in this microstructure.
 
         Each crystal phase is stored in a list attribute: `_phases`. Note that
@@ -1735,9 +2009,11 @@ class Microstructure(SampleData):
         """
         return len(self._phases)
 
-    def get_number_of_grains(self, from_grain_map=False):
+    def get_number_of_grains(self, from_grain_map=False) -> int:
         """Return the number of grains in this microstructure.
 
+        :param bool from_grain_map: controls if the retrurned number of grains
+        comes from the grain data table or from the grain map.
         :return: the number of grains in the microstructure.
         """
         if from_grain_map:
@@ -1745,7 +2021,7 @@ class Microstructure(SampleData):
         else:
             return self.grains.nrows
 
-    def add_phase(self, phase):
+    def add_phase(self, phase) -> None:
         """Add a new phase to this microstructure.
 
         Before adding this phase, the phase id is set to the corresponding id.
@@ -1765,24 +2041,26 @@ class Microstructure(SampleData):
         self.add_attributes(d, '/PhaseData/phase_%02d' % new_phase_id)
         print('new phase added: %s' % phase.name)
 
-    def get_phase_ids_list(self):
+    def get_phase_list(self) -> list:
+        """Return the list of the phases in this microstructure."""
+        return self._phases
+
+    def get_phase_ids_list(self) -> list:
         """Return the list of the phase ids."""
         return [phase.phase_id for phase in self._phases]
 
-    def get_phase(self, phase_id=None):
+    def get_phase(self, phase_id=1) -> CrystallinePhase:
         """Get a crystalline phase.
 
-        If no phase_id is given, the active phase is returned.
+        If no phase_id is given, the first phase is returned.
 
         :param int phase_id: the id of the phase to return.
         :return: the `CrystallinePhase` corresponding to the id.
         """
-        if phase_id is None:
-            phase_id = self.active_phase_id
         index = self.get_phase_ids_list().index(phase_id)
         return self._phases[index]
 
-    def get_lattice(self, phase_id=None):
+    def get_lattice(self, phase_id=1) -> Lattice:
         """Get the crystallographic lattice associated with this microstructure.
 
         If no phase_id is given, the `Lattice` of the active phase is returned.
@@ -1791,7 +2069,14 @@ class Microstructure(SampleData):
         """
         return self.get_phase(phase_id).get_lattice()
 
-    def get_grain_map(self, as_numpy=True):
+    def get_grain_map(self) -> np.array:
+        """Get the active grain map as a numpy array.
+
+        The grain map is the image constituted by the grain ids or labels.
+        Label zero is reserved for the background or unattributed voxels.
+
+        :return: the grain map as a numpy array.
+        """
         grain_map = self.get_field(self.active_grain_map)
         if self._is_empty(self.active_grain_map):
             grain_map = None
@@ -1799,29 +2084,62 @@ class Microstructure(SampleData):
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
             if len(new_dim) == 3:
-                grain_map = grain_map.reshape((new_dim))
+                grain_map = grain_map.reshape(new_dim)
             else:
-                grain_map = grain_map.reshape((grain_map.shape[0],
-                                               grain_map.shape[1],
-                                               1))
+                grain_map = grain_map.reshape(
+                    (grain_map.shape[0], grain_map.shape[1], 1))
         return grain_map
 
-    def get_phase_map(self, as_numpy=True):
-        phase_map = self.get_field('phase_map')
+    def get_phase_map(self):
+        """Get the active phase map as a numpy array.
+
+        The phase map is an array of int where each voxel value tells you what
+        is the local material phase with respect to the `phase_list` attribute.
+
+        :return: the phase map as a numpy array.
+        """
+        phase_map = self.get_field(self.active_phase_map)
         if self._is_empty('phase_map'):
             phase_map = None
         elif phase_map.ndim == 2:
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
             if len(new_dim) == 3:
-                phase_map = phase_map.reshape((new_dim))
+                phase_map = phase_map.reshape(new_dim)
             else:
-                phase_map = phase_map.reshape((phase_map.shape[0],
-                                               phase_map.shape[1],
-                                               1))
+                phase_map = phase_map.reshape(
+                    (phase_map.shape[0], phase_map.shape[1], 1))
         return phase_map
 
-    def get_mask(self, as_numpy=False):
+    def get_orientation_map(self):
+        """Get the orientation map as a numpy array.
+
+        The orientation map is an array of triplets representing orientation
+        data for each voxel in the forme of rodrigues vectors.
+
+        :return: the orientation map as a numpy array.
+        """
+        orientation_map = self.get_field('orientation_map')
+        if self._is_empty('orientation_map'):
+            orientation_map = None
+        elif orientation_map.ndim == 3:
+            # case (nx, ny, 3)
+            new_dim = self.get_attribute('dimension', 'CellData')
+            if len(new_dim) == 3:
+                orientation_map = orientation_map.reshape(new_dim)
+            else:
+                orientation_map = orientation_map.reshape(
+                    (orientation_map.shape[0], orientation_map.shape[1], 1, 3))
+        return orientation_map
+
+    def get_mask(self):
+        """Get the mask as a numpy array.
+
+        The mask represent the sample outline. The value 1 means we are inside
+        the sample, the value 0 means we are outside the sample.
+
+        :return: the mask as a numpy array.
+        """
         mask = self.get_field('mask')
         if self._is_empty('mask'):
             mask = None
@@ -1829,11 +2147,10 @@ class Microstructure(SampleData):
             # reshape to 3D
             new_dim = self.get_attribute('dimension', 'CellData')
             if len(new_dim) == 3:
-                mask = mask.reshape((new_dim))
+                mask = mask.reshape(new_dim)
             else:
-                mask = mask.reshape((mask.shape[0],
-                                     mask.shape[1],
-                                               1))
+                mask = mask.reshape(
+                    (mask.shape[0], mask.shape[1], 1))
         return mask
 
     def get_ids_from_grain_map(self):
@@ -1884,7 +2201,7 @@ class Microstructure(SampleData):
         :param list id_list: a non empty list of the grain ids.
         :return: a numpy array containing the grain volumes.
         """
-        if id_list:
+        if id_list is not None:
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['volume']
         else:
@@ -1900,7 +2217,7 @@ class Microstructure(SampleData):
         :param list id_list: a non empty list of the grain ids.
         :return: a numpy array containing the grain centers.
         """
-        if id_list:
+        if id_list is not None:
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['center']
         else:
@@ -1917,7 +2234,7 @@ class Microstructure(SampleData):
         :param list id_list: a non empty list of the grain ids.
         :return: a numpy array containing the grain rodrigues vectors.
         """
-        if id_list:
+        if id_list is not None:
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['orientation']
         else:
@@ -1945,10 +2262,20 @@ class Microstructure(SampleData):
         used to restrict the grains, by default all the grain bounding boxes
         are returned.
 
-        :param list id_list: a non empty list of the grain ids.
+        .. note::
+
+          The bounding boxes are returned in ascending order of the grain ids
+          (not necessary the same order than the list if it is not ordered).
+          The maximum length of the ids list is 256.
+
+        :param list id_list: a non empty (preferably ordered) list of the
+        selected grain ids (with a maximum number of ids of 256).
         :return: a numpy array containing the grain bounding boxes.
+        :raise: a ValueError if the length of the id list is larger than 256.
         """
-        if id_list:
+        if id_list is not None:
+            if len(id_list) > 256:
+                raise(ValueError("the id_list can only have 256 values"))
             condition = Microstructure.id_list_to_condition(id_list)
             return self.grains.read_where(eval(condition))['bounding_box']
         else:
@@ -2054,45 +2381,64 @@ class Microstructure(SampleData):
         self.set_tablecol('GrainDataTable', 'volume', column=volumes)
         return
 
-    def set_lattice(self, lattice, phase_id=None):
+    def set_grain_phases(self, phases):
+        """ Store grain phases array in GrainDataTable
+
+            phases : 1D array of the phase id for each grain.
+        """
+        self.set_tablecol('GrainDataTable', 'phase', column=phases)
+        return
+
+    def set_lattice(self, lattice, phase_id=1):
         """Set the crystallographic lattice associated with this microstructure.
 
-        If no `phase_id` is specified, the lattice will be set for the active
-        phase.
+        If no `phase_id` is specified, the lattice will be set for the first
+        phase of the list.
 
         :param Lattice lattice: an instance of the `Lattice class`.
         :param int phase_id: the id of the phase to set the lattice.
         """
-        if phase_id is None:
-            phase_id = self.active_phase_id
         self.get_phase(phase_id)._lattice = lattice
 
     def set_active_grain_map(self, map_name='grain_map'):
-        """Set the active grain map name to inputed string.
+        """Set the active grain map name.
 
-        The active_grain_map string is used as Name to get the grain_map field
-        in the dataset through the SampleData "get_field" method.
+        The `active_grain_map` string attribute is used to locate the array
+        when the `get_grain_map` method is called. This allows to have multiple
+        grain maps within a data set.
         """
         self.active_grain_map = map_name
-        self.add_attributes({'active_grain_map':map_name}, 'CellData')
+        self.add_attributes({'active_grain_map': map_name}, 'CellData')
+        return
+
+    def set_active_phase_map(self, map_name='phase_map'):
+        """Set the active phase map name.
+
+        The `active_phase_map` string attribute is used to locate the array
+        when the `get_phase_map` method is called. This allows to have multiple
+        grain maps within a data set.
+        """
+        self.active_phase_map = map_name
+        self.add_attributes({'active_phase_map': map_name}, 'CellData')
         return
 
     def set_grain_map(self, grain_map, voxel_size=None,
-                      map_name='grain_map'):
+                      map_name='grain_map', compression=None):
         """Set the grain map for this microstructure.
 
         :param ndarray grain_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
-        # TODO: ad compression_options
+        if compression is None:
+            compression = self.default_compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
             if not empty:
                 create_image = False
         if create_image:
-            if (voxel_size is None):
+            if voxel_size is None:
                 msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
             if np.isscalar(voxel_size):
@@ -2107,25 +2453,29 @@ class Microstructure(SampleData):
                                       fieldname=map_name,
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True)
+                                      replace=True,
+                                      compression_options=compression)
         else:
             # Handle case of a 2D Microstrucutre: squeeze grain map to
             # ensure (Nx,Ny,1) array will be stored as (Nx,Ny)
-            if self._get_group_type('CellData')  == '2DImage':
+            if self._get_group_type('CellData') == '2DImage':
                 grain_map = grain_map.squeeze()
             self.add_field(gridname='CellData', fieldname=map_name,
-                           array=grain_map, replace=True)
+                           array=grain_map, replace=True,
+                           compression_options=compression)
         self.set_active_grain_map(map_name)
         return
 
-    def set_phase_map(self, phase_map, voxel_size=None):
+    def set_phase_map(self, phase_map, voxel_size=None, map_name='phase_map',
+                      compression=None):
         """Set the phase map for this microstructure.
 
         :param ndarray phase_map: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
-        # TODO: add compression_options
+        if compression is None:
+            compression = self.default_compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
@@ -2143,35 +2493,98 @@ class Microstructure(SampleData):
                     raise ValueError('voxel_size array must have a length '
                                      'equal to grain_map shape')
                 spacing_array = voxel_size
-            self.add_image_from_field(phase_map, 'phase_map',
+            self.add_image_from_field(field_array=phase_map,
+                                      fieldname=map_name,
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True)
+                                      replace=True,
+                                      compression_options=compression)
         else:
-            self.add_field(gridname='CellData', fieldname='phase_map',
+            self.add_field(gridname='CellData', fieldname=map_name,
                            array=phase_map, replace=True,
-                           indexname='phase_map')
+                           indexname='phase_map',
+                           compression_options=compression)
+        self.set_active_phase_map(map_name)
+        return
 
-    def set_mask(self, mask, voxel_size=None):
+    def update_phase_map_from_grains(self, grain_ids=None):
+        """Update the phase map from the grain map.
+
+        This method update the phase map by setting the phase of all
+        voxels of the grains to the appropriate value.
+
+        :param list grain_ids: the list of the grains ids that are
+            concerned by the update (all grain by default).
+        :param int phase_id: phase Id to set for the list of grains concerned
+            by the update.
+        """
+        # TODO: check existence of grain map
+        phase_map = self.get_phase_map()
+        # handle case of empty phase map
+        if phase_map is None:
+            map_shape = self.get_attribute('dimension', 'CellData')
+            phase_map = np.zeros(shape=map_shape, dtype=np.uint8)
+        if not grain_ids:
+            grain_ids = self.get_ids_from_grain_map()
+        time.sleep(0.2)
+        for gid in tqdm(grain_ids, desc='updating phase map'):
+            g = self.grains.read_where('idnumber == %d' % gid)[0]
+            bb = g['bounding_box']
+            phase_id = g['phase']
+            this_grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                                  bb[1][0]:bb[1][1],
+                                                  bb[2][0]:bb[2][1]]
+            phase_map[bb[0][0]:bb[0][1], bb[1][0]:bb[1][1],
+                      bb[2][0]:bb[2][1]][this_grain_map == gid] = phase_id
+        self.set_phase_map(phase_map)
+
+    def set_orientation_map(self, orientation_map, compression=None):
+        """Set the orientation_map map for this microstructure.
+
+        The orientation map is an array containing the voxel wise orientation
+        data in form of Rodigues vectors.
+
+        :param ndarray orientation_map: a 2D or 3D numpy array with rodrigues
+        vectors at each pixels. The size of the array must be compatible with
+        the `CellData` node image dimensions.
+        """
+        if compression is None:
+            compression = self.default_compression_options
+        dims = orientation_map.shape
+        cell_data_dims = self.get_attribute('dimension', 'CellData')
+        if not np.all(np.equal(dims[:-1], cell_data_dims)):
+            print('warning: the orientation map shape %s is not compatible with '
+                  'CellData node shape %s' % (dims, cell_data_dims))
+            return None
+        self.add_field(gridname='CellData', fieldname='orientation_map',
+                       array=orientation_map, replace=True,
+                       indexname='orientation_map',
+                       compression_options=compression)
+
+    def set_mask(self, mask, voxel_size=None, compression=None):
         """Set the mask for this microstructure.
 
         :param ndarray mask: a 2D or 3D numpy array.
         :param float voxel_size: the size of the voxels in mm unit. Used only
             if the CellData image Node must be created.
         """
-        # TODO: add compression_options
+        if compression is None:
+            compression = self.default_compression_options
         create_image = True
         if self.__contains__('CellData'):
             empty = self.get_attribute(attrname='empty', nodename='CellData')
-            if not (empty):
+            if not empty:
                 create_image = False
+        if mask.dtype == 'bool':
+            # use uint8 encoding
+            mask = mask.astype(np.uint8)
         if create_image:
-            if (voxel_size is None):
+            if voxel_size is None:
                 msg = 'Please specify voxel size for CellData image'
                 raise ValueError(msg)
             if np.isscalar(voxel_size):
                 dim = len(mask.shape)
-                spacing_array = voxel_size*np.ones((dim,))
+                spacing_array = voxel_size * np.ones((dim, ))
             else:
                 if len(voxel_size) != len(mask.shape):
                     raise ValueError('voxel_size array must have a length '
@@ -2180,10 +2593,12 @@ class Microstructure(SampleData):
             self.add_image_from_field(mask, 'mask',
                                       imagename='CellData', location='/',
                                       spacing=spacing_array,
-                                      replace=True)
+                                      replace=True,
+                                      compression_options=compression)
         else:
             self.add_field(gridname='CellData', fieldname='mask',
-                           array=mask, replace=True, indexname='mask')
+                           array=mask, replace=True, indexname='mask',
+                           compression_options=compression)
         return
 
     def set_random_orientations(self):
@@ -2197,7 +2612,7 @@ class Microstructure(SampleData):
 
     def remove_grains_not_in_map(self):
         """Remove from GrainDataTable grains that are not in the grain map."""
-        _,not_in_map,_ = self.compute_grains_map_table_intersection()
+        _, not_in_map, _ = self.compute_grains_map_table_intersection()
         self.remove_grains_from_table(not_in_map)
         return
 
@@ -2224,7 +2639,7 @@ class Microstructure(SampleData):
         if not self._is_empty('grain_map'):
             # Remove grains from grain map
             grain_map = self.get_grain_map()
-            grain_map[np.where(np.isin(grain_map,id_list))] = 0
+            grain_map[np.where(np.isin(grain_map, id_list))] = 0
             if new_grain_map_name is not None:
                 map_name = new_grain_map_name
             else:
@@ -2245,28 +2660,39 @@ class Microstructure(SampleData):
             self.grains.remove_row(int(where))
         return
 
-    def add_grains(self, euler_list, grain_ids=None):
-        """A a list of grains to this microstructure.
+    def add_grains(self, orientation_list, orientation_type='euler',
+                   grain_ids=None):
+        """Add a list of grains to this microstructure.
 
-        This function adds a list of grains represented by a list of Euler
-        angles triplets, to the microstructure. If provided, the `grain_ids`
-        list will be used for the grain ids.
+        This function adds a list of grains represented by their orientation
+        (either a list of Euler angles or Rodrigues vectors) to the
+        microstructure. If provided, the `grain_ids` list will be used for
+        the grain ids.
 
-        :param list euler_list: the list of euler angles (Bunge passive convention).
+        :param list orientation_list: a list of values representing the orientations.
+        :param str orientation_type: euler or rod for Euler angles (Bunge
+        passive convention and degrees) or Rodrigues vectors.
         :param list grain_ids: an optional list for the ids of the new grains.
         """
         grain = self.grains.row
         # build a list of grain ids if it is not given
         if grain_ids is None:
             if self.get_number_of_grains() > 0:
-                min_id = max(self.get_grain_ids())
+                min_id = max(self.get_grain_ids()) + 1
             else:
                 min_id = 0
-            grain_ids = range(min_id, min_id + len(euler_list))
-        print('adding %d grains to the microstructure' % len(grain_ids))
-        for gid, euler in zip(grain_ids, euler_list):
+            grain_ids = range(min_id, min_id + len(orientation_list))
+        if len(grain_ids) > 0:
+            s = 's' if len(grain_ids) > 1 else ''
+            print(f'adding {len(grain_ids)} grain{s} to the microstructure')
+        for gid, orientation in zip(grain_ids, orientation_list):
             grain['idnumber'] = gid
-            grain['orientation'] = Orientation.Euler2Rodrigues(euler)
+            if orientation_type == 'euler':
+                grain['orientation'] = Orientation.Euler2Rodrigues(orientation)
+            elif orientation_type in ['rod', 'rodrigues']:
+                grain['orientation'] = orientation
+            else:
+                raise ValueError('unknown type of orientation: %s' % orientation_type)
             grain.append()
         self.grains.flush()
 
@@ -2278,23 +2704,24 @@ class Microstructure(SampleData):
         _, _, not_in_table = self.compute_grains_map_table_intersection()
         # remove ID <0 from list (reserved to background)
         not_in_table = np.delete(not_in_table, np.where(not_in_table <= 0))
-        # generate random eule r angles
-        phi1 = np.random.rand(len(not_in_table),1) * 360.
-        Phi = 180. * np.arccos(2 * np.random.rand(len(not_in_table),1)- 1) / np.pi
-        phi2 = np.random.rand(len(not_in_table),1) * 360.
-        euler_list = np.concatenate((phi1,Phi,phi2), axis=1)
-        self.add_grains(euler_list, grain_ids=not_in_table)
+        # generate random euler angles
+        phi1 = np.random.rand(len(not_in_table), 1) * 360.
+        Phi = 180. * np.arccos(2 * np.random.rand(len(not_in_table), 1) - 1) / np.pi
+        phi2 = np.random.rand(len(not_in_table), 1) * 360.
+        euler_list = np.concatenate((phi1, Phi, phi2), axis=1)
+        self.add_grains(euler_list, orientation_type='euler', grain_ids=not_in_table)
         return
 
     @staticmethod
-    def random_texture(n=100):
+    def random_texture(n=100, phase=None):
         """Generate a random texture microstructure.
 
-        **parameters:**
-
-        *n* The number of grain orientations in the microstructure.
+        :param int n: the number of grain orientations in the microstructure.
+        :param CrystallinePhase phase: the phase to use for this microstructure.
+        :return: a `Microstructure` instance with n randomly oriented grains.
         """
-        m = Microstructure(name='random_texture', overwrite_hdf5=True)
+        m = Microstructure(name='random_texture', phase=phase,
+                           overwrite_hdf5=True)
         grain = m.grains.row
         for i in range(n):
             grain['idnumber'] = i + 1
@@ -2307,96 +2734,100 @@ class Microstructure(SampleData):
     def set_mesh(self, mesh_object=None, file=None, meshname='micro_mesh'):
         """Add a mesh of the microstructure to the dataset.
 
-        Mesh can be inputed as a BasicTools mesh object or as a mesh file.
-        Handled file format for now only include .geof (Zset software fmt).
+        Mesh can be input as a BasicTools mesh object or as a mesh file.
+        Handled file format for now only include .geof (Zset software format).
         """
         self.add_mesh(mesh_object=mesh_object, meshname=meshname,
                       location='/MeshData', replace=True, file=file)
         return
 
-    def create_grain_ids_field(self, meshname=None, store=True):
+    def create_grain_ids_field(self, meshname=None, elset_prefix='grain_',
+                               store=True):
         """Create a grain Id field of grain orientations on the input mesh.
 
         Creates a element wise field from the microsctructure mesh provided,
-        adding to each element the value of the Rodrigues vector
-        of the local grain element set, as it is and if it is referenced in the
-        `GrainDataTable` node.
+        adding to each element the value of the grain id of the local grain
+        element set, as it is and if it is referenced in the `GrainDataTable`
+        node.
 
-        :param str mesh: Name, Path or index name of the mesh on which an
+        .. note::
+
+          The grain elsets must be named with a prefix directly followed by the
+          grain number. This means that if the elsets are named `grain_1`,
+          `grain_2`, etc, the variable `elset_prefix' must be set to `grain_`.
+
+        :param str meshname: Name, Path or index name of the mesh on which an
             orientation map element field must be constructed
-        :param bool store: If `True`, store the orientation map in `CellData`
-            image group, with name `orientation_map`
+        :param str elset_prefix: prefix to define the element sets representing
+            the grains.
+        :param bool store: If `True`, store the grain ids field in `MeshData`
+            group, with name `grain_ids`
         """
-        # TODO : adapt data model to include microstructure mesh and adapt
-        # routine arugments and code to the new data model
-        # input a mesh_object or a mesh group ?
-        # check if mesh is provided
         if meshname is None:
-                raise ValueError('meshname do not refer to an existing mesh')
-        if not(self._is_mesh(meshname)) or  self._is_empty(meshname):
-                raise ValueError('meshname do not refer to a non empty mesh'
-                                 'group')
+            raise ValueError('mesh_name do not refer to an existing mesh')
+        if not self._is_mesh(meshname) or self._is_empty(meshname):
+            raise ValueError('mesh_name do not refer to a non empty mesh group')
         # create empty element vector field
-        Nelements = int(self.get_attribute('Number_of_elements',meshname))
+        n_elements = int(self.get_attribute('Number_of_elements', meshname))
         mesh = self.get_node(meshname)
-        El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
-        ID_field = np.zeros((Nelements,1),dtype=float)
-        grainIds = self.get_grain_ids()
+        el_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
+        grain_id_field = np.zeros((n_elements, 1), dtype=int)
+        grain_ids = self.get_grain_ids()
         # if mesh is provided
-        for i in range(len(grainIds)):
-            set_name = 'ET_grain_'+str(grainIds[i]).strip()
-            elset_path = os.path.join(El_tag_path, set_name)
-            element_ids = self.get_node(elset_path, as_numpy=True)
-            ID_field[element_ids] = grainIds[i]
+        for i in range(len(grain_ids)):
+            set_name = '%s%d' % (elset_prefix, grain_ids[i])
+            print('using elset name %s' % set_name)
+            elset_path = '%s/%s' % (el_tag_path, set_name)
+            element_ids = self.get_node(elset_path, as_numpy=True).astype(int)
+            grain_id_field[element_ids == 1] = grain_ids[i]
         if store:
             self.add_field(gridname=meshname, fieldname='grain_ids',
-                           array=ID_field)
-        return ID_field
+                           array=grain_id_field, replace=True)
+        return grain_id_field
 
-    def create_orientation_field(self, meshname=None, store=True):
-        """Create a vector field of grain orientations on the inputed mesh.
+    def create_orientation_field(self, mesh_name=None, elset_prefix='grain_',
+                                 store=True):
+        """Create a vector field of grain orientations on the input mesh.
 
-        Creates a element wise field from the microsctructure mesh provided,
-        adding to each element the value of the Rodrigues vector
-        of the local grain element set, as it is and if it is referenced in the
-        `GrainDataTable` node.
+        This method creates a element wise field on the microstructure mesh
+        indicated, adding to each element the value of the Rodrigues vector of
+        this grain as referenced in the `GrainDataTable` node.
 
-        :param str mesh: Name, Path or index name of the mesh on which an
-            orientation map element field must be constructed
-        :param bool store: If `True`, store the orientation map in `CellData`
-            image group, with name `orientation_map`
+        :param str mesh_name: Name, Path or index name of the mesh on which an
+            orientation field must be constructed
+        :param str elset_prefix: prefix to define the element sets representing
+            the grains.
+        :param bool store: If `True`, store the orientation field in corresponding
+            mesh group, with name `orientation_field`.
         """
-        # TODO : adapt data model to include microstructure mesh and adapt
-        # routine arugments and code to the new data model
-        # input a mesh_object or a mesh group ?
-        # check if mesh is provided
-        if meshname is None:
-                raise ValueError('meshname do not refer to an existing mesh')
-        if not(self._is_mesh(meshname)) or  self._is_empty(meshname):
-                raise ValueError('meshname do not refer to a non empty mesh'
-                                 'group')
+        if mesh_name is None:
+            raise ValueError('mesh_name do not refer to an existing mesh')
+        if not(self._is_mesh(mesh_name)) or self._is_empty(mesh_name):
+            raise ValueError('mesh_name do not refer to a non empty mesh group')
         # create empty element vector field
-        Nelements = int(self.get_attribute('Number_of_elements',meshname))
-        mesh = self.get_node(meshname)
-        El_tag_path = os.path.join(mesh._v_pathname,'Geometry','ElementsTags')
-        orientation_field = np.zeros((Nelements,3),dtype=float)
-        grainIds = self.get_grain_ids()
+        n_elements = int(self.get_attribute('Number_of_elements', mesh_name))
+        mesh = self.get_node(mesh_name)
+        el_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
+        orientation_field = np.zeros((n_elements, 3), dtype=float)
+        grain_ids = self.get_grain_ids()
         grain_orientations = self.get_grain_rodrigues()
+        print(grain_orientations)
         # if mesh is provided
-        for i in range(len(grainIds)):
-            set_name = 'ET_grain_'+str(grainIds[i]).strip()
-            elset_path = os.path.join(El_tag_path, set_name)
-            element_ids = self.get_node(elset_path, as_numpy=True)
-            orientation_field[element_ids,:] = grain_orientations[i,:]
+        for i in range(len(grain_ids)):
+            set_name = '%s%d' % (elset_prefix, grain_ids[i])
+            print('using elset name %s' % set_name, grain_orientations[i, :])
+            elset_path = '%s/%s' % (el_tag_path, set_name)
+            element_ids = self.get_node(elset_path, as_numpy=True).astype(int)
+            orientation_field[np.squeeze(element_ids) == 1, :] = grain_orientations[i, :]
         if store:
-            self.add_field(gridname=meshname, fieldname='grain_orientations',
-                           array=orientation_field)
+            self.add_field(gridname=mesh_name, fieldname='orientation_field',
+                           array=orientation_field, replace=True)
         return orientation_field
 
     def create_orientation_map(self, store=True):
         """Create a vector field in CellData of grain orientations.
 
-        Creates a (Nx, Ny, Nz, 3) or (Nx, Ny, 3) field from the microsctructure
+        Creates a (Nx, Ny, Nz, 3) or (Nx, Ny, 3) field from the microstructure
         `grain_map`, adding to each voxel the value of the Rodrigues vector
         of the local grain Id, as it is and if it is referenced in the
         `GrainDataTable` node.
@@ -2405,41 +2836,240 @@ class Microstructure(SampleData):
             image group, with name `orientation_map`
         """
         # safety check
-        if self._is_empty('grain_map'):
-            raise RuntimeError('The microstructure instance has an empty'
-                                '`grain_map` node. Cannot create orientation'
-                                ' map')
-        grain_map = self.get_grain_map().squeeze()
-        grainIds = self.get_grain_ids()
+        if self._is_empty(self.active_grain_map):
+            msg = 'The microstructure instance has no associated grain_map. ' \
+                  'Cannot create orientation map.'
+            raise RuntimeError(msg)
+        grain_map = self.get_grain_map()
+        grain_ids = self.get_grain_ids()
         grain_orientations = self.get_grain_rodrigues()
         # safety check 2
         grain_list = np.unique(grain_map)
         # remove -1 and 0 from the list of grains in grain map (Ids reserved
         # for background and overlaps in non-dilated reconstructed grain maps)
         grain_list = np.delete(grain_list, np.isin(grain_list, [-1, 0]))
-        if not np.all(np.isin(grain_list, grainIds)):
-            raise ValueError('Some grain Ids in `grain_map` are not referenced'
-                             ' in the `GrainDataTable` array. Cannot create'
-                             ' orientation map.')
+        if not np.all(np.isin(grain_list, grain_ids)):
+            msg = 'Some grain ids in the grain_map are not referenced in the ' \
+                  '`GrainDataTable` array. Cannot create orientation map.'
+            raise ValueError(msg)
         # create empty orientation map with right dimensions
-        im_dim = self.get_attribute('dimension', 'CellData')
-        shape_orientation_map = np.empty(shape=(len(im_dim)+1), dtype='int32')
-        shape_orientation_map[:-1] = im_dim
-        shape_orientation_map[-1] = 3
+        im_dim = tuple(self.get_attribute('dimension', 'CellData'))
+        print(im_dim)
+        shape_orientation_map = im_dim + (3,)
+        print(shape_orientation_map)
         orientation_map = np.zeros(shape=shape_orientation_map, dtype=float)
-        omap_X = orientation_map[..., 0]
-        omap_Y = orientation_map[..., 1]
-        omap_Z = orientation_map[..., 2]
-        for i in range(len(grainIds)):
-            slc = np.where(grain_map == grainIds[i])
-            omap_X[slc] = grain_orientations[i, 0]
-            omap_Y[slc] = grain_orientations[i, 1]
-            omap_Z[slc] = grain_orientations[i, 2]
+        for i in range(len(grain_ids)):
+            #TODO use grain bounding box here
+            #slc = np.where(grain_map == grain_ids[i])
+            orientation_map[grain_map == grain_ids[i], 0] = grain_orientations[i, 0]
+            orientation_map[grain_map == grain_ids[i], 1] = grain_orientations[i, 1]
+            orientation_map[grain_map == grain_ids[i], 2] = grain_orientations[i, 2]
+            #orientation_map[slc, 1] = grain_orientations[i, 1]
+            #orientation_map[slc, 2] = grain_orientations[i, 2]
         if store:
             self.add_field(gridname='CellData', fieldname='orientation_map',
                            array=orientation_map, replace=True,
                            location='CellData')
         return orientation_map
+
+    def add_grain_lattices_representation(self):
+        """Add a mesh with one cell per grain representing the crystal lattices.
+
+        This function create a mesh with one cell per grain. Each cell is a hexahedron
+        shaped as the crystal lattice and sclaed by the grain size. A scalar field 
+        of the grain ids is also attached to the mesh.
+
+        :note: The case of hexagonal lattice is handled by putting together 3 hexahedrons 
+        to build a hexagonal prism since the VTK_HEXAGONAL_PRISM topology is not presently
+        supported by the XDMF format.
+        """
+        lattice = self.get_phase().get_lattice()
+        coords, edges, faces = lattice.get_points(origin='mid', handle_hexagonal=False)
+        grain_ids = self.get_grain_ids()
+        sizes = self.get_grain_volumes()
+        centers = self.get_grain_centers()
+        n = self.get_number_of_grains()
+
+        # local function to insert a new cell representing one lattice
+        def insert_grain_lattice_cell(grid, id_offset, om, coords, center, size):
+            coords_rot = np.empty_like(coords)
+            assert len(coords) == 8
+            Ids = vtk.vtkIdList()
+            hexahedron_order = [0, 1, 3, 2, 4, 5, 7, 6]
+            for k, coord in enumerate(coords):
+                # scale coordinates with the grain size and center on the grain
+                coords_rot[k] = center + np.sqrt(size) * np.dot(om.T, coord)
+                points.InsertNextPoint(coords_rot[k])
+                Ids.InsertNextId(id_offset + hexahedron_order[k])                        
+            grid.InsertNextCell(vtk.VTK_HEXAHEDRON, Ids)
+
+        # vtkPoints instance for all the vertices
+        points = vtk.vtkPoints()
+        # vtkUnstructuredGrid instance for all the cells
+        grid = vtk.vtkUnstructuredGrid()
+        grid.SetPoints(points)
+        if lattice.get_symmetry() is Symmetry.hexagonal:
+            grid.Allocate(3 * n, 1)
+        else:
+            grid.Allocate(n, 1)
+        id_offset = 0
+
+        for g in tqdm(self.grains, desc='creating lattice cell for all grains'):
+            gid = g['idnumber']
+            center = g['center']
+            size = g['volume']
+            om = self.get_grain(gid).orientation.orientation_matrix()
+            insert_grain_lattice_cell(grid, id_offset, om, coords, center, size)
+            id_offset += len(coords)
+            if lattice.get_symmetry() is Symmetry.hexagonal:
+                # handle hexagonal case by creating 3 hexahedrons
+                euler = self.get_grain(gid).orientation.euler
+                om = Orientation.from_euler(euler + np.array([0., 0. , 120.])).orientation_matrix()
+                insert_grain_lattice_cell(grid, id_offset, om, coords, center, size)
+                id_offset += len(coords)
+                om = Orientation.from_euler(euler + np.array([0., 0. , 240.])).orientation_matrix()
+                insert_grain_lattice_cell(grid, id_offset, om, coords, center, size)
+                id_offset += len(coords)
+
+        from vtk.util import numpy_support
+        grain_ids_array = numpy_support.numpy_to_vtk(grain_ids)
+        if lattice.get_symmetry() is Symmetry.hexagonal:
+            grain_ids_array = numpy_support.numpy_to_vtk(np.repeat(grain_ids, 3))
+        grain_ids_array.SetName('grain_ids')
+        grid.GetCellData().AddArray(grain_ids_array)
+
+        # now add the created mesh to the microstructure
+        from BasicTools.Containers import vtkBridge
+        mesh = vtkBridge.VtkToMesh(grid)
+        self.add_mesh(mesh_object=mesh, location='/MeshData', meshname='grain_lattices',
+                      indexname='mesh_grain_lattices', replace=True)
+        
+    def fz_grain_orientation_data(self, grain_id, plot=True, move_to_fz=True):
+        """Plot the orientation data for this grain.
+
+        This function extracts orientation data for a given grain and creates
+        a three dimensional plot in Rodrigues space.
+
+        :param int grain_id: the grain id to retrieve orientation data.
+        :param bool plot: flag to create a 3D plot. If False, the Rodrigues
+        orientation data is simply returned.
+        :param bool plot: flag to move the orientation data to the fundamental
+        zone (the crystal lattice of the microstructure is used for that).
+        :return: a numpy array of size (n, 3) with n being the number of data
+        points for this grain.
+        """
+        orientation_map = self.get_orientation_map()
+        rods_gid = orientation_map[np.where(self.get_grain_map() == grain_id)]
+        sym = self.get_lattice().get_symmetry()
+
+        if move_to_fz:
+            # move to the fundamental zone
+            for i in range(len(rods_gid)):
+                g = Orientation.from_rodrigues(rods_gid[i]).orientation_matrix()
+                g_fz = sym.move_rotation_to_FZ(g, verbose=False)
+                o_fz = Orientation(g_fz)
+                rods_gid[i] = o_fz.rod
+
+        if plot:
+            # plot orientation data in Rodrigues space
+            fig = plt.figure()
+            ax = fig.add_subplot(projection='3d')
+            ax.scatter(rods_gid[:, 0], rods_gid[:, 1], rods_gid[:, 2])
+            plt.show()
+        return rods_gid
+
+    def compute_god_map(self, id_list=None, store=True,
+                        recompute_mean_orientation=False):
+        """Create a GOD (grain orientation deviation) map.
+
+        This method computes the grain orientation deviation map. For each
+        grain in the list (all grain by default), the orientation of each
+        voxel belonging to this grain is compared to the mean orientation in
+        the grain and the resulting misorientation is assigned to the pixel.
+
+        A grain ids list can be used to restrict the grains where to compute
+        the orientation deviation (the number of grains in the list must be 256
+        maximum). By default, this method uses the mean orientation in the
+        GrainDataTable but the mean orientation can also be recomputed from the
+        orientation map and grain map by activating the flag
+        `recompute_mean_orientation`.
+
+        .. note::
+
+          This method needs both a grain map and an orientation map, a message
+          will be displayed if this is not the case.
+
+        :param list id_list: the list of the grain ids to include (compute
+        for all grains by default).
+        :param bool recompute_mean_orientation: if `True` the mean grain
+        orientation is recalculated from the orientatin map instead of using
+        the value in the `GrainDataTable`.
+        :param bool store: If `True`, store the grain orientation deviation map
+        in the `CellData` group, with name `grain_orientation_deviation`.
+        """
+        if self._is_empty('grain_map'):
+            print('no grain map found, please add a grain map to your data set')
+            return None
+        elif self._is_empty('orientation_map'):
+            print('no orientation map found, please add an orientation map to your data set')
+            return None
+        grain_ids = self.get_grain_map()
+        print('grain ids shape', grain_ids.shape)
+        orientation_map = self.get_orientation_map()
+        print('orientation map shape', orientation_map.shape)
+        # assume only one phase
+        if self.get_number_of_phases() > 1:
+            print('error, multiple phases not yet supported')
+            return None
+        sym = self.get_phase().get_symmetry()
+        god = np.zeros_like(grain_ids, dtype=float)
+        if not id_list:
+            id_list = np.unique(self.get_ids_from_grain_map())
+        if not recompute_mean_orientation:
+            # verify that all required grain ids are present in the GrainDataTable
+            all_grain_in_table = np.all([gid in self.get_grain_ids() for gid in id_list])
+            if not all_grain_in_table:
+                print('warning not all grains present in the grain map have an '
+                      'entry in the grain data table, the GOD map cannot be '
+                      'computed for the requested grains. Consider using the '
+                      'option `recompute_mean_orientation=True` or restrict the '
+                      'list of grains using the argument `id_list`.')
+            else:
+                print('all grains are present in the GrainDataTable')
+        for index, gid in enumerate(id_list):
+            if gid < 1:
+                continue
+            progress = 100 * index / len(id_list)
+            print('GOD computation progress: {:.2f} % (grain {:d})'.format(progress, gid), end='\r')
+            # we use grain bounding boxes to speed up calculations
+            bb = self.get_grain_bounding_boxes(id_list=[gid])[0]
+            grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
+                                             bb[1][0]:bb[1][1],
+                                             bb[2][0]:bb[2][1]]
+            indices = np.where(grain_map == gid)
+            if recompute_mean_orientation:
+                # compute the mean orientation of this grain
+                rods_gid = np.squeeze(orientation_map[bb[0][0]:bb[0][1],
+                                                      bb[1][0]:bb[1][1],
+                                                      bb[2][0]:bb[2][1]][grain_map == gid])
+                #print('\nrods_gid shape', rods_gid.shape)
+                o = Orientation.compute_mean_orientation(rods_gid, symmetry=sym)
+            else:
+                o = self.get_grain(gid).orientation
+                #print('mean grain orientation:', o.rod)
+            # now compute the orientation deviation for each pixel of the grain
+            for i, j, k in zip(indices[0], indices[1], indices[2]):
+                ii, jj, kk = bb[0][0] + i, bb[1][0] + j, bb[2][0] + k
+                rod_ijk = orientation_map[ii, jj, kk, :]
+                o_ijk = Orientation.from_rodrigues(rod_ijk)
+                god[ii, jj, kk] = np.degrees(o.disorientation(o_ijk, crystal_structure=sym)[0])
+        print('GOD computation progress: 100.00 %')
+        if store:
+            # pick the location of the grain map to add the new field
+            location = self._get_parent_name(self.active_grain_map)
+            self.add_field(gridname=location, array=god, replace=True,
+                           fieldname='grain_orientation_deviation')
+        return god
 
     def add_IPF_maps(self):
         """Add IPF maps to the data set.
@@ -2450,13 +3080,16 @@ class Microstructure(SampleData):
         """
         ipf100 = self.create_IPF_map(axis=np.array([1., 0., 0.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_100',
-                       array=ipf100, replace=True)
+                       array=ipf100, replace=True,
+                       compression_options=self.default_compression_options)
         ipf010 = self.create_IPF_map(axis=np.array([0., 1., 0.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_010',
-                       array=ipf010, replace=True)
+                       array=ipf010, replace=True,
+                       compression_options=self.default_compression_options)
         ipf001 = self.create_IPF_map(axis=np.array([0., 0., 1.]))
         self.add_field(gridname='CellData', fieldname='ipf_map_001',
-                       array=ipf001, replace=True)
+                       array=ipf001, replace=True,
+                       compression_options=self.default_compression_options)
         del ipf100, ipf010, ipf001
 
     def create_IPF_map(self, axis=np.array([0., 0., 1.])):
@@ -2468,159 +3101,40 @@ class Microstructure(SampleData):
         :param axis: the unit vector for the load direction to compute IPF
             colors.
         """
-        dims = list(self.get_grain_map().shape)
-        grain_ids = self.get_grain_ids()
+        grain_map = self.get_grain_map()
+        dims = list(grain_map.shape)
         shape_ipf_map = list(dims) + [3]
-        ipf_map = np.zeros(shape=shape_ipf_map, dtype=float)
-        for i in range(len(grain_ids)):
-            gid = grain_ids[i]
+        ipf_map = np.zeros(shape=shape_ipf_map, dtype=np.float32)
+        for g in tqdm(self.grains, desc='computing IPF map'):
+            gid = g['idnumber']
             # use the bounding box for this grain
-            bb = self.grains.read_where('idnumber == %d' % gid)['bounding_box'][0]
-            grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
-                                             bb[1][0]:bb[1][1],
-                                             bb[2][0]:bb[2][1]]
-            o = self.get_grain(gid).orientation
+            bb = g['bounding_box']
+            this_grain_map = grain_map[bb[0][0]:bb[0][1],
+                                       bb[1][0]:bb[1][1],
+                                       bb[2][0]:bb[2][1]]
+            o = Orientation.from_rodrigues(g['orientation'])
+            sym = self.get_phase(g['phase']).get_symmetry()
+            rgb = o.ipf_color(axis, symmetry=sym, saturate=True)
             ipf_map[bb[0][0]:bb[0][1],
                     bb[1][0]:bb[1][1],
-                    bb[2][0]:bb[2][1]][grain_map == gid] = o.ipf_color(axis, symmetry=self.get_lattice(
-            ).get_symmetry(), saturate=True)
-            progress = 100 * (1 + i) / len(grain_ids)
-            print('computing IPF map: {0:.2f} %'.format(progress), end='\r')
+                    bb[2][0]:bb[2][1]][this_grain_map == gid] = rgb
         return ipf_map.squeeze()
 
-    def view_slice(self, slice=None, color='random', show_mask=True,
-                   show_grain_ids=False, highlight_ids=None, slip_system=None,
-                   axis=[0., 0., 1], show_slip_traces=False, hkl_planes=None,
-                   display=True):
+    def view_slice(self, **kwargs):
         """A simple utility method to show one microstructure slice.
 
-        The microstructure can be colored using different fields such as a
-        random color (default), the grain ids, the Schmid factor or the grain
-        orientation using IPF coloring.
-        The plot can be customized in several ways. Annotations can be added
-        in the grains (ids, lattice plane traces) and the list of grains where
-        annotations are shown can be controled using the `highlight_ids`
-        argument. By default, if present, the mask will be shown.
-
-        :param int slice: the slice number
-        :param str color: a string to chose the colormap from ('random',
-            'grain_ids', 'schmid', 'ipf')
-        :param bool show_mask: a flag to show the mask by transparency.
-        :param bool show_grain_ids: a flag to annotate the plot with the grain
-            ids.
-        :param list highlight_ids: a list of grain ids to restrict the
-            annotations (by default all grains are annotated).
-        :param slip_system: an instance (or a list of instances) of the class
-            SlipSystem to compute the Schmid factor.
-        :param axis: the unit vector for the load direction to compute
-            the Schmid factor or to display IPF coloring.
-        :param bool show_slip_traces: activate slip traces plot in each grain.
-        :param list hkl_planes: the list of planes to plot the slip traces.
-        :param bool display: if True, the show method is called, otherwise,
-            the figure is simply returned.
+        Refer to the view_map_slice methode in `pymicro.crystal.view`module 
+        for the kwargs definition. 
         """
-        if self._is_empty('grain_map'):
-            print('Microstructure instance mush have a grain_map field to use '
-                  'this method')
-            return
-        grain_map = self.get_grain_map(as_numpy=True)
-        if slice is None or slice > grain_map.shape[2] - 1 or slice < 0:
-            slice = grain_map.shape[2] // 2
-            print('using slice value %d' % slice)
-        grains_slice = grain_map[:, :, slice]
-        gids = np.intersect1d(np.unique(grains_slice), self.get_grain_ids())
-        fig, ax = plt.subplots()
-        if color == 'random':
-            grain_cmap = Microstructure.rand_cmap(first_is_black=True)
-            ax.imshow(grains_slice.T, cmap=grain_cmap, vmin=0, interpolation='nearest')
-        elif color == 'grain_ids':
-            ax.imshow(grains_slice.T, cmap='viridis', vmin=0, interpolation='nearest')
-        elif color == 'schmid':
-            # construct a Schmid factor image
-            schmid_image = np.zeros_like(grains_slice, dtype=float)
-            for gid in gids:
-                o = self.get_grain(gid).orientation
-                if type(slip_system) == list:
-                    # compute max Schmid factor
-                    sf = max(o.compute_all_schmid_factors(
-                        slip_systems=slip_system, load_direction=axis))
-                else:
-                    sf = o.schmid_factor(slip_system, axis)
-                schmid_image[grains_slice == gid] = sf
-            from matplotlib import cm
-            plt.imshow(schmid_image.T, cmap=cm.gray, vmin=0, vmax=0.5, interpolation='nearest')
-            cb = plt.colorbar()
-            cb.set_label('Schmid factor')
-        elif color == 'ipf':
-            # build IPF image
-            ipf_image = np.zeros((*grains_slice.shape, 3), dtype=float)
-            for gid in gids:
-                o = self.get_grain(gid).orientation
-                try:
-                    c = o.ipf_color(axis, symmetry=self.get_lattice().get_symmetry(), saturate=True)
-                except ValueError:
-                    print('problem moving to the fundamental zone for rodrigues vector {}'.format(o.rod))
-                    c = np.array([0., 0., 0.])
-                ipf_image[grains_slice == gid] = c
-            plt.imshow(ipf_image.transpose(1, 0, 2), interpolation='nearest')
-        else:
-            print('unknown color scheme requested, please chose between {random, '
-                  'grain_ids, schmid, ipf}, returning')
-            return
-        ax.xaxis.set_label_position('top')
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        if not self._is_empty('mask') and show_mask:
-            from pymicro.view.vol_utils import alpha_cmap
-            mask = self.get_mask()
-            plt.imshow(mask[:, :, slice].T, cmap=alpha_cmap(opacity=0.3))
-
-        # compute the center of mass of each grain of interest in this slice
-        if show_grain_ids or show_slip_traces:
-            centers = np.zeros((len(gids), 2))
-            sizes = np.zeros(len(gids))
-            for i, gid in enumerate(gids):
-                if highlight_ids and gid not in highlight_ids:
-                    continue
-                sizes[i] = np.sum(grains_slice == gid)
-                centers[i] = ndimage.measurements.center_of_mass(
-                    grains_slice == gid, grains_slice)
-
-        # grain id labels
-        if show_grain_ids:
-            for i, gid in enumerate(gids):
-                if highlight_ids and gid not in highlight_ids:
-                    continue
-                plt.annotate('%d' % gids[i], xycoords='data',
-                             xy=(centers[i, 0], centers[i, 1]),
-                             horizontalalignment='center',
-                             verticalalignment='center',
-                             color='k',
-                             fontsize=12)
-        # slip traces on this slice for a set of lattice planes
-        if show_slip_traces and hkl_planes:
-            for i, gid in enumerate(gids):
-                if highlight_ids and gid not in highlight_ids:
-                    continue
-                g = self.get_grain(gid)
-                for hkl in hkl_planes:
-                    trace = hkl.slip_trace(g.orientation,
-                                           n_int=[0, 0, 1],
-                                           view_up=[0, -1, 0],
-                                           trace_size=0.8 * np.sqrt(sizes[i]),
-                                           verbose=False)
-                    color = 'k'
-                    x = centers[i][0] + np.array([-trace[0] / 2, trace[0] / 2])
-                    y = centers[i][1] + np.array([-trace[1] / 2, trace[1] / 2])
-                    #plt.plot(centers[i][0], centers[i][1], 'o', color=color)
-                    plt.plot(x, y, '-', linewidth=1, color=color)
-            extent = (-self.get_voxel_size() * grains_slice.shape[0] / 2,
-                      self.get_voxel_size() * grains_slice.shape[0] / 2,
-                      self.get_voxel_size() * grains_slice.shape[1] / 2,
-                      -self.get_voxel_size() * grains_slice.shape[1] / 2)
-            plt.axis([0, grains_slice.shape[0], grains_slice.shape[1], 0])
-        if display:
-            plt.show()
+        from pymicro.crystal.view import View_slice
+        view = View_slice(self)
+        if 'unit' in kwargs:
+            view.set_unit(kwargs['unit'])
+            kwargs.pop('unit')
+        if 'plane' in kwargs:
+            view.set_plane(kwargs['plane'])
+            kwargs.pop('plane')
+        fig, ax = view.view_map_slice(**kwargs)
         return fig, ax
 
     @staticmethod
@@ -2644,19 +3158,15 @@ class Microstructure(SampleData):
 
     def ipf_cmap(self):
         """
-        Return a colormap with ipf colors.
-
-        .. warning::
-
-          This function works only for a microstructure with the cubic symmetry
-          due to current limitation in the `Orientation` get_ipf_colour method.
+        Return a colormap with ipf colors for each grain.
 
         :return: a color map that can be directly used in pyplot.
         """
-        ipf_colors = np.zeros((4096, 3))
+        ipf_colors = np.zeros((self.get_number_of_grains(), 3))
         for grain in self.grains:
             o = Orientation.from_rodrigues(grain['orientation'])
-            ipf_colors[grain['idnumber'], :] = o.get_ipf_colour()
+            sym = self.get_phase(phase_id=grain['phase']).get_symmetry()
+            ipf_colors[grain['idnumber'], :] = o.ipf_color(symmetry=sym)
         return colors.ListedColormap(ipf_colors)
 
     @staticmethod
@@ -2710,69 +3220,97 @@ class Microstructure(SampleData):
         return s
 
     @staticmethod
-    def match_grains(micro1, micro2, use_grain_ids=None, verbose=False):
-        return micro1.match_grains(micro2, use_grain_ids=use_grain_ids,
-                                   verbose=verbose)
-
-    def match_grains(self, micro2, mis_tol=1, use_grain_ids=None, verbose=False):
+    def match_grains(m1, m2, **kwargs):
+        return micro1.match_grains(micro2, **kwargs)
+        
+    def match_grains(self, m2, mis_tol=1, 
+                     grains_to_match=None, grains_to_search=None, 
+                     use_centers=False, center_tol=0.1, scale_m2=1., 
+                     offset_m2=None, center_merit=10., verbose=False):
         """Match grains from a second microstructure to this microstructure.
 
-        This function try to find pair of grains based on their orientations.
+        This function try to find pair of grains based on a function of
+        merit based on their orientations. This function can optionnally 
+        use the center of the grains. In this case several paramaters 
+        can be used to adjust the origin of the microstructure, their 
+        scale and the relative merit of the center proximity with 
+        respect to the orientation differences.
 
         .. warning::
 
-          This function works only for microstructures with the same symmetry.
+        This function works only for microstructures with the same symmetry.
 
-        :param micro2: the second instance of `Microstructure` from which
+        :param m2: the second instance of `Microstructure` from which
             to match the grains.
         :param float mis_tol: the tolerance is misorientation to use
             to detect matches (in degrees).
         :param list use_grain_ids: a list of ids to restrict the grains
-            in which to search for matches.
+            of the first microstructure in which to search for matches.
+        :param use_centers verbose: use the grain centers to build the 
+            function of merit.
+        :param float center_tol: the tolerance for 2 grains to be match 
+            together (in mm).
         :param bool verbose: activate verbose mode.
         :raise ValueError: if the microstructures do not have the same symmetry.
         :return tuple: a tuple of three lists holding respectively the matches,
-           the candidates for each match and the grains that were unmatched.
+        the candidates for each match and the grains that were unmatched.
         """
         # TODO : Test
         if not (self.get_lattice().get_symmetry()
-                == micro2.get_lattice().get_symmetry()):
+                == m2.get_lattice().get_symmetry()):
             raise ValueError('warning, microstructure should have the same '
-                             'symmetry, got: {} and {}'.format(
+                            'symmetry, got: {} and {}'.format(
                 self.get_lattice().get_symmetry(),
-                micro2.get_lattice().get_symmetry()))
+                m2.get_lattice().get_symmetry()))
         candidates = []
         matched = []
         unmatched = []  # grain that were not matched within the given tolerance
-        # restrict the grain ids to match if needed
+        # restrict the grain ids to match and to search if needed
         sym = self.get_lattice().get_symmetry()
-        if use_grain_ids is None:
+        if grains_to_match is None:
             grains_to_match = self.get_tablecol(tablename='GrainDataTable',
                                                 colname='idnumber')
-        else:
-            grains_to_match = use_grain_ids
-        # look at each grain
+        if grains_to_search is None:
+            grains_to_search = m2.get_tablecol(tablename='GrainDataTable',
+                                               colname='idnumber')
+        # look at each grain and compute a figure of merits
         for i, g1 in enumerate(self.grains):
             if not (g1['idnumber'] in grains_to_match):
                 continue
+            c1 = g1['center']
             cands_for_g1 = []
-            best_mis = mis_tol
+            best_merit = mis_tol
+            if use_centers:
+                best_merit *= (center_tol * center_merit)
             best_match = -1
             o1 = Orientation.from_rodrigues(g1['orientation'])
-            for g2 in micro2.grains:
+            for g2 in m2.grains:
+                if not (g2['idnumber'] in grains_to_search):
+                    continue
+                if use_centers:
+                    c2 = g2['center'] * scale_m2 + offset_m2
+                    if np.linalg.norm(c2 - c1) > center_tol:
+                        continue
                 o2 = Orientation.from_rodrigues(g2['orientation'])
                 # compute disorientation
                 mis, _, _ = o1.disorientation(o2, crystal_structure=sym)
                 misd = np.degrees(mis)
                 if misd < mis_tol:
+                    if use_centers:
+                        center_dif = np.linalg.norm(c2 - c1)
                     if verbose:
                         print('grain %3d -- candidate: %3d, misorientation:'
-                              ' %.2f deg' % (g1['idnumber'], g2['idnumber'],
-                                             misd))
+                            ' %.2f deg' % (g1['idnumber'], g2['idnumber'],
+                                            misd))
+                        if use_centers:
+                            print('center difference: %.2f' % center_dif)
                     # add this grain to the list of candidates
                     cands_for_g1.append(g2['idnumber'])
-                    if misd < best_mis:
-                        best_mis = misd
+                    merit = misd
+                    if use_centers:
+                        merit *= (center_dif * center_merit)
+                    if merit < best_merit:
+                        best_merit = merit
                         best_match = g2['idnumber']
             # add our best match or mark this grain as unmatched
             if best_match > 0:
@@ -2783,7 +3321,7 @@ class Microstructure(SampleData):
         if verbose:
             print('done with matching')
             print('%d/%d grains were matched ' % (len(matched),
-                                                  len(grains_to_match)))
+                                                len(grains_to_match)))
         return matched, candidates, unmatched
 
     def match_orientation(self, orientation, use_grain_ids=None):
@@ -2850,13 +3388,13 @@ class Microstructure(SampleData):
         :param bool use_mask: if True and that this microstructure has a mask,
             the dilation will be limited by it.
         """
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         grain_volume_init = (grain_map == grain_id).sum()
         grain_data = grain_map == grain_id
         grain_data = ndimage.binary_dilation(grain_data,
                                              iterations=dilation_steps).astype(np.uint8)
         if use_mask and not self._is_empty('mask'):
-            grain_data *= self.get_mask(as_numpy=True)
+            grain_data *= self.get_mask()
         grain_map[grain_data == 1] = grain_id
         grain_volume_final = (grain_map == grain_id).sum()
         print('grain %s was dilated by %d voxels' % (grain_id,
@@ -2951,27 +3489,35 @@ class Microstructure(SampleData):
         return array
 
     def dilate_grains(self, dilation_steps=1, dilation_ids=None,
-                      new_map_name='dilated_grain_map'):
+                      new_map_name='dilated_grain_map',
+                      update_microstructure_properties=False):
         """Dilate grains to fill the gap between them.
 
         This function calls `dilate_labels` with the grain map of the
-        microstructure.
+        microstructure. The grain properties and the phase map can be updated
+        after the dilation by setting the `update_microstructure_properties`
+        parameter to True.
 
-        :param int dilation_steps: the number of dilation steps to apply.
-        :param list dilation_ids: a list to restrict the dilation to the given ids.
+        :param int dilation_steps: the number of dilation steps to
+            apply to the grain map.
+        :param list dilation_ids: a list to restrict the dilation to
+            the given ids.
+        :param str new_map_name: the name to use for the dilated grain map.
+        :param bool update_microstructure_properties: a flag to update all
+            grains properties and update the microstructure phase map.
         """
         if not self.__contains__('grain_map'):
             raise ValueError('microstructure %s must have an associated '
                              'grain_map ' % self.get_sample_name())
             return
-        grain_map = self.get_grain_map(as_numpy=True).copy()
+        grain_map = self.get_grain_map().copy()
         # get rid of overlap regions flaged by -1
         grain_map[grain_map == -1] = 0
 
         if not self._is_empty('mask'):
             grain_map = Microstructure.dilate_labels(grain_map,
                                                      dilation_steps=dilation_steps,
-                                                     mask=self.get_mask(as_numpy=True),
+                                                     mask=self.get_mask(),
                                                      dilation_ids=dilation_ids)
         else:
             grain_map = Microstructure.dilate_labels(grain_map,
@@ -2979,6 +3525,14 @@ class Microstructure(SampleData):
                                                      dilation_ids=dilation_ids)
         # finally assign the dilated grain map to the microstructure
         self.set_grain_map(grain_map, map_name=new_map_name)
+
+        if update_microstructure_properties:
+            self.recompute_grain_bounding_boxes()
+            self.recompute_grain_centers()
+            self.recompute_grain_volumes()
+            # and update the phase map if necessary
+            if not self._is_empty('phase_map'):
+                self.update_phase_map_from_grains()
 
     def clean_grain_map(self,  new_map_name='grain_map_clean'):
         """Apply a morphological cleaning treatment to the active grain map.
@@ -2994,11 +3548,11 @@ class Microstructure(SampleData):
 
           ..Warning::
 
-              This method relies on the code of the 'core.utils' and on Matlab
+              This method relies on the code of the `core.utils` and on Matlab
               code developed by F. Nguyen at the 'Centre des Matériaux, Mines
               Paris'. These tools and codes must be installed and referenced
               in the PATH of your workstation for this method to work. For
-              more details, see the 'utils' package.
+              more details, see the `utils` package.
         """
         from pymicro.core.utils.SDZsetUtils.SDmeshers import SDImageMesher
         Mesher = SDImageMesher(data=self)
@@ -3019,12 +3573,12 @@ class Microstructure(SampleData):
 
           ..Warning::
 
-              This method relies on the code of the 'core.utils', on Matlab
+              This method relies on the code of the `core.utils`, on Matlab
               code developed by F. Nguyen at the 'Centre des Matériaux, Mines
-              Paris', on the Zset software and the Mesh GMS software.
+              Paris', on the Z-set software and the Mesh GEMS software.
               These tools and codes must be installed and referenced
               in the PATH of your workstation for this method to work. For
-              more details, see the 'utils' package.
+              more details, see the `utils` package.
         """
         from pymicro.core.utils.SDZsetUtils.SDmeshers import SDImageMesher
         Mesher = SDImageMesher(data=self)
@@ -3050,18 +3604,19 @@ class Microstructure(SampleData):
         :param int y_end: end value for slicing the second axis.
         :param int z_start: start value for slicing the third axis.
         :param int z_end: end value for slicing the third axis.
-        :param str crop name: the name for the cropped microstructure
+        :param str crop_name: the name for the cropped microstructure
             (the default is to append '_crop' to the initial name).
         :param bool autodelete: a flag to delete the microstructure files
             on the disk when it is not needed anymore.
-        :param bool recompute_geometry: If `True` (defaults), recompute the
-            grain centers, volumes, and bounding boxes in the croped micro.
-            Use `False` when using a crop that do not cut grains, for instance
-            when cropping a microstructure within the mask, to avoid the heavy
-            computational cost of the grain geometry data update.
+        :param bool recompute_geometry: if `True` (default), recompute the
+            grain centers, volumes, and bounding boxes in the cropped
+            microstructure. Use `False` when using a crop that do not cut
+            grains, for instance when cropping a microstructure within the
+            mask, to avoid the heavy computational cost of the grain geometry
+            data update.
+        :param bool verbose: activate verbose mode.
         :return: a new `Microstructure` instance with the cropped grain map.
         """
-        # TODO: add phase transfer to new microstructure
         if self._is_empty('grain_map'):
             print('warning: needs a grain map to crop the microstructure')
             return
@@ -3080,43 +3635,53 @@ class Microstructure(SampleData):
             z_end = self.get_grain_map().shape[2]
         if not crop_name:
             crop_name = self.get_sample_name() + \
-                    (not self.get_sample_name().endswith('_')) * '_' + 'crop'
+                        (not self.get_sample_name().endswith('_')) * '_' + 'crop'
+        print('CROP: %s' % crop_name)
         # create new microstructure dataset
         micro_crop = Microstructure(name=crop_name, overwrite_hdf5=True,
+                                    phase=self.get_phase(),
                                     autodelete=autodelete)
-        micro_crop.set_lattice(self.get_lattice())
+        if self.get_number_of_phases() > 1:
+            for i in range(2, self.get_number_of_phases()):
+                micro_crop.add_phase(self.get_phase(phase_id=i))
+        micro_crop.default_compression_options = self.default_compression_options
         print('cropping microstructure to %s' % micro_crop.h5_file)
-        # crop CellData fields
+        # crop all CellData fields
         image_group = self.get_node('CellData')
-        FIndex_path = os.path.join(image_group._v_pathname,'Field_index')
+        spacing = self.get_attribute('spacing', 'CellData')
+        FIndex_path = '%s/Field_index' % image_group._v_pathname
         field_list = self.get_node(FIndex_path)
         for name in field_list:
-            fieldname = name.decode('utf-8')
-            spacing_array = self.get_attribute('spacing','CellData')
-            print('cropping field %s' % fieldname)
-            field = self.get_field(fieldname)
-            if not self._is_empty(fieldname):
+            field_name = name.decode('utf-8')
+            print('cropping field %s' % field_name)
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
                 if self._get_group_type('CellData') == '2DImage':
-                    field_crop = field[x_start:x_end,y_start:y_end, ...]
+                    field_crop = field[x_start:x_end, y_start:y_end, ...]
                 else:
-                    field_crop = field[x_start:x_end,y_start:y_end,
+                    field_crop = field[x_start:x_end, y_start:y_end,
                                        z_start:z_end, ...]
                 empty = micro_crop.get_attribute(attrname='empty',
-                                           nodename='CellData')
+                                                 nodename='CellData')
                 if empty:
                     micro_crop.add_image_from_field(
-                        field_array=field_crop, fieldname=fieldname,
+                        field_array=field_crop, fieldname=field_name,
                         imagename='CellData', location='/',
-                        spacing=spacing_array, replace=True)
+                        spacing=spacing, replace=True)
                 else:
                     micro_crop.add_field(gridname='CellData',
-                                         fieldname=fieldname,
+                                         fieldname=field_name,
                                          array=field_crop, replace=True)
+        # update the origin of the image group according to the crop
+        origin = self.get_attribute('origin', 'CellData')
+        origin += spacing * np.array([x_start, y_start, z_start])
+        print('origin will be set to', origin)
+        micro_crop.set_origin('CellData', origin)
         if verbose:
-            print('Cropped dataset:')
+            print('cropped dataset:')
             print(micro_crop)
         micro_crop.set_active_grain_map(self.active_grain_map)
-        grain_ids = np.unique(micro_crop.get_grain_map(as_numpy=True))
+        grain_ids = np.unique(micro_crop.get_grain_map())
         for gid in grain_ids:
             if not gid > 0:
                 continue
@@ -3174,7 +3739,7 @@ class Microstructure(SampleData):
             return
         self.sync_grain_table_with_grain_map()
         # At this point, the table and the map have the same grain Ids
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         grain_map_renum = grain_map.copy()
         if sort_by_size:
             print('sorting ids by grain size')
@@ -3192,7 +3757,7 @@ class Microstructure(SampleData):
             if not only_grain_map:
                 g['idnumber'] = new_id
                 g.update()
-        print('maxium grain id is now %d' % max(new_ids))
+        print('maximum grain id is now %d' % max(new_ids))
         if only_grain_map:
             return grain_map_renum
         # assign the renumbered grain_map to the microstructure
@@ -3246,11 +3811,11 @@ class Microstructure(SampleData):
                                          bb[2][0]:bb[2][1]]
         voxel_size = self.get_attribute('spacing', 'CellData')
         if len(voxel_size) == 2:
-            voxel_size = np.concatenate((voxel_size,np.array([0])), axis=0)
+            voxel_size = np.concatenate((voxel_size, np.array([0])), axis=0)
         offset = bb[:, 0]
         grain_data_bin = (grain_map == gid).astype(np.uint8)
-        local_com = ndimage.measurements.center_of_mass(grain_data_bin) \
-                    + np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
+        local_com = ndimage.measurements.center_of_mass(grain_data_bin) + \
+                    np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
         com = voxel_size * (offset + local_com
                             - 0.5 * np.array(self.get_grain_map().shape))
         return com
@@ -3299,7 +3864,7 @@ class Microstructure(SampleData):
         volumes = self.get_grain_volumes(id_list)
         if not id_list:
             id_list = self.get_grain_ids()
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         if len(grain_map.shape) < 3:
             raise ValueError('Cannot compute grain sphericities on a non'
                              ' tridimensional grain map.')
@@ -3321,7 +3886,7 @@ class Microstructure(SampleData):
         :return: a 1D numpy array of the grain aspect ratios.
         """
         from skimage.measure import regionprops
-        props = regionprops(self.get_grain_map(as_numpy=True))
+        props = regionprops(self.get_grain_map())
         grain_aspect_ratios = np.array([prop.major_axis_length /
                                         prop.minor_axis_length
                                         for prop in props])
@@ -3332,7 +3897,7 @@ class Microstructure(SampleData):
 
         Each grain volume is computed using the grain map. The value is
         assigned to the volume column of the GrainDataTable node.
-        If the voxel size is specified, the grain centers will be in mm unit,
+        If the voxel size is specified, the grain volumes will be in mm unit,
         if not in voxel unit.
 
         .. note::
@@ -3397,9 +3962,8 @@ class Microstructure(SampleData):
     def recompute_grain_bounding_boxes(self, verbose=False):
         """Compute and assign the center of all grains in the microstructure.
 
-        Each grain center is computed using its center of mass. The value is
-        assigned to the grain.center attribute. If the voxel size is specified,
-        the grain centers will be in mm unit, if not in voxel unit.
+        Each grain bounding box is computed in voxel unit. The value is
+        assigned to the grain.bounding_box attribute.
 
         .. note::
 
@@ -3412,16 +3976,22 @@ class Microstructure(SampleData):
             print('warning: need a grain map to recompute the bounding boxes'
                   ' of the grains')
             return
-        # find_objects will return a list of N slices with N being the max grain id
-        slices = ndimage.find_objects(self.get_grain_map(as_numpy=True))
-        for g in self.grains:
+        # find_objects will return a list of N slices, N being the max grain id
+        slices = ndimage.find_objects(self.get_grain_map())
+        for g in tqdm(self.grains, desc='computing grain bounding boxes'):
             try:
                 g_slice = slices[g['idnumber'] - 1]
                 x_indices = (g_slice[0].start, g_slice[0].stop)
                 y_indices = (g_slice[1].start, g_slice[1].stop)
                 z_indices = (g_slice[2].start, g_slice[2].stop)
                 bbox = x_indices, y_indices, z_indices
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, IndexError):
+                '''
+                ValueError or TypeError can arise for grains in the data table
+                that are not in the grain map (None will be returned from
+                find_objects). IndexError can occur if these grain ids are
+                larger than the maximum id in the grain map.
+                '''
                 print('skipping grain %d' % g['idnumber'])
                 continue
             if verbose:
@@ -3434,7 +4004,16 @@ class Microstructure(SampleData):
         return self.get_grain_bounding_boxes()
 
     def compute_grains_geometry(self, overwrite_table=False):
-        """ Compute grain centers, volume and bounding box from grain_map """
+        """Compute grain geometry from the grain map.
+
+        This method computes the grain centers, volume and bounding boxes from
+        the grain map and update the grain data table. This applies only to
+        grains represented in the grain map. If other grains are present, their
+        information is unchanged unless the option `overwrite_table` is activated.
+
+        :param bool overwrite_table: if this is True, the grains present in the
+        data table and not in the grain map are removed from it.
+        """
         #TODO revisit this method as we now rely on the grain bounding boxes to compute the geometry
         grains_id = self.get_ids_from_grain_map()
         if self.grains.nrows > 0 and overwrite_table:
@@ -3473,7 +4052,7 @@ class Microstructure(SampleData):
             print('warning: a grain map is needed to compute grains map'
                   '/table intersection.')
             return
-        grain_map = self.get_grain_map(as_numpy=True)
+        grain_map = self.get_grain_map()
         map_ids = np.unique(grain_map)
         # only positive integer values are considered as valid grain ids, remove everything else:
         map_ids = np.delete(map_ids, range(0, np.where(map_ids > 0)[0][0]))
@@ -3484,11 +4063,11 @@ class Microstructure(SampleData):
         not_in_table = map_ids[np.isin(map_ids, table_ids, invert=True,
                              assume_unique=True)]
         if verbose:
-            print('Grains IDs both in grain map and GrainDataTable:')
+            print('Grains ids both in grain map and GrainDataTable:')
             print(str(intersection).strip('[]'))
-            print('Grains IDs in GrainDataTable but not in grain map:')
+            print('Grains ids in GrainDataTable but not in grain map:')
             print(str(not_in_map).strip('[]'))
-            print('Grains IDs in grain map but not in GrainDataTable :')
+            print('Grains ids in grain map but not in GrainDataTable :')
             print(str(not_in_table).strip('[]'))
         return intersection, not_in_map, not_in_table
 
@@ -3503,35 +4082,141 @@ class Microstructure(SampleData):
         self.recompute_grain_volumes()
         return
 
+    def graph(self):
+        """Create the graph of this microstructure.
+
+        This method process a `Microstructure` instance using a Region Adgency
+        Graph built with the crystal misorientation between neighbors as weights.
+        The graph has a node per grain and a connection between neighboring
+        grains of the same phase. The misorientation angle is attach to each edge.
+        
+        :return rag: the region adjency graph of this microstructure.
+        """
+        try:
+            from skimage.future import graph
+        except ImportError:
+            from skimage import graph
+
+        print('build the region agency graph for this microstructure')
+        rag = graph.RAG(self.get_grain_map(), connectivity=1)
+
+        # remove node and connections to the background
+        if 0 in rag.nodes:
+            rag.remove_node(0)
+
+        # get the grain infos
+        grain_ids = self.get_grain_ids()
+        rodrigues = self.get_grain_rodrigues()
+        centers = self.get_grain_centers()
+        volumes = self.get_grain_volumes()
+        phases = self.grains[:]['phase']
+        for grain_id, d in rag.nodes(data=True):
+            d['label'] = [grain_id]
+            index = grain_ids.tolist().index(grain_id)
+            d['rod'] = rodrigues[index]
+            d['center'] = centers[index]
+            d['volume'] = volumes[index]
+            d['phase'] = phases[index]
+
+        # assign grain misorientation between neighbors to each edge of the graph
+        for x, y, d in rag.edges(data=True):
+            if rag.nodes[x]['phase'] != rag.nodes[y]['phase']:
+                # skip edge between neighboring grains of different phases
+                continue
+            sym = self.get_phase(phase_id=rag.nodes[x]['phase']).get_symmetry()
+            o_x = Orientation.from_rodrigues(rag.nodes[x]['rod'])
+            o_y = Orientation.from_rodrigues(rag.nodes[y]['rod'])
+            mis = np.degrees(o_x.disorientation(o_y, crystal_structure=sym)[0])
+            d['misorientation'] = mis
+        
+        return rag
+
+    def segment_mtr(self, labels_seg=None, mis_thr=20., min_area=500, store=False):
+        """Segment micro-textured regions (MTR).
+
+        This method process a `Microstructure` instance to segment the MTR
+        with the specified parameters.
+
+        :param ndarray labels_seg: a pre-segmentation of the grain map, the full
+        grain map will be used if not specified.
+        :param float mis_thr: threshold in misorientation used to cut the graph.
+        :param int min_area: minimum area used to define a MTR.
+        :param bool store: flag to store the segmented array in the microstructure.
+        :return mtr_labels: array with the labels of the segmented regions.
+        """
+        rag_seg = self.graph()
+
+        # cut our graph with the misorientation threshold
+        rag = rag_seg.copy()
+        edges_to_remove = [(x, y) for x, y, d in rag.edges(data=True)
+                           if d['misorientation'] >= mis_thr]
+        rag.remove_edges_from(edges_to_remove)
+
+        import networkx as nx
+        comps = nx.connected_components(rag)
+        map_array = np.arange(labels_seg.max() + 1, dtype=labels_seg.dtype)
+        for i, nodes in enumerate(comps):
+            # compute area of this component
+            area = np.sum(np.isin(labels_seg, list(nodes)))
+            if area < min_area:
+                # ignore small MTR (simply assign them to label zero)
+                i = 0
+            for node in nodes:
+                for label in rag.nodes[node]['label']:
+                    map_array[label] = i
+        mtr_labels = map_array[labels_seg]
+        print('%d micro-textured regions were segmented' % len(np.unique(mtr_labels)))
+        if store:
+            self.add_field(gridname='CellData', fieldname='mtr_segmentation',
+                           array=mtr_labels, replace=True)
+        return mtr_labels
+
     @staticmethod
-    def voronoi(self, shape=(256, 256), n_grain=50):
+    def voronoi(shape=(256, 256), n=50):
         """Simple voronoi tesselation to create a grain map.
 
-        The method works both in 2 and 3 dimensions. The grains are labeled
-        from 1 to `n_grains` (included).
+        The method works both in 2 and 3 dimensions and will create a sample
+        with a size of 1 (domain from -0.5 to 0.5). The grains are labeled
+        from 1 to `n` (included).
 
         :param tuple shape: grain map shape in 2 or 3 dimensions.
-        :param int n_grains: number of grains to generate.
-        :return: a numpy array  grain_map
+        :param int n: number of grains to generate.
+        :raise: a ValueError if the shape has not size 2 or 3.
+        :return: a 2D or 3D numpy array representing the grain map.
         """
-        if len(shape) not in [2, 3]:
+        dim = len(shape)
+        if dim not in [2, 3]:
             raise ValueError('specified shape must be either 2D or 3D')
-        grain_map = np.zeros(shape)
+        grain_map = np.zeros(shape, dtype=int)
         nx, ny = shape[0], shape[1]
         x = np.linspace(-0.5, 0.5, nx, endpoint=True)
         y = np.linspace(-0.5, 0.5, ny, endpoint=True)
-        if len(shape) == 3:
+        print('%dD voronoi tesselation' % dim)
+        if dim == 2:
+            XX, YY = np.meshgrid(x, y)
+            seeds = np.random.rand(n, 2) - np.array([0.5, 0.5])
+            distance = np.zeros(shape=(n, nx, ny))
+            # compute Voronoi distance in 2D
+            for i in range(n):
+                distance[i] = np.sqrt((XX - seeds[i, 0]) ** 2
+                                      + (YY - seeds[i, 1]) ** 2)
+            grain_map = 1 + np.argmin(distance, axis=0)
+        else:
             nz = shape[2]
             z = np.linspace(-0.5, 0.5, nz, endpoint=True)
-        XX, YY = np.meshgrid(x, y)
-        seeds = Dx * np.random.rand(n_grains, 2)
-        distance = np.zeros(shape=(nx, ny, n_grains))
-
-        XX, YY, ZZ = np.meshgrid(x, y, z)
-        # TODO finish this...
+            XX, YY, ZZ = np.meshgrid(x, y, z)
+            seeds = np.random.rand(n, 3) - np.array([0.5, 0.5, 0.5])
+            distance = np.zeros(shape=(n, nx, ny, nz))
+            # compute Voronoi distance in 3D
+            for i in range(n):
+                distance[i] = np.sqrt((XX - seeds[i, 0]) ** 2
+                                      + (YY - seeds[i, 1]) ** 2
+                                      + (ZZ - seeds[i, 2]) ** 2)
+            grain_map = 1 + np.argmin(distance, axis=0)
         return grain_map
 
-    def to_amitex_fftp(self, binary=True, mat_file=True, elasaniso_path='',
+    def to_amitex_fftp(self, binary=True, mat_file=True, algo_file=True,
+                       char_file=True, elasaniso_path='',
                        add_grips=False, grip_size=10,
                        grip_constants=(104100., 49440.), add_exterior=False,
                        exterior_size=10, use_mask=False):
@@ -3552,6 +4237,8 @@ class Microstructure(SampleData):
 
         :param bool binary: flag to write the files in binary or ascii format.
         :param bool mat_file: flag to write the material file for Amitex.
+        :param bool algo_file: flag to write the algorithm file for Amitex.
+        :param bool char_file: flag to write the loading file for Amitex.
         :param str elasaniso_path: path for the libUmatAmitex.so in
             the Amitex_FFTP installation.
         :param bool add_grips: add a constant region at the beginning and the
@@ -3569,24 +4256,24 @@ class Microstructure(SampleData):
         ext = 'bin' if binary else 'txt'
         grip_id = n_phases   # material id for the grips
         ext_id = n_phases + 1 if add_grips else n_phases # material id for the exterior
-        n1x = open('N1X.%s' % ext, 'w')
-        n1y = open('N1Y.%s' % ext, 'w')
-        n1z = open('N1Z.%s' % ext, 'w')
-        n2x = open('N2X.%s' % ext, 'w')
-        n2y = open('N2Y.%s' % ext, 'w')
-        n2z = open('N2Z.%s' % ext, 'w')
+        n1x = open('%s_N1X.%s' % (self.get_sample_name(), ext), 'w')
+        n1y = open('%s_N1Y.%s' % (self.get_sample_name(), ext), 'w')
+        n1z = open('%s_N1Z.%s' % (self.get_sample_name(), ext), 'w')
+        n2x = open('%s_N2X.%s' % (self.get_sample_name(), ext), 'w')
+        n2y = open('%s_N2Y.%s' % (self.get_sample_name(), ext), 'w')
+        n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'w')
         files = [n1x, n1y, n1z, n2x, n2y, n2z]
         if binary:
             import struct
             for f in files:
                 f.write('%d \ndouble \n' % self.get_number_of_grains())
                 f.close()
-            n1x = open('N1X.%s' % ext, 'ab')
-            n1y = open('N1Y.%s' % ext, 'ab')
-            n1z = open('N1Z.%s' % ext, 'ab')
-            n2x = open('N2X.%s' % ext, 'ab')
-            n2y = open('N2Y.%s' % ext, 'ab')
-            n2z = open('N2Z.%s' % ext, 'ab')
+            n1x = open('%s_N1X.%s' % (self.get_sample_name(), ext), 'ab')
+            n1y = open('%s_N1Y.%s' % (self.get_sample_name(), ext), 'ab')
+            n1z = open('%s_N1Z.%s' % (self.get_sample_name(), ext), 'ab')
+            n2x = open('%s_N2X.%s' % (self.get_sample_name(), ext), 'ab')
+            n2y = open('%s_N2Y.%s' % (self.get_sample_name(), ext), 'ab')
+            n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'ab')
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
                 g = o.orientation_matrix()
@@ -3618,6 +4305,51 @@ class Microstructure(SampleData):
         n2z.close()
         print('orientation data written for AMITEX_FFTP')
 
+        # if required, write the loading file for Amitex
+        if char_file:
+            from lxml import etree, builder
+            root = etree.Element('Loading_Output')
+            output = etree.Element('Output')
+            output.append(etree.Element(_tag='vtk_StressStrain', Strain='1', Stress='0'))
+            root.append(output)
+            loading = etree.Element('Loading', Tag='1')
+            loading.append(etree.Element(_tag='Time_Discretization', Discretization='Linear', Nincr='1', Tfinal='1'))
+            loading.append(etree.Element(_tag='Output_zone', Number='1'))
+            output_vtk_list = etree.Element('Output_vtkList')
+            output_vtk_list.text = "1"
+            loading.append(output_vtk_list)
+            loading.append(etree.Element(_tag='xx', Driving='Stress', Evolution='Constant'))
+            loading.append(etree.Element(_tag='yy', Driving='Stress', Evolution='Constant'))
+            loading.append(etree.Element(_tag='zz', Driving='Stress', Evolution='Linear', Value='100.0'))
+            loading.append(etree.Element(_tag='xy', Driving='Stress', Evolution='Constant'))
+            loading.append(etree.Element(_tag='xz', Driving='Stress', Evolution='Constant'))
+            loading.append(etree.Element(_tag='yz', Driving='Stress', Evolution='Constant'))
+            root.append(loading)
+            # write the file
+            tree = etree.ElementTree(root)
+            tree.write('char.xml', xml_declaration=True, pretty_print=True,
+                       encoding='UTF-8')
+            print('FFT loading file written in char.xml')
+
+        # if required, write the material file for Amitex
+        if algo_file:
+            from lxml import etree, builder
+            root = etree.Element('Algorithm_Parameters')
+            algo = etree.Element('Algorithm', Type='Basic_Scheme')
+            algo.append(etree.Element(_tag='Convergence_Criterion', Value='Default'))
+            algo.append(etree.Element(_tag='Convergence_Acceleration', Value='true'))
+            algo.append(etree.Element(_tag='Nitermin_acv', Value='0'))
+            root.append(algo)
+            mech = etree.Element('Mechanics')
+            mech.append(etree.Element(_tag='Filter', Type='Default'))
+            mech.append(etree.Element(_tag='Small_Perturbations', Value='true'))
+            root.append(mech)
+            # write the file
+            tree = etree.ElementTree(root)
+            tree.write('algo.xml', xml_declaration=True, pretty_print=True,
+                       encoding='UTF-8')
+            print('FFT algorithm file written in algo.xml')
+
         # if required, write the material file for Amitex
         if mat_file:
             from lxml import etree, builder
@@ -3633,8 +4365,10 @@ class Microstructure(SampleData):
                 raise ValueError('inconsistent phase numbering (should be from '
                                  '1 to n_phases): {}'.format(phase_ids))
             for phase_id in phase_ids:
+                comment = etree.Comment(' phase %d: %s ' % (phase_id, self.get_phase().name))
+                root.append(comment)
                 mat = etree.Element('Material', numM=str(phase_id),
-                                    Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
+                                    Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                     Law='elasaniso')
                 # get the C_IJ values
                 phase = self.get_phase(phase_id)
@@ -3644,6 +4378,8 @@ class Microstructure(SampleData):
                 (1, 2, 3, 4, 5, 6) = (11, 22, 33, 12, 13, 23)
                 Because of this indices 4 and 6 are inverted with respect to the Voigt convention.
                 '''
+                comment = etree.Comment(' orthotropic elasticity coefficients (9 values) ')
+                mat.insert(0, comment)
                 mat.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(C[0, 0])))  # C11
                 mat.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(C[0, 1])))  # C12
                 mat.append(etree.Element(_tag='Coeff', Index='3', Type='Constant', Value=str(C[0, 2])))  # C13
@@ -3653,6 +4389,8 @@ class Microstructure(SampleData):
                 mat.append(etree.Element(_tag='Coeff', Index='7', Type='Constant', Value=str(C[5, 5])))  # C66
                 mat.append(etree.Element(_tag='Coeff', Index='8', Type='Constant', Value=str(C[4, 4])))  # C55
                 mat.append(etree.Element(_tag='Coeff', Index='9', Type='Constant', Value=str(C[3, 3])))  # C44
+                comment = etree.Comment(' cristal orientation: N1 coeff(10-12), N2 coeff(13-15) ')
+                mat.insert(9, comment)
                 fmt = "binary" if binary else "ascii"
                 mat.append(etree.Element(_tag='Coeff', Index="10", Type="Constant_Zone", File="N1X.bin", Format=fmt))
                 mat.append(etree.Element(_tag='Coeff', Index="11", Type="Constant_Zone", File="N1Y.bin", Format=fmt))
@@ -3660,20 +4398,28 @@ class Microstructure(SampleData):
                 mat.append(etree.Element(_tag='Coeff', Index="13", Type="Constant_Zone", File="N2X.bin", Format=fmt))
                 mat.append(etree.Element(_tag='Coeff', Index="14", Type="Constant_Zone", File="N2Y.bin", Format=fmt))
                 mat.append(etree.Element(_tag='Coeff', Index="15", Type="Constant_Zone", File="N2Z.bin", Format=fmt))
+                comment = etree.Comment(' internal variable for the elastic strain field ')
+                mat.append(comment)
+                for i in range(6):
+                    mat.append(etree.Element(_tag='IntVar', Index=str(i + 1), Type="Constant", Value="0."))
 
                 root.append(mat)
             # add a material for top and bottom layers
             if add_grips:
+                comment = etree.Comment(' Isotropic elastic material for tension test grips ')
+                root.append(comment)
                 grips = etree.Element('Material', numM=str(grip_id + 1),
-                                      Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
+                                      Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                       Law='elasiso')
                 grips.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value=str(grip_constants[0])))
                 grips.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value=str(grip_constants[1])))
                 root.append(grips)
             # add a material for external buffer
             if add_exterior or use_mask:
+                comment = etree.Comment(' Isotropic elastic material for the exterior ')
+                root.append(comment)
                 exterior = etree.Element('Material', numM=str(ext_id + 1),
-                                         Lib=os.path.join(elasaniso_path, 'libUmatAmitex.so'),
+                                         Lib='%s/libUmatAmitex.so' % elasaniso_path,
                                          Law='elasiso')
                 exterior.append(etree.Element(_tag='Coeff', Index='1', Type='Constant', Value='0.'))
                 exterior.append(etree.Element(_tag='Coeff', Index='2', Type='Constant', Value='0.'))
@@ -3685,19 +4431,18 @@ class Microstructure(SampleData):
             print('material file written in mat.xml')
 
         # if possible, write the vtk file to run the computation
-        if self.__contains__('grain_map'):
+        if not self._is_empty('grain_map'):
             # convert the grain map to vtk file
             from vtk.util import numpy_support
-            #TODO adapt to 2D grain maps
-            #TODO build a continuous grain map for amitex
-            # grain_ids = self.get_grain_map(as_numpy=True)
+            # TODO adapt to 2D grain maps
+            # TODO build a continuous grain map for amitex
+            # grain_ids = self.get_grain_map()
             grain_ids = self.renumber_grains(only_grain_map=True)
             if not self._is_empty('phase_map'):
                 # use the phase map for the material ids
-                material_ids = self.get_phase_map(as_numpy=True)
+                material_ids = self.get_phase_map().astype(grain_ids.dtype)
             elif use_mask:
-                material_ids = self.get_mask(as_numpy=True).astype(
-                                                            grain_ids.dtype)
+                material_ids = self.get_mask().astype(grain_ids.dtype)
             else:
                 material_ids = np.ones_like(grain_ids)
             if add_grips:
@@ -3709,29 +4454,32 @@ class Microstructure(SampleData):
                                    mode='constant', constant_values=1)
                 if use_mask:
                     # create top and bottom mask extrusions
-                    mask_top = material_ids[:,:,[-1]]
-                    mask_bot = material_ids[:,:,[0]]
-                    top_grip = np.tile(mask_top, (1,1,grip_size))
-                    bot_grip = np.tile(mask_top, (1,1,grip_size))
+                    mask_top = material_ids[:, :, [-1]]
+                    mask_bot = material_ids[:, :, [0]]
+                    top_grip = np.tile(mask_top, (1, 1, grip_size))
+                    bot_grip = np.tile(mask_bot, (1, 1, grip_size))
                     # add grip layers to unit cell matID
                     material_ids = np.concatenate(
-                        ((grip_id+1)*bot_grip, material_ids,
-                         (grip_id+1)*top_grip), axis=2)
+                        ((grip_id + 1) * bot_grip, material_ids,
+                         (grip_id + 1) * top_grip), axis=2)
                 else:
                     material_ids = np.pad(
                         material_ids, ((0, 0), (0, 0), (grip_size, grip_size)),
-                        mode='constant', constant_values=grip_id+1)
+                        mode='constant',
+                        constant_values=grip_id + 1)
             if add_exterior and not use_mask:
                 # add a layer of new_id around the first two dimensions
                 grain_ids = np.pad(grain_ids, ((exterior_size, exterior_size),
                                                (exterior_size, exterior_size),
                                                (0, 0)),
-                                   mode='constant', constant_values=1)
+                                   mode='constant',
+                                   constant_values=1)
                 material_ids = np.pad(material_ids,
                                       ((exterior_size, exterior_size),
                                        (exterior_size, exterior_size),
                                        (0, 0)),
-                                      mode='constant', constant_values=ext_id+1)
+                                      mode='constant',
+                                      constant_values=ext_id + 1)
             if use_mask:
                 grain_ids[np.where(grain_ids == 0)] = 1
                 material_ids[np.where(material_ids == 0)] = ext_id + 1
@@ -3759,21 +4507,21 @@ class Microstructure(SampleData):
                 print('%s array written in legacy vtk form for AMITEX_FFTP' %
                       array_name)
 
-    def from_amitex_fftp(self, results_basename, grip_size=0, ext_size=0,
-                         grip_dim=2, sim_prefix='Amitex', int_var_names=dict(),
-                         finite_strain=False, load_fields=True,
-                         compression_options=dict()):
-        """Read output of a Amitex_fftp simulation and stores in dataset.
+    def from_amitex_fftp(self, base_name, grip_size=0, ext_size=0,
+                         sim_prefix='Amitex', int_var_names={},
+                         load_fields=True, compression_options={}):
+        """Read the output of a Amitex_fftp simulation and store the field
+        in the dataset.
 
         Read a Amitex_fftp result directory containing a mechanical simulation
-        of the microstructure. See method 'to_amitex_fftp' to generate input
+        of the microstructure. See method `to_amitex_fftp` to generate input
         files for such simulation of Microstructure instances.
 
         The results are stored as fields of the CellData group by default.
         If generated by the simulation, the strain and stress tensor fields
         are stored, as well as the internal variables fields.
 
-        Mechanical fields and macroscopical curves are stored. The latter is
+        Mechanical fields and macroscopic curves are stored. The latter is
         stored in the data group '/Mechanical_simulation' as a structured
         array.
 
@@ -3787,16 +4535,13 @@ class Microstructure(SampleData):
                 be modified in the future to allow to specify a new image data
                 group to store de results (created if needed).
 
-        :param results_basename: Basename of Amitex .std, .vtk output files to
+        :param base_name: Basename of Amitex .std, .vtk output files to
             load in dataset.
-        :type results_basename: str
+        :type base_name: str
         :param grip_size: Thickness of the grips added to simulation unit cell
             by the method 'to_amitex_fftp' of this class, defaults to 0. This
             value corresponds to a number of voxels on both ends of the cell.
         :type grip_size: int, optional
-        :param grip_dim: Dimension along which the tension test has been
-            simulated (0:x, 1:y, 2:z)
-        :type grip_dim: int, optional
         :param ext_size: Thickness of the exterior region added to simulation
             unit cell by the method 'to_amitex_fftp' of this class,
             defaults to 0.  This value corresponds to a number of voxels on
@@ -3805,27 +4550,31 @@ class Microstructure(SampleData):
         :param sim_prefix: Prefix of the name of the fields that will be
             stored on the CellData group from simulation results.
         :type sim_prefix: str, optional
-        :param int_var_names: Dictionnary whose keys are the names of
+        :param int_var_names: Dictionary whose keys are the names of
             internal variables stored in Amitex output files
-            (varInt1, varInt2...) and values are corresponding names for
+            (varInt1, varInt2, ...) and values are corresponding names for
             these variables in the dataset.
         :type int_var_names: dict, optional
+        :param bool load_fields: Flag to control if the fields are imported
+            from the vtk files.
+        :param dict compression_options: Dictionary containing the compression
+            options to use for the imported fields.
         """
         # TODO: add grain map to all time steps
         from pymicro.core.utils.SDAmitexUtils import SDAmitexIO
-        # Get std file result
-        p_mstd = Path(str(results_basename)).absolute().with_suffix('.mstd')
+        # get std result file path (.std or .mstd)
+        std_suffix = '.std' if grip_size == 0 and ext_size == 0 else '.mstd'
+        std_path = Path(str(base_name)).absolute().with_suffix(std_suffix)
         # safety check
-        if not p_mstd.exists():
-            raise ValueError('results not found, "results_basename" argument'
+        if not std_path.exists():
+            raise ValueError('results not found, "base_name" argument'
                              ' not associated with Amitex_fftp simulation'
                              ' results.')
-        # load .mstd results --> only lines of microstructure material mean
-        # values
         step = 1
+        # for .mstd results skip grid and exterior lines
         if grip_size > 0:
             step += 1
-        if ext_size >0 :
+        if ext_size > 0:
             step += 1
         elif not self._is_empty('mask'):
             # if mask used as exterior in computation but exterior size = 0
@@ -3833,75 +4582,77 @@ class Microstructure(SampleData):
             # increment
             if np.any(self['mask'] == 0):
                 step += 1
-        std_res = SDAmitexIO.load_std(p_mstd, step=step)
-        # load .zstd results
-        p_zstd = Path(str(results_basename)+'_1').with_suffix('.zstd')
-        if p_zstd.exists():
-            zstd_res = SDAmitexIO.load_std(p_zstd, Int_var_names=int_var_names)
-        # Store macro data in specific group
+        std_res = SDAmitexIO.load_std(std_path, step=step)
+        print(std_res[0])
+        print(std_res[-1])
+        # store macro data in specific group
         self.add_group(groupname=f'{sim_prefix}_Results', location='/',
                        indexname='fft_sim', replace=True)
         # std_res is a numpy structured array whose fields depend on
         # the type of output (finite strain ou infinitesimal strain sim.)
         # ==> we load it into the dataset as a structured table data item.
         self.add_table(location='fft_sim', name='Standard_output',
-                       indexname=f'{sim_prefix}_std',
+                       indexname=f'{sim_prefix}_std', replace=True,
                        description=std_res.dtype, data=std_res)
         # idem for zstd --> Add as Mechanical Grain Data Table
-        if p_zstd.exists():
+        zstd_path = Path(str(base_name) + '_1').with_suffix('.zstd')
+        if zstd_path.exists():
+            # load .zstd results
+            zstd_res = SDAmitexIO.load_std(zstd_path,
+                                           int_var_names=int_var_names)
             self.add_table(location='GrainData',
                            name='MechanicalGrainDataTable',
-                           indexname='Mech_Grain_Data',
+                           indexname='Mech_Grain_Data', replace=True,
                            description=zstd_res.dtype, data=zstd_res)
-            grainIDs = self.get_grain_ids()
-            N_zone_times = int(zstd_res.shape[0]/ len(grainIDs))
-            dtype_col = np.dtype([('grain_ID', np.int)])
-            IDs = np.tile(grainIDs, N_zone_times).astype(dtype_col)
+            grain_ids = self.get_grain_ids()
+            n_zone_times = int(zstd_res.shape[0] / len(grain_ids))
+            dtype_col = np.dtype([('grain_ID', np.int32)])
+            IDs = np.tile(grain_ids, n_zone_times).astype(dtype_col)
             self.add_tablecols(tablename='MechanicalGrainDataTable',
                                description=IDs.dtype, data=IDs)
-        # End of macroscopic data loading. Check if field data must be loaded.
+        # end of macroscopic data loading. Check if field data must be loaded.
         if not load_fields:
             return
-        # Get vtk files results
-        Stress, Strain, VarInt, Incr_list = SDAmitexIO.load_amitex_output_fields(
-            results_basename, grip_size=grip_size, ext_size=ext_size,
+        # get results from vtk files
+        stress, strain, var_int, incr_list = SDAmitexIO.load_amitex_output_fields(
+            base_name, grip_size=grip_size, ext_size=ext_size,
             grip_dim=2)
-        ## Loop over time steps: create group to store results
+        # loop over time steps: create group to store results
         self.add_group(groupname=f'{sim_prefix}_fields',
                        location='/CellData', indexname='fft_fields',
                        replace=True)
-        # Create CellData temporal subgrids for each time value with a vtk
-        # field output
-        time_values = std_res['time'][Incr_list].squeeze()
-        if len(time_values) == 0:
+        # create CellData sub-grids for each time value with a vtk field output
+        time_values = std_res['time'][incr_list].squeeze()
+        if np.size(time_values) == 0:
             time_values = [0.]
+            print(time_values)
         self.add_grid_time('CellData', time_values)
 
-        # Add fields to CellData grid collections
-        for incr in Stress:
-            Time = std_res['time'][incr].squeeze()
-            fieldname = f'{sim_prefix}_stress'
-            self.add_field(gridname='CellData', fieldname=fieldname,
-                            array=Stress[incr], location='fft_fields',
-                            time=Time, compression_options=compression_options)
-        for incr in Strain:
-            Time = std_res['time'][incr].squeeze()
-            fieldname = f'{sim_prefix}_strain'
-            self.add_field(gridname='CellData', fieldname=fieldname,
-                            array=Strain[incr], location='fft_fields',
-                            time=Time, compression_options=compression_options)
-        for mat in VarInt:
-            for incr in VarInt[mat]:
-                Time = std_res['time'][incr].squeeze()
-                for var in VarInt[mat][incr]:
-                    varname = var
+        # add fields to CellData grid collections
+        for incr in stress:
+            time = std_res['time'][incr].squeeze()
+            field_name = f'{sim_prefix}_stress'
+            self.add_field(gridname='CellData', fieldname=field_name,
+                           array=stress[incr], location='fft_fields',
+                           time=time, compression_options=compression_options)
+        for incr in strain:
+            time = std_res['time'][incr].squeeze()
+            field_name = f'{sim_prefix}_strain'
+            self.add_field(gridname='CellData', fieldname=field_name,
+                           array=strain[incr], location='fft_fields',
+                           time=time, compression_options=compression_options)
+        for mat in var_int:
+            for incr in var_int[mat]:
+                time = std_res['time'][incr].squeeze()
+                for var in var_int[mat][incr]:
+                    var_name = var
                     if int_var_names.__contains__(var):
-                        varname = int_var_names[var]
-                    fieldname = f'{sim_prefix}_mat{mat}_{varname}'
-                    self.add_field(gridname='CellData', fieldname=fieldname,
-                                    array=VarInt[mat][incr][var],
-                                    location='fft_fields', time=Time,
-                                     compression_options=compression_options)
+                        var_name = int_var_names[var]
+                    field_name = f'{sim_prefix}_mat{mat}_{var_name}'
+                    self.add_field(gridname='CellData', fieldname=field_name,
+                                   array=var_int[mat][incr][var],
+                                   location='fft_fields', time=time,
+                                   compression_options=compression_options)
         return
 
     def print_zset_material_block(self, mat_file, grain_prefix='_ELSET'):
@@ -3977,60 +4728,142 @@ class Microstructure(SampleData):
         # geometry
         geom = m.create_group('_SIMPL_GEOMETRY')
         geom.attrs['GeometryType'] = np.uint32(999)
-        geom.attrs['GeometryTypeName'] = np.string_('UnkownGeometry')
+        geom.attrs['GeometryTypeName'] = np.string_('UnknownGeometry')
         # create the data container bundles group
         f.create_group('DataContainerBundles')
         f.close()
 
     @staticmethod
-    def from_dream3d(file_path, main_key='DataContainers',
-                     data_container='DataContainer', grain_data='FeatureData',
+    def from_dream3d(file_path,
+                     main_key='DataContainers',
+                     data_container='DataContainer',
+                     ensemble_data='EnsembleData',
+                     grain_data='FeatureData',
                      grain_orientations='AvgEulerAngles',
-                     orientation_type='euler', grain_centroid='Centroids'):
-        """Read a microstructure from a hdf5 file.
+                     grain_orientations_type='euler',
+                     grain_centroids='Centroids',
+                     cell_data='CellData',
+                     grain_ids='FeatureIds',
+                     mask='Mask',
+                     phases='Phases',
+                     orientations='EulerAngles',
+                     orientations_type='euler',
+                     ipf_color='IPFColor'
+                     ):
+        """Read a microstructure from a Dream3d hdf5 file.
 
         :param str file_path: the path to the hdf5 file to read.
-        :param str main_key: the string describing the root key.
+        :param str main_key: the string describing the main key group.
         :param str data_container: the string describing the data container
-            group in the hdf5 file.
+            group in the file.
+        :param str ensemble_data: the string describing the ensemble data group
+            in the file.
         :param str grain_data: the string describing the grain data group in the
             hdf5 file.
         :param str grain_orientations: the string describing the average grain
             orientations in the hdf5 file.
-        :param str orientation_type: the string describing the descriptor used
-            for orientation data.
-        :param str grain_centroid: the string describing the grain centroid in
+        :param str grain_orientations_type: the string describing the descriptor
+            used for average grain orientation data.
+        :param str grain_centroids: the string describing the grain centroids in
             the hdf5 file.
-        :return: a `Microstructure` instance created from the hdf5 file.
+        :param str cell_data: the string describing the cell data group in the
+            file.
+        :param str grain_ids: the string describing the field representing
+            grain ids within the cell_data data group.
+        :param str mask: the string describing the field representing the sample
+            mask within the cell_data data group.
+        :param str phases: the string describing the field representing the
+            sample phases within the cell_data data group.
+        :param str orientations: the string describing the field representing
+            voxel wise orientations within the cell_data data group.
+        :param str orientations_type: the string describing the descriptor
+            used for the orientation field.
+        :return: a `Microstructure` instance created from the dream3d file.
         """
         head, tail = os.path.split(file_path)
-        micro = Microstructure(name=tail, file_path=head, overwrite_hdf5=True)
+        tail = tail.strip('.dream3d')
         with h5py.File(file_path, 'r') as f:
+            # get information on the material phases
+            phases_data_path = '%s/%s/%s' % (main_key, data_container, ensemble_data)
+            phase_names = f[phases_data_path]['MaterialName'][()]
+            n_phases = len(phase_names) - 1  # skip background
+            phase_list = []
+            for i_phase in range(n_phases):
+                phase_id = i_phase + 1
+                n = int(f[phases_data_path]['CrystalStructures'][()][phase_id])
+                lattice_constants = f[phases_data_path]['LatticeConstants'][()][phase_id]
+                for i in range(3):
+                    lattice_constants[i] = lattice_constants[i] / 10  # use nm unit
+                # print('found phase with crystal structure %d' % n)
+                l = Lattice.from_parameters(*lattice_constants, symmetry=Symmetry.from_dream3d(n))
+                phase = CrystallinePhase(phase_id=phase_id, name=phase_names[phase_id], lattice=l)
+                phase_list.append(phase)
+            # initialize our microstructure
+            micro = Microstructure(name=tail, phase=phase_list, overwrite_hdf5=True)
+            # if n_phases > 1:
+            #     micro.set_phases(phase_list)
+            # now get grain data informations
             grain_data_path = '%s/%s/%s' % (main_key, data_container, grain_data)
-            orientations = f[grain_data_path][grain_orientations].value
-            if grain_centroid:
-                centroids = f[grain_data_path][grain_centroid].value
-                offset = 0
-                if len(centroids) < len(orientations):
-                    offset = 1  # if grain 0 has not a centroid
-            grain = micro.grains.row
-            for i in range(len(orientations)):
-                grain['idnumber'] = i
-                if orientations[i, 0] == 0. and orientations[i, 1] == 0. and \
-                        orientations[i, 2] == 0.:
-                    # skip grain 0 which is always (0., 0., 0.)
-                    print('skipping (0., 0., 0.)')
-                    continue
-                if orientation_type == 'euler':
-                    grain['orientation'] = Orientation.from_euler(
-                        orientations[i] * 180 / np.pi).rod
-                elif orientation_type == 'rodrigues':
-                    grain['orientation'] = Orientation.from_rodrigues(
-                        orientations[i]).rod
-                if grain_centroid:
-                    grain['center'] = centroids[i - offset]
-                grain.append()
-            micro.grains.flush()
+            grain_orientations = f[grain_data_path][grain_orientations][()]
+            # switch to degrees
+            grain_orientations = grain_orientations*(180./np.pi)
+            # suppose that the grains are number from 0 or 1 to Ngrains by
+            # dream3D
+            gids = np.array(range(grain_orientations.shape[0]))
+            try:
+                centroids = f[grain_data_path][grain_centroids][()]
+            except:
+                centroids = None
+            if np.array_equal(grain_orientations[0], [0., 0., 0.]):
+                # skip the background
+                grain_orientations = grain_orientations[1:]
+                gids = gids[1:]
+                if centroids is not None:
+                    centroids = centroids[1:]
+            micro.add_grains(grain_orientations,
+                             orientation_type=grain_orientations_type,
+                             grain_ids=gids)
+            if centroids is not None:
+                micro.set_centers(centroids)
+            # print('%d grains in the data set' % micro.get_number_of_grains())
+            # read voxel size and origin
+            geom_path = '%s/%s/_SIMPL_GEOMETRY' % (main_key, data_container)
+            voxel_size = f[geom_path]['SPACING'][()]
+            origin = f[geom_path]['ORIGIN'][()]
+            print(voxel_size)
+            # now read cell data
+            cell_data_path = '%s/%s/%s' % (main_key, data_container, cell_data)
+            grain_ids = f[cell_data_path][grain_ids][:, :, :, 0].transpose()
+            cell_data_shape = grain_ids.shape
+            print('CellData dimensions:', cell_data_shape)
+            mask = f[cell_data_path][mask][:, :, :, 0].transpose()
+            # now assign these arrays to the microstructure
+            micro.set_grain_map(grain_ids, voxel_size=voxel_size)
+            micro.set_origin('CellData', origin)
+            micro.set_mask(mask)
+            # add phase map array if needed
+            if phases in f[cell_data_path].keys():
+                phase_map = f[cell_data_path][phases][:, :, :, 0].transpose()
+                micro.set_phase_map(phase_map)
+            # add voxel wise orientation data
+            if orientations in f[cell_data_path].keys():
+                print('adding orientation field from key %s' % orientations)
+                orientation_map = f[cell_data_path][orientations][:, :, :, :]
+                if orientations_type == 'euler':
+                    # convert this array to rodrigues vectors
+                    orientation_map_euler = orientation_map.reshape((np.prod(cell_data_shape), 3))
+                    print('shape of euler angles list:', orientation_map_euler.shape)
+                    orientation_map = Orientation.eu2ro(orientation_map_euler).reshape(list(cell_data_shape) + [3])
+                elif orientations_type == 'rodrigues':
+                    pass
+                else:
+                    print('warning, only euler and rodrigues type supported at the moment')
+                micro.set_orientation_map(orientation_map)
+            if ipf_color in f[cell_data_path].keys():
+                print('adding IPF color field from key %s' % ipf_color)
+                ipf_map = f[cell_data_path][ipf_color][:, :, :, :].transpose(2, 1, 0, 3)
+                micro.add_field(gridname='CellData', fieldname=ipf_color, array=ipf_map, replace=True)
+            del grain_ids, mask, phases,
         return micro
 
     @staticmethod
@@ -4045,6 +4878,8 @@ class Microstructure(SampleData):
         else:
             return
 
+# TODO: create ReaderClasses to improve methods factorisation, customization
+#       and readability
     @staticmethod
     def from_neper(neper_file_path):
         """Create a microstructure from a neper tesselation.
@@ -4067,6 +4902,12 @@ class Microstructure(SampleData):
         micro = Microstructure(name=name, filename=filename, overwrite_hdf5=True)
         with open(neper_file_path, 'r', encoding='latin-1') as f:
             line = f.readline()  # ***tesr
+            line = f.readline()  # **format
+            format_tokens = f.readline().strip().split()
+            print(format_tokens)
+            format_version = float(format_tokens[0])
+            if format_version <= 2.0:
+                data_type = format_tokens[1]
             # look for **general
             while True:
                 line = f.readline().strip()  # get rid of unnecessary spaces
@@ -4078,39 +4919,47 @@ class Microstructure(SampleData):
             print(dims)
             voxel_size = np.array(f.readline().split()).astype(float).tolist()
             print(voxel_size)
+            #line = f.readline().strip()
+            origin = np.array([0., 0., 0.])
             # look for **cell
             while True:
                 line = f.readline().strip()
+                if line.startswith('*origin'):
+                    origin = np.array(f.readline().split()).astype(float)
+                    print('origin will be set to', origin)
                 if line.startswith('**cell'):
                     break
             n = int(f.readline().strip())
             print('microstructure contains %d grains' % n)
             f.readline()  # *id
             grain_ids = []
-            # look for *ori
+            # read the cell ids
             while True:
                 line = f.readline().strip()
-                if line.startswith('*ori'):
+                if line.startswith('*'):
                     break
                 else:
                     grain_ids.extend(np.array(line.split()).astype(int).tolist())
             print('grain ids are:', grain_ids)
-            oridescriptor = f.readline().strip()  # must be euler-bunge:passive
-            if oridescriptor != 'euler-bunge:passive':
-                print('Wrong orientation descriptor: %s, must be '
-                      'euler-bunge:passive' % oridescriptor)
-            grain = micro.grains.row
-            for i in range(n):
-                euler_angles = np.array(f.readline().split()).astype(float).tolist()
-                print('adding grain %d' % grain_ids[i])
-                grain['idnumber'] = grain_ids[i]
-                grain['orientation'] = Orientation.from_euler(euler_angles).rod
-                grain.append()
-            micro.grains.flush()
+            # current line may be *ori or **data
+            has_ori = 'ori' in line
+            print('has orientation data:', has_ori)
+            if has_ori:
+                oridescriptor = f.readline().strip()  # must be euler-bunge:passive
+                if oridescriptor != 'euler-bunge:passive':
+                    print('Wrong orientation descriptor: %s, must be '
+                          'euler-bunge:passive' % oridescriptor)
+                grain = micro.grains.row
+                for i in range(n):
+                    euler_angles = np.array(f.readline().split()).astype(float).tolist()
+                    print('adding grain %d' % grain_ids[i])
+                    grain['idnumber'] = grain_ids[i]
+                    grain['orientation'] = Orientation.from_euler(euler_angles).rod
+                    grain.append()
+                micro.grains.flush()
             # look for **data and handle *group if present
             phase_ids = None
             while True:
-                line = f.readline().strip()
                 if line.startswith('*group'):
                     print('multi phase sample')
                     phase_ids = []
@@ -4122,21 +4971,25 @@ class Microstructure(SampleData):
                             phase_ids.extend(np.array(line.split()).astype(int).tolist())
                     print('phase ids are:', phase_ids)
                 if line.startswith('**data'):
+                    if format_version > 2.0:
+                        # read the data type
+                        data_type = f.readline().strip()
+                    print('data type is %s' % data_type)
                     break
+                line = f.readline().strip()
             print(f.tell())
             print('reading data from byte %d' % f.tell())
             data = np.fromfile(f, dtype=np.uint16)[:-4]  # leave out the last 4 values
             print(data.shape)
             assert np.prod(dims) == data.shape[0]
             micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0),
-                                voxel_size=voxel_size[0])  # swap X/Z axes
-            print('updating grain geometry')
-            micro.recompute_grain_bounding_boxes()
-            micro.recompute_grain_centers()
-            micro.recompute_grain_volumes()
+                                voxel_size=voxel_size)  # swap X/Z axes
+            micro.set_origin('CellData', origin)
+            print('updating grain data table and grain geometry')
+            micro.sync_grain_table_with_grain_map(sync_geometry=True)
             # if necessary set the phase_map
             if phase_ids:
-                grain_map = micro.get_grain_map(as_numpy=True)
+                grain_map = micro.get_grain_map()
                 phase_map = np.zeros_like(grain_map)
                 for grain_id, phase_id in zip(grain_ids, phase_ids):
                     # ignore phase id == 1 as this corresponds to phase_map == 0
@@ -4147,85 +5000,138 @@ class Microstructure(SampleData):
         return micro
 
     @staticmethod
-    def from_labdct(labdct_file, data_dir='.', include_IPF_map=False,
-                    include_rodrigues_map=False):
+    def from_labdct(labdct_file, data_dir='.', name=None, include_ipf_map=False,
+                    grain_map_key='GrainId', recompute_mean_orientation=False):
         """Create a microstructure from a DCT reconstruction.
 
         :param str labdct_file: the name of the file containing the labDCT data.
         :param str data_dir: the path to the folder containing the HDF5
             reconstruction file.
-        :param bool include_IPF_map: if True, the IPF maps will be included
+        :param str name: the file name to use for this microstructure.
+            By default, the suffix `_data` is added to the base name of the
+            labDCT scan.
+        :param bool include_ipf_map: if True, the IPF maps will be included
             in the microstructure fields.
-        :param bool include_rodrigues_map: if True, the rodrigues map will be
-            included in the microstructure fields.
+        :param str grain_map_key: string defining the path to the grain map
+            (GrainId by default).
+        :param bool recompute_mean_orientation: it True, the orientation of 
+            each grain is computed from the rodrigues map (this may take a 
+            long time).
         :return: a `Microstructure` instance created from the labDCT
             reconstruction file.
         """
         file_path = os.path.join(data_dir, labdct_file)
         print('creating microstructure for labDCT scan %s' % file_path)
-        name, ext = os.path.splitext(labdct_file)
+        if not name:
+            name, ext = os.path.splitext(labdct_file)
         # get the phase data
         with h5py.File(file_path, 'r') as f:
             #TODO handle multiple phases
             phase01 = f['PhaseInfo']['Phase01']
+            #phase_name = phase01['Name'][()].decode('utf-8')
             phase_name = phase01['Name'][0].decode('utf-8')
             parameters = phase01['UnitCell'][()]  # length unit is angstrom
             a, b, c = parameters[:3] / 10  # use nm unit
             alpha, beta, gamma = parameters[3:]
             print(parameters)
-            sym = Lattice.guess_symmetry_from_parameters(a, b, c, alpha, beta, gamma)
+            space_group = phase01['SpaceGroup'][()]
+            sym = Symmetry.from_space_group(space_group)
             print('found %s symmetry' % sym)
             lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
             phase = CrystallinePhase(phase_id=1, name=phase_name, lattice=lattice)
         # create the microstructure with the phase infos
-        micro = Microstructure(name=name, path=data_dir, overwrite_hdf5=True, phase=phase)
+        m = Microstructure(name=name, overwrite_hdf5=True, phase=phase)
 
-        # load cell data
+        # load LabDCT cell data
         with h5py.File(file_path, 'r') as f:
             spacing = f['LabDCT']['Spacing'][0]
             rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()].transpose(2, 1, 0, 3)
-            grain_map = f['LabDCT']['Data']['GrainId'][()].transpose(2, 1, 0)
+            grain_map = f['LabDCT']['Data'][grain_map_key][()].transpose(2, 1, 0)
             print('adding cell data with shape {}'.format(grain_map.shape))
-            micro.set_grain_map(grain_map, voxel_size=spacing)
+            m.set_grain_map(grain_map, voxel_size=spacing)
             mask = f['LabDCT']['Data']['Mask'][()].transpose(2, 1, 0)
-            micro.set_mask(mask, voxel_size=spacing)
+            m.set_mask(mask, voxel_size=spacing)
             phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
-            micro.set_phase_map(phase_map, voxel_size=spacing)
-            if include_IPF_map:
-                IPF001_map = f['LabDCT']['Data']['IPF001'][()].transpose(2, 1, 0, 3)
-                micro.add_field(gridname='CellData', fieldname='IPF001_map',
-                                array=IPF001_map)
-                IPF010_map = f['LabDCT']['Data']['IPF010'][()].transpose(2, 1, 0, 3)
-                micro.add_field(gridname='CellData', fieldname='IPF010_map',
-                                array=IPF010_map)
-                IPF100_map = f['LabDCT']['Data']['IPF100'][()].transpose(2, 1, 0, 3)
-                micro.add_field(gridname='CellData', fieldname='IPF100_map',
-                                array=IPF100_map)
-            if include_rodrigues_map:
-                micro.add_field(gridname='CellData', fieldname='rodrigues_map',
-                                array=rodrigues_map)
+            m.set_phase_map(phase_map, voxel_size=spacing)
+            m.set_orientation_map(rodrigues_map)
+            if 'Completeness' in f['LabDCT/Data']:
+                completeness_map = f['LabDCT']['Data']['Completeness'][()].transpose(2, 1, 0)
+                m.add_field(gridname='CellData', fieldname='completeness_map',
+                            array=completeness_map)
+
+        # analyze the grain map
+        grain_ids_list = range(1, grain_map.max() + 1)  # ids are consecutive
+        slices = ndimage.find_objects(grain_map)
+        mask = grain_map > 0
+        sizes = ndimage.sum(mask, grain_map, grain_ids_list)
 
         # create grain data table infos
-        grain_ids = np.unique(grain_map)
-        print(grain_ids)
-        micro.build_grain_table_from_grain_map()
-        # now get each grain orientation from the rodrigues map
-        for i, g in enumerate(micro.grains):
-            gid = g['idnumber']
-            progress = (1 + i) / len(micro.grains)
-            print('adding grains: {0:.2f} %'.format(progress), end='\r')
-            x, y, z = np.where(micro.get_grain_map() == gid)
-            orientation = rodrigues_map[x[0], y[0], z[0]]
-            # assign orientation to this grain
-            g['orientation'] = orientation
-            g.update()
-        micro.grains.flush()
-        return micro
+        grain = m.grains.row
+        for i in tqdm(range(len(grain_ids_list)), desc='adding grains to the microstructure'):
+            gid = grain_ids_list[i]
+            # use the bounding box for this grain
+            g_slice = slices[i]
+            x_indices = (g_slice[0].start, g_slice[0].stop)
+            y_indices = (g_slice[1].start, g_slice[1].stop)
+            z_indices = (g_slice[2].start, g_slice[2].stop)
+            bb = x_indices, y_indices, z_indices
+            this_grain_map = grain_map[bb[0][0]:bb[0][1],
+                                    bb[1][0]:bb[1][1],
+                                    bb[2][0]:bb[2][1]]
+            # here orientations are constant per grain, grab the first voxel for each grain
+            indices = np.where(this_grain_map == gid)
+            rod = rodrigues_map[bb[0][0] + indices[0][0],
+                                bb[1][0] + indices[1][0],
+                                bb[2][0] + indices[2][0], :]
+            # grain center
+            grain_data_bin = (this_grain_map == gid).astype(np.uint8)
+            local_com = ndimage.measurements.center_of_mass(grain_data_bin) + \
+                        np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
+            com = spacing * (np.array(bb)[:, 0] + local_com - 0.5 * np.array(grain_map.shape))
+
+            # create new grain in the data table
+            grain['idnumber'] = gid
+            grain['orientation'] = rod
+            grain['bounding_box'] = bb
+            grain['center'] = com
+            grain['volume'] = sizes[i] * spacing ** 3
+            grain.append()
+        m.grains.flush()
+
+        if include_ipf_map:
+            print('adding X, Y and Z-IPF maps')
+            with h5py.File(file_path, 'r') as f:
+                if 'IPF001' in f['LabDCT/Data']:
+                    IPF001_map = f['LabDCT/Data/IPF001'][()].transpose(2, 1, 0, 3)
+                else:
+                    IPF001_map = m.create_IPF_map(axis=np.array([0., 0., 1.]))
+                m.add_field(gridname='CellData', fieldname='IPF001_map',
+                            array=IPF001_map, 
+                            compression_options=m.default_compression_options)
+                if 'IPF010' in f['LabDCT/Data']:
+                    IPF010_map = f['LabDCT/Data/IPF010'][()].transpose(2, 1, 0, 3)
+                else:
+                    IPF010_map = m.create_IPF_map(axis=np.array([0., 1., 0.]))
+                m.add_field(gridname='CellData', fieldname='IPF010_map',
+                            array=IPF010_map, 
+                            compression_options=m.default_compression_options)
+                if 'IPF100' in f['LabDCT/Data']:
+                    IPF100_map = f['LabDCT/Data/IPF100'][()].transpose(2, 1, 0, 3)
+                else:
+                    IPF100_map = m.create_IPF_map(axis=np.array([1., 0., 0.]))
+                m.add_field(gridname='CellData', fieldname='IPF100_map',
+                            array=IPF100_map, 
+                            compression_options=m.default_compression_options)
+                del IPF001_map, IPF010_map, IPF100_map
+        return m
 
     @staticmethod
-    def from_dct(data_dir='.', grain_file='index.mat',
-                 vol_file='phase_01_vol.mat', mask_file='volume_mask.mat',
-                 use_dct_path=True, verbose=True):
+    def from_dct(data_dir='.', grain_file='index.mat', use_dct_path=True,
+                 vol_file='phase_01_vol.mat', vol_key='vol',
+                 mask_file='volume_mask.mat', mask_key='vol',
+                 phase_file='volume.mat', phase_key='phases',
+                 rod_map_file='phase_01_vol.mat', rod_map_key='dmvol',
+                 roi=None, verbose=True):
         """Create a microstructure from a DCT reconstruction.
 
         DCT reconstructions are stored in several files. The indexed grain
@@ -4237,21 +5143,34 @@ class Microstructure(SampleData):
         :param str data_dir: the path to the folder containing the
                               reconstruction data.
         :param str grain_file: the name of the file containing grains info.
-        :param str vol_file: the name of the volume file.
-        :param str mask_file: the name of the mask file.
         :param bool use_dct_path: if True, the grain_file should be located in
             4_grains/phase_01 folder and the vol_file and mask_file in the
             5_reconstruction folder.
+        :param str vol_file: the name of the volume file.
+        :param str vol_key: the key to access the volume in the hdf5 file.
+        :param str mask_file: the name of the mask file.
+        :param str mask_key: the key to access the mask in the hdf5 file.
+        :param str phase_file: the name of the file containing the phase map array.
+        :param str phase_key: the key to access the phase array in the hdf5 file.
+        :param str rod_map_file: the name of the file containing the local
+            orientations as a rodrigues vector array.
+        :param str rod_map_key: the key to access the phase rodrigues vector
+            array in the file.
+        :param list roi: specify a region of interest by a list of 6
+            integers in the form [x1, x2, y1, y2, z1, z2] to crop the grain map.
         :param bool verbose: activate verbose mode.
         :return: a `Microstructure` instance created from the DCT reconstruction.
         """
         if data_dir == '.':
             data_dir = os.getcwd()
+        if isinstance(data_dir, Path):
+            data_dir = str(data_dir)
         if data_dir.endswith(os.sep):
             data_dir = data_dir[:-1]
+        
         scan = data_dir.split(os.sep)[-1]
         print('creating microstructure for DCT scan %s' % scan)
-        filename = os.path.join(data_dir,scan)
+        filename = os.path.join(data_dir, scan)
         micro = Microstructure(filename=filename, overwrite_hdf5=True)
         micro.data_dir = data_dir
         if use_dct_path:
@@ -4265,62 +5184,111 @@ class Microstructure(SampleData):
                              ' grain file.' % index_path)
             return None
         from scipy.io import loadmat
-        index = loadmat(index_path)
-        #TODO fetch pixel size from detgeo instead
-        voxel_size = index['cryst'][0][0][25][0][0]
+        index = loadmat(index_path, simplify_cells=True)
+        voxel_size = index['cryst']['pixelsize']
         # grab the crystal lattice
-        lattice_params = index['cryst'][0][0][3][0]
-        sym = Symmetry.from_string(index['cryst'][0][0][7][0])
+        lattice_params = index['cryst']['latticepar']
+        sym = Symmetry.from_string(index['cryst']['lattice_system'])
         print('creating crystal lattice {} ({}) with parameters {}'
-              ''.format(index['cryst'][0][0][0][0], sym, lattice_params))
+              ''.format(index['cryst']['name'], sym, lattice_params))
         lattice_params[:3] /= 10  # angstrom to nm
         lattice = Lattice.from_parameters(*lattice_params, symmetry=sym)
-        micro.set_lattice(lattice)
+        # create a crystalline phase
+        phase_name = index['cryst']['name']
+        phase = CrystallinePhase(name=phase_name, lattice=lattice)
+        micro.set_phase(phase)
         # add all grains to the microstructure
         grain = micro.grains.row
-        for i in range(len(index['grain'][0])):
-            grain['idnumber'] = index['grain'][0][i][0][0][0][0][0]
-            grain['orientation'] = index['grain'][0][i][0][0][3][0]
-            grain['center'] = index['grain'][0][i][0][0][15][0]
+        for i in range(len(index['grain'])):
+            grain['idnumber'] = index['grain'][i]['id']
+            grain['orientation'] = index['grain'][i]['R_vector']
+            grain['center'] = index['grain'][i]['center']
             grain.append()
         micro.grains.flush()
 
-        # load the grain map if available
+        # setup file pathes
         if use_dct_path:
-            grain_map_path = os.path.join(data_dir, '5_reconstruction',
-                                          vol_file)
+            grain_map_path = os.path.join(data_dir, '5_reconstruction', vol_file)
+            mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
+            phase_path = os.path.join(data_dir, '5_reconstruction', phase_file)
+            rod_map_path = os.path.join(data_dir, '5_reconstruction', rod_map_file)
         else:
             grain_map_path = os.path.join(data_dir, vol_file)
-        if os.path.exists(grain_map_path):
-            with h5py.File(grain_map_path, 'r') as f:
-                # because how matlab writes the data, we need to swap X and Z
-                # axes in the DCT volume
-                micro.set_grain_map(f['vol'][()].transpose(2, 1, 0), voxel_size)
-                if verbose:
-                    print('loaded grain ids volume with shape: {}'
-                          ''.format(micro.get_grain_map().shape))
-        # load the mask if available
-        if use_dct_path:
-            mask_path = os.path.join(data_dir, '5_reconstruction', mask_file)
-        else:
             mask_path = os.path.join(data_dir, mask_file)
+            phase_path = os.path.join(data_dir, phase_file)
+            rod_map_path = os.path.join(data_dir, rod_map_file)
+        # load the grain map if available
+        if os.path.exists(grain_map_path):
+            try:
+                with h5py.File(grain_map_path, 'r') as f:
+                    # because how matlab writes the data, we need to swap X and Z
+                    # axes in the DCT volume
+                    print(f[vol_key][()].shape)
+                    print(voxel_size)
+                    grain_map = f[vol_key][()].transpose(2, 1, 0)
+            except OSError:
+                # fallback on matlab format
+                grain_map = loadmat(grain_map_path)[vol_key]
+            # work out the ROI
+            if roi:
+                x1, x2, y1, y2, z1, z2 = roi
+                grain_map = grain_map[x1:x2, y1:y2, z1:z2]
+            micro.set_grain_map(grain_map, voxel_size)
+            if verbose:
+                print('loaded grain ids volume with shape: {}'.format(
+                    micro.get_grain_map().shape))
+            print('computing grain bounding boxes')
+            micro.recompute_grain_bounding_boxes()
+        # load the mask if available
         if os.path.exists(mask_path):
             try:
                 with h5py.File(mask_path, 'r') as f:
-                    mask = f['vol'][()].transpose(2, 1, 0).astype(np.uint8)
-                    # check if mask shape needs to be zero padded
-                    if not mask.shape == micro.get_grain_map().shape:
-                        offset = np.array(micro.get_grain_map().shape) - np.array(mask.shape)
-                        padding = [(o // 2, o // 2) for o in offset]
-                        print('mask padding is {}'.format(padding))
-                        mask = np.pad(mask, padding, mode='constant')
-                    print('now mask shape is {}'.format(mask.shape))
-                    micro.set_mask(mask, voxel_size)
-            except:
+                    mask = f[mask_key][()].transpose(2, 1, 0).astype(np.uint8)
+            except OSError:
                 # fallback on matlab format
-                micro.set_mask(loadmat(mask_path)['vol'], voxel_size)
+                mask = loadmat(mask_path)[mask_key]
+            if roi:
+                x1, x2, y1, y2, z1, z2 = roi
+                mask = mask[x1:x2, y1:y2, z1:z2]
+            # check if mask shape needs to be zero padded
+            if not mask.shape == micro.get_grain_map().shape:
+                offset = np.array(micro.get_grain_map().shape) - np.array(mask.shape)
+                padding = [(o // 2, o // 2) for o in offset]
+                print('mask padding is {}'.format(padding))
+                mask = np.pad(mask, padding, mode='constant')
+            print('now mask shape is {}'.format(mask.shape))
+            micro.set_mask(mask, voxel_size)
             if verbose:
                 print('loaded mask volume with shape: {}'.format(micro.get_mask().shape))
+        # load the phase map if available
+        if os.path.exists(phase_path):
+            try:
+                with h5py.File(phase_path, 'r') as f:
+                    phase_map = f[phase_key][()].transpose(2, 1, 0).astype(np.uint8)
+            except OSError:
+                # fallback on matlab format
+                phase_map = loadmat(phase_path)[phase_key]
+            if roi:
+                x1, x2, y1, y2, z1, z2 = roi
+                phase_map = phase_map[x1:x2, y1:y2, z1:z2]
+            micro.set_phase_map(phase_map, voxel_size)
+            if verbose:
+                print('loaded phase_map volume with shape: {}'.format(micro.get_phase_map().shape))
+        # load the orientation map if available
+        if os.path.exists(rod_map_path):
+            try:
+                with h5py.File(rod_map_path, 'r') as f:
+                    orientation_map = f[rod_map_key][()].transpose(3, 2, 1, 0).astype(float)
+                    if roi:
+                        x1, x2, y1, y2, z1, z2 = roi
+                        orientation_map = orientation_map[x1:x2, y1:y2, z1:z2, :]
+                    micro.set_orientation_map(orientation_map)
+                    if verbose:
+                        print('loaded orientation_map volume with shape: {}'.format(micro.get_orientation_map().shape))
+            except KeyError:
+                print('warning, local orientation not found in %s' % rod_map_file)
+                # give up on local orientations
+                pass
         return micro
 
     @staticmethod
@@ -4375,46 +5343,54 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None, tol=5., min_ci=0.2):
+    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, phase_list=None, ref_frame_id=2, grain_ids=None):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
         :param list roi: a list of 4 integers in the form [x1, x2, y1, y2]
             to crop the EBSD scan.
+        :param int ds: integer value to downsample the data.
         :param float tol: the misorientation angle tolerance to segment
             the grains (default is 5 degrees).
         :param float min_ci: minimum confidence index for a pixel to be a valid
             EBSD measurement.
+        :param list phase_list: a list of CrystallinePhase to overwrite the ones
+            in the file, this is particularly useful for osc files as phases
+            cannot be read from them at the moment.
         :return: a new instance of `Microstructure`.
         """
+        # TODO: segmentation super slow, need to reconsider the process
+        #       (Dream3D hundreds to thousand times faster)
         # Get name of file and create microstructure instance
         name = os.path.splitext(os.path.basename(file_path))[0]
         micro = Microstructure(name=name, autodelete=False, overwrite_hdf5=True)
         from pymicro.crystal.ebsd import OimScan
-        # Read raw EBSD .h5 data file from OIM
-        scan = OimScan.from_file(file_path)
+        # Read raw EBSD file, enforce spatial reference frame for orientation data
+        scan = OimScan.from_file(file_path, crop=(roi, ds),
+                                 use_spatial_ref_frame=True, ref_frame_id=ref_frame_id)
+        if phase_list:
+            scan.phase_list = phase_list
+        # sort the phase list so that it is not renumbered and consistent with the phase map
+        phase_ids = [phase.phase_id for phase in scan.phase_list]
+        scan.phase_list = np.array(scan.phase_list)[np.argsort(phase_ids)]
         micro.set_phases(scan.phase_list)
-        if roi:
-            print('importing data from region {}'.format(roi))
-            scan.cols = roi[1] - roi[0]
-            scan.rows = roi[3] - roi[2]
-            scan.iq = scan.iq[roi[0]:roi[1], roi[2]:roi[3]]
-            scan.ci = scan.ci[roi[0]:roi[1], roi[2]:roi[3]]
-            scan.euler = scan.euler[roi[0]:roi[1], roi[2]:roi[3], :]
-        # change the orientation reference frame to XYZ
-        scan.change_orientation_reference_frame()
         iq = scan.iq
         ci = scan.ci
         euler = scan.euler
-        mask = np.ones_like(iq)
-        # segment the grains
-        grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
+        mask = np.ones_like(scan.phase, dtype=np.uint8)
+        # check if we use an existing segmentation
+        if grain_ids is None:
+            # segment the grains
+            grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
+        else:
+            print('using existing segmentation containing %d grains, size is ' % 
+                  len(np.unique(grain_ids)), grain_ids.shape)
         voxel_size = np.array([scan.xStep, scan.yStep])
         micro.set_grain_map(grain_ids, voxel_size)
+        micro.set_phase_map(scan.phase)
+        micro.set_mask(mask)
 
         # add each array to the data file to the CellData image Group
-        micro.add_field(gridname='CellData', fieldname='mask', array=mask,
-                        replace=True)
         micro.add_field(gridname='CellData', fieldname='iq', array=iq,
                         replace=True)
         micro.add_field(gridname='CellData', fieldname='ci', array=ci,
@@ -4425,51 +5401,66 @@ class Microstructure(SampleData):
         # Fill GrainDataTable
         grains = micro.grains.row
         grain_ids_list = np.unique(grain_ids).tolist()
-        for gid in grain_ids_list:
+        time.sleep(0.2)  # prevent tqdm from messing in the output
+        for gid in tqdm(grain_ids_list, desc='creating new grains'):
             if gid == 0:
                 continue
-            progress = 100 * (1 + grain_ids_list.index(gid)) / len(grain_ids_list)
-            print('creating new grains [{:.2f} %]: adding grain {:d}'.format(
-                progress, gid), end='\r')
-            # get the symmetry for this grain
-            phase_grain = scan.phase[np.where(grain_ids == 1)]
-            assert len(np.unique(phase_grain)) == 1  # all pixel of this grain must have the same phase id by
-            # construction
-            grain_phase_id = phase_grain[0]
-            sym = scan.phase_list[grain_phase_id].get_symmetry()
+            # get the phase for this grain
+            phase_grain = scan.phase[np.where((grain_ids == gid) & (scan.phase > 0))].astype(int)
+            values, counts = np.unique(phase_grain, return_counts=True)
+            if len(counts) == 0:
+                continue
+            grain_phase_id = values[np.argmax(counts)]
+            if len(values) > 1:
+                # all indexed pixel of this grain must have the same phase id
+                print('warning, phase for grain %d is not unique, using value %d' % (gid, grain_phase_id))
+            grain_phase_index = [phase.phase_id for phase in scan.phase_list].index(grain_phase_id)
+            sym = scan.phase_list[grain_phase_index].get_symmetry()
             # compute the mean orientation for this grain
-            euler_grain = scan.euler[np.where(grain_ids == gid)]
-            #euler_grain = np.atleast_2d(euler_grain)  # for one pixel grains
-            euler_grain = euler_grain
+            euler_grain = scan.euler[np.where((grain_ids == gid) & (scan.phase > 0))]
             rods = Orientation.eu2ro(euler_grain)
             rods = np.atleast_2d(rods)  # for one pixel grains
             o_tsl = Orientation.compute_mean_orientation(rods, symmetry=sym)
             grains['idnumber'] = gid
+            grains['phase'] = scan.phase_list[grain_phase_index].phase_id
             grains['orientation'] = o_tsl.rod
             grains.append()
         micro.grains.flush()
-        micro.recompute_grain_bounding_boxes()
-        micro.recompute_grain_centers(verbose=False)
-        micro.recompute_grain_volumes(verbose=False)
-        micro.recompute_grain_bounding_boxes(verbose=False)
+        #print('computing grains geometry')
+        #micro.recompute_grain_bounding_boxes()
+        #micro.recompute_grain_centers(verbose=False)
+        #micro.recompute_grain_volumes(verbose=False)
         micro.sync()
         return micro
 
     @staticmethod
     def merge_microstructures(micros, overlap, translation_offset=[0, 0, 0],
-                              plot=False):
+                              key_array_to_merge='/CellData', plot=False):
         """Merge two `Microstructure` instances together.
 
         The function works for two microstructures with grain maps and an
-        overlap between them. Temporarily `Microstructures` restricted to the
-        overlap regions are created and grains are matched between the two
-        based on a disorientation tolerance.
+        overlap between them along the Z direction. Temporary `Microstructures`
+        restricted to the overlap regions are created and grains are matched
+        between the two based on a disorientation tolerance.
+
+        The method is written such that the end slices of the grain map of the
+        first scan in the `micros` list must correspond to the beginning of the
+        grain map of the second scan.
+
+        .. note::
+
+          The overlap value can be negative, in that case, the first and last
+          layers of the two microstructure are used to match grains and the
+          merged microstructure is constructed with a gap that may be filled
+          later with the `dilate_grains` method.
 
         .. note::
 
           The two microstructure must have the same crystal lattice and the
           same voxel_size for this method to run.
 
+        :param str key_array_to_merge: the path to the arrays to merge in the
+            hdf5 files.
         :param list micros: a list containing the two microstructures to merge.
         :param int overlap: the overlap to use.
         :param list translation_offset: a manual translation (in voxels) offset
@@ -4478,18 +5469,15 @@ class Microstructure(SampleData):
         :return: a new `Microstructure` instance containing the merged
                  microstructure.
         """
-        from scipy import ndimage
-
         # perform some sanity checks
         for i in range(2):
             if micros[i]._is_empty('grain_map'):
                 raise ValueError('microstructure instance %s must have an '
                                  'associated grain_map attribute'
                                  % micros[i].get_sample_name())
-        if micros[0].get_lattice() != micros[1].get_lattice():
-            raise ValueError('both microstructure must have the same crystal '
-                             'lattice')
-        lattice = micros[0].get_lattice()
+        if micros[0].get_phase() != micros[1].get_phase():
+            raise ValueError('both microstructure must have the same phase')
+        phase = micros[0].get_phase()
         if micros[0].get_voxel_size() != micros[1].get_voxel_size():
             raise ValueError('both microstructure must have the same'
                              ' voxel size')
@@ -4500,16 +5488,18 @@ class Microstructure(SampleData):
         if len(micros[1].get_grain_map().shape) == 2:
             raise ValueError('Microstructures to merge must be tridimensional')
 
-        # create two microstructures for the two overlapping regions:
-        # end slices in first scan and first slices in second scan
-        micro1_ol = micros[0].crop(z_start=micros[0].get_grain_map().shape[2] -
-                                           overlap, autodelete=True)
-        micro2_ol = micros[1].crop(z_end=overlap, autodelete=True)
+        # create two microstructures for the two overlapping regions
+        z1 = micros[0].get_grain_map().shape[2] - max(1, overlap)
+        z2 = max(1, overlap)
+        micro1_ol = micros[0].crop(z_start=z1, autodelete=True)
+        micro2_ol = micros[1].crop(z_end=z2, autodelete=True)
         micros_ol = [micro1_ol, micro2_ol]
 
         # match grain from micros_ol[1] to micros_ol[0] (the reference)
         matched, _, unmatched = micros_ol[0].match_grains(micros_ol[1],
                                                           verbose=True)
+        #np.save('matched.npy', matched)
+        #matched = np.load('matched.npy')
 
         # to find the translation, we compute the differences in coordinates of
         # the center of mass of the matched grains between the two microstructures
@@ -4530,6 +5520,9 @@ class Microstructure(SampleData):
         print('translation is in voxels {}'.format(translation_voxel))
         # manually correct the result if necessary
         translation_voxel += translation_offset
+        #if overlap < 0:
+        #    translation_voxel[2] -= overlap
+        #    print('translation in voxels updated to {}'.format(translation_voxel))
 
         # now delete overlapping microstructures
         del micro1_ol, micro2_ol
@@ -4541,7 +5534,6 @@ class Microstructure(SampleData):
             ids_ref_list.remove(-1)  # grain overlap
         if 0 in ids_ref_list:
             ids_ref_list.remove(0)  # background
-        print(ids_ref_list)
         id_offset = max(ids_ref_list)
         print('grain ids in volume %s will be offset by %d'
               % (micros[1].get_sample_name(), id_offset))
@@ -4553,11 +5545,10 @@ class Microstructure(SampleData):
             ids_mrg_list.remove(-1)  # grain overlap
         if 0 in ids_mrg_list:
             ids_mrg_list.remove(0)  # background
-        print(ids_mrg_list)
 
         # prepare a volume with the same size as the second grain map,
         # with grain ids renumbered and (X, Y) translations applied.
-        grain_map = micros[1].get_grain_map(as_numpy=True)
+        grain_map = micros[1].get_grain_map()
         grain_map_translated = grain_map.copy()
         print('renumbering grains in the overlap region of volume %s'
               % micros[1].get_sample_name())
@@ -4580,14 +5571,17 @@ class Microstructure(SampleData):
             renumbered_grains.append([other_id, new_id])
 
         # apply translation along the (X, Y) axes
-        grain_map_translated = np.roll(grain_map_translated,
-                                       translation_voxel[:2], (0, 1))
+        print(grain_map_translated.shape)
+        shifts = translation_voxel[:2].tolist() + [0]
+        print('shifts:', shifts)
+        grain_map_translated = ndimage.shift(grain_map_translated,
+                                             shifts, order=0, cval=0)
 
         check = overlap // 2
-        print(grain_map_translated.shape)
+        print('check=%d' % check)
         print(overlap)
         print(translation_voxel[2] + check)
-        if plot:
+        if plot and overlap > 0:
             slice_ref = micros[0].get_grain_map()[:, :,
                                                   translation_voxel[2] + check]
             slice_renum = grain_map_translated[:, :, check]
@@ -4608,118 +5602,10 @@ class Microstructure(SampleData):
                           == grain_map_translated[:, :, check])
             ax3.imshow(same_voxel.T, vmin=0, vmax=2)
             plt.axis('off')
-            plt.title('voxels that are identicals')
+            plt.title('voxels that are identical')
             plt.savefig('merging_check1.pdf')
 
-        # start the merging: the first volume is the reference
-        gmap_shape = [micros[0].get_grain_map().shape,
-                      micros[1].get_grain_map().shape]
-        overlap = gmap_shape[0][2] - translation_voxel[2]
-        print('overlap is %d voxels' % overlap)
-        z_shape = gmap_shape[0][2] + gmap_shape[1][2] - overlap
-        print('vertical size will be: %d + %d + %d = %d'
-              % (gmap_shape[0][2] - overlap, overlap,
-                 gmap_shape[1][2] - overlap, z_shape))
-        shape_merged = (np.array(gmap_shape[0])
-                        + [0, 0, gmap_shape[1][2] - overlap])
-        print('initializing volume with shape {}'.format(shape_merged))
-        grain_ids_merged = np.zeros(shape_merged, dtype=np.int16)
-        print(gmap_shape[0])
-        print(gmap_shape[1])
-
-        # add the non-overlapping part of the 2 volumes as is
-        grain_ids_merged[:, :, :gmap_shape[0][2] - overlap] = (
-            micros[0].get_grain_map()[:, :, :-overlap])
-        grain_ids_merged[:, :, gmap_shape[0][2]:] = grain_map_translated[:, :,
-                                                    overlap:]
-
-        # look at vertices with the same label
-        print(micros[0].get_grain_map()[:, :, translation_voxel[2]:].shape)
-        print(grain_map_translated[:, :, :overlap].shape)
-        print('translation_voxel[2] = %d' % translation_voxel[2])
-        print('micros[0].grain_map.shape[2] - overlap = %d'
-              % (gmap_shape[0][2] - overlap))
-        same_voxel = (micros[0].get_grain_map()[:, :, translation_voxel[2]:]
-                      == grain_map_translated[:, :, :overlap])
-        print(same_voxel.shape)
-        grain_ids_merged[:, :, translation_voxel[2]:gmap_shape[0][2]] = (
-                grain_map_translated[:, :, :overlap] * same_voxel)
-
-        # look at vertices with a single label
-        single_voxels_0 = ((micros[0].get_grain_map()[:, :,
-                            translation_voxel[2]:] > 0)
-                           & (grain_map_translated[:, :, :overlap] == 0))
-        print(single_voxels_0.shape)
-        grain_ids_merged[:, :, translation_voxel[2]:gmap_shape[0][2]] += (
-            (micros[0].get_grain_map()[:, :, translation_voxel[2]:]
-             * single_voxels_0))
-        single_voxels_1 = ((grain_map_translated[:, :, :overlap] > 0)
-                           & (micros[0].get_grain_map()[:, :,
-                              translation_voxel[2]:] == 0))
-        print(single_voxels_1.shape)
-        grain_ids_merged[:, :, translation_voxel[2]:gmap_shape[0][2]] += (
-                grain_map_translated[:, :, :overlap] * single_voxels_1)
-
-        if plot:
-            fig = plt.figure(figsize=(14, 10))
-            ax1 = fig.add_subplot(1, 2, 1)
-            ax1.imshow(grain_ids_merged[:, grain_ids_merged.shape[1] // 2, :].T)
-            plt.axis('off')
-            plt.title('XZ slice')
-            ax2 = fig.add_subplot(1, 2, 2)
-            ax2.imshow(grain_ids_merged[grain_ids_merged.shape[0] // 2, :, :].T)
-            plt.axis('off')
-            plt.title('YZ slice')
-            plt.savefig('merging_check2.pdf')
-
-        if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
-            mask_translated = np.roll(micros[1].get_mask(),
-                                      translation_voxel[:2], (0, 1))
-
-            # merging the masks
-            mask_merged = np.zeros(shape_merged, dtype=np.uint8)
-            # add the non-overlapping part of the 2 volumes as is
-            mask_merged[:, :, :gmap_shape[0][2] - overlap] = (
-                micros[0].get_mask()[:, :, :-overlap])
-            mask_merged[:, :, gmap_shape[0][2]:] = (
-                mask_translated[:, :, overlap:])
-
-            # look at vertices with the same label
-            same_voxel = (micros[0].get_mask()[:, :, translation_voxel[2]:] ==
-                          mask_translated[:, :, :overlap])
-            print(same_voxel.shape)
-            mask_merged[:, :,
-            translation_voxel[2]:micros[0].get_mask().shape[2]] = (
-                    mask_translated[:, :, :overlap] * same_voxel)
-
-            # look at vertices with a single label
-            single_voxels_0 = (micros[0].get_mask()[:, :, translation_voxel[2]:]
-                               > 0) & (mask_translated[:, :, :overlap] == 0)
-            mask_merged[:, :,
-            translation_voxel[2]:micros[0].get_mask().shape[2]] += (
-                (micros[0].get_mask()[:, :, translation_voxel[2]:]
-                 * single_voxels_0).astype(np.uint8))
-            single_voxels_1 = ((mask_translated[:, :, :overlap] > 0)
-                               & (micros[0].get_mask()[:, :,
-                                  translation_voxel[2]:] == 0))
-            mask_merged[:, :,
-            translation_voxel[2]:micros[0].get_mask().shape[2]] += (
-                (mask_translated[:, :, :overlap]
-                 * single_voxels_1).astype(np.uint8))
-
-            if plot:
-                fig = plt.figure(figsize=(14, 10))
-                ax1 = fig.add_subplot(1, 2, 1)
-                ax1.imshow(mask_merged[:, 320, :].T)
-                plt.axis('off')
-                plt.title('XZ slice')
-                ax2 = fig.add_subplot(1, 2, 2)
-                ax2.imshow(mask_merged[320, :, :].T)
-                plt.axis('off')
-                plt.title('YZ slice')
-                plt.savefig('merging_check3.pdf')
-
-        # merging finished, build the new microstructure instance
+        # merging finished, building the new microstructure instance
         name_part1 = micros[0].get_sample_name()
         if name_part1.endswith('_data'):
             name_part1 = name_part1[:-5]
@@ -4731,8 +5617,7 @@ class Microstructure(SampleData):
         desc = 'merged microstructure from %s and %s' % \
                (micros[0].get_sample_name(), micros[1].get_sample_name())
         merged_micro = Microstructure(name=merged_name, description=desc,
-                                      overwrite_hdf5=True)
-        merged_micro.set_lattice(lattice)
+                                      phase=phase, overwrite_hdf5=True)
         # add all grains from the reference volume
         grains_0 = micros[0].grains.read()
         merged_micro.grains.append(grains_0)
@@ -4749,16 +5634,270 @@ class Microstructure(SampleData):
               % merged_micro.get_number_of_grains())
         merged_micro.grains.flush()
 
-        # add the full grain map
-        print('assigning merged grain map')
-        merged_micro.set_grain_map(grain_ids_merged, voxel_size)
+        # start the merging: the first volume in the list is the reference
+        gmap_shape = [micros[0].get_grain_map().shape,
+                      micros[1].get_grain_map().shape]
+        overlap = gmap_shape[0][2] - translation_voxel[2]
+        print('overlap is %d voxels' % overlap)
+        z_shape = gmap_shape[0][2] + gmap_shape[1][2] - overlap
+        print('vertical size will be: %d + %d + %d = %d'
+              % (gmap_shape[0][2] - overlap, overlap,
+                 gmap_shape[1][2] - overlap, z_shape))
+        shape_merged = (np.array(gmap_shape[0])
+                        + [0, 0, gmap_shape[1][2] - overlap])
+        print('shape merged: {}'.format(shape_merged))
+
+        if overlap > 0:
+            # look at vertices with the same label
+            same_voxel = (micros[0].get_grain_map()[:, :, translation_voxel[2]:]
+                          == grain_map_translated[:, :, :overlap])
+            # look at vertices with a single label
+            single_voxels_0 = ((micros[0].get_grain_map()[:, :,
+                                translation_voxel[2]:] > 0)
+                               & (grain_map_translated[:, :, :overlap] == 0))
+            single_voxels_1 = ((grain_map_translated[:, :, :overlap] > 0)
+                               & (micros[0].get_grain_map()[:, :,
+                                  translation_voxel[2]:] == 0))
+
+        # factorize the merging of all arrays
+        array_names = micros[0].get_node('%s/Field_index' % key_array_to_merge)[()]
+        for index, array_name in enumerate(array_names):
+            array_name = str(array_names[index], 'utf-8)')
+            print('merging array %s' % array_name)
+            if not micros[0]._is_empty(array_name) and not micros[1]._is_empty(array_name):
+                a_bot = micros[0].get_field(array_name)
+                array_type = a_bot.dtype
+                print(gmap_shape[0][2], a_bot.shape[2])
+                if array_name == 'grain_map':
+                    # use our renumbered grain map for the second volume
+                    a_top = grain_map_translated
+                else:
+                    # simply translate the second volume
+                    #a_top = np.roll(micros[1].get_field(array_name),
+                    #                translation_voxel[:2], (0, 1))
+                    array_to_shift = micros[1].get_field(array_name)
+                    the_shifts = np.zeros_like(array_to_shift.shape)
+                    the_shifts[:len(shifts)] = shifts
+                    a_top = ndimage.shift(micros[1].get_field(array_name),
+                                          the_shifts, order=0, cval=0)
+
+                # merging the two arrays
+                shape_array_merged = shape_merged
+                merged = np.zeros(shape_array_merged, dtype=array_type)
+                if overlap > 0:
+                    print('shape same_voxel before test ndim==4', same_voxel.shape)
+                    if a_bot.ndim == 4:
+                        # handle field arrays (typically local orientation map)
+                        shape_array_merged = np.concatenate((shape_merged, [a_bot.shape[3]]))
+                        same_voxel = np.expand_dims(same_voxel, axis=same_voxel.ndim)
+                        same_voxel = np.concatenate((same_voxel, same_voxel, same_voxel), axis=3)
+                        print('shape same_voxel', same_voxel.shape)
+                        single_voxels_0 = np.expand_dims(single_voxels_0, axis=single_voxels_0.ndim)
+                        single_voxels_0 = np.concatenate((single_voxels_0, single_voxels_0, single_voxels_0), axis=3)
+                        print('shape single_voxels_0', single_voxels_0.shape)
+                        single_voxels_1 = np.expand_dims(single_voxels_1, axis=single_voxels_1.ndim)
+                        single_voxels_1 = np.concatenate((single_voxels_1, single_voxels_1, single_voxels_1), axis=3)
+                        print('shape single_voxels_1', single_voxels_1.shape)
+                    # add the non-overlapping part of the 2 volumes as is
+                    merged[:, :, :gmap_shape[0][2] - overlap] = (a_bot[:, :, :-overlap])
+                    merged[:, :, gmap_shape[0][2]:] = (a_top[:, :, overlap:])
+
+                    # copy voxels with the same grain ids
+                    #TODO check if we should use the mean value here
+                    merged[:, :, translation_voxel[2]:a_bot.shape[2]] = (
+                            a_top[:, :, :overlap] * same_voxel)
+
+                    # copy voxels with single values
+                    merged[:, :, translation_voxel[2]:a_bot.shape[2]] += (
+                        (a_bot[:, :, translation_voxel[2]:]
+                         * single_voxels_0).astype(array_type))
+                    merged[:, :, translation_voxel[2]:a_bot.shape[2]] += (
+                        (a_top[:, :, :overlap]
+                         * single_voxels_1).astype(array_type))
+                else:
+                    # overlap is < 0
+                    print('shape merged: {}'.format(merged.shape))
+                    print(a_bot.shape, a_top.shape)
+                    print('gmap_shape[1][2]: {}'.format(gmap_shape[1][2]))
+                    merged[:, :, :gmap_shape[0][2]] = a_bot
+                    merged[:, :, -gmap_shape[1][2]:] = a_top
+
+                if plot:
+                    fig = plt.figure(figsize=(14, 10))
+                    ax1 = fig.add_subplot(1, 2, 1)
+                    ax1.imshow(merged[:, shape_merged[1] // 2, :].T)
+                    plt.axis('off')
+                    plt.title('%s XZ slice' % array_name)
+                    ax2 = fig.add_subplot(1, 2, 2)
+                    ax2.imshow(merged[shape_merged[0] // 2, :, :].T)
+                    plt.axis('off')
+                    plt.title('%s YZ slice' % array_name)
+                    plt.savefig('merging_check%d.pdf' % (3 + index))
+
+                if array_name == 'grain_map':
+                    print('assigning merged grain map')
+                    merged_micro.set_grain_map(merged, voxel_size)
+                else:
+                    try:
+                        print('assigning new fused array: %s' % array_name)
+                        merged_micro.add_field(gridname=key_array_to_merge,
+                                               fieldname=array_name,
+                                               array=merged, replace=True,
+                                               indexname=array_name,
+                                               compression_options=micros[0].default_compression_options)
+                    except ValueError:
+                        print('skipping array %s' % array_name)
+
         # recompute the geometry of the grains
         print('updating grain geometry')
         merged_micro.recompute_grain_bounding_boxes()
         merged_micro.recompute_grain_centers()
         merged_micro.recompute_grain_volumes()
-        if not micros[0]._is_empty('mask') and not micros[1]._is_empty('mask'):
-            print('assigning merged mask')
-            merged_micro.set_mask(mask_merged, voxel_size)
+
         merged_micro.sync()
         return merged_micro
+
+    def get_grain_boundaries_map(self, kernel_size=3):
+        """
+        method to compute grain boundaries map using microstructure grain_map
+        """
+        x, y, z = self.get_grain_map().shape
+        grain_boundaries_map = np.zeros_like(self.get_grain_map())
+        pad_grain_map = np.pad(self.get_grain_map(), pad_width=1)
+                
+        for i in range(x):
+            for j in range(y):
+                for k in range(z):
+                    kernel = pad_grain_map[i:i+kernel_size//2+1,
+                                        j:j+kernel_size//2+1,
+                                        k:k+kernel_size//2+1]
+                    mean_kernel = np.mean(kernel)
+                    inten_level = np.abs(grain_map[i, j, k] - mean_kernel)
+                    if inten_level > 0:
+                        grain_boundaries_map[i, j, k] = 1
+
+        return grain_boundaries_map
+    
+    def resample(self, resampling_factor, resample_name=None, autodelete=False,
+            recompute_geometry=True, verbose=False):
+        """
+        Resample the microstructure by a given factor to create a new one.
+
+        This method resamples the CellData image group to a new microstructure,
+        and adapts the GrainDataTable to the resampled.
+
+        :param int resample_factor: the factor used for resolution degradation
+        :param str resample_name: the name for the resampled microstructure
+            (the default is to append '_resampled' to the initial name).
+        :param bool autodelete: a flag to delete the microstructure files
+            on the disk when it is not needed anymore.
+        :param bool recompute_geometry: if `True` (default), recompute the
+            grain centers, volumes, and bounding boxes in the resampled
+            microstructure. Use `False` when using a resample that do not cut
+            grains, for instance when resampling a microstructure within the
+            mask, to avoid the heavy computational cost of the grain geometry
+            data update.
+        :param bool verbose: activate verbose mode.
+        :return: a new `Microstructure` instance with the resampled grain map.
+        """
+        if self._is_empty('grain_map'):
+            print('warning: needs a grain map to resample the microstructure')
+            return
+        # input default values for bounds if not specified
+        if not resample_name:
+            resample_name = self.get_sample_name() + \
+                        (not self.get_sample_name().endswith('_')) * '_' + 'resampled' + \
+                            '_' + str(resampling_factor)
+        print('RESAMPLING: %s' % resample_name)
+        # create new microstructure dataset
+        micro_resampled = Microstructure(name=resample_name, overwrite_hdf5=True,
+                                    phase=self.get_phase(),
+                                    autodelete=autodelete)
+        if self.get_number_of_phases() > 1:
+            for i in range(2, self.get_number_of_phases()):
+                micro_resampled.add_phase(self.get_phase(phase_id=i))
+        micro_resampled.default_compression_options = self.default_compression_options
+        print('resampling microstructure to %s' % micro_resampled.h5_file)
+        # Resize all CellData fields
+        image_group = self.get_node('CellData')
+        spacing = self.get_attribute('spacing', 'CellData')
+        FIndex_path = '%s/Field_index' % image_group._v_pathname
+        field_list = self.get_node(FIndex_path)
+
+        dims = self.get_attribute('dimension', 'CellData')
+        # Fields dimensions should be multiples of 2 (AMITEX requirement for Zoom Structural purposes, cf L. Gelebart)
+        if len(dims) == 3:
+            X, Y, Z = dims
+            end_X, end_Y, end_Z = resampling_factor * np.array([X//resampling_factor,
+                                                                Y//resampling_factor,
+                                                                Z//resampling_factor])
+        elif len(dims) == 2:
+            X, Y = dims
+            end_X, end_Y = resampling_factor * np.array([X//resampling_factor,
+                                                        Y//resampling_factor])
+        else:
+            raise ValueError('CellData should be either 2D or 3D')
+
+        resampled_voxel_size = self.get_voxel_size() * resampling_factor  
+
+        for name in field_list:
+            field_name = name.decode('utf-8')
+            print('resampling field %s' % field_name)
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
+                if self._get_group_type('CellData') == '2DImage':
+                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor, ...]
+
+                else:
+                    field_resampled = field[:end_X:resampling_factor, :end_Y:resampling_factor,
+                                    :end_Z:resampling_factor, ...]
+                empty = micro_resampled.get_attribute(attrname='empty',
+                                                nodename='CellData')
+                if empty:
+                    micro_resampled.add_image_from_field(
+                        field_array=field_resampled, fieldname=field_name,
+                        imagename='CellData', location='/',
+                        spacing=spacing, replace=True)
+                else:
+                    micro_resampled.add_field(gridname='CellData',
+                                        fieldname=field_name,
+                                        array=field_resampled, replace=True)
+                    print(field_resampled.shape)
+
+        # update the origin of the image group according to the resampling
+        if verbose:
+            print('resampled dataset:')
+            print(micro_resampled)
+        micro_resampled.set_voxel_size('CellData', resampled_voxel_size)
+        print('Updating active grain map')
+        print(micro_resampled.get_grain_map().shape)
+        micro_resampled.set_active_grain_map('CellData_%s' % self.active_grain_map)
+        print(micro_resampled.get_grain_map().shape)
+        micro_resampled.add_grains_in_map()
+        grain_ids = np.unique(micro_resampled.get_grain_map())
+        orientation = []
+        for gid in grain_ids:
+            if not gid > 0:
+                continue
+            orientation.append(self.get_grain(gid).orientation.rod)
+        orientation = np.array(orientation)
+        micro_resampled.set_orientations(orientation)
+        micro_resampled.remove_grains_not_in_map()
+        max_grain = micro_resampled.get_grain_ids()[-1]
+        nb_grain = micro_resampled.get_number_of_grains()
+        if max_grain > nb_grain:
+            print('renumbering in progress : %i - %i ' % (max_grain, nb_grain))
+            micro_resampled.renumber_grains()
+            
+        print('%d grains in resampled microstructure' % micro_resampled.grains.nrows)
+        micro_resampled.grains.flush()
+        
+        # recompute the grain geometry
+        if recompute_geometry:
+            print('updating grain geometry')
+            micro_resampled.recompute_grain_bounding_boxes(verbose)
+            micro_resampled.recompute_grain_centers(verbose)
+            micro_resampled.recompute_grain_volumes(verbose)
+            
+        return micro_resampled
+

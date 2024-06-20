@@ -4,7 +4,7 @@
    :target: https://readthedocs.org/projects/pymicro/?badge=latest
    :alt: Read the Docs
 
-.. image:: https://img.shields.io/pypi/v/pymicro?labelColor=brown
+.. image:: https://img.shields.io/pypi/v/pymicro
    :target: https://pypi.python.org/pypi/pymicro
    :alt: Pypi pymicro
 

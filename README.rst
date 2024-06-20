@@ -5,7 +5,7 @@
    :alt: Read the Docs
 
 .. image:: https://img.shields.io/pypi/v/pymicro?labelColor=brown
-   :target: pypi.python.org/pypi/pymicro
+   :target: https://pypi.python.org/pypi/pymicro
    :alt: Pypi pymicro
 
 .. image:: https://img.shields.io/badge/Python-3.8+-blue.svg

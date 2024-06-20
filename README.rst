@@ -5,12 +5,12 @@
    :alt: Read the Docs
 
 .. image:: https://img.shields.io/pypi/v/pymicro?labelColor=brown
-   :target: https://travis-ci.org/heprom/pymicro
-   :alt: Travis CI
-
-.. image:: https://img.shields.io/badge/Python-3.8+-blue.svg
    :target: pypi.python.org/pypi/pymicro
    :alt: Pypi pymicro
+
+.. image:: https://img.shields.io/badge/Python-3.8+-blue.svg
+   :target: https://www.python.org/downloads
+   :alt: Python 3.8+
 
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
    :target: https://opensource.org/licenses/MIT

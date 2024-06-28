@@ -6,8 +6,8 @@
 
 __version__ = '0.6.0'
 
-import pathlib as pl 
-import os 
+import pathlib as pl
+import os
 
 DATASET_SOURCE = "https://raw.githubusercontent.com/heprom/pymicro-data/main"
 
@@ -54,14 +54,13 @@ def dowload_datadir():
 PYMICRO_ROOT_DIR = pl.Path(__file__).parent.parent
 
 def get_examples_data_dir(download_if_required=True) -> pl.Path:
-    """Get the path to the examples data directory
+    """Get the path to the examples data directory.
 
     Returns:
         pl.Path: the path to the examples data directory
     """
-    
-    data_home = os.environ.get("PYMICRO_DATA", pl.Path.home() / ".pymicro_data")
-    if data_home.exists():
+    data_home = os.environ.get("PYMICRO_DATA", str(pl.Path.home() / ".pymicro_data"))
+    if os.path.exists(data_home):
         PYMICRO_EXAMPLES_DATA_DIR = pl.Path(data_home)
     elif download_if_required:
         PYMICRO_EXAMPLES_DATA_DIR = dowload_datadir()

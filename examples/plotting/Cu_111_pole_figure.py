@@ -3,11 +3,15 @@ import os, numpy as np
 from pymicro.crystal.microstructure import Microstructure
 from pymicro.crystal.texture import PoleFigure
 
+from pymicro import get_examples_data_dir
+PYMICRO_EXAMPLES_DATA_DIR = get_examples_data_dir()
+
 """
 111 Pole figure of a copper sample containing 10000 grains with a fibre
 texture.
 """
-euler_list = np.genfromtxt('../data/Cu_111.dat', usecols=(0, 1, 2), max_rows=1000)
+euler_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'Cu_111.dat')
+euler_list = np.genfromtxt(euler_path, usecols=(0, 1, 2), max_rows=1000)
 micro = Microstructure(name='Cu_111', autodelete=True)
 micro.add_grains(euler_list)
 

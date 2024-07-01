@@ -4082,6 +4082,76 @@ class Microstructure(SampleData):
         self.recompute_grain_volumes()
         return
 
+    def is_unitary_vector(v):
+        # v must be a list or a numpy array with all elements being -1, 0, or 1
+        if isinstance(v, (list, np.ndarray)) and all(x in {-1, 0, 1} for x in v):
+            # check if there's exactly one non-zero element
+            return sum(abs(x) for x in v) == 1
+        return False
+        
+    def change_reference_frame(self, new_x, new_y, cell_data='CellData'):
+        # input check    
+        if not np.all([Microstructure.is_unitary_vector(v) for v in[new_x, new_y]]) or np.dot(new_x, new_y) != 0:
+            raise ValueError("input vectors must be unitary, aligned with the cartesian axes and prependicular, please correct your input")
+        new_z = np.cross(new_x, new_y)
+        T = np.array([new_x, new_y, new_z])
+        assert np.linalg.det(T) == 1.0
+        swap_indices = np.argwhere(new_x)[0][0], np.argwhere(new_y)[0][0], np.argwhere(new_z)[0][0]
+        print('swap indices are', swap_indices)
+        #TODO find out which direction needs to be reversed
+        name_xyz = self.get_sample_name() + '_XYZ'
+
+        # create the new Microstructure instance
+        m2 = Microstructure(name_xyz, phase=self.get_phase(), overwrite_hdf5=True)
+        grain_map_xyz = self.get_grain_map().transpose(swap_indices)
+        m2.set_grain_map(grain_map_xyz, voxel_size=0.001)
+        print('new grain_map has shape', m2.get_grain_map().shape)
+        m2.sync_grain_table_with_grain_map(sync_geometry=True)
+        #print(m2.grains[:5])
+        
+        # rotate grain orientations
+        rods = self.get_grain_rodrigues()
+        rods_xyz = np.empty_like(rods)
+        for i in range(len(rods)):
+            o = Orientation.from_rodrigues(rods[i])
+            g_xyz = np.dot(o.orientation_matrix(), T.T)  # move to new local frame
+            rods_xyz[i] = Orientation(g_xyz).rod
+        m2.set_orientations(rods_xyz)
+
+        # rotate all the fields in CellData
+        image_group = self.get_node(cell_data)
+        field_index_path = '%s/Field_index' % image_group._v_pathname
+        field_list = self.get_node(field_index_path)
+        time.sleep(0.2)
+        for name in tqdm(field_list, desc='rotating fields'):
+            field_name = name.decode('utf-8')
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
+                if self._get_group_type('CellData') == '2DImage':
+                    field = np.expand_dims(field, axis=2)
+                if field.ndim == 4:
+                    field_xyz = field.transpose(swap_indices + (-1,))
+                else:
+                    field_xyz = field.transpose(swap_indices)
+                m2.add_field(gridname=cell_data, 
+                            fieldname=field_name,
+                            array=field_xyz,
+                            replace=True)
+        
+        # also rotate the orientation map
+        if not m2._is_empty('orientation_map'):
+            orientation_map_xyz = m2.get_orientation_map()
+            indices = np.where(m2.get_phase_map() > 0)
+            time.sleep(0.2)
+            for i, j, k in tqdm(zip(*indices), total=len(indices[0]), 
+                                desc='changing orientation map reference frame'):
+                o_tsl = Orientation.from_rodrigues(orientation_map_xyz[i, j, k, :])
+                g_xyz = np.dot(o_tsl.orientation_matrix(), T.T)  # move to XYZ local frame
+                orientation_map_xyz[i, j, k, :] = Orientation(g_xyz).rod
+            m2.set_orientation_map(orientation_map_xyz)
+        
+        return m2
+
     def graph(self):
         """Create the graph of this microstructure.
 
@@ -5343,7 +5413,8 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, phase_list=None, ref_frame_id=2, grain_ids=None):
+    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, min_size=0.0, 
+                  phase_list=None, ref_frame_id=2, grain_ids=None):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
@@ -5381,7 +5452,10 @@ class Microstructure(SampleData):
         # check if we use an existing segmentation
         if grain_ids is None:
             # segment the grains
-            grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
+            scan.seg_params['tol'] = tol
+            scan.seg_params['min_ci'] = min_ci
+            scan.seg_params['min_size'] = min_size
+            grain_ids = scan.segment_grains()
         else:
             print('using existing segmentation containing %d grains, size is ' % 
                   len(np.unique(grain_ids)), grain_ids.shape)

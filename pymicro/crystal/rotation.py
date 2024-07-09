@@ -208,3 +208,79 @@ def qu2om(q):
                    2 * (q2 * q3 + P * q0 * q1),
                    qbar + 2 * q3 ** 2]])
     return g
+
+def qu2ax_angle(q):
+    q0 = q[:, 0]
+    angle = 2*np.arccos(np.clip(q0, epsilon, 1 - epsilon))
+    return angle
+
+def qu2ax_axis(q):
+    q0, q1, q2, q3 = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+    axis = np.array([x for x in zip(q1, q2, q3)])
+
+    n = len(q0)
+    ax_array = np.zeros((n, 3))
+
+    angle0_ind = np.where(q0 >= 1 - epsilon)
+    ax_array[angle0_ind] = np.array([[0, 0, 1]]*len(angle0_ind))
+
+    q00_ind = np.where(q0 <= epsilon)
+    ax_array[q00_ind] = axis[q00_ind]
+
+    others_ind = np.where(np.logical_and((q0 < 1 - epsilon), (q0 > epsilon)))
+    s = np.sign(q0[others_ind])/np.linalg.norm(axis[others_ind], axis=1)
+    ax_array[others_ind] = np.multiply(s[:, np.newaxis],axis[others_ind])
+
+    return ax_array
+
+def qu2ax_vect(q):
+    angle = qu2ax_angle(q)
+    axis = qu2ax_axis(q)
+    return np.column_stack((axis, angle))
+
+def om2qu_vect(om):
+    """
+    Compute the quaternion from the orientation matrix
+
+    :param om: Array of orientations matrices
+    :returns: Array of quaternion (4-list)
+    """
+    a11 = om[:, 0, 0]
+    a12 = om[:, 0, 1]
+    a13 = om[:, 0, 2]
+    a21 = om[:, 1, 0]
+    a22 = om[:, 1, 1]
+    a23 = om[:, 1, 2]
+    a31 = om[:, 2, 0]
+    a32 = om[:, 2, 1]
+    a33 = om[:, 2, 2]
+
+    q0 = 0.5*np.sqrt(1 + a11 + a22 + a33)
+    q1 = -0.5*np.sqrt(1 + a11 - a22 - a33)
+    q2 = -0.5*np.sqrt(1 - a11 + a22 - a33)
+    q3 = -0.5*np.sqrt(1 - a11 - a22 + a33)
+
+    ind1 = np.where(a32 < a23)
+    ind2 = np.where(a13 < a31)
+    ind3 = np.where(a21 < a12)
+
+    q1[ind1] = -q1[ind1]
+    q2[ind2] = -q2[ind2]
+    q3[ind3] = -q3[ind3]
+
+    return np.array([x/np.sqrt((np.array(x)**2).sum()) for x in zip(q0, q1, q2, q3)])
+
+def qu2om_vect(q):
+    """
+    Compute the orientation matrix from the quaternion representation.
+
+    :param q: Array of Quaternion [q0, q1, q2, q3]
+    :returns: Array of orientation matrices
+    """
+    P = -1  # q.convention
+    (q0, q1, q2, q3) = q
+    qbar = q0 ** 2 - q1 ** 2 - q2 ** 2 - q3 ** 2
+    g = np.array([[qbar + 2 * q1 ** 2, 2 * (q1 * q2 - P * q0 * q3), 2 * (q1 * q3 + P * q0 * q2)],
+                  [2 * (q1 * q2 + P * q0 * q3), qbar + 2 * q2 ** 2, 2 * (q2 * q3 - P * q0 * q1)],
+                  [2 * (q1 * q3 - P * q0 * q2), 2 * (q2 * q3 + P * q0 * q1), qbar + 2 * q3 ** 2]])
+    return g

@@ -19,8 +19,8 @@ import math
 from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
-from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal, Quaternion2OrientationMatrix_bis
-from pymicro.crystal.rotation import om2ro, ro2qu, qu2om, om2qu
+from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
+from pymicro.crystal.rotation import om2ro, ro2qu, qu2om, om2qu, qu2ax_angle, qu2ax_axis
 from pymicro.crystal.quaternion import Quaternion
 from pymicro.core.samples import SampleData
 import tables
@@ -28,6 +28,15 @@ from math import atan2, pi
 from tqdm import tqdm
 import time
 
+
+"""
+Defining functions to compute the product of quaternions
+
+Note : quaternions are represented with a numpy array of 4 components :
+q = q0 + i*q1 + j*q2 + k*q3 --> np.array([q0,q1,q2,q3])
+"""
+
+#Product of to 'normal' quaternions
 def Q_product(q1, q2) :
         r0 = q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3]
         r1 = q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2]
@@ -35,9 +44,43 @@ def Q_product(q1, q2) :
         r3 = q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0]
         return np.array([r0, r1, r2, r3])
 
+#Vectorized product of to arrays of quatenions, of the same size
+def Q_product_vect(q1,q2) :
+    r = np.empty((q1.shape[0], 4))
+    r[:,0] = q1[:,0]*q2[:,0] - q1[:,1]*q2[:,1] - q1[:,2]*q2[:,2] - q1[:,3]*q2[:,3]
+    r[:,1] = q1[:,0]*q2[:,1] + q1[:,1]*q2[:,0] + q1[:,2]*q2[:,3] - q1[:,3]*q2[:,2]
+    r[:,2] = q1[:,0]*q2[:,2] - q1[:,1]*q2[:,3] + q1[:,2]*q2[:,0] + q1[:,3]*q2[:,1]
+    r[:,3] = q1[:,0]*q2[:,3] + q1[:,1]*q2[:,2] - q1[:,2]*q2[:,1] + q1[:,3]*q2[:,0]
+    return r
+
+#Product of an array of quaternions by a quaternion : every quaternion of the array is multiplied by the quaternion q2 (q2 is right applied)
+def Q_product_semivect_right(q1,q2) :
+    r = np.empty((q1.shape[0], 4))
+    r[:,0] = q1[:,0]*q2[0] - q1[:,1]*q2[1] - q1[:,2]*q2[2] - q1[:,3]*q2[3]
+    r[:,1] = q1[:,0]*q2[1] + q1[:,1]*q2[0] + q1[:,2]*q2[3] - q1[:,3]*q2[2]
+    r[:,2] = q1[:,0]*q2[2] - q1[:,1]*q2[3] + q1[:,2]*q2[0] + q1[:,3]*q2[1]
+    r[:,3] = q1[:,0]*q2[3] + q1[:,1]*q2[2] - q1[:,2]*q2[1] + q1[:,3]*q2[0]
+    return r
+
+#Product of an array of quaternions by a quaternion : every quaternion of the array is multiplied by the quaternion q1 (q1 is left applied)
+def Q_product_semivect_left(q1,q2) :
+    r = np.empty((q2.shape[0], 4))
+    r[:,0] = q1[0]*q2[:,0] - q1[1]*q2[:,1] - q1[2]*q2[:,2] - q1[3]*q2[:,3]
+    r[:,1] = q1[0]*q2[:,1] + q1[1]*q2[:,0] + q1[2]*q2[:,3] - q1[3]*q2[:,2]
+    r[:,2] = q1[0]*q2[:,2] - q1[1]*q2[:,3] + q1[2]*q2[:,0] + q1[3]*q2[:,1]
+    r[:,3] = q1[0]*q2[:,3] + q1[1]*q2[:,2] - q1[2]*q2[:,1] + q1[3]*q2[:,0]
+    return r
+
 def Q_conjugate(q) : 
     return np.array([q[0], -q[1], -q[2], -q[3]])
 
+def Q_conjugate_vect(q):
+    r = np.empty((q.shape[0], 4))
+    r[:,0] = q[:,0]
+    r[:,1] = -q[:,1]
+    r[:,2] = -q[:,2]
+    r[:,3] = -q[:,3]
+    return r
 
 class Orientation:
     """Crystallographic orientation class.
@@ -548,12 +591,14 @@ class Orientation:
         for (Q_g1, Q_g2) in [(Q_gA, Q_gB), (Q_gB, Q_gA)]:
             for j in range(symmetries.shape[0]):
                 sym_j = symmetries[j]
-                oj = Q_product(sym_j, Q_g1)  # the crystal symmetry operator is left applied
+                oj = Q_product(Q_g1, sym_j) # the crystal symmetry operator is left applied
                 for i in range(symmetries.shape[0]):
                     sym_i = symmetries[i]
-                    oi = Q_product(sym_i, Q_g2)
+                    oi = Q_product(Q_g2, sym_i)
                     delta = qu2om(Q_product(Q_conjugate(oj), oi)) #A modifier pour enlever la conversion
                     mis_angle = Orientation.misorientation_angle_from_delta(delta)
+                    #delta = np.array([Q_product(Q_conjugate(oj), oi)])
+                    #mis_angle = qu2ax_angle(delta)
                     if mis_angle < the_angle:
                         # now compute the misorientation axis, should check if it lies in the fundamental zone
                         mis_axis = Orientation.misorientation_axis_from_delta(delta)
@@ -563,6 +608,35 @@ class Orientation:
                         the_axis = mis_axis
                         the_axis_xyz = np.dot((qu2om(oi)).T, the_axis) #A modifier imperativement pour enlever la conversion et le produit matriciel
         return the_angle, the_axis, the_axis_xyz
+
+
+    def Q_disorientation_vect(self, orientation, crystal_structure=Symmetry.triclinic):
+        the_angle = np.pi
+        symmetries = crystal_structure.Q_symmetry_operators()
+        (Q_gA, Q_gB) = (self.quaternion(), orientation.quaternion())  
+        for (Q_g1, Q_g2) in [(Q_gA, Q_gB), (Q_gB, Q_gA)]:
+            oj = Q_product_semivect_left(Q_g1, symmetries)
+            oi = Q_product_semivect_left(Q_g2, symmetries)
+            mis_angles = qu2ax_angle(Q_product_vect(Q_conjugate_vect(oj), oi))
+            the_angle = np.min(mis_angles)
+        the_axis = None
+        the_axis_xyz = None
+        return the_angle, the_axis, the_axis_xyz
+    
+    def Q_disorientation_vect_bis(self, orientation, crystal_structure=Symmetry.triclinic):
+        the_angle = np.pi
+        symmetries = crystal_structure.Q_symmetry_operators()
+        (Q_gA, Q_gB) = (self.quaternion(), orientation.quaternion())
+        oj = Q_product_semivect_left(Q_gA, symmetries)
+        oi = Q_product_semivect_left(Q_gB, symmetries)
+        mis_angles = qu2ax_angle(Q_product_vect(Q_conjugate_vect(oj), oi))
+        the_angle = np.min(mis_angles)
+        the_axis = None
+        the_axis_xyz = None
+        return the_angle, the_axis, the_axis_xyz
+
+
+
 
     def phi1(self):
         """Convenience method to expose the first Euler angle."""

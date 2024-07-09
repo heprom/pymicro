@@ -10,40 +10,35 @@ from numpy import pi, dot, transpose, radians, linalg
 from matplotlib import pyplot as plt
 from pymicro.crystal.rotation import om2ro, ro2qu, qu2om, om2qu
 
-def Quaternion2OrientationMatrix_bis(q):
-        P = 1
-        (q0, q1, q2, q3) = q
-        qbar = q0 ** 2 - q1 ** 2 - q2 ** 2 - q3 ** 2
-        g = np.array([[qbar + 2 * q1 ** 2, 2 * (q1 * q2 - P * q0 * q3), 2 * (q1 * q3 + P * q0 * q2)],
-                      [2 * (q1 * q2 + P * q0 * q3), qbar + 2 * q2 ** 2, 2 * (q2 * q3 - P * q0 * q1)],
-                      [2 * (q1 * q3 - P * q0 * q2), 2 * (q2 * q3 + P * q0 * q1), qbar + 2 * q3 ** 2]])
-        return g
 
+"""
+Defining the symetry operators in quaternions
+"""
 Q_cubic = np.zeros((24, 4), dtype=float)
-Q_cubic[0] = om2qu(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
-Q_cubic[1] = om2qu(np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]]))
-Q_cubic[2] = om2qu(np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]]))
-Q_cubic[3] = om2qu(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
-Q_cubic[4] = om2qu(np.array([[0., 0., 1.], [0., 1., 0.], [-1., 0., 0.]]))
-Q_cubic[5] = om2qu(np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]]))
-Q_cubic[6] = om2qu(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
-Q_cubic[7] = om2qu(np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]]))
-Q_cubic[8] = om2qu(np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]))
-Q_cubic[9] = om2qu(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
-Q_cubic[10] = om2qu(np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]]))
-Q_cubic[11] = om2qu(np.array([[0., 0., 1.], [1., 0., 0.], [0., 1., 0.]]))
-Q_cubic[12] = om2qu(np.array([[0., 1., 0.], [0., 0., 1.], [1., 0., 0.]]))
-Q_cubic[13] = om2qu(np.array([[0., 0., -1.], [-1., 0., 0.], [0., 1., 0.]]))
-Q_cubic[14] = om2qu(np.array([[0., -1., 0.], [0., 0., 1.], [-1., 0., 0.]]))
-Q_cubic[15] = om2qu(np.array([[0., 1., 0.], [0., 0., -1.], [-1., 0., 0.]]))
-Q_cubic[16] = om2qu(np.array([[0., 0., -1.], [1., 0., 0.], [0., -1., 0.]]))
-Q_cubic[17] = om2qu(np.array([[0., 0., 1.], [-1., 0., 0.], [0., -1., 0.]]))
-Q_cubic[18] = om2qu(np.array([[0., -1., 0.], [0., 0., -1.], [1., 0., 0.]]))
-Q_cubic[19] = om2qu(np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]]))
-Q_cubic[20] = om2qu(np.array([[-1., 0., 0.], [0., 0., 1.], [0., 1., 0.]]))
-Q_cubic[21] = om2qu(np.array([[0., 0., 1.], [0., -1., 0.], [1., 0., 0.]]))
-Q_cubic[22] = om2qu(np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]]))
-Q_cubic[23] = om2qu(np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]]))
+Q_cubic[0] = om2qu(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])) #ok
+Q_cubic[1] = om2qu(np.array([[0., 0., -1.], [0., -1., 0.], [-1., 0., 0.]])) #ok
+Q_cubic[2] = om2qu(np.array([[0., 0., -1.], [0., 1., 0.], [1., 0., 0.]])) #ok
+Q_cubic[3] = om2qu(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])) #ok
+Q_cubic[4] = om2qu(np.array([[0., 0., 1.], [0., 1., 0.], [-1., 0., 0.]])) #ok
+Q_cubic[5] = om2qu(np.array([[1., 0., 0.], [0., 0., -1.], [0., 1., 0.]])) #ok
+Q_cubic[6] = om2qu(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])) #ok
+Q_cubic[7] = om2qu(np.array([[1., 0., 0.], [0., 0., 1.], [0., -1., 0.]])) #ok
+Q_cubic[8] = om2qu(np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])) #ok
+Q_cubic[9] = om2qu(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])) #ok
+Q_cubic[10] = om2qu(np.array([[0., 1., 0.], [-1., 0., 0.], [0., 0., 1.]])) #ok
+Q_cubic[11] = om2qu(np.array([[0., 0., 1.], [1., 0., 0.], [0., 1., 0.]])) #ok
+Q_cubic[12] = om2qu(np.array([[0., 1., 0.], [0., 0., 1.], [1., 0., 0.]])) #ok
+Q_cubic[13] = om2qu(np.array([[0., 0., -1.], [-1., 0., 0.], [0., 1., 0.]])) #ok
+Q_cubic[14] = om2qu(np.array([[0., -1., 0.], [0., 0., 1.], [-1., 0., 0.]])) #ok
+Q_cubic[15] = om2qu(np.array([[0., 1., 0.], [0., 0., -1.], [-1., 0., 0.]])) #ok
+Q_cubic[16] = om2qu(np.array([[0., 0., -1.], [1., 0., 0.], [0., -1., 0.]])) #ok
+Q_cubic[17] = om2qu(np.array([[0., 0., 1.], [-1., 0., 0.], [0., -1., 0.]])) #ok
+Q_cubic[18] = om2qu(np.array([[0., -1., 0.], [0., 0., -1.], [1., 0., 0.]])) #ok
+Q_cubic[19] = om2qu(np.array([[0., 1., 0.], [1., 0., 0.], [0., 0., -1.]])) #ok
+Q_cubic[20] = om2qu(np.array([[-1., 0., 0.], [0., 0., 1.], [0., 1., 0.]])) #ok
+Q_cubic[21] = om2qu(np.array([[0., 0., 1.], [0., -1., 0.], [1., 0., 0.]])) #ok
+Q_cubic[22] = om2qu(np.array([[0., -1., 0.], [-1., 0., 0.], [0., 0., -1.]])) #ok
+Q_cubic[23] = om2qu(np.array([[-1., 0., 0.], [0., 0., -1.], [0., -1., 0.]])) #ok
 
 Q_hex = np.zeros((12, 4), dtype=float)
 s60 = np.sin(60 * np.pi / 180)
@@ -63,7 +58,7 @@ Q_hex[11] = om2qu(np.array([[0.5, -s60, 0.], [-s60, -0.5, 0.], [0., 0., -1.]]))
 Q_ortho = np.zeros((4, 4), dtype=float)
 Q_ortho[0] = om2qu(np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]))
 Q_ortho[1] = om2qu(np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]]))
-Q_ortho[2] = om2qu(np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]]))
+Q_ortho[2] = om2qu(np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]]))
 Q_ortho[3] = om2qu(np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]]))
 
 Q_tetra = np.zeros((8, 4), dtype=float)
@@ -463,7 +458,7 @@ class Symmetry(enum.Enum):
             sym = np.zeros((4, 3, 3), dtype=float)
             sym[0] = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
             sym[1] = np.array([[1., 0., 0.], [0., -1., 0.], [0., 0., -1.]])
-            sym[2] = np.array([[-1., 0., -1.], [0., 1., 0.], [0., 0., -1.]])
+            sym[2] = np.array([[-1., 0., 0.], [0., 1., 0.], [0., 0., -1.]])
             sym[3] = np.array([[-1., 0., 0.], [0., -1., 0.], [0., 0., 1.]])
         elif self is Symmetry.tetragonal:
             sym = np.zeros((8, 3, 3), dtype=float)

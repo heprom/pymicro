@@ -2886,7 +2886,7 @@ class Microstructure(SampleData):
         lattice = self.get_phase().get_lattice()
         coords, edges, faces = lattice.get_points(origin='mid', handle_hexagonal=False)
         grain_ids = self.get_grain_ids()
-        sizes = self.get_grain_volumes()
+        grain_sizes = self.compute_grain_equivalent_diameters()  #self.get_grain_volumes()
         centers = self.get_grain_centers()
         n = self.get_number_of_grains()
 
@@ -2898,9 +2898,9 @@ class Microstructure(SampleData):
             hexahedron_order = [0, 1, 3, 2, 4, 5, 7, 6]
             for k, coord in enumerate(coords):
                 # scale coordinates with the grain size and center on the grain
-                coords_rot[k] = center + np.sqrt(size) * np.dot(om.T, coord)
+                coords_rot[k] = center + size * np.dot(om.T, coord)
                 points.InsertNextPoint(coords_rot[k])
-                Ids.InsertNextId(id_offset + hexahedron_order[k])                        
+                Ids.InsertNextId(id_offset + hexahedron_order[k])
             grid.InsertNextCell(vtk.VTK_HEXAHEDRON, Ids)
 
         # vtkPoints instance for all the vertices
@@ -2917,7 +2917,7 @@ class Microstructure(SampleData):
         for g in tqdm(self.grains, desc='creating lattice cell for all grains'):
             gid = g['idnumber']
             center = g['center']
-            size = g['volume']
+            size = self.compute_grain_equivalent_diameters(id_list=[gid])[0]  #g['volume']
             om = self.get_grain(gid).orientation.orientation_matrix()
             insert_grain_lattice_cell(grid, id_offset, om, coords, center, size)
             id_offset += len(coords)
@@ -2933,10 +2933,14 @@ class Microstructure(SampleData):
 
         from vtk.util import numpy_support
         grain_ids_array = numpy_support.numpy_to_vtk(grain_ids)
+        grain_sizes_array = numpy_support.numpy_to_vtk(grain_sizes)
         if lattice.get_symmetry() is Symmetry.hexagonal:
             grain_ids_array = numpy_support.numpy_to_vtk(np.repeat(grain_ids, 3))
+            grain_sizes_array = numpy_support.numpy_to_vtk(np.repeat(grain_sizes, 3))
         grain_ids_array.SetName('grain_ids')
+        grain_sizes_array.SetName('grain_sizes')
         grid.GetCellData().AddArray(grain_ids_array)
+        grid.GetCellData().AddArray(grain_sizes_array)
 
         # now add the created mesh to the microstructure
         from BasicTools.Containers import vtkBridge
@@ -3838,12 +3842,24 @@ class Microstructure(SampleData):
     def compute_grain_equivalent_diameters(self, id_list=None):
         """Compute the equivalent diameter for a list of grains.
 
+        The equivalent diameter is defined as the diameter of a sphere with
+        the same volume as the grain if 3D or the diameter of the circle with
+        the same surface as the grain in 2D.
+
+        .. math::
+
+          D_{eq} = \left(\dfrac{6V}{\pi}\right)^{1/3}
+
         :param list id_list: the list of the grain ids to include (compute
             for all grains by default).
         :return: a 1D numpy array of the grain diameters.
         """
-        grain_equivalent_diameters = 2 * (3 * self.get_grain_volumes(id_list) /
-                                          4 / np.pi) ** (1 / 3)
+        volumes = self.get_grain_volumes(id_list)
+        location = self._get_parent_name(self.active_grain_map)
+        if self._get_group_type('CellData') == '2DImage':
+            grain_equivalent_diameters = (4 * volumes / np.pi) ** (1 / 2)
+        else:
+            grain_equivalent_diameters = (6 * volumes / np.pi) ** (1 / 3)
         return grain_equivalent_diameters
 
     def compute_grain_sphericities(self, id_list=None):
@@ -5304,6 +5320,9 @@ class Microstructure(SampleData):
                 x1, x2, y1, y2, z1, z2 = roi
                 grain_map = grain_map[x1:x2, y1:y2, z1:z2]
             micro.set_grain_map(grain_map, voxel_size)
+            location = micro._get_parent_name(micro.active_grain_map)
+            origin = -0.5 * micro.get_voxel_size() * np.array(micro.get_grain_map().shape)
+            micro.set_origin(location, origin)
             if verbose:
                 print('loaded grain ids volume with shape: {}'.format(
                     micro.get_grain_map().shape))

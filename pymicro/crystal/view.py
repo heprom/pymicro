@@ -329,23 +329,27 @@ class View_slice:
 
     def _overlay_crystal_lattices(self, ax, centers, highlight_ids, sizes, extent):
         """Overlay crystal lattice on grain map slice view."""
-        par = self.annotate_lattices_params
         #FIXME adapt for multi phase material
-        centers = self.microstructure.get_grain_centers(id_list=highlight_ids)
-        sizes = self.microstructure.get_grain_volumes(id_list=highlight_ids)
-        coords, edges, faces = self.microstructure.get_lattice().get_points(origin='mid')
-        #FIXME handle all 3 planes
-        if self.plane != 'XY':
-            print('lattices can only be plotted in the XY plane for now, skipping this...')
-            return
+        par = self.annotate_lattices_params
+        cut_axis, n_int, _ = self._get_slice_geometry()
+        coords_indices = [0, 1, 2]
+        coords_indices.pop(cut_axis)
+        location = self.microstructure._get_parent_name(self.microstructure.active_grain_map)
+        spacing = self.microstructure.get_attribute('spacing', location)
+        sizes = sizes * spacing[0] * spacing[1]
+        coords, _, faces = self.microstructure.get_lattice().get_points(origin='mid')
 
         for k, gid in enumerate(highlight_ids):
             # apply the crystal orientation
-            g = self.microstructure.get_grain(gid).orientation.orientation_matrix()
+            try:
+                g = self.microstructure.get_grain(gid).orientation.orientation_matrix()
+            except ValueError:
+                # skip this grain
+                continue
             coords_rot = np.empty_like(coords)
             for i, coord in enumerate(coords):
                 # scale coordinates with the grain size and center on the grain
-                coords_rot[i] = centers[k] + np.sqrt(sizes[k]) * np.dot(g.T, coord)
+                coords_rot[i] = np.sqrt(sizes[k]) * np.dot(g.T, coord)
             # scale coords to the proper unit
             if self.unit == 'pixel':
                 coords_rot = coords_rot / self.microstructure.get_voxel_size() + 0.5 * np.array(self.microstructure.get_grain_map().shape)
@@ -353,17 +357,19 @@ class View_slice:
             normals = np.empty((len(faces), 3), dtype='f')
             for i, face in enumerate(faces):
                 face_coords = coords_rot[face]
+                # project the face onto the slice
+                face_coords_slice = centers[k] + face_coords[:, coords_indices]
                 # for each face, compute the normal
                 normals[i] = np.cross(coords_rot[face[1]] - coords_rot[face[0]],
                                       coords_rot[face[-2]] - coords_rot[face[-1]])
                 normals[i] /= np.linalg.norm(normals[i])
-                if normals[i, 2] < 0.:
-                    # note: up is -Z
+
+                if np.dot(normals[i], n_int) < 0.:
                     if par['fill_faces_up'] is True:
-                        ax.fill(face_coords[:, 0], face_coords[:, 1], color='gray', alpha=0.5)
-                    ax.plot(face_coords[:, 0], face_coords[:, 1], 'k-')
+                        ax.fill(face_coords_slice[:, 0], face_coords_slice[:, 1], color='gray', alpha=0.5)
+                    ax.plot(face_coords_slice[:, 0], face_coords_slice[:, 1], 'k-')
                 elif par['back_faces'] is True:
-                    ax.plot(face_coords[:, 0], face_coords[:, 1], 'k', linestyle='dotted')
+                    ax.plot(face_coords_slice[:, 0], face_coords_slice[:, 1], 'k', linestyle='dotted')
         # prevent axis to move due to lines spanning outside the map
         plt.axis(extent)
 
@@ -372,15 +378,7 @@ class View_slice:
         """Overlay slip traces on grain map slice view."""
         # TODO: adapt for multi phase material
         # TODO: scale slip traces with surface/slip plane angle ?
-        cut_axis = self.allowed_planes.index(self.plane)
-        n_int = np.zeros(3)
-        n_int[cut_axis] = 1.
-        view_up = [0, -1, 0]
-        if self.plane == 'XZ':
-            view_up = [0, 0, -1]
-            n_int[cut_axis] = -1.
-        elif self.plane == 'YZ':
-            view_up = [0, 0, -1]
+        _, n_int, view_up = self._get_slice_geometry()
         for i, gid in enumerate(highlight_ids):
             g = self.microstructure.get_grain(gid)
             for hkl in hkl_planes:
@@ -397,6 +395,29 @@ class View_slice:
                 ax.plot(x, y, '-', linewidth=1, color=color)
             # prevent axis to move due to traces spanning outside the map
             plt.axis(extent)
+
+    def _get_slice_geometry(self):
+        """_summary_
+
+        note: n_int is going inside the creen.
+
+        if plane = XY we have cut_axis = 2, n_int = [0, 0, 1], view_up = [0, -1, 0]
+        if plane = YZ we have cut_axis = 0, n_int = [1, 0, 0], view_up = [0, 0, -1]
+        if plane = XZ we have cut_axis = 1, n_int = [0, -1, 0], view_up = [0, 0, -1]
+
+        Returns:
+            _type_: _description_
+        """
+        cut_axis = self.allowed_planes.index(self.plane)
+        n_int = np.zeros(3)
+        n_int[cut_axis] = 1.
+        view_up = [0, -1, 0]
+        if self.plane == 'XZ':
+            view_up = [0, 0, -1]
+            n_int[cut_axis] = -1.
+        elif self.plane == 'YZ':
+            view_up = [0, 0, -1]
+        return cut_axis, n_int, view_up
 
     def _overlay_gb(self, ax, grains_slice, extent):
         """Plot grain boundaries in slice view."""

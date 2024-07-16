@@ -12,6 +12,7 @@ dependencies:
   - tifffile
   - matplotlib
   - vtk
+  - tqdm
   - h5py
   - lxml
   - pytables

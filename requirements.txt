@@ -1,4 +1,4 @@
-numpy
+numpy<2.0.0
 scipy
 scikit-image
 scikit-learn
@@ -8,4 +8,9 @@ h5py
 lxml
 tables
 networkx
--e git+https://gitlab.com/drti/basic-tools.git#egg=basictools
+tqdm
+scikit-image 
+scikit-learn
+requests
+pytest 
+BasicToolsFrozen

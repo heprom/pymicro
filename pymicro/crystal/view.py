@@ -1,8 +1,9 @@
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, colors
 import numpy as np
 from scipy import ndimage
 from skimage import filters
-from pymicro.crystal.microstructure import Microstructure
+from pymicro.crystal.microstructure import Microstructure, Orientation
+import networkx as nx
 
 class View_slice:
 
@@ -14,6 +15,8 @@ class View_slice:
         self.allowed_planes = ['YZ', 'XZ', 'XY']
         self.allowed_annotation = ['grain_ids', 'lattices', 'slip_traces']
         self.annotate = None
+        self.annotate_lattices_params = {'back_faces': True,
+                                         'fill_faces_up': True}
 
     def set_unit(self, unit):
         if unit in self.allowed_units:
@@ -30,10 +33,10 @@ class View_slice:
             print('view plane is', self.plane)
 
     def view_map_slice(self, map_name='grain_map', slice=None,
-                    color='random', show_mask=True, highlight_ids=None,
+                    color='random', show_mask=False, highlight_ids=None,
                     show_grain_ids=False, circle_ids=False, show_lattices=False,
                     slip_system=None, axis=[0., 0., 1], show_slip_traces=False,
-                    hkl_planes=None, show_phases=False, show_gb=False,
+                    hkl_planes=None, show_gb=False,
                     display=True):
         """A simple utility method to show one microstructure slice.
         
@@ -53,7 +56,7 @@ class View_slice:
         :param int slice: the slice number
         :param str plane: the cut plane, must be one of 'XY', 'YZ' or 'XZ'
         :param str color: a string to chose the colormap from ('random',
-            'grain_ids', 'schmid', 'ipf')
+            'grain_ids', 'schmid', 'ipf', 'phase')
         :param bool show_mask: a flag to show the mask by transparency.
         :param list highlight_ids: a list of grain ids to restrict the
             annotations (by default all grains are annotated).
@@ -71,8 +74,6 @@ class View_slice:
         :param list hkl_planes: the list of planes to plot the slip traces.
         :param str unit: switch between mm and pixel units.
         :param bool show_gb: show the grain boundaries.
-        :param bool show_phases: show the phases from the phase mapby hatching
-            regions on the slice. Works only if the phase map exists.
         :param bool display: if True, the show method is called, otherwise,
             the figure is simply returned.
         """
@@ -131,15 +132,6 @@ class View_slice:
             else:
                 extent = self._set_extent(grains_slice)
                 self._overlay_gb(ax, grains_slice, extent)
-        # phases on the map
-        if show_phases:
-            phase_slice, vmin, vmax = self._get_slice_map("phase_map",
-                                    slice, color, slip_system)
-            if phase_slice is None:
-                print('Could not get phase slice, proceeding... ')
-            else:
-                extent = self._set_extent(phase_slice, vertical_reverse=False)
-                self._hatch_phases(ax, phase_slice, extent)
         if display:
             plt.show()
         return fig, ax
@@ -171,19 +163,24 @@ class View_slice:
         # Check if slice value fits and otherwise computes half size slice
         if slice is None or slice > map_array.shape[cut_axis] - 1 or slice < 0:
             slice = map_array.shape[cut_axis] // 2
-            print('using slice value %d' % slice)
+            #print('using slice value %d' % slice)
         # cut slice from map
         map_slice = map_array.take(indices=slice, axis=cut_axis)
         if map_name == "grain_map":
-            # Compute slice for schmid factor
-            if (color == 'schmid'):
+            # compute slice for schmid factor
+            if color == 'schmid':
                 map_slice = self._build_schmid_factor_map(map_slice,
                                                           slip_system, axis)
                 vmin = 0
                 vmax = 0.5
-            # Compute image for IPF
-            if (color == 'ipf'):
+            # compute image for IPF
+            elif color == 'ipf':
                 map_slice = self._build_ipf_map(map_slice, axis)
+            # compute image for phase
+            elif color == 'phase':
+                map_slice = self._build_phase_map(map_slice)
+                vmin = 0
+                vmax = 10
         return map_slice, vmin, vmax
 
     def _get_slice_grain_centers(self, grains_slice, highlight_ids):
@@ -222,11 +219,11 @@ class View_slice:
         ipf_image = np.zeros((*grains_slice.shape, 3), dtype=float)
         gids = np.intersect1d(np.unique(grains_slice), self.microstructure.get_grain_ids())
         for gid in gids:
-            o = self.microstructure.get_grain(gid).orientation
+            g = self.microstructure.grains.read_where('idnumber==%d' % gid)[0]
+            o = Orientation.from_rodrigues(g['orientation'])
+            sym = self.microstructure.get_phase(phase_id=g['phase']).get_symmetry()
             try:
-                c = o.ipf_color(axis,
-                                symmetry=self.microstructure.get_lattice().get_symmetry(),
-                                saturate=True)
+                c = o.ipf_color(axis, symmetry=sym, saturate=True)
             except ValueError:
                 print('problem moving to the fundamental zone for '
                       'rodrigues vector {}'.format(o.rod))
@@ -235,19 +232,32 @@ class View_slice:
             ipf_image[grains_slice == gid] = c
         return ipf_image
 
+    def _build_phase_map(self, grains_slice):
+        """Compute IPF map for view slice."""
+        phase_image = np.zeros_like(grains_slice, dtype=float)
+        gids = np.intersect1d(np.unique(grains_slice), self.microstructure.get_grain_ids())
+        for gid in gids:
+            g = self.microstructure.grains.read_where('idnumber==%d' % gid)[0]
+            phase_image[grains_slice == gid] = g['phase']
+        return phase_image
+
     def _set_slice_colors(self, color):
         """Set colormap to plot grain map in slice view."""
         if color == 'random':
             cmap = Microstructure.rand_cmap(first_is_black=True)
-        elif (color == 'grain_ids') or (color == 'values'):
+        elif color in ['grain_ids', 'values']:
             cmap = 'viridis'
         elif color == 'schmid':
             cmap = plt.cm.gray
         elif color == 'ipf':
             cmap = None
+        elif color == 'phase':
+            phase_colors = np.array(plt.cm.tab10.colors)
+            phase_colors[0] = [0., 0., 0.]  # color background in black
+            cmap = colors.ListedColormap(phase_colors)
         else:
             print('unknown color scheme requested, please chose between '
-                  '{random, grain_ids, values, schmid, ipf}, returning')
+                  '{random, grain_ids, values, schmid, ipf, phase}, returning')
             return
         return cmap
 
@@ -283,6 +293,15 @@ class View_slice:
         if color == 'schmid':
             cb = plt.colorbar(im)
             cb.set_label('Schmid factor')
+        # add legend for phase colors
+        elif color == 'phase':
+            from matplotlib.patches import Patch
+            phase_patches = []
+            phase_colors = plt.cm.tab10.colors
+            for phase_id in self.microstructure.get_phase_ids_list():
+                phase = self.microstructure.get_phase(phase_id)
+                phase_patches.append(Patch(color=phase_colors[phase_id], label=phase.name))
+            plt.legend(handles=phase_patches)
         # add axes legend
         ax.xaxis.set_label_position('top')
         plt.xlabel(self.plane[0] + ' [%s]' % self.unit)
@@ -310,27 +329,41 @@ class View_slice:
 
     def _overlay_crystal_lattices(self, ax, centers, highlight_ids, sizes, extent):
         """Overlay crystal lattice on grain map slice view."""
+        par = self.annotate_lattices_params
         #FIXME adapt for multi phase material
         centers = self.microstructure.get_grain_centers(id_list=highlight_ids)
         sizes = self.microstructure.get_grain_volumes(id_list=highlight_ids)
-        coords, edge_point_ids = self.microstructure.get_lattice().get_points(origin='mid')
+        coords, edges, faces = self.microstructure.get_lattice().get_points(origin='mid')
         #FIXME handle all 3 planes
         if self.plane != 'XY':
             print('lattices can only be plotted in the XY plane for now, skipping this...')
             return
+
         for k, gid in enumerate(highlight_ids):
-            # now apply the crystal orientation
+            # apply the crystal orientation
             g = self.microstructure.get_grain(gid).orientation.orientation_matrix()
             coords_rot = np.empty_like(coords)
-            for i in range(len(coords_rot)):
+            for i, coord in enumerate(coords):
                 # scale coordinates with the grain size and center on the grain
-                coords_rot[i] = centers[k] + np.sqrt(sizes[k]) * np.dot(g.T, coords[i])
+                coords_rot[i] = centers[k] + np.sqrt(sizes[k]) * np.dot(g.T, coord)
             # scale coords to the proper unit
             if self.unit == 'pixel':
                 coords_rot = coords_rot / self.microstructure.get_voxel_size() + 0.5 * np.array(self.microstructure.get_grain_map().shape)
-            for edge_id in range(len(edge_point_ids)):
-                ax.plot(coords_rot[edge_point_ids[edge_id, :], 0],
-                        coords_rot[edge_point_ids[edge_id, :], 1], 'k-')
+            
+            normals = np.empty((len(faces), 3), dtype='f')
+            for i, face in enumerate(faces):
+                face_coords = coords_rot[face]
+                # for each face, compute the normal
+                normals[i] = np.cross(coords_rot[face[1]] - coords_rot[face[0]],
+                                      coords_rot[face[-2]] - coords_rot[face[-1]])
+                normals[i] /= np.linalg.norm(normals[i])
+                if normals[i, 2] < 0.:
+                    # note: up is -Z
+                    if par['fill_faces_up'] is True:
+                        ax.fill(face_coords[:, 0], face_coords[:, 1], color='gray', alpha=0.5)
+                    ax.plot(face_coords[:, 0], face_coords[:, 1], 'k-')
+                elif par['back_faces'] is True:
+                    ax.plot(face_coords[:, 0], face_coords[:, 1], 'k', linestyle='dotted')
         # prevent axis to move due to lines spanning outside the map
         plt.axis(extent)
 
@@ -402,3 +435,104 @@ class View_slice:
             handle.set_alpha(0.8)
         plt.rcParams['hatch.linewidth'] = 0.5
         return
+
+class View_graph:
+        def __init__(self, 
+                    m: Microstructure, 
+                    min_grain_size: int=20):
+            self.microstructure = m
+            self.min_grain_size = min_grain_size
+            self.G = None
+
+            # Ensure that the microstructure has a grain map (if get_grain_map() is not None, then it has a grain map)
+            assert m.get_grain_map() is not None, 'Microstructure instance must have a grain map to view it with "view_graph"'
+
+            self.grain_ids = np.squeeze(m.get_grain_map())
+            indices = np.indices(self.grain_ids.shape)
+            rows, cols = indices
+
+            # Create a structure to track grain ids and their positions
+            self.rows = rows.flatten()
+            self.cols = cols.flatten()
+            self.grain_ids_flat = self.grain_ids.flatten()
+
+            # Populate grain_sizes dictionary
+            self.grain_sizes = np.bincount(self.grain_ids_flat)
+            self.grain_sizes[0] = 0  # set size of grain ID 0 (background) to 0
+
+        def build_graph(self):
+
+            G = nx.Graph()
+            for i in range(self.grain_ids.shape[0]):       # Rows
+                for j in range(self.grain_ids.shape[1]):   # Columns
+                    grain_id = self.grain_ids[i, j]
+                    if grain_id > 0 and self.grain_sizes[grain_id] >= self.min_grain_size:
+                        G.add_node(grain_id)
+
+                    # Check the neighbor to the right
+                    if j < self.grain_ids.shape[1] - 1:
+                        right_grain_id = self.grain_ids[i, j + 1]
+                        self.add_edge(G, grain_id, right_grain_id, self.grain_sizes)
+
+                    # Check the neighbor below
+                    if i < self.grain_ids.shape[0] - 1:
+                        below_grain_id = self.grain_ids[i + 1, j]
+                        self.add_edge(G, grain_id, below_grain_id, self.grain_sizes)
+
+            self.G = G
+            print("Number of nodes:", G.number_of_nodes())
+            print("Number of edges:", G.number_of_edges())
+            return G
+        
+        def plot(self, 
+                    G:nx.Graph=None, 
+                    arranged: bool=True, 
+                    min_node_size: float=0.1,
+                    with_labels: bool=True,
+                    font_size: int=8,
+                    figsize: tuple=(12, 12),
+                    show: bool=True,
+                    save: bool=False,
+                    save_path: str=None):
+            if G is None:
+                assert self.G is not None, 'Graph must be built first using build_graph() method.'
+                G = self.G
+
+            node_sizes = [self.grain_sizes[grain_id] * min_node_size for grain_id in G.nodes()]
+
+            if arranged:
+                # Generate positions from centroids and draw the graph with centroids
+                centroids = self.get_centroids()
+                pos = {gid: (centroid[1], -centroid[0]) for gid, centroid in centroids.items()}
+            else:
+                pos = nx.spring_layout(G, seed=42)
+
+            plt.figure(figsize=figsize)
+            nx.draw(G, pos, node_size=node_sizes, edge_color='gray', node_color='blue', with_labels=False)
+            node_labels = {node: str(node) for node in G.nodes() if node > 0}
+            if with_labels:
+                nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=font_size)
+            plt.title('Grain Network Visualization with Centroids')
+            if save:
+                plt.savefig(save_path if save_path is not None else 'grain_network.png')
+            if show:
+                plt.show()
+
+
+
+        def add_edge(self, G, node1, node2, grain_sizes):
+            if node1 != node2 and node1 > 0 and node2 > 0 and grain_sizes[node1] >= self.min_grain_size and grain_sizes[node2] >= self.min_grain_size:
+                G.add_edge(node1, node2)
+
+        def get_centroids(self):
+            sum_coords = np.zeros((self.grain_ids.max() + 1, 2), dtype=np.float64)
+            pixel_count = np.zeros(self.grain_ids.max() + 1, dtype=int)
+
+            for idx in range(len(self.grain_ids_flat)):
+                gid = self.grain_ids_flat[idx]
+                if gid > 0:
+                    sum_coords[gid] += [self.rows[idx], self.cols[idx]]
+                    pixel_count[gid] += 1
+
+            centroids = {gid: sum_coords[gid] / count for gid, count in enumerate(pixel_count) if count > 0}
+            return centroids

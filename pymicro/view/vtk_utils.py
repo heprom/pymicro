@@ -2300,7 +2300,7 @@ def slits(size, x_slits=0):
     A vtk assembly of the 4 corners representing the slits.
     '''
     slits = vtk.vtkAssembly()
-    corner_points = np.empty((3, 3, 4), dtype=np.float)
+    corner_points = np.empty((3, 3, 4), dtype=np.float64)
     corner_points[:, 0, 0] = [x_slits, -0.6 * size[1] / 2, -size[2] / 2]
     corner_points[:, 1, 0] = [x_slits, -size[1] / 2, -size[2] / 2]
     corner_points[:, 2, 0] = [x_slits, -size[1] / 2, -0.6 * size[2] / 2]

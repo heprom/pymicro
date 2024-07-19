@@ -583,6 +583,7 @@ class Orientation:
                         the_axis_xyz = np.dot(oi.T, the_axis)
         return the_angle, the_axis, the_axis_xyz
 
+# Premiere implementation du calcul de desorientation utilisant les quaternions
     def Q_disorientation(self, orientation, crystal_structure=Symmetry.triclinic):
         
         the_angle = np.pi
@@ -595,10 +596,8 @@ class Orientation:
                 for i in range(symmetries.shape[0]):
                     sym_i = symmetries[i]
                     oi = Q_product(Q_g2, sym_i)
-                    delta = qu2om(Q_product(Q_conjugate(oj), oi)) #A modifier pour enlever la conversion
+                    delta = qu2om(Q_product(Q_conjugate(oj), oi))
                     mis_angle = Orientation.misorientation_angle_from_delta(delta)
-                    #delta = np.array([Q_product(Q_conjugate(oj), oi)])
-                    #mis_angle = qu2ax_angle(delta)
                     if mis_angle < the_angle:
                         # now compute the misorientation axis, should check if it lies in the fundamental zone
                         mis_axis = Orientation.misorientation_axis_from_delta(delta)
@@ -606,32 +605,33 @@ class Orientation:
                         # print(mis_axis, mis_angle*180/np.pi, np.dot(oj.T, mis_axis))
                         the_angle = mis_angle
                         the_axis = mis_axis
-                        the_axis_xyz = np.dot((qu2om(oi)).T, the_axis) #A modifier imperativement pour enlever la conversion et le produit matriciel
+                        the_axis_xyz = np.dot((qu2om(oi)).T, the_axis) 
         return the_angle, the_axis, the_axis_xyz
 
-
+# Version vectorisee du calcul de desorientation utilisant les quaternion
     def Q_disorientation_vect(self, orientation, crystal_structure=Symmetry.triclinic):
         the_angle = np.pi
         symmetries = crystal_structure.Q_symmetry_operators()
         (Q_gA, Q_gB) = (self.quaternion(), orientation.quaternion())  
         for (Q_g1, Q_g2) in [(Q_gA, Q_gB), (Q_gB, Q_gA)]:
-            oj = Q_product_semivect_left(Q_g1, symmetries)
+            oj = Q_product_semivect_left(Q_g1, symmetries) #crystal symetry operators are left applied
             oi = Q_product_semivect_left(Q_g2, symmetries)
-            mis_angles = qu2ax_angle(Q_product_vect(Q_conjugate_vect(oj), oi))
-            the_angle = np.min(mis_angles)
-        the_axis = None
+            mis_angles = qu2ax_angle(Q_product_vect(Q_conjugate_vect(oj), oi)) #compute the misorientation angle
+            the_angle = np.min(mis_angles) #take the minimum to have the final misorientation angle
+        the_axis = None #there is no need to compute the_axis and the_axis_xyz in segment_grains
         the_axis_xyz = None
         return the_angle, the_axis, the_axis_xyz
     
+# Suppression de l'iteration sur Q_g1 et Q_g2, a priori inutile
     def Q_disorientation_vect_bis(self, orientation, crystal_structure=Symmetry.triclinic):
         the_angle = np.pi
         symmetries = crystal_structure.Q_symmetry_operators()
         (Q_gA, Q_gB) = (self.quaternion(), orientation.quaternion())
-        oj = Q_product_semivect_left(Q_gA, symmetries)
+        oj = Q_product_semivect_left(Q_gA, symmetries) #crystal symetry operators are left applied
         oi = Q_product_semivect_left(Q_gB, symmetries)
-        mis_angles = qu2ax_angle(Q_product_vect(Q_conjugate_vect(oj), oi))
-        the_angle = np.min(mis_angles)
-        the_axis = None
+        mis_angles = qu2ax_angle(Q_product_vect(Q_conjugate_vect(oj), oi)) #compute the misorientation angle
+        the_angle = np.min(mis_angles) #take the minimum to have the final misorientation angle
+        the_axis = None #there is no need to compute the_axis and the_axis_xyz in segment_grains
         the_axis_xyz = None
         return the_angle, the_axis, the_axis_xyz
 

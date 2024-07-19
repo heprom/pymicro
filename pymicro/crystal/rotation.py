@@ -233,11 +233,13 @@ def qu2ax_axis(q):
 
     return ax_array
 
+# Calcul vectorise de la conversion axe-angle vers quaternion, utilisant les deux fonctions precendentes
 def qu2ax_vect(q):
     angle = qu2ax_angle(q)
     axis = qu2ax_axis(q)
     return np.column_stack((axis, angle))
 
+#Vectorisation de la conversion matrice vers quaternion
 def om2qu_vect(om):
     """
     Compute the quaternion from the orientation matrix
@@ -270,6 +272,7 @@ def om2qu_vect(om):
 
     return np.array([x/np.sqrt((np.array(x)**2).sum()) for x in zip(q0, q1, q2, q3)])
 
+#Vectorisation de la conversion quaternion vers matrice
 def qu2om_vect(q):
     """
     Compute the orientation matrix from the quaternion representation.

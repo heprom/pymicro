@@ -425,7 +425,7 @@ class OimScan:
         :note: The scan reference frame settings appears not to be 
         consistent from one scan to another so the reference frame 
         can be specified as a parameter. The default value is set 
-        to 4 as this seemss to be the most common for CTF data files.
+        to 4 as this seems to be the most common for CTF data files.
 
         :raise ValueError: if the job mode is not grid.
         :param str file_path: the path to the ctf file to read.

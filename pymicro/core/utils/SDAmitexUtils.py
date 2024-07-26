@@ -235,7 +235,7 @@ class SDAmitexIO():
             Strain_dict[incr] = np.zeros(shape=eps_shape, dtype=np.double)
         # Fill strain dict with output
         for file in eps_files:
-            eps_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
+            eps_tmp,dx = SDAmitexIO.read_vtk_legacy(file, Sl)
             increment = int(incr_pattern.findall(file)[0].strip('.vtk'))
             comp_list = comp_pattern.findall(file)
             if len(comp_list) == 0:
@@ -271,7 +271,7 @@ class SDAmitexIO():
         # Get first value shape to initialize output and
         # find output_slice
         if len(sig_files) > 0:
-            sig_tmp = SDAmitexIO.read_vtk_legacy(sig_files[0])
+            sig_tmp, dx = SDAmitexIO.read_vtk_legacy(sig_files[0])
             Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
                 init_shape=sig_tmp.shape, grip_size=grip_size, grip_dim=grip_dim,
                 ext_size=ext_size)
@@ -288,7 +288,7 @@ class SDAmitexIO():
             Stress_dict[incr] = np.zeros(shape=sig_shape, dtype=np.double)
         # Fill Stress dict with output
         for file in sig_files:
-            sig_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
+            sig_tmp, dx = SDAmitexIO.read_vtk_legacy(file, Sl)
             increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
             comp_list = comp_pattern.findall(file)
             if len(comp_list) == 0:
@@ -328,7 +328,7 @@ class SDAmitexIO():
         # Get first value shape to initialize output and
         # find output_slice
         if len(varI_files) > 0:
-            varI_tmp = SDAmitexIO.read_vtk_legacy(varI_files[0])
+            varI_tmp, dx = SDAmitexIO.read_vtk_legacy(varI_files[0])
             Sl = SDAmitexIO.get_amitex_tension_test_relevant_slice(
                 init_shape=varI_tmp.shape, grip_size=grip_size,
                 grip_dim=grip_dim, ext_size=ext_size)
@@ -339,7 +339,7 @@ class SDAmitexIO():
             VarInt_dict[mat] = {}
         # Fill dict with output
         for file in varI_files:
-            varInt_tmp = SDAmitexIO.read_vtk_legacy(file, Sl)
+            varInt_tmp, dx = SDAmitexIO.read_vtk_legacy(file, Sl)
             increment = incr = int(incr_pattern.findall(file)[0].strip('.vtk'))
             comp_list = comp_pattern.findall(file)
             component = int(comp_list[0].strip('varInt'))

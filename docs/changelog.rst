@@ -1,6 +1,24 @@
 Change log history
 ==================
 
+pymicro version 0.6.1
+---------------------
+
+* change version number to 0.6.1 (Henry Proudhon)
+* various improvements and speed ups (Henry Proudhon)
+* extend lattice plot on all planes (Henry Proudhon)
+* update computation of grain equivalent diameters (2D and 3D) (Henry Proudhon)
+* new Refactor change_reference_frame method in Microstructure class (Henry Proudhon)
+* added a dictionnary to store segmentation parameters (Henry Proudhon)
+* update examples to use external data directory (Henry Proudhon)
+* Update .readthedocs.yaml (Basile Marchand)
+* Update examples to use external data directory (Basile Marchand)
+* added PyQt5 as dependency (Henry Proudhon)
+* Update conf.py to fix readthedoc build (Basile Marchand)
+* crancked up Qt version to 5 (Henry Proudhon)
+* work around mock issue to build doc (Henry Proudhon)
+* new .readthedocs.yaml file to build the documentation (Henry Proudhon)
+
 pymicro version 0.6.0
 ---------------------
 

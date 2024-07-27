@@ -14,3 +14,4 @@ scikit-learn
 requests
 pytest 
 BasicToolsFrozen
+PyQt5

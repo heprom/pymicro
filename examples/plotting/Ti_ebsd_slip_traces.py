@@ -1,7 +1,9 @@
 import os
 from pymicro.crystal.microstructure import Microstructure
 from pymicro.crystal.lattice import HklPlane
-from pymicro.examples import PYMICRO_EXAMPLES_DATA_DIR
+
+from pymicro import get_examples_data_dir
+PYMICRO_EXAMPLES_DATA_DIR = get_examples_data_dir()
 
 from matplotlib import pyplot as plt, image
 

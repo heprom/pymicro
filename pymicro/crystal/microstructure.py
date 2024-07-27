@@ -63,6 +63,9 @@ class Orientation:
         """Returns the orientation matrix in the form of a 3x3 numpy array."""
         return self._matrix
 
+    def __eq__(self, value: object) -> bool:
+        return np.allclose(self.orientation_matrix(), value.orientation_matrix())
+
     def __repr__(self):
         """Provide a string representation of the class."""
         s = 'Crystal Orientation \n-------------------'
@@ -887,7 +890,7 @@ class Orientation:
         return o
 
     @staticmethod
-    def from_amitex(data_dir='.', binary=True):
+    def from_amitex(data_dir='.', binary=True, prefix=''):
         """This methods reads the orientations from Amitex files.
 
         The orientation data is read from 6 files: N1X.bin, N1Y.bin, N1Z.bin,
@@ -896,13 +899,14 @@ class Orientation:
 
         :param str data_dir: the folder where the orientation files are located.
         :param bool binary: use binary format (True by default).
+        :param str prefix: a prefix for the file names.
         :return: a list containing instances of the `Orientation` class.
         """
         orientations = []
         n_components = []
         if binary:
-            for file_name in ['N1X.bin', 'N1Y.bin', 'N1Z.bin',
-                              'N2X.bin', 'N2Y.bin', 'N2Z.bin']:
+            for file_name in ['%sN1X.bin' % prefix, '%sN1Y.bin' % prefix, '%sN1Z.bin' % prefix,
+                              '%sN2X.bin' % prefix, '%sN2Y.bin' % prefix, '%sN2Z.bin' % prefix]:
                 with open(os.path.join(data_dir, file_name), 'rb') as f:
                     line = f.readline()
                     n = int(line.decode('utf-8').split('\n')[0])
@@ -912,8 +916,8 @@ class Orientation:
                     assert (len(n_components[-1]) == n)
         else:
             # using ascii file format
-            for file_name in ['N1X.txt', 'N1Y.txt', 'N1Z.txt',
-                              'N2X.txt', 'N2Y.txt', 'N2Z.txt']:
+            for file_name in ['%sN1X.txt' % prefix, '%sN1Y.txt' % prefix, '%sN1Z.txt' % prefix,
+                              '%sN2X.txt' % prefix, '%sN2Y.txt' % prefix, '%sN2Z.txt' % prefix]:
                 with open(os.path.join(data_dir, file_name), 'r') as f:
                     n_components.append(np.atleast_1d(np.genfromtxt(file_name)))
                 n = len(n_components[-1])
@@ -1657,7 +1661,6 @@ class Grain:
         """
         label = self.id  # we use the grain id here...
         # create vtk structure
-        from scipy import ndimage
         from vtk.util import numpy_support
         grain_size = np.shape(array)
         array_bin = (array == label).astype(np.uint8)
@@ -1774,7 +1777,6 @@ class Grain:
             with h5py.File(grain_map_path, 'r') as f:
                 # because how matlab writes the data, we need to swap X and Z axes in the DCT volume
                 vol = f['vol'].value.transpose(2, 1, 0)
-                from scipy import ndimage
                 grain_data = vol[ndimage.find_objects(vol == label)[0]]
                 g.volume = ndimage.measurements.sum(vol == label)
                 # create the vtk representation of the grain
@@ -2886,7 +2888,7 @@ class Microstructure(SampleData):
         lattice = self.get_phase().get_lattice()
         coords, edges, faces = lattice.get_points(origin='mid', handle_hexagonal=False)
         grain_ids = self.get_grain_ids()
-        sizes = self.get_grain_volumes()
+        grain_sizes = self.compute_grain_equivalent_diameters()  #self.get_grain_volumes()
         centers = self.get_grain_centers()
         n = self.get_number_of_grains()
 
@@ -2898,9 +2900,9 @@ class Microstructure(SampleData):
             hexahedron_order = [0, 1, 3, 2, 4, 5, 7, 6]
             for k, coord in enumerate(coords):
                 # scale coordinates with the grain size and center on the grain
-                coords_rot[k] = center + np.sqrt(size) * np.dot(om.T, coord)
+                coords_rot[k] = center + size * np.dot(om.T, coord)
                 points.InsertNextPoint(coords_rot[k])
-                Ids.InsertNextId(id_offset + hexahedron_order[k])                        
+                Ids.InsertNextId(id_offset + hexahedron_order[k])
             grid.InsertNextCell(vtk.VTK_HEXAHEDRON, Ids)
 
         # vtkPoints instance for all the vertices
@@ -2917,7 +2919,7 @@ class Microstructure(SampleData):
         for g in tqdm(self.grains, desc='creating lattice cell for all grains'):
             gid = g['idnumber']
             center = g['center']
-            size = g['volume']
+            size = self.compute_grain_equivalent_diameters(id_list=[gid])[0]  #g['volume']
             om = self.get_grain(gid).orientation.orientation_matrix()
             insert_grain_lattice_cell(grid, id_offset, om, coords, center, size)
             id_offset += len(coords)
@@ -2933,10 +2935,14 @@ class Microstructure(SampleData):
 
         from vtk.util import numpy_support
         grain_ids_array = numpy_support.numpy_to_vtk(grain_ids)
+        grain_sizes_array = numpy_support.numpy_to_vtk(grain_sizes)
         if lattice.get_symmetry() is Symmetry.hexagonal:
             grain_ids_array = numpy_support.numpy_to_vtk(np.repeat(grain_ids, 3))
+            grain_sizes_array = numpy_support.numpy_to_vtk(np.repeat(grain_sizes, 3))
         grain_ids_array.SetName('grain_ids')
+        grain_sizes_array.SetName('grain_sizes')
         grid.GetCellData().AddArray(grain_ids_array)
+        grid.GetCellData().AddArray(grain_sizes_array)
 
         # now add the created mesh to the microstructure
         from BasicTools.Containers import vtkBridge
@@ -3420,7 +3426,6 @@ class Microstructure(SampleData):
             connectivity by default).
         :return: the dilated array.
         """
-        from scipy import ndimage
         if struct is None:
             struct = ndimage.morphology.generate_binary_structure(array.ndim, 1)
         assert struct.ndim == array.ndim
@@ -3459,7 +3464,7 @@ class Microstructure(SampleData):
                 zstart[zstart < 0] = 0
                 zend[zend > array.shape[2] - 1] = array.shape[2] - 1
 
-            dilation = np.zeros_like(X).astype(np.int16)
+            dilation = np.zeros_like(X).astype(array.dtype)#np.int16)
             print('%d voxels to replace' % len(X))
             for i in range(len(X)):
                 if array.ndim == 2:
@@ -3694,7 +3699,7 @@ class Microstructure(SampleData):
             print('updating grain geometry')
             micro_crop.recompute_grain_bounding_boxes(verbose)
             micro_crop.recompute_grain_centers(verbose)
-            micro_crop.recompute_grain_volumes(verbose)
+            micro_crop.recompute_grain_volumes()
         return micro_crop
 
     def sync_grain_table_with_grain_map(self, sync_geometry=False):
@@ -3747,7 +3752,7 @@ class Microstructure(SampleData):
             new_ids = self.get_grain_ids()[np.argsort(sizes)][::-1]
         else:
             new_ids = range(1, len(np.unique(grain_map)) + 1)
-        for i, g in enumerate(self.grains):
+        for i, g in enumerate(tqdm(self.grains, desc='renumbering grains')):
             gid = g['idnumber']
             if not gid > 0:
                 # only renumber positive grain ids
@@ -3838,12 +3843,24 @@ class Microstructure(SampleData):
     def compute_grain_equivalent_diameters(self, id_list=None):
         """Compute the equivalent diameter for a list of grains.
 
+        The equivalent diameter is defined as the diameter of a sphere with
+        the same volume as the grain if 3D or the diameter of the circle with
+        the same surface as the grain in 2D.
+
+        .. math::
+
+          D_{eq} = \left(\dfrac{6V}{\pi}\right)^{1/3}
+
         :param list id_list: the list of the grain ids to include (compute
             for all grains by default).
         :return: a 1D numpy array of the grain diameters.
         """
-        grain_equivalent_diameters = 2 * (3 * self.get_grain_volumes(id_list) /
-                                          4 / np.pi) ** (1 / 3)
+        volumes = self.get_grain_volumes(id_list)
+        location = self._get_parent_name(self.active_grain_map)
+        if self._get_group_type('CellData') == '2DImage':
+            grain_equivalent_diameters = (4 * volumes / np.pi) ** (1 / 2)
+        else:
+            grain_equivalent_diameters = (6 * volumes / np.pi) ** (1 / 3)
         return grain_equivalent_diameters
 
     def compute_grain_sphericities(self, id_list=None):
@@ -3892,7 +3909,7 @@ class Microstructure(SampleData):
                                         for prop in props])
         return grain_aspect_ratios
 
-    def recompute_grain_volumes(self, verbose=False):
+    def recompute_grain_volumes(self):
         """Compute the volume of all grains in the microstructure.
 
         Each grain volume is computed using the grain map. The value is
@@ -3905,25 +3922,19 @@ class Microstructure(SampleData):
           A grain map need to be associated with this microstructure instance
           for the method to run.
 
-        :param bool verbose: flag for verbose mode.
         :return: a 1D array with all grain volumes.
         """
         if self._is_empty('grain_map'):
             print('warning: needs a grain map to recompute the volumes '
                   'of the grains')
             return
-        for g in self.grains:
-            try:
-                vol = self.compute_grain_volume(g['idnumber'])
-            except ValueError:
-                print('skipping grain %d' % g['idnumber'])
-                continue
-            if verbose:
-                print('grain {}, computed volume is {}'.format(g['idnumber'],
-                                                               vol))
-            g['volume'] = vol
-            g.update()
-        self.grains.flush()
+        voxel_size = self.get_attribute('spacing', 'CellData')
+        labels = self.get_grain_map()
+        mask = labels > 0
+        volumes = ndimage.sum_labels(mask, 
+                                     labels, 
+                                     index=self.get_grain_ids()) * np.prod(voxel_size)
+        self.set_volumes(volumes)
         return self.get_grain_volumes()
 
     def recompute_grain_centers(self, verbose=False):
@@ -3945,18 +3956,20 @@ class Microstructure(SampleData):
             print('warning: need a grain map to recompute the center of mass'
                   ' of the grains')
             return
-        for g in self.grains:
-            try:
-                com = self.compute_grain_center(g['idnumber'])
-            except ValueError:
-                print('skipping grain %d' % g['idnumber'])
-                continue
-            if verbose:
-                print('grain %d center: %.3f, %.3f, %.3f'
-                      % (g['idnumber'], com[0], com[1], com[2]))
-            g['center'] = com
-            g.update()
-        self.grains.flush()
+
+        origin = self.get_attribute('origin', 'CellData')
+        if len(origin) == 2:
+            origin = np.concatenate((origin, np.array([0])), axis=0)
+        voxel_size = self.get_attribute('spacing', 'CellData')
+        if len(voxel_size) == 2:
+            voxel_size = np.concatenate((voxel_size, np.array([0])), axis=0)
+
+        grain_map = self.get_grain_map()
+        centers = ndimage.center_of_mass(grain_map > 0, labels=grain_map, index=self.get_grain_ids())
+        # convert to mm
+        centers = origin + (centers + np.array([0.5, 0.5, 0.5])) * voxel_size
+        #centers = (centers + np.array([0.5, 0.5, 0.5]) - 0.5 * np.array(grain_map.shape)) * voxel_size
+        self.set_centers(centers)
         return self.get_grain_centers()
 
     def recompute_grain_bounding_boxes(self, verbose=False):
@@ -4081,6 +4094,115 @@ class Microstructure(SampleData):
         self.recompute_grain_centers()
         self.recompute_grain_volumes()
         return
+
+    def is_unitary_vector(v):
+        # v must be a list or a numpy array with all elements being -1, 0, or 1
+        if isinstance(v, (list, np.ndarray)) and all(x in {-1, 0, 1} for x in v):
+            # check if there's exactly one non-zero element
+            return sum(abs(x) for x in v) == 1
+        return False
+        
+    def change_reference_frame(self, new_x, new_y, cell_data='CellData', in_place=True, suffix='_XYZ'):
+        """Change teh local reference frame of this Microstructure instance.
+
+        Args:
+            new_x (_type_): _description_
+            new_y (_type_): _description_
+            cell_data (str, optional): _description_. Defaults to 'CellData'.
+            in_place (bool, optional): _description_. Defaults to True.
+            suffix (str, optional): _description_. Defaults to '_XYZ'.
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
+        """
+        # input check
+        if not np.all([Microstructure.is_unitary_vector(v) for v in[new_x, new_y]]) or np.dot(new_x, new_y) != 0:
+            raise ValueError("input vectors must be unitary, aligned with the cartesian axes and prependicular, please correct your input")
+        is_2d = self._get_group_type(cell_data) == '2DImage'
+        if in_place is True and is_2d:
+            print('warning: cannot change reference frame in place for 2DImage, creating a new Microstructure instance')
+            in_place = False
+        new_z = np.cross(new_x, new_y)
+        T = np.array([new_x, new_y, new_z])
+        assert np.linalg.det(T) == 1.0
+        swap_indices = np.argwhere(new_x)[0][0], np.argwhere(new_y)[0][0], np.argwhere(new_z)[0][0]
+        print('swap indices are', swap_indices)
+        # find which direction needs to be reversed
+        flip_indices = []
+        for i, v in enumerate([new_x, new_y, new_z]):
+            if np.dot(v, np.abs(v)) < 0:
+                flip_indices.append(i)
+
+        if not in_place:
+            # create the new Microstructure instance if needed
+            file_xyz = os.path.splitext(self.h5_file)[0] + suffix + '.h5'
+            print('new microstructure file name is', file_xyz)
+            if is_2d:
+                # create a blank new file which will not be 2D anymore
+                m2 = Microstructure(filename=file_xyz, 
+                                    name=self.get_sample_name() + suffix, 
+                                    phase=self.get_phase_list(),
+                                    autodelete=False, overwrite_hdf5=True)
+            else:
+                m2 = Microstructure.copy_sample(self.h5_path, file_xyz, overwrite=True, get_object=True, autodelete=False)
+        else:
+            m2 = self
+        grain_map_xyz = self.get_grain_map().transpose(swap_indices)
+        print('flip indices are', flip_indices)
+        if len(flip_indices) > 0:
+            grain_map_xyz = np.flip(grain_map_xyz, axis=flip_indices)
+        m2.set_grain_map(grain_map_xyz, voxel_size=self.get_voxel_size())
+        print('new grain_map has shape', m2.get_grain_map().shape)
+        m2.sync_grain_table_with_grain_map(sync_geometry=True)
+        
+        # rotate grain orientations
+        rods = self.get_grain_rodrigues()
+        rods_xyz = np.empty_like(rods)
+        for i in range(len(rods)):
+            o = Orientation.from_rodrigues(rods[i])
+            g_xyz = np.dot(o.orientation_matrix(), T.T)  # move to new local frame
+            rods_xyz[i] = Orientation(g_xyz).rod
+        m2.set_orientations(rods_xyz)
+
+        # rotate all the fields in CellData
+        image_group = self.get_node(cell_data)
+        field_index_path = '%s/Field_index' % image_group._v_pathname
+        field_list = self.get_node(field_index_path)
+        time.sleep(0.2)
+        for name in tqdm(field_list, desc='rotating fields'):
+            field_name = name.decode('utf-8')
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
+                if self._get_group_type('CellData') == '2DImage':
+                    field = np.expand_dims(field, axis=2)
+                if field.ndim == 4:
+                    field_xyz = field.transpose(swap_indices + (-1,))
+                else:
+                    field_xyz = field.transpose(swap_indices)
+                if len(flip_indices) > 0:
+                    field_xyz = np.flip(field_xyz, axis=flip_indices)
+                m2.add_field(gridname=cell_data,
+                            fieldname=field_name,
+                            array=field_xyz,
+                            replace=True)
+        
+        # also rotate the orientation map
+        if not m2._is_empty('orientation_map'):
+            orientation_map_xyz = m2.get_orientation_map()
+            indices = np.where(m2.get_phase_map() > 0)
+            time.sleep(0.2)
+            for i, j, k in tqdm(zip(*indices), total=len(indices[0]), 
+                                desc='changing orientation map reference frame'):
+                o_tsl = Orientation.from_rodrigues(orientation_map_xyz[i, j, k, :])
+                g_xyz = np.dot(o_tsl.orientation_matrix(), T.T)  # move to XYZ local frame
+                orientation_map_xyz[i, j, k, :] = Orientation(g_xyz).rod
+            m2.set_orientation_map(orientation_map_xyz)
+        
+        if not in_place:
+           return m2
 
     def graph(self):
         """Create the graph of this microstructure.
@@ -4276,6 +4398,9 @@ class Microstructure(SampleData):
             n2z = open('%s_N2Z.%s' % (self.get_sample_name(), ext), 'ab')
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
+                # handle hexagonal case
+                if self.get_phase(g['phase']).get_symmetry() == Symmetry.hexagonal:
+                    o = Orientation.from_euler(o.euler - np.array([0, 0, 30]))
                 g = o.orientation_matrix()
                 n1 = g[0]  # first row
                 n2 = g[1]  # second row
@@ -4288,6 +4413,8 @@ class Microstructure(SampleData):
         else:
             for g in self.grains:
                 o = Orientation.from_rodrigues(g['orientation'])
+                if self.get_phase(g['phase']).get_symmetry() == Symmetry.hexagonal:
+                    o = Orientation.from_euler(o.euler - np.array([0, 0, 30]))
                 g = o.orientation_matrix()
                 n1 = g[0]  # first row
                 n2 = g[1]  # second row
@@ -4434,10 +4561,11 @@ class Microstructure(SampleData):
         if not self._is_empty('grain_map'):
             # convert the grain map to vtk file
             from vtk.util import numpy_support
-            # TODO adapt to 2D grain maps
-            # TODO build a continuous grain map for amitex
-            # grain_ids = self.get_grain_map()
-            grain_ids = self.renumber_grains(only_grain_map=True)
+            # make sure we have a continuous grain map for amitex
+            if not self.get_grain_ids().tolist() == list(range(1, self.get_number_of_grains() + 1)):
+                print('note: grain ids are not continuous and starting at 1, renumbering them')
+                self.renumber_grains(only_grain_map=True)
+            grain_ids = self.get_grain_map()
             if not self._is_empty('phase_map'):
                 # use the phase map for the material ids
                 material_ids = self.get_phase_map().astype(grain_ids.dtype)
@@ -4984,7 +5112,10 @@ class Microstructure(SampleData):
             assert np.prod(dims) == data.shape[0]
             micro.set_grain_map(data.reshape(dims[::-1]).transpose(2, 1, 0),
                                 voxel_size=voxel_size)  # swap X/Z axes
-            micro.set_origin('CellData', origin)
+            # update the origin grabbed from neper with the shape of the data
+            location = micro._get_parent_name(micro.active_grain_map)
+            origin = -0.5 * micro.get_voxel_size() * np.array(micro.get_grain_map().shape)
+            micro.set_origin(location, origin)
             print('updating grain data table and grain geometry')
             micro.sync_grain_table_with_grain_map(sync_geometry=True)
             # if necessary set the phase_map
@@ -5234,6 +5365,9 @@ class Microstructure(SampleData):
                 x1, x2, y1, y2, z1, z2 = roi
                 grain_map = grain_map[x1:x2, y1:y2, z1:z2]
             micro.set_grain_map(grain_map, voxel_size)
+            location = micro._get_parent_name(micro.active_grain_map)
+            origin = -0.5 * micro.get_voxel_size() * np.array(micro.get_grain_map().shape)
+            micro.set_origin(location, origin)
             if verbose:
                 print('loaded grain ids volume with shape: {}'.format(
                     micro.get_grain_map().shape))
@@ -5343,7 +5477,8 @@ class Microstructure(SampleData):
             return micro
 
     @staticmethod
-    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, phase_list=None, ref_frame_id=2, grain_ids=None):
+    def from_ebsd(file_path, roi=None, ds=1, tol=5., min_ci=0.2, min_size=0.0, 
+                  phase_list=None, ref_frame_id=2, grain_ids=None):
         """"Create a microstructure from an EBSD scan.
 
         :param str file_path: the path to the file to read.
@@ -5381,7 +5516,10 @@ class Microstructure(SampleData):
         # check if we use an existing segmentation
         if grain_ids is None:
             # segment the grains
-            grain_ids = scan.segment_grains(tol=tol, min_ci=min_ci)
+            scan.seg_params['tol'] = tol
+            scan.seg_params['min_ci'] = min_ci
+            scan.seg_params['min_size'] = min_size
+            grain_ids = scan.segment_grains()
         else:
             print('using existing segmentation containing %d grains, size is ' % 
                   len(np.unique(grain_ids)), grain_ids.shape)
@@ -5897,7 +6035,7 @@ class Microstructure(SampleData):
             print('updating grain geometry')
             micro_resampled.recompute_grain_bounding_boxes(verbose)
             micro_resampled.recompute_grain_centers(verbose)
-            micro_resampled.recompute_grain_volumes(verbose)
+            micro_resampled.recompute_grain_volumes()
             
         return micro_resampled
 

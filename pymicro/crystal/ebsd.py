@@ -116,6 +116,7 @@ class OimScan:
         self.init_arrays()
         self.grain_ids = None
         self.god = None
+        self.seg_params = {'tol': 5., 'min_ci': 0.2, 'min_size': 0.}
 
     def __repr__(self):
         """Provide a string representation of the class."""
@@ -424,7 +425,7 @@ class OimScan:
         :note: The scan reference frame settings appears not to be 
         consistent from one scan to another so the reference frame 
         can be specified as a parameter. The default value is set 
-        to 4 as this seemss to be the most common for CTF data files.
+        to 4 as this seems to be the most common for CTF data files.
 
         :raise ValueError: if the job mode is not grid.
         :param str file_path: the path to the ctf file to read.
@@ -588,9 +589,10 @@ class OimScan:
                                 (scan.rows, scan.cols)).transpose(1, 0)
             scan.iq = np.reshape(data['IQ'], (scan.rows, scan.cols)).transpose(1, 0)
             scan.ci = np.reshape(data['CI'], (scan.rows, scan.cols)).transpose(1, 0)
-            # the phase value is decreased by 1 wrt the phase_id in the list
             scan.phase = np.reshape(data['Phase'],
                                     (scan.rows, scan.cols)).transpose(1, 0)
+            # check if we need to fix the phase array
+            scan.fix_phase_array()            
         return scan
 
     def get_phase(self, phase_id=1):
@@ -642,7 +644,7 @@ class OimScan:
                     self.ipf010[i, j] = [0., 0., 0.]
                     self.ipf100[i, j] = [0., 0., 0.]
 
-    def segment_grains(self, tol=5., min_ci=0.2):
+    def segment_grains(self, **kwargs):
         """Segment the grains based on the euler angle maps.
 
         The segmentation is carried out using a region growing algorithm based
@@ -662,22 +664,33 @@ class OimScan:
           This function does not account yet for multiple phases. Grains should
           be created separately for each crystallographic phase.
 
-        :param float tol: misorientation tolerance in degrees.
-        :param float min_ci: minimum confidence index for a pixel to be a valid
+        The segmentation parameters can be tuned using the following keywords:
+         * 'tol': misorientation tolerance in degrees.
+         * 'min_ci': minimum confidence index for a pixel to be a valid
             EBSD measurement.
+         * 'min_size': minimum size for a grain to be kept.
+         
+        :param dict **kwargs: parameters for the segmentation that override the 
+        default values.
         :raise ValueError: if no phase is present in the scan.
         :return: a numpy array of the grain labels.
         """
         if not len(self.phase_list) > 0:
             raise ValueError('at least one phase must be present in this EBSD '
                              'scan to segment the grains')
+        # get the segmentation parameters
+        seg_params = self.seg_params.copy()
+        seg_params.update(kwargs)
+        print(f"grain segmentation for EBSD scan, "
+              f"misorientation tolerance={seg_params['tol']:.1f}, "
+              f"minimum confidence index={seg_params['min_ci']:.1f}, "
+              f"minimum grain size={seg_params['min_size']:.1f}")
+
         # segment the grains
-        print('grain segmentation for EBSD scan, misorientation tolerance={:.1f}, '
-              'minimum confidence index={:.1f}'.format(tol, min_ci))
         grain_ids = np.zeros_like(self.iq, dtype='int')
         grain_ids += -1  # mark all pixels as non assigned
         # start by assigning bad pixel to grain 0
-        grain_ids[self.ci <= min_ci] = 0
+        grain_ids[self.ci <= seg_params['min_ci']] = 0
         # grains with phase 0 are also not taken into account
         grain_ids[self.phase == 0] = 0
 
@@ -717,17 +730,32 @@ class OimScan:
                         # check misorientation
                         o_neighbor = Orientation.from_euler(np.degrees(self.euler[neighbor]))
                         mis, _, _ = o.disorientation(o_neighbor, crystal_structure=sym)
-                        if mis * 180 / np.pi < tol:
+                        if mis * 180 / np.pi < seg_params['tol']:
                             # add to this grain
                             grain_ids[neighbor] = n_grains
                             # add to the list of candidates
                             candidates.append(neighbor)
                     progress = 100 * np.sum(grain_ids >= 0) / (self.cols * self.rows)
             print('segmentation progress: {0:.2f} %'.format(progress), end='\r')
-        print('\n%d grains were segmented' % len(np.unique(grain_ids)))
         # assign grain_ids array to the scan
         self.grain_ids = grain_ids
-        return grain_ids
+        # remove small grains if needed
+        if seg_params['min_size'] > 0.:
+            self.remove_small_grains(seg_params['min_size'])
+        print('\n%d grains were segmented' % len(np.unique(grain_ids)))
+        return self.grain_ids
+
+    def remove_small_grains(self, min_size):
+        """Remove small grains from the grain_ids array.
+
+        :param numpy.ndarray grain_ids: the grain_ids array.
+        :param int min_size: the minimum size for a grain to be kept.
+        :return: the updated grain_ids array.
+        """
+        unique_ids, counts = np.unique(self.grain_ids, return_counts=True)
+        small_grains = unique_ids[counts < min_size]
+        for grain_id in small_grains:
+            self.grain_ids[self.grain_ids == grain_id] = 0
 
     @staticmethod
     def edax_reference_frame(coord_system_id=2):

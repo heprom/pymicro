@@ -2,7 +2,9 @@ import os
 from pymicro.crystal.ebsd import OimScan, OimPhase
 from pymicro.crystal.lattice import Lattice
 from matplotlib import pyplot as plt, cm, image
-from config import PYMICRO_EXAMPLES_DATA_DIR
+
+from pymicro import get_examples_data_dir # import file directory path
+PYMICRO_EXAMPLES_DATA_DIR = get_examples_data_dir() # get the file directory path
 
 file_path = os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'ebsd_ti_beta_crack.osc')
 scan = OimScan.from_file(file_path)

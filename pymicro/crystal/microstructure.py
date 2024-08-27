@@ -2682,7 +2682,7 @@ class Microstructure(SampleData):
             if self.get_number_of_grains() > 0:
                 min_id = max(self.get_grain_ids()) + 1
             else:
-                min_id = 0
+                min_id = 1
             grain_ids = range(min_id, min_id + len(orientation_list))
         if len(grain_ids) > 0:
             s = 's' if len(grain_ids) > 1 else ''
@@ -2945,7 +2945,7 @@ class Microstructure(SampleData):
         grid.GetCellData().AddArray(grain_sizes_array)
 
         # now add the created mesh to the microstructure
-        from BasicTools.Containers import vtkBridge
+        from BasicTools.Bridges import vtkBridge
         mesh = vtkBridge.VtkToMesh(grid)
         self.add_mesh(mesh_object=mesh, location='/MeshData', meshname='grain_lattices',
                       indexname='mesh_grain_lattices', replace=True)
@@ -2994,11 +2994,10 @@ class Microstructure(SampleData):
         the grain and the resulting misorientation is assigned to the pixel.
 
         A grain ids list can be used to restrict the grains where to compute
-        the orientation deviation (the number of grains in the list must be 256
-        maximum). By default, this method uses the mean orientation in the
-        GrainDataTable but the mean orientation can also be recomputed from the
-        orientation map and grain map by activating the flag
-        `recompute_mean_orientation`.
+        the orientation deviation. By default, this method uses the mean 
+        orientation in the GrainDataTable but the mean orientation can also 
+        be recomputed from the orientation map and grain map by activating 
+        the flag `recompute_mean_orientation`.
 
         .. note::
 
@@ -3011,7 +3010,7 @@ class Microstructure(SampleData):
         orientation is recalculated from the orientatin map instead of using
         the value in the `GrainDataTable`.
         :param bool store: If `True`, store the grain orientation deviation map
-        in the `CellData` group, with name `grain_orientation_deviation`.
+        in the group of the active grain map, with name `grain_orientation_deviation`.
         """
         if self._is_empty('grain_map'):
             print('no grain map found, please add a grain map to your data set')
@@ -3023,13 +3022,8 @@ class Microstructure(SampleData):
         print('grain ids shape', grain_ids.shape)
         orientation_map = self.get_orientation_map()
         print('orientation map shape', orientation_map.shape)
-        # assume only one phase
-        if self.get_number_of_phases() > 1:
-            print('error, multiple phases not yet supported')
-            return None
-        sym = self.get_phase().get_symmetry()
         god = np.zeros_like(grain_ids, dtype=float)
-        if not id_list:
+        if id_list is None:
             id_list = np.unique(self.get_ids_from_grain_map())
         if not recompute_mean_orientation:
             # verify that all required grain ids are present in the GrainDataTable
@@ -3042,34 +3036,33 @@ class Microstructure(SampleData):
                       'list of grains using the argument `id_list`.')
             else:
                 print('all grains are present in the GrainDataTable')
-        for index, gid in enumerate(id_list):
-            if gid < 1:
-                continue
-            progress = 100 * index / len(id_list)
-            print('GOD computation progress: {:.2f} % (grain {:d})'.format(progress, gid), end='\r')
+        for g in tqdm(self.grains[np.isin(self.get_grain_ids(), id_list)], desc='computing GrOD'):
+            sym = self.get_phase(g['phase']).get_symmetry()
+            """
             # we use grain bounding boxes to speed up calculations
-            bb = self.get_grain_bounding_boxes(id_list=[gid])[0]
+            bb = g['bounding_box']
             grain_map = self.get_grain_map()[bb[0][0]:bb[0][1],
                                              bb[1][0]:bb[1][1],
                                              bb[2][0]:bb[2][1]]
-            indices = np.where(grain_map == gid)
+            """
+            indices = np.where(grain_ids == g['idnumber'])
             if recompute_mean_orientation:
                 # compute the mean orientation of this grain
+                """
                 rods_gid = np.squeeze(orientation_map[bb[0][0]:bb[0][1],
                                                       bb[1][0]:bb[1][1],
                                                       bb[2][0]:bb[2][1]][grain_map == gid])
                 #print('\nrods_gid shape', rods_gid.shape)
-                o = Orientation.compute_mean_orientation(rods_gid, symmetry=sym)
+                """
+                o = Orientation.compute_mean_orientation(orientation_map[indices], symmetry=sym)
             else:
-                o = self.get_grain(gid).orientation
-                #print('mean grain orientation:', o.rod)
+                o = Orientation.from_rodrigues(g['orientation'])
             # now compute the orientation deviation for each pixel of the grain
-            for i, j, k in zip(indices[0], indices[1], indices[2]):
-                ii, jj, kk = bb[0][0] + i, bb[1][0] + j, bb[2][0] + k
+            for ii, jj, kk in zip(indices[0], indices[1], indices[2]):
+                #ii, jj, kk = bb[0][0] + i, bb[1][0] + j, bb[2][0] + k
                 rod_ijk = orientation_map[ii, jj, kk, :]
                 o_ijk = Orientation.from_rodrigues(rod_ijk)
                 god[ii, jj, kk] = np.degrees(o.disorientation(o_ijk, crystal_structure=sym)[0])
-        print('GOD computation progress: 100.00 %')
         if store:
             # pick the location of the grain map to add the new field
             location = self._get_parent_name(self.active_grain_map)
@@ -4203,95 +4196,6 @@ class Microstructure(SampleData):
         
         if not in_place:
            return m2
-
-    def graph(self):
-        """Create the graph of this microstructure.
-
-        This method process a `Microstructure` instance using a Region Adgency
-        Graph built with the crystal misorientation between neighbors as weights.
-        The graph has a node per grain and a connection between neighboring
-        grains of the same phase. The misorientation angle is attach to each edge.
-        
-        :return rag: the region adjency graph of this microstructure.
-        """
-        try:
-            from skimage.future import graph
-        except ImportError:
-            from skimage import graph
-
-        print('build the region agency graph for this microstructure')
-        rag = graph.RAG(self.get_grain_map(), connectivity=1)
-
-        # remove node and connections to the background
-        if 0 in rag.nodes:
-            rag.remove_node(0)
-
-        # get the grain infos
-        grain_ids = self.get_grain_ids()
-        rodrigues = self.get_grain_rodrigues()
-        centers = self.get_grain_centers()
-        volumes = self.get_grain_volumes()
-        phases = self.grains[:]['phase']
-        for grain_id, d in rag.nodes(data=True):
-            d['label'] = [grain_id]
-            index = grain_ids.tolist().index(grain_id)
-            d['rod'] = rodrigues[index]
-            d['center'] = centers[index]
-            d['volume'] = volumes[index]
-            d['phase'] = phases[index]
-
-        # assign grain misorientation between neighbors to each edge of the graph
-        for x, y, d in rag.edges(data=True):
-            if rag.nodes[x]['phase'] != rag.nodes[y]['phase']:
-                # skip edge between neighboring grains of different phases
-                continue
-            sym = self.get_phase(phase_id=rag.nodes[x]['phase']).get_symmetry()
-            o_x = Orientation.from_rodrigues(rag.nodes[x]['rod'])
-            o_y = Orientation.from_rodrigues(rag.nodes[y]['rod'])
-            mis = np.degrees(o_x.disorientation(o_y, crystal_structure=sym)[0])
-            d['misorientation'] = mis
-        
-        return rag
-
-    def segment_mtr(self, labels_seg=None, mis_thr=20., min_area=500, store=False):
-        """Segment micro-textured regions (MTR).
-
-        This method process a `Microstructure` instance to segment the MTR
-        with the specified parameters.
-
-        :param ndarray labels_seg: a pre-segmentation of the grain map, the full
-        grain map will be used if not specified.
-        :param float mis_thr: threshold in misorientation used to cut the graph.
-        :param int min_area: minimum area used to define a MTR.
-        :param bool store: flag to store the segmented array in the microstructure.
-        :return mtr_labels: array with the labels of the segmented regions.
-        """
-        rag_seg = self.graph()
-
-        # cut our graph with the misorientation threshold
-        rag = rag_seg.copy()
-        edges_to_remove = [(x, y) for x, y, d in rag.edges(data=True)
-                           if d['misorientation'] >= mis_thr]
-        rag.remove_edges_from(edges_to_remove)
-
-        import networkx as nx
-        comps = nx.connected_components(rag)
-        map_array = np.arange(labels_seg.max() + 1, dtype=labels_seg.dtype)
-        for i, nodes in enumerate(comps):
-            # compute area of this component
-            area = np.sum(np.isin(labels_seg, list(nodes)))
-            if area < min_area:
-                # ignore small MTR (simply assign them to label zero)
-                i = 0
-            for node in nodes:
-                for label in rag.nodes[node]['label']:
-                    map_array[label] = i
-        mtr_labels = map_array[labels_seg]
-        print('%d micro-textured regions were segmented' % len(np.unique(mtr_labels)))
-        if store:
-            self.add_field(gridname='CellData', fieldname='mtr_segmentation',
-                           array=mtr_labels, replace=True)
-        return mtr_labels
 
     @staticmethod
     def voronoi(shape=(256, 256), n=50):

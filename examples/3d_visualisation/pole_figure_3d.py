@@ -14,9 +14,8 @@ A sphere is added to show how a pole figure can be constructed.
 base_name = os.path.splitext(__file__)[0]
 s3d = Scene3D(display=False, ren_size=(800, 800), name=base_name)
 
-orientation = Orientation.from_euler(numpy.array([142.8, 32.0, 214.4]))
 pf = PoleFigure(hkl='111')
-pf.microstructure.grains.append(Grain(1, orientation))
+pf.microstructure.add_grains([[142.8, 32.0, 214.4]])
 pole_figure = pole_figure_3d(pf, radius=1.0, show_lattice=True)
 
 # add all actors to the 3d scene

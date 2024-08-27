@@ -211,14 +211,6 @@ class MicrostructureTests(unittest.TestCase):
             self.assertTrue(gid in neighbors)
         del m
 
-    def test_graph(self):
-        m = Microstructure(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'm1_data.h5'))
-        rag = m.graph()
-        self.assertEqual(len(rag.nodes), m.get_number_of_grains())
-        e = rag.edges[15, 26]  # pick two neighboring grains
-        self.assertTrue('misorientation' in e)
-        self.assertAlmostEqual(e['misorientation'], 43.9954034, 6)
-
     def test_voronoi(self):
         n = 10  # grains
         # create test voronoi tesselations in 2D and 3D

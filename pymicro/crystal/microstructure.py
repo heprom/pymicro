@@ -1693,14 +1693,14 @@ class Grain:
             grid.GetCellData().SetScalars(vtk_data_array)
             # threshold selected grain
             thresh = vtk.vtkThreshold()
-            thresh.SetLowerThreshold(0.5)
-            thresh.SetUpperThreshold(1.5)
-            thresh.Between()
-            # thresh.ThresholdBetween(label-0.5, label+0.5)
-            if vtk.vtkVersion().GetVTKMajorVersion() > 5:
-                thresh.SetInputData(grid)
+            if vtk.vtkVersion().GetVTKMajorVersion() < 10 and vtk.vtkVersion().GetVTKMinorVersion() < 1:
+                thresh.ThresholdBetween(0.5, 1.5)
             else:
-                thresh.SetInput(grid)
+                # the vtkTrheshold class API was changed in VTK 9.1
+                thresh.SetLowerThreshold(0.5)
+                thresh.SetUpperThreshold(1.5)
+                thresh.Between()
+            thresh.SetInputData(grid)
             if verbose:
                 print('thresholding label: %d' % label)
                 print(thresh.GetOutput())

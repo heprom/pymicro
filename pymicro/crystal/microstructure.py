@@ -3764,7 +3764,7 @@ class Microstructure(SampleData):
         else:
             map_name = new_map_name
         self.set_grain_map(grain_map_renum, self.get_voxel_size(),
-                           map_name=map_name)
+                            map_name=map_name)
         return
 
     def compute_grain_volume(self, gid):
@@ -4143,13 +4143,61 @@ class Microstructure(SampleData):
                 m2 = Microstructure.copy_sample(self.h5_path, file_xyz, overwrite=True, get_object=True, autodelete=False)
         else:
             m2 = self
-        grain_map_xyz = self.get_grain_map().transpose(swap_indices)
+            
+        # grain_map_xyz = self.get_grain_map()
         print('flip indices are', flip_indices)
-        if len(flip_indices) > 0:
-            grain_map_xyz = np.flip(grain_map_xyz, axis=flip_indices)
-        m2.set_grain_map(grain_map_xyz, voxel_size=self.get_voxel_size())
+        # if len(flip_indices) > 0:
+        #     grain_map_xyz = np.flip(grain_map_xyz, axis=flip_indices)
+        # m2.set_grain_map(grain_map_xyz, voxel_size=self.get_voxel_size())
+        print('old grain_map has shape', m2.get_grain_map().shape)
+        # m2.sync_grain_table_with_grain_map(sync_geometry=True)
+
+        # get names of all the fields in CellData
+        image_group = m2.get_node(cell_data)
+        fields_to_rotate = []
+        for child in image_group._v_children: 
+            if m2._is_field(child):
+                fields_to_rotate.append(child)
+        # rotate all fields in CellData
+        for fieldname in tqdm(fields_to_rotate, desc="rotating fields"):
+                field = m2.get_field(fieldname)
+                print(f"Rotating {fieldname}...")
+                if m2._get_group_type(cell_data) == '2DImage':
+                    field = np.expand_dims(field, axis=2)
+                if field.ndim == 4:
+                    field_xyz = field.transpose(swap_indices + (-1,))
+                else:
+                    field_xyz = field.transpose(swap_indices)
+                if len(flip_indices) > 0:
+                    field_xyz = np.flip(field_xyz, axis=flip_indices)
+                m2.add_field(gridname=cell_data, fieldname=fieldname,
+                            array=field_xyz, replace=True)
+        
         print('new grain_map has shape', m2.get_grain_map().shape)
         m2.sync_grain_table_with_grain_map(sync_geometry=True)
+        
+        # field_index_path = '%s/Field_index' % image_group._v_pathname
+        # field_list = self.get_node(field_index_path)
+        # print(f"Fields to rotate: {field_list}")
+        # time.sleep(0.2)
+        # for name in tqdm(field_list, desc='rotating fields'):
+        #     field_name = name.decode('utf-8')
+        #     field = self.get_field(field_name)
+        #     print(f'{field_name} is empty ? {self._is_empty(field_name)}')
+        #     if not self._is_empty(field_name):
+        #         if self._get_group_type('CellData') == '2DImage':
+        #             field = np.expand_dims(field, axis=2)
+        #         if field.ndim == 4:
+        #             field_xyz = field.transpose(swap_indices + (-1,))
+        #         else:
+        #             field_xyz = field.transpose(swap_indices)
+        #         if len(flip_indices) > 0:
+        #             field_xyz = np.flip(field_xyz, axis=flip_indices)
+                # m2.add_field(gridname=cell_data,
+                #             fieldname=field_name,
+                #             array=field_xyz,
+                #             replace=True)
+        
         
         # rotate grain orientations
         rods = self.get_grain_rodrigues()
@@ -4159,28 +4207,6 @@ class Microstructure(SampleData):
             g_xyz = np.dot(o.orientation_matrix(), T.T)  # move to new local frame
             rods_xyz[i] = Orientation(g_xyz).rod
         m2.set_orientations(rods_xyz)
-
-        # rotate all the fields in CellData
-        image_group = self.get_node(cell_data)
-        field_index_path = '%s/Field_index' % image_group._v_pathname
-        field_list = self.get_node(field_index_path)
-        time.sleep(0.2)
-        for name in tqdm(field_list, desc='rotating fields'):
-            field_name = name.decode('utf-8')
-            field = self.get_field(field_name)
-            if not self._is_empty(field_name):
-                if self._get_group_type('CellData') == '2DImage':
-                    field = np.expand_dims(field, axis=2)
-                if field.ndim == 4:
-                    field_xyz = field.transpose(swap_indices + (-1,))
-                else:
-                    field_xyz = field.transpose(swap_indices)
-                if len(flip_indices) > 0:
-                    field_xyz = np.flip(field_xyz, axis=flip_indices)
-                m2.add_field(gridname=cell_data,
-                            fieldname=field_name,
-                            array=field_xyz,
-                            replace=True)
         
         # also rotate the orientation map
         if not m2._is_empty('orientation_map'):
@@ -4195,7 +4221,7 @@ class Microstructure(SampleData):
             m2.set_orientation_map(orientation_map_xyz)
         
         if not in_place:
-           return m2
+            return m2
 
     @staticmethod
     def voronoi(shape=(256, 256), n=50):
@@ -4242,10 +4268,10 @@ class Microstructure(SampleData):
         return grain_map
 
     def to_amitex_fftp(self, binary=True, mat_file=True, algo_file=True,
-                       char_file=True, elasaniso_path='',
-                       add_grips=False, grip_size=10,
-                       grip_constants=(104100., 49440.), add_exterior=False,
-                       exterior_size=10, use_mask=False):
+                        char_file=True, elasaniso_path='',
+                        add_grips=False, grip_size=10,
+                        grip_constants=(104100., 49440.), add_exterior=False,
+                        exterior_size=10, use_mask=False):
         """Write orientation data to ascii files to prepare for FFT computation.
 
         AMITEX_FFTP can be used to compute the elastoplastic response of
@@ -4359,7 +4385,7 @@ class Microstructure(SampleData):
             # write the file
             tree = etree.ElementTree(root)
             tree.write('char.xml', xml_declaration=True, pretty_print=True,
-                       encoding='UTF-8')
+                        encoding='UTF-8')
             print('FFT loading file written in char.xml')
 
         # if required, write the material file for Amitex
@@ -4378,7 +4404,7 @@ class Microstructure(SampleData):
             # write the file
             tree = etree.ElementTree(root)
             tree.write('algo.xml', xml_declaration=True, pretty_print=True,
-                       encoding='UTF-8')
+                        encoding='UTF-8')
             print('FFT algorithm file written in algo.xml')
 
         # if required, write the material file for Amitex

@@ -159,7 +159,7 @@ class View_slice:
         elif map_name == "mask":
             map_array = m.get_mask()
         else:
-            map_array = m[map_name]
+            map_array = np.atleast_3d(m[map_name])
         # Check if slice value fits and otherwise computes half size slice
         if slice is None or slice > map_array.shape[cut_axis] - 1 or slice < 0:
             slice = map_array.shape[cut_axis] // 2

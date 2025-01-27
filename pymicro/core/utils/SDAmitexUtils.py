@@ -72,8 +72,8 @@ class SDAmitexIO():
         p = Path(std_path).absolute()
         # get pattern to find out which internal variables values are present
         # (for .zstd only)
-        pattern = re.compile('variable interne \d+')
-        idx_pattern = re.compile('\d+e')
+        pattern = re.compile('variable interne \\d+')
+        idx_pattern = re.compile('\\d+e')
         varInt_names = dict()
         # read txt content of .std or .mstd or .zstd file
         with open(p,'r') as f:
@@ -196,9 +196,9 @@ class SDAmitexIO():
         # Check if strain outputs exist
         vtk_path = Path(vtk_basename).absolute()
         # Get all names of vtk files in the directory and associeted increments
-        pattern = re.compile(vtk_path.stem+'_def\d?_\d+.vtk')
-        incr_pattern = re.compile('\d+.vtk')
-        comp_pattern = re.compile('def\d')
+        pattern = re.compile(vtk_path.stem+'_def\\d?_\\d+.vtk')
+        incr_pattern = re.compile('\\d+.vtk')
+        comp_pattern = re.compile('def\\d')
         fs_pattern = re.compile('def9')
         eps_files = []
         eps_incr = []
@@ -253,9 +253,9 @@ class SDAmitexIO():
                                  ' component value (must be one digit).')
         # Same for stress fields
         # Get all names of vtk files in the directory and associeted increments
-        pattern = re.compile(vtk_path.stem+'_sig\d?_\d+.vtk')
-        incr_pattern = re.compile('\d+.vtk')
-        comp_pattern = re.compile('sig\d')
+        pattern = re.compile(vtk_path.stem+'_sig\\d?_\\d+.vtk')
+        incr_pattern = re.compile('\\d+.vtk')
+        comp_pattern = re.compile('sig\\d')
         sig_files = []
         sig_incr = []
         for filepath in os.listdir(vtk_path.parent):
@@ -305,10 +305,10 @@ class SDAmitexIO():
                                  ' component value (must be one digit).')
         # Same for internal variables fields
         # Get all names of vtk files in the directory and associeted increments
-        pattern = re.compile(vtk_path.stem+'_M\d_varInt\d+_\d+.vtk')
-        incr_pattern = re.compile('\d+.vtk')
-        comp_pattern = re.compile('varInt\d+')
-        material_pattern = re.compile('_M\d+')
+        pattern = re.compile(vtk_path.stem+'_M\\d_varInt\\d+_\\d+.vtk')
+        incr_pattern = re.compile('\\d+.vtk')
+        comp_pattern = re.compile('varInt\\d+')
+        material_pattern = re.compile('_M\\d+')
         varI_files = []
         varI_incr = []
         varI_mat = []

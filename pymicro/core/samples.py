@@ -725,8 +725,10 @@ class SampleData:
             mesh_object = self._read_mesh_from_file(file)
         ### Create or fetch mesh group
         mesh_group = self.add_group(meshname, location, indexname, replace)
+        print(mesh_group)
+        print(mesh_group._v_pathname)
         ### empty meshes creation
-        if (mesh_object is None):
+        if mesh_object is None:
             self.add_attributes({'empty': True, 'group_type': 'emptyMesh'},
                                 mesh_group._v_pathname)
             return
@@ -743,6 +745,9 @@ class SampleData:
         self._add_nodes_elements_tags(mesh_object, mesh_group, replace,
                                       bin_fields_from_sets)
         ### Add fields if some are stored in the mesh object
+        print('before add fields')
+        print(mesh_group)
+        print(mesh_group._v_pathname)
         for field_name, field in mesh_object.nodeFields.items():
             self.add_field(gridname=mesh_group._v_pathname,
                            fieldname=field_name, array=field,

@@ -61,12 +61,22 @@ def store_graph(m: Microstructure, rag: graph.RAG):
         rag = create_graph(m)
     # create  points for each node in the graph
     points = vtk.vtkPoints()
-    # vtkUnstructuredGrid instance for all the cells
-    grid = vtk.vtkUnstructuredGrid()
+    # vtkUnstructuredGrid instance for all the line cells
+    grid = vtk.vtkPolyData()
+    #grid = vtk.vtkUnstructuredGrid()
     grid.SetPoints(points)
     for grain_id, d in rag.nodes(data=True):
         # scale coordinates with the grain size and center on the grain
         points.InsertNextPoint(d['center'])
+    lines = vtk.vtkCellArray()
+    for e in rag.edges:
+        line = vtk.vtkLine()
+        for i in range(2):
+            line.GetPointIds().SetId(i, e[i] - 1)
+        lines.InsertNextCell(line)
+    grid.SetLines(lines)
+
+    """
     # allocate memory for the cells representing the edges
     grid.Allocate(len(rag.edges), 1)
     for e in rag.edges:
@@ -74,6 +84,7 @@ def store_graph(m: Microstructure, rag: graph.RAG):
         Ids.InsertNextId(e[0] - 1)
         Ids.InsertNextId(e[1] - 1)
         grid.InsertNextCell(vtk.VTK_LINE, Ids)
+    """
     # add arrays containing useful information to the grid
     grain_ids = m.get_grain_ids()
     grain_sizes = m.compute_grain_equivalent_diameters()
@@ -81,8 +92,14 @@ def store_graph(m: Microstructure, rag: graph.RAG):
     grain_sizes_array = numpy_support.numpy_to_vtk(grain_sizes)
     grain_ids_array.SetName('grain_ids')
     grain_sizes_array.SetName('grain_sizes')
-    grid.GetCellData().AddArray(grain_ids_array)
-    grid.GetCellData().AddArray(grain_sizes_array)
+    grid.GetPointData().AddArray(grain_ids_array)
+    grid.GetPointData().AddArray(grain_sizes_array)
+
+    # write to vtp file
+    writer = vtk.vtkXMLPolyDataWriter()
+    writer.SetInputData(grid)
+    writer.SetFileName('lines.vtp')
+    writer.Write()
 
     # now add the created mesh to the microstructure
     mesh = vtkBridge.VtkToMesh(grid)

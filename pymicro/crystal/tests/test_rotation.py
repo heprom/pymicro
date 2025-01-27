@@ -69,3 +69,43 @@ class RotationTests(unittest.TestCase):
                 continue
             om = self.conversions[i][1](self.conversions[1][i](self.om))
             self.assertAlmostEqual(self.om_dist(self.om, om), 0.)
+
+
+    def test_eu2om_single_vectorized(self):
+        """Test eu2om with a single Euler angle set (shape (3,))."""
+        # Example single euler set (radians)
+        euler_single = np.array([0.1, 0.2, 0.3])
+        om_single = eu2om(euler_single)  # should be (3,3)
+
+        # Check shape
+        self.assertEqual(om_single.shape, (3, 3),
+                        msg="eu2om(single) should return shape (3,3).")
+
+        # Optionally, check that converting back to Euler matches original (within tolerance)
+        # We can re-use om2eu from the module to check round-trip error:
+        euler_back = om2eu(om_single)
+        self.assertAlmostEqual(self.euler_dist(euler_single, euler_back), 0.,
+                            msg="Round-trip conversion with single euler failed.")
+
+
+    def test_eu2om_array_vectorized(self):
+        """Test eu2om with multiple Euler angle sets (shape (n, 3))."""
+        np.random.seed(0)  # for reproducible tests
+        n = 10
+        eulers = np.random.rand(n, 3) * np.pi  # 10 random rows, each is [phi1, Phi, phi2]
+        om_array = eu2om(eulers)  # should be (10, 3, 3)
+
+        # Check shape
+        self.assertEqual(om_array.shape, (n, 3, 3),
+                        msg="eu2om(array) should return shape (n,3,3).")
+
+        # Check consistency: row-by-row, it should match single-euler usage
+        for i in range(n):
+            om_single = eu2om(eulers[i])  # shape (3,3)
+            self.assertTrue(np.allclose(om_array[i], om_single),
+                            msg=f"Row {i} of eu2om(array) differs from eu2om(single).")
+
+        # (Optional) Round-trip check for one or more rows
+        euler_back_0 = om2eu(om_array[0])
+        self.assertAlmostEqual(self.euler_dist(eulers[0], euler_back_0), 0.,
+                                msg="Round-trip conversion with euler[0] failed.")

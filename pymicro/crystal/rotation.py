@@ -82,13 +82,43 @@ def eu2ro(euler):
 
 
 def eu2om(euler):
-    c1 = np.cos(euler[0])
-    s1 = np.sin(euler[0])
-    c = np.cos(euler[1])
-    s = np.sin(euler[1])
-    c2 = np.cos(euler[2])
-    s2 = np.sin(euler[2])
-    # rotation matrix g
+    """
+    Convert Euler angles (phi, theta, psi) to rotation matrices.
+
+    Parameters
+    ----------
+    euler : array-like
+        Either a single set of Euler angles of shape (3,) or
+        an array of shape (n, 3).
+
+    Returns
+    -------
+    g : np.ndarray
+        If input is (3,), returns shape (3, 3).
+        If input is (n, 3), returns shape (n, 3, 3).
+    """
+    # Convert to a NumPy array to ensure proper indexing
+    euler = np.asarray(euler)
+
+    # Distinguish between single-vector input and multiple angles
+    if euler.ndim == 1:
+        # shape (3,) => reshape to (1,3) for vectorized math
+        euler = euler[np.newaxis, :]
+        single_input = True
+    elif euler.ndim == 2:
+        single_input = False
+    else:
+        raise ValueError("Input must be shape (3,) or (n,3).")
+
+    # Compute sines and cosines in vectorized form
+    c1 = np.cos(euler[:, 0])
+    s1 = np.sin(euler[:, 0])
+    c  = np.cos(euler[:, 1])
+    s  = np.sin(euler[:, 1])
+    c2 = np.cos(euler[:, 2])
+    s2 = np.sin(euler[:, 2])
+
+    # Each of these will have shape (n,)
     g11 = c1 * c2 - s1 * s2 * c
     g12 = s1 * c2 + c1 * s2 * c
     g13 = s2 * s
@@ -98,7 +128,19 @@ def eu2om(euler):
     g31 = s1 * s
     g32 = -c1 * s
     g33 = c
-    g = np.array([[g11, g12, g13], [g21, g22, g23], [g31, g32, g33]])
+
+    # Stack them up into an (n, 3, 3) array
+    g = np.stack([
+        np.stack([g11, g12, g13], axis=-1),
+        np.stack([g21, g22, g23], axis=-1),
+        np.stack([g31, g32, g33], axis=-1),
+    ], axis=1)
+
+    # If the original input was just one set of angles (shape (3,)),
+    # return a single 3x3 matrix instead of a (1, 3, 3).
+    if single_input:
+        g = g[0]
+
     return g
 
 

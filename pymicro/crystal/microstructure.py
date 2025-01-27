@@ -20,8 +20,7 @@ from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
-from pymicro.crystal.rotation import om2ro, ro2qu, qu2om
-from pymicro.crystal.quaternion import Quaternion
+from pymicro.crystal.rotation import om2eu, om2ro, ro2qu, eu2ro, qu2om
 from pymicro.core.samples import SampleData
 import tables
 from math import atan2, pi
@@ -55,9 +54,9 @@ class Orientation:
         """Initialization from the 9 components of the orientation matrix."""
         g = np.array(matrix, dtype=np.float64).reshape((3, 3))
         self._matrix = g
-        self.euler = Orientation.OrientationMatrix2Euler(g)
+        self.euler = om2eu(g)
         self.rod = om2ro(g)
-        self.quat = Quaternion(ro2qu(self.rod))
+        self.quat = ro2qu(self.rod)
 
     def orientation_matrix(self):
         """Returns the orientation matrix in the form of a 3x3 numpy array."""
@@ -859,20 +858,17 @@ class Orientation:
             (phi1, phi, phi2) = (euler[0] + 90, euler[1], euler[2] - 90)
         else:
             (phi1, phi, phi2) = euler
-        g = Orientation.Euler2OrientationMatrix((phi1, phi, phi2))
-        o = Orientation(g)
+        o = Orientation(eu2om([phi1, phi, phi2]))
         return o
 
     @staticmethod
     def from_rodrigues(rod):
-        g = Orientation.Rodrigues2OrientationMatrix(rod)
-        o = Orientation(g)
+        o = Orientation(ro2om(rod))
         return o
 
     @staticmethod
-    def from_Quaternion(q):
-        g = Orientation.Quaternion2OrientationMatrix(q)
-        o = Orientation(g)
+    def from_quaternion(q):
+        o = Orientation(qu2om(q))
         return o
 
     @staticmethod
@@ -1003,351 +999,6 @@ class Orientation:
         x3 = x3 / np.linalg.norm(x3)
 
         g = np.array([x1, x2, x3]).transpose()
-        return g
-
-    @staticmethod
-    def OrientationMatrix2EulerSF(g):
-        """
-        Compute the Euler angles (in degrees) from the orientation matrix
-        in a similar way as done in Mandel_crystal.c
-        """
-        tol = 0.1
-        r = np.zeros(9, dtype=np.float64)  # double precision here
-        # Z-set order for tensor is 11 22 33 12 23 13 21 32 31
-        r[0] = g[0, 0]
-        r[1] = g[1, 1]
-        r[2] = g[2, 2]
-        r[3] = g[0, 1]
-        r[4] = g[1, 2]
-        r[5] = g[0, 2]
-        r[6] = g[1, 0]
-        r[7] = g[2, 1]
-        r[8] = g[2, 0]
-        phi = np.arccos(r[2])
-        if phi == 0.:
-            phi2 = 0.
-            phi1 = np.arcsin(r[6])
-            if abs(np.cos(phi1) - r[0]) > tol:
-                phi1 = np.pi - phi1
-        else:
-            x2 = r[5] / np.sin(phi)
-            x1 = r[8] / np.sin(phi);
-            if x1 > 1.:
-                x1 = 1.
-            if x2 > 1.:
-                x2 = 1.
-            if x1 < -1.:
-                x1 = -1.
-            if x2 < -1.:
-                x2 = -1.
-            phi2 = np.arcsin(x2)
-            phi1 = np.arcsin(x1)
-            if abs(np.cos(phi2) * np.sin(phi) - r[7]) > tol:
-                phi2 = np.pi - phi2
-            if abs(np.cos(phi1) * np.sin(phi) + r[4]) > tol:
-                phi1 = np.pi - phi1
-        return np.degrees(np.array([phi1, phi, phi2]))
-
-    @staticmethod
-    def OrientationMatrix2Euler(g):
-        """
-        Compute the Euler angles from the orientation matrix.
-
-        This conversion follows the paper of Rowenhorst et al. :cite:`Rowenhorst2015`.
-        In particular when :math:`g_{33} = 1` within the machine precision,
-        there is no way to determine the values of :math:`\phi_1` and :math:`\phi_2`
-        (only their sum is defined). The convention is to attribute
-        the entire angle to :math:`\phi_1` and set :math:`\phi_2` to zero.
-
-        :param g: The 3x3 orientation matrix
-        :return: The 3 euler angles in degrees.
-        """
-        eps = np.finfo('float').eps
-        (phi1, Phi, phi2) = (0.0, 0.0, 0.0)
-        # treat special case where g[2, 2] = 1
-        if np.abs(g[2, 2]) >= 1 - eps:
-            if g[2, 2] > 0.0:
-                phi1 = np.arctan2(g[0][1], g[0][0])
-            else:
-                phi1 = -np.arctan2(-g[0][1], g[0][0])
-                Phi = np.pi
-        else:
-            Phi = np.arccos(g[2][2])
-            zeta = 1.0 / np.sqrt(1.0 - g[2][2] ** 2)
-            phi1 = np.arctan2(g[2][0] * zeta, -g[2][1] * zeta)
-            phi2 = np.arctan2(g[0][2] * zeta, g[1][2] * zeta)
-        # ensure angles are in the range [0, 2*pi]
-        if phi1 < 0.0:
-            phi1 += 2 * np.pi
-        if Phi < 0.0:
-            Phi += 2 * np.pi
-        if phi2 < 0.0:
-            phi2 += 2 * np.pi
-        return np.degrees([phi1, Phi, phi2])
-
-    @staticmethod
-    def OrientationMatrix2Rodrigues(g):
-        """
-        Compute the rodrigues vector from the orientation matrix.
-
-        :param g: The 3x3 orientation matrix representing the rotation.
-        :returns: The Rodrigues vector as a 3 components array.
-        """
-        t = g.trace() + 1
-        if np.abs(t) < np.finfo(g.dtype).eps:
-            print('warning, returning [0., 0., 0.], consider using axis, angle '
-                  'representation instead')
-            return np.zeros(3)
-        else:
-            r1 = (g[1, 2] - g[2, 1]) / t
-            r2 = (g[2, 0] - g[0, 2]) / t
-            r3 = (g[0, 1] - g[1, 0]) / t
-        return np.array([r1, r2, r3])
-
-    @staticmethod
-    def OrientationMatrix2Quaternion(g, P=1):
-        q0 = 0.5 * np.sqrt(1 + g[0, 0] + g[1, 1] + g[2, 2])
-        q1 = P * 0.5 * np.sqrt(1 + g[0, 0] - g[1, 1] - g[2, 2])
-        q2 = P * 0.5 * np.sqrt(1 - g[0, 0] + g[1, 1] - g[2, 2])
-        q3 = P * 0.5 * np.sqrt(1 - g[0, 0] - g[1, 1] + g[2, 2])
-
-        if g[2, 1] < g[1, 2]:
-            q1 = q1 * -1
-        elif g[0, 2] < g[2, 0]:
-            q2 = q2 * -1
-        elif g[1, 0] < g[0, 1]:
-            q3 = q3 * -1
-
-        q = Quaternion(np.array([q0, q1, q2, q3]), convention=P)
-        return q.quat
-
-    @staticmethod
-    def Rodrigues2OrientationMatrix(rod):
-        """
-        Compute the orientation matrix from the Rodrigues vector.
-
-        :param rod: The Rodrigues vector as a 3 components array.
-        :returns: The 3x3 orientation matrix representing the rotation.
-        """
-        r = np.linalg.norm(rod)
-        I = np.diagflat(np.ones(3))
-        if r < np.finfo(r.dtype).eps:
-            # the rodrigues vector is zero, return the identity matrix
-            return I
-        theta = 2 * np.arctan(r)
-        n = rod / r
-        omega = np.array([[0.0, n[2], -n[1]],
-                          [-n[2], 0.0, n[0]],
-                          [n[1], -n[0], 0.0]])
-        g = I + np.sin(theta) * omega + (1 - np.cos(theta)) * omega.dot(omega)
-        return g
-
-    @staticmethod
-    def Rodrigues2Axis(rod):
-        """
-        Compute the axis/angle representation from the Rodrigues vector.
-
-        :param rod: The Rodrigues vector as a 3 components array.
-        :returns: A tuple in the (axis, angle) form.
-        """
-        r = np.linalg.norm(rod)
-        axis = rod / r
-        angle = 2 * np.arctan(r)
-        return axis, angle
-
-    @staticmethod
-    def Axis2OrientationMatrix(axis, angle):
-        """
-        Compute the (passive) orientation matrix associated the rotation
-        defined by the given (axis, angle) pair.
-
-        :param axis: the rotation axis.
-        :param angle: the rotation angle (degrees).
-        :returns: the 3x3 orientation matrix.
-        """
-        omega = np.radians(angle)
-        c = np.cos(omega)
-        s = np.sin(omega)
-        g = np.array([[c + (1 - c) * axis[0] ** 2,
-                       (1 - c) * axis[0] * axis[1] + s * axis[2],
-                       (1 - c) * axis[0] * axis[2] - s * axis[1]],
-                      [(1 - c) * axis[0] * axis[1] - s * axis[2],
-                       c + (1 - c) * axis[1] ** 2,
-                       (1 - c) * axis[1] * axis[2] + s * axis[0]],
-                      [(1 - c) * axis[0] * axis[2] + s * axis[1],
-                       (1 - c) * axis[1] * axis[2] - s * axis[0],
-                       c + (1 - c) * axis[2] ** 2]])
-        return g
-
-    @staticmethod
-    def Axis2Quaternion(axis, angle, P=1):
-        """
-        Compute the quaternion associated the rotation defined by the given
-        (axis, angle) pair.
-
-        :param axis: the rotation axis.
-        :param angle: the rotation angle (degrees).
-        :param int P: convention (1 for active, -1 for passive)
-        :return: the corresponding Quaternion.
-        """
-        omega = np.radians(angle)
-        axis /= np.linalg.norm(axis)
-        q = Quaternion([np.cos(0.5 * omega), *(-P * np.sin(0.5 * omega) * axis)], convention=P)
-        return q
-
-    @staticmethod
-    def Euler2Axis(euler):
-        """Compute the (axis, angle) representation associated to this (passive)
-        rotation expressed by the Euler angles.
-
-        :param euler: 3 euler angles (in degrees).
-        :returns: a tuple containing the axis (a vector) and the angle (in radians).
-        """
-        (phi1, Phi, phi2) = np.radians(euler)
-        t = np.tan(0.5 * Phi)
-        s = 0.5 * (phi1 + phi2)
-        d = 0.5 * (phi1 - phi2)
-        tau = np.sqrt(t ** 2 + np.sin(s) ** 2)
-        alpha = 2 * np.arctan2(tau, np.cos(s))
-        if alpha > np.pi:
-            axis = np.array([-t / tau * np.cos(d), -t / tau * np.sin(d), -1 / tau * np.sin(s)])
-            angle = 2 * np.pi - alpha
-        else:
-            axis = np.array([t / tau * np.cos(d), t / tau * np.sin(d), 1 / tau * np.sin(s)])
-            angle = alpha
-        return axis, angle
-
-    @staticmethod
-    def Euler2Quaternion(euler, P=1):
-        """Compute the quaternion from the 3 euler angles (in degrees).
-
-        :param tuple euler: the 3 euler angles in degrees.
-        :param int P: +1 to compute an active quaternion (default), -1 for a passive quaternion.
-        :return: a `Quaternion` instance representing the rotation.
-        """
-        (phi1, Phi, phi2) = np.radians(euler)
-        q0 = np.cos(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
-        q1 = np.cos(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
-        q2 = np.sin(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
-        q3 = np.sin(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
-        q = Quaternion(np.array([q0, -P * q1, -P * q2, -P * q3]), convention=P)
-        if q0 < 0:
-            # the scalar part must be positive
-            q.quat = q.quat * -1
-        return q
-
-    @staticmethod
-    def Euler2Rodrigues(euler):
-        """Compute the rodrigues vector from the 3 euler angles (in degrees).
-
-        :param euler: the 3 Euler angles (in degrees).
-        :return: the rodrigues vector as a 3 components numpy array.
-        """
-        (phi1, Phi, phi2) = np.radians(euler)
-        a = 0.5 * (phi1 - phi2)
-        b = 0.5 * (phi1 + phi2)
-        r1 = np.tan(0.5 * Phi) * np.cos(a) / np.cos(b)
-        r2 = np.tan(0.5 * Phi) * np.sin(a) / np.cos(b)
-        r3 = np.tan(b)
-        return np.array([r1, r2, r3])
-
-    @staticmethod
-    def eu2ro(euler):
-        """Transform a series of euler angles into Rodrigues vectors.
-
-        :param ndarray euler: the (n, 3) shaped array of Euler angles (radians).
-        :returns: a (n, 3) array with the Rodrigues vectors.
-        """
-        if euler.ndim != 2 or euler.shape[1] != 3:
-            raise ValueError('Wrong shape for the euler array: %s -> should be (n, 3)' % euler.shape)
-        phi1, Phi, phi2 = np.squeeze(np.split(euler, 3, axis=1))
-        a = 0.5 * (phi1 - phi2)
-        b = 0.5 * (phi1 + phi2)
-        r1 = np.tan(0.5 * Phi) * np.cos(a) / np.cos(b)
-        r2 = np.tan(0.5 * Phi) * np.sin(a) / np.cos(b)
-        r3 = np.tan(b)
-        return np.array([r1, r2, r3]).T
-
-    @staticmethod
-    def Euler2OrientationMatrix(euler):
-        """Compute the orientation matrix :math:`\mathbf{g}` associated with
-        the 3 Euler angles :math:`(\phi_1, \Phi, \phi_2)`.
-
-        The matrix is calculated via (see the `euler_angles` recipe in the
-        cookbook for a detailed example):
-
-        .. math::
-
-           \mathbf{g}=\\begin{pmatrix}
-           \cos\phi_1\cos\phi_2 - \sin\phi_1\sin\phi_2\cos\Phi &
-           \sin\phi_1\cos\phi_2 + \cos\phi_1\sin\phi_2\cos\Phi &
-           \sin\phi_2\sin\Phi \\\\
-           -\cos\phi_1\sin\phi_2 - \sin\phi_1\cos\phi_2\cos\Phi &
-           -\sin\phi_1\sin\phi_2 + \cos\phi_1\cos\phi_2\cos\Phi &
-           \cos\phi_2\sin\Phi \\\\
-           \sin\phi_1\sin\Phi & -\cos\phi_1\sin\Phi & \cos\Phi \\\\
-           \end{pmatrix}
-
-        :param euler: The triplet of the Euler angles (in degrees).
-        :return g: The 3x3 orientation matrix.
-        """
-        phi1, Phi, phi2 = np.radians(euler)
-        c1 = np.cos(phi1)
-        s1 = np.sin(phi1)
-        c = np.cos(Phi)
-        s = np.sin(Phi)
-        c2 = np.cos(phi2)
-        s2 = np.sin(phi2)
-
-        # rotation matrix g
-        g11 = c1 * c2 - s1 * s2 * c
-        g12 = s1 * c2 + c1 * s2 * c
-        g13 = s2 * s
-        g21 = -c1 * s2 - s1 * c2 * c
-        g22 = -s1 * s2 + c1 * c2 * c
-        g23 = c2 * s
-        g31 = s1 * s
-        g32 = -c1 * s
-        g33 = c
-        g = np.array([[g11, g12, g13], [g21, g22, g23], [g31, g32, g33]])
-        return g
-
-    @staticmethod
-    def Quaternion2Euler(q):
-        """
-        Compute Euler angles from a Quaternion
-        :param q: Quaternion
-        :return: Euler angles (in degrees, Bunge convention)
-        """
-        P = q.convention
-        (q0, q1, q2, q3) = q.quat
-        q03 = q0 ** 2 + q3 ** 2
-        q12 = q1 ** 2 + q2 ** 2
-        chi = np.sqrt(q03 * q12)
-        if chi == 0.:
-            if q12 == 0.:
-                phi_1 = atan2(-2 * P * q0 * q3, q0 ** 2 - q3 ** 2)
-                Phi = 0.
-            else:
-                phi_1 = atan2(-2 * q1 * q2, q1 ** 2 - q2 ** 2)
-                Phi = pi
-            phi_2 = 0.
-        else:
-            phi_1 = atan2((q1 * q3 - P * q0 * q2) / chi,
-                          (-P * q0 * q1 - q2 * q3) / chi)
-            Phi = atan2(2 * chi, q03 - q12)
-            phi_2 = atan2((P * q0 * q2 + q1 * q3) / chi,
-                          (q2 * q3 - P * q0 * q1) / chi)
-        return np.degrees([phi_1, Phi, phi_2])
-
-    @staticmethod
-    def Quaternion2OrientationMatrix(q):
-        P = q.convention
-        (q0, q1, q2, q3) = q.quat
-        qbar = q0 ** 2 - q1 ** 2 - q2 ** 2 - q3 ** 2
-        g = np.array([[qbar + 2 * q1 ** 2, 2 * (q1 * q2 - P * q0 * q3), 2 * (q1 * q3 + P * q0 * q2)],
-                      [2 * (q1 * q2 + P * q0 * q3), qbar + 2 * q2 ** 2, 2 * (q2 * q3 - P * q0 * q1)],
-                      [2 * (q1 * q3 - P * q0 * q2), 2 * (q2 * q3 + P * q0 * q1), qbar + 2 * q3 ** 2]])
         return g
 
     @staticmethod
@@ -2690,7 +2341,7 @@ class Microstructure(SampleData):
         for gid, orientation in zip(grain_ids, orientation_list):
             grain['idnumber'] = gid
             if orientation_type == 'euler':
-                grain['orientation'] = Orientation.Euler2Rodrigues(orientation)
+                grain['orientation'] = eu2ro(orientation)
             elif orientation_type in ['rod', 'rodrigues']:
                 grain['orientation'] = orientation
             else:
@@ -3764,7 +3415,7 @@ class Microstructure(SampleData):
         else:
             map_name = new_map_name
         self.set_grain_map(grain_map_renum, self.get_voxel_size(),
-                            map_name=map_name)
+                           map_name=map_name)
         return
 
     def compute_grain_volume(self, gid):
@@ -4103,7 +3754,7 @@ class Microstructure(SampleData):
         .. note::
 
           The method can only handle rotations of 90 degrees at the moment.
-          
+
         Args:
             new_x (_type_): _description_
             new_y (_type_): _description_
@@ -4149,61 +3800,13 @@ class Microstructure(SampleData):
                 m2 = Microstructure.copy_sample(self.h5_path, file_xyz, overwrite=True, get_object=True, autodelete=False)
         else:
             m2 = self
-            
-        # grain_map_xyz = self.get_grain_map()
+        grain_map_xyz = self.get_grain_map().transpose(swap_indices)
         print('flip indices are', flip_indices)
-        # if len(flip_indices) > 0:
-        #     grain_map_xyz = np.flip(grain_map_xyz, axis=flip_indices)
-        # m2.set_grain_map(grain_map_xyz, voxel_size=self.get_voxel_size())
-        print('old grain_map has shape', m2.get_grain_map().shape)
-        # m2.sync_grain_table_with_grain_map(sync_geometry=True)
-
-        # get names of all the fields in CellData
-        image_group = m2.get_node(cell_data)
-        fields_to_rotate = []
-        for child in image_group._v_children: 
-            if m2._is_field(child):
-                fields_to_rotate.append(child)
-        # rotate all fields in CellData
-        for fieldname in tqdm(fields_to_rotate, desc="rotating fields"):
-                field = m2.get_field(fieldname)
-                print(f"Rotating {fieldname}...")
-                if m2._get_group_type(cell_data) == '2DImage':
-                    field = np.expand_dims(field, axis=2)
-                if field.ndim == 4:
-                    field_xyz = field.transpose(swap_indices + (-1,))
-                else:
-                    field_xyz = field.transpose(swap_indices)
-                if len(flip_indices) > 0:
-                    field_xyz = np.flip(field_xyz, axis=flip_indices)
-                m2.add_field(gridname=cell_data, fieldname=fieldname,
-                            array=field_xyz, replace=True)
-        
+        if len(flip_indices) > 0:
+            grain_map_xyz = np.flip(grain_map_xyz, axis=flip_indices)
+        m2.set_grain_map(grain_map_xyz, voxel_size=self.get_voxel_size())
         print('new grain_map has shape', m2.get_grain_map().shape)
         m2.sync_grain_table_with_grain_map(sync_geometry=True)
-        
-        # field_index_path = '%s/Field_index' % image_group._v_pathname
-        # field_list = self.get_node(field_index_path)
-        # print(f"Fields to rotate: {field_list}")
-        # time.sleep(0.2)
-        # for name in tqdm(field_list, desc='rotating fields'):
-        #     field_name = name.decode('utf-8')
-        #     field = self.get_field(field_name)
-        #     print(f'{field_name} is empty ? {self._is_empty(field_name)}')
-        #     if not self._is_empty(field_name):
-        #         if self._get_group_type('CellData') == '2DImage':
-        #             field = np.expand_dims(field, axis=2)
-        #         if field.ndim == 4:
-        #             field_xyz = field.transpose(swap_indices + (-1,))
-        #         else:
-        #             field_xyz = field.transpose(swap_indices)
-        #         if len(flip_indices) > 0:
-        #             field_xyz = np.flip(field_xyz, axis=flip_indices)
-                # m2.add_field(gridname=cell_data,
-                #             fieldname=field_name,
-                #             array=field_xyz,
-                #             replace=True)
-        
         
         # rotate grain orientations
         rods = self.get_grain_rodrigues()
@@ -4213,8 +3816,30 @@ class Microstructure(SampleData):
             g_xyz = np.dot(o.orientation_matrix(), T.T)  # move to new local frame
             rods_xyz[i] = Orientation(g_xyz).rod
         m2.set_orientations(rods_xyz)
+
+        # rotate all the fields in CellData
+        image_group = self.get_node(cell_data)
+        field_index_path = '%s/Field_index' % image_group._v_pathname
+        field_list = self.get_node(field_index_path)
+        time.sleep(0.2)
+        for name in tqdm(field_list, desc='rotating fields'):
+            field_name = name.decode('utf-8')
+            field = self.get_field(field_name)
+            if not self._is_empty(field_name):
+                if self._get_group_type('CellData') == '2DImage':
+                    field = np.expand_dims(field, axis=2)
+                if field.ndim == 4:
+                    field_xyz = field.transpose(swap_indices + (-1,))
+                else:
+                    field_xyz = field.transpose(swap_indices)
+                if len(flip_indices) > 0:
+                    field_xyz = np.flip(field_xyz, axis=flip_indices)
+                m2.add_field(gridname=cell_data,
+                            fieldname=field_name,
+                            array=field_xyz,
+                            replace=True)
         
-        # also rotate the orientation map
+        # also rotate the orientation map data
         if not m2._is_empty('orientation_map'):
             orientation_map_xyz = m2.get_orientation_map()
             indices = np.where(m2.get_phase_map() > 0)
@@ -4227,7 +3852,7 @@ class Microstructure(SampleData):
             m2.set_orientation_map(orientation_map_xyz)
         
         if not in_place:
-            return m2
+           return m2
 
     @staticmethod
     def voronoi(shape=(256, 256), n=50):
@@ -4274,10 +3899,10 @@ class Microstructure(SampleData):
         return grain_map
 
     def to_amitex_fftp(self, binary=True, mat_file=True, algo_file=True,
-                        char_file=True, elasaniso_path='',
-                        add_grips=False, grip_size=10,
-                        grip_constants=(104100., 49440.), add_exterior=False,
-                        exterior_size=10, use_mask=False):
+                       char_file=True, elasaniso_path='',
+                       add_grips=False, grip_size=10,
+                       grip_constants=(104100., 49440.), add_exterior=False,
+                       exterior_size=10, use_mask=False):
         """Write orientation data to ascii files to prepare for FFT computation.
 
         AMITEX_FFTP can be used to compute the elastoplastic response of
@@ -4391,7 +4016,7 @@ class Microstructure(SampleData):
             # write the file
             tree = etree.ElementTree(root)
             tree.write('char.xml', xml_declaration=True, pretty_print=True,
-                        encoding='UTF-8')
+                       encoding='UTF-8')
             print('FFT loading file written in char.xml')
 
         # if required, write the material file for Amitex
@@ -4410,7 +4035,7 @@ class Microstructure(SampleData):
             # write the file
             tree = etree.ElementTree(root)
             tree.write('algo.xml', xml_declaration=True, pretty_print=True,
-                        encoding='UTF-8')
+                       encoding='UTF-8')
             print('FFT algorithm file written in algo.xml')
 
         # if required, write the material file for Amitex

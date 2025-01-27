@@ -148,23 +148,18 @@ def eu2qu(euler):
     """Compute the quaternion from the 3 euler angles (in radians).
 
     :param tuple euler: the 3 euler angles in radians.
-    :return: a `Quaternion` instance representing the rotation.
+    :return: a unit quaternion representing the rotation.
     """
     (phi1, Phi, phi2) = euler
     q0 = np.cos(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
     q1 = np.cos(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
     q2 = np.sin(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
     q3 = np.sin(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
-    q = Quaternion(np.array([q0, -P * q1, -P * q2, -P * q3]), convention=P)
-    if q0 < 0:
-        # the scalar part must be positive
-        q.quat = q.quat * -1
-    # ambiguous rotation
-    if q.quat[0] < 3 * epsilon:
-        axis = upper_hemishpere_axis(q.quat[1:])
-        q.quat = np.array([0., *axis])
-    return q.quat
-
+    q = np.array([q0, -P * q1, -P * q2, -P * q3])
+    # the scalar part must be positive
+    if q[0] < 0.:
+        q *= -1 
+    return q
 
 def eu2ax(euler):
     """Compute the (axis, angle) representation associated to this (passive)
@@ -236,17 +231,52 @@ def ro2ax(rod):
 def ro2qu(rod):
     return ax2qu(ro2ax(rod))
 
+def ro2eu(rod):
+    return qu2eu(ro2qu(rod))
+
+def ro2om(rod):
+    return qu2om(ro2qu(rod))
+
+def qu2eu(q):
+    q_03 = q[0] ** 2 + q[3] ** 2
+    q_12 = q[1] ** 2 + q[2] ** 2
+    chi = np.sqrt(q_03 * q_12)
+    if chi < epsilon:
+        if q_03 < epsilon:
+            euler = np.array([np.arctan2(-2 * P * q[0] * q[3], q[0] ** 2 - q[3] ** 2), 0., 0.])
+        else:
+            euler = np.array([np.arctan2(2 * q[1] * q[2], q[1] ** 2 - q[2] ** 2), np.pi, 0.])
+    else:
+        euler = np.array([
+            np.arctan2((q[1] * q[3] - P * q[0] * q[2]) / chi, (- P * q[0] * q[1] - q[2] * q[3]) / chi),
+            np.arctan2(2 * chi, q_03 - q_12),
+            np.arctan2((P * q[0] * q[2] + q[1] * q[3]) / chi, (q[2] * q[3] - P * q[0] * q[1]) / chi)
+        ])
+    return euler
+
+def qu2ax(q):
+    # start by computing the rotation angle
+    omega = 2 * np.arccos(q[0])
+    if omega < epsilon:
+        return np.array([0., 0., 1., 0.])
+    elif abs(q[0] < epsilon):
+        return np.array([q[1], q[2], q[3], np.pi])
+    else:
+        s = np.sign(q[0]) / np.sqrt(q[1] ** 2 + q[2] ** 2 + q[3] ** 2)
+        return np.array([s * q[1], s * q[2], s * q[3], omega])
+
+def qu2ro(q):
+    return ax2ro(qu2ax(q))
 
 def qu2om(q):
-    (q0, q1, q2, q3) = q
-    qbar = q0 ** 2 - q1 ** 2 - q2 ** 2 - q3 ** 2
-    g = np.array([[qbar + 2 * q1 ** 2,
-                   2 * (q1 * q2 - P * q0 * q3),
-                   2 * (q1 * q3 + P * q0 * q2)],
-                  [2 * (q1 * q2 + P * q0 * q3),
-                   qbar + 2 * q2 ** 2,
-                   2 * (q2 * q3 - P * q0 * q1)],
-                  [2 * (q1 * q3 - P * q0 * q2),
-                   2 * (q2 * q3 + P * q0 * q1),
-                   qbar + 2 * q3 ** 2]])
+    qbar = q[0] ** 2 - q[1] ** 2 - q[2] ** 2 - q[3] ** 2
+    g = np.array([[qbar + 2 * q[1] ** 2,
+                   2 * (q[1] * q[2] - P * q[0] * q[3]),
+                   2 * (q[1] * q[3] + P * q[0] * q[2])],
+                  [2 * (q[1] * q[2] + P * q[0] * q[3]),
+                   qbar + 2 * q[2] ** 2,
+                   2 * (q[2] * q[3] - P * q[0] * q[1])],
+                  [2 * (q[1] * q[3] - P * q[0] * q[2]),
+                   2 * (q[2] * q[3] + P * q[0] * q[1]),
+                   qbar + 2 * q[3] ** 2]])
     return g

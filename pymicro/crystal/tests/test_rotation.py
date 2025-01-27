@@ -91,7 +91,7 @@ class RotationTests(unittest.TestCase):
     def test_eu2om_array_vectorized(self):
         """Test eu2om with multiple Euler angle sets (shape (n, 3))."""
         np.random.seed(0)  # for reproducible tests
-        n = 10
+        n = 100
         eulers = np.random.rand(n, 3) * np.pi  # 10 random rows, each is [phi1, Phi, phi2]
         om_array = eu2om(eulers)  # should be (10, 3, 3)
 
@@ -109,3 +109,49 @@ class RotationTests(unittest.TestCase):
         euler_back_0 = om2eu(om_array[0])
         self.assertAlmostEqual(self.euler_dist(eulers[0], euler_back_0), 0.,
                                 msg="Round-trip conversion with euler[0] failed.")
+
+
+    def test_eu2qu_single_vectorized(self):
+        """Test eu2qu with a single Euler angle set (shape (3,))."""
+        # Example single Euler set (radians)
+        euler_single = np.array([0.1, 0.2, 0.3])
+        qu_single = eu2qu(euler_single)  # should be shape (4,)
+
+        # Check shape
+        self.assertEqual(qu_single.shape, (4,),
+                        msg="eu2qu(single) should return shape (4,).")
+
+        # Scalar part should be non-negative
+        self.assertGreaterEqual(qu_single[0], 0.,
+                                msg="Scalar part of quaternion should be >= 0.")
+        
+        # Check quaternion norm is 1
+        self.assertAlmostEqual(np.linalg.norm(qu_single), 1.0,
+                             msg="Quaternion should have unit norm.")
+
+
+    def test_eu2qu_array_vectorized(self):
+        """Test eu2qu with multiple Euler angle sets (shape (n, 3))."""
+        np.random.seed(0)  # for reproducible tests
+        n = 100
+        eulers = np.random.rand(n, 3) * np.pi  # 10 random rows
+        qu_array = eu2qu(eulers)  # should be (10, 4)
+
+        # Check shape
+        self.assertEqual(qu_array.shape, (n, 4),
+                        msg="eu2qu(array) should return shape (n,4).")
+
+        # Check scalar part non-negative
+        self.assertTrue(np.all(qu_array[:, 0] >= 0),
+                        msg="Scalar part of each quaternion should be >= 0.")
+        
+        # Check all quaternions have unit norm
+        norms = np.linalg.norm(qu_array, axis=1)
+        self.assertTrue(np.allclose(norms, 1.0),
+                        msg="All quaternions should have unit norm.")
+
+        # Compare row-by-row: eu2qu(eulers[i]) vs qu_array[i]
+        for i in range(n):
+            qu_single = eu2qu(eulers[i])  # shape (4,)
+            self.assertTrue(np.allclose(qu_array[i], qu_single),
+                            msg=f"Row {i} of eu2qu(array) differs from eu2qu(single).")

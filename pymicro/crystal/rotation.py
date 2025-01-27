@@ -4,18 +4,107 @@ epsilon = np.finfo('float').eps
 P = -1  # passive convention
 
 
+import numpy as np
+
 def om2eu(g):
     """
-    Compute the Euler angles from the orientation matrix.
+    Compute the Euler angles from the orientation matrix (or matrices).
 
-    This conversion follows the paper of Rowenhorst et al. :cite:`Rowenhorst2015`.
-    In particular when :math:`g_{33} = 1` within the machine precision,
-    there is no way to determine the values of :math:`\phi_1` and :math:`\phi_2`
-    (only their sum is defined). The convention is to attribute
-    the entire angle to :math:`\phi_1` and set :math:`\phi_2` to zero.
+    Parameters
+    ----------
+    g : array_like
+        Either a single orientation matrix of shape (3, 3) or
+        an array of shape (n, 3, 3).
 
-    :param g: The 3x3 orientation matrix
-    :return: The 3 euler angles in radians.
+    Returns
+    -------
+    eulers : np.ndarray
+        If input is (3, 3), returns an array of shape (3,).
+        If input is (n, 3, 3), returns an array of shape (n, 3).
+
+    Notes
+    -----
+    The logic follows the paper of Rowenhorst et al. (2015). When g[2,2] ≈ 1
+    (within machine precision), the angle :math:`\\Phi` is set to 0 (or :math:`\\pi`),
+    and :math:`\\phi_2` is set to 0, with all the rotation mapped into :math:`\\phi_1`.
+    """
+    g = np.asarray(g, dtype=float)
+
+    # Determine if input is single (3,3) or multiple (n,3,3)
+    if g.ndim == 2:
+        # Single orientation matrix => reshape to (1,3,3) for vectorization
+        single_input = True
+        g = g[np.newaxis, ...]
+    elif g.ndim == 3:
+        single_input = False
+    else:
+        raise ValueError("Input must be shape (3,3) or (n,3,3).")
+
+    n = g.shape[0]  # Number of matrices
+
+    eps = np.finfo(float).eps
+    # Extract g[2,2] for each matrix
+    g22 = g[:, 2, 2]
+
+    # Arrays for the Euler angles
+    phi1 = np.zeros(n, dtype=float)
+    Phi  = np.zeros(n, dtype=float)
+    phi2 = np.zeros(n, dtype=float)
+
+    # Identify special-case indices where |g22| = 1 within machine precision
+    # i.e. top/bottom of the sphere
+    special_mask = (np.abs(g22) >= 1.0 - eps)
+
+    # Submasks for g22 > 0 (near +1) vs g22 < 0 (near -1)
+    pos_mask = special_mask & (g22 > 0)
+    neg_mask = special_mask & (g22 < 0)
+
+    # == Handle the special cases: g22 ≈ +1 ==
+    # phi1 = atan2(g[0,1], g[0,0]), Phi = 0, phi2 = 0
+    phi1[pos_mask] = np.arctan2(g[pos_mask, 0, 1], g[pos_mask, 0, 0])
+    # (No need to set Phi or phi2; they stay 0)
+
+    # == Handle the special cases: g22 ≈ -1 ==
+    # phi1 = -atan2(-g[0,1], g[0,0]), Phi = π, phi2 = 0
+    phi1[neg_mask] = -np.arctan2(-g[neg_mask, 0, 1], g[neg_mask, 0, 0])
+    Phi[neg_mask] = np.pi
+    # (phi2 remains 0)
+
+    # == Handle the "regular" case: |g22| < 1 ==
+    reg_mask = ~special_mask
+
+    # Phi = arccos(g22)
+    Phi[reg_mask] = np.arccos(g22[reg_mask])
+
+    # zeta = 1 / sqrt(1 - g22^2)
+    zeta = np.zeros(n, dtype=float)
+    zeta[reg_mask] = 1.0 / np.sqrt(1.0 - g22[reg_mask] ** 2)
+
+    # phi1 = atan2(g[2,0]*zeta, -g[2,1]*zeta)
+    phi1[reg_mask] = np.arctan2(g[reg_mask, 2, 0] * zeta[reg_mask],
+                                -g[reg_mask, 2, 1] * zeta[reg_mask])
+
+    # phi2 = atan2(g[0,2]*zeta, g[1,2]*zeta)
+    phi2[reg_mask] = np.arctan2(g[reg_mask, 0, 2] * zeta[reg_mask],
+                                g[reg_mask, 1, 2] * zeta[reg_mask])
+
+    # Ensure angles are in range [0, 2*pi)
+    phi1 %= 2.0 * np.pi
+    Phi  %= 2.0 * np.pi
+    phi2 %= 2.0 * np.pi
+
+    # Stack into a single array of shape (n,3)
+    eulers = np.column_stack([phi1, Phi, phi2])
+
+    # If single input => return shape (3,)
+    if single_input:
+        return eulers[0]
+    return eulers
+
+def om2eu_OLD(g):
+    """
+    Legacy om2eu before vectorization.
+    Kept to compare with the new implementation.
     """
     eps = np.finfo('float').eps
     (phi1, Phi, phi2) = (0.0, 0.0, 0.0)

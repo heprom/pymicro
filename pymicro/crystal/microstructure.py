@@ -4096,8 +4096,14 @@ class Microstructure(SampleData):
         return False
         
     def change_reference_frame(self, new_x, new_y, cell_data='CellData', in_place=True, suffix='_XYZ'):
-        """Change teh local reference frame of this Microstructure instance.
+        """Change the local reference frame of this Microstructure instance.
 
+        This method takes care of rotating all the cell data arrays and the mean grain orientations.
+
+        .. note::
+
+          The method can only handle rotations of 90 degrees at the moment.
+          
         Args:
             new_x (_type_): _description_
             new_y (_type_): _description_

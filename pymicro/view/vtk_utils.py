@@ -2127,8 +2127,12 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
             if (vtk.vtkVersion().GetVTKMajorVersion() > 6) | \
                     (vtk.vtkVersion().GetVTKMajorVersion() == 6 and
                      vtk.vtkVersion().GetVTKMinorVersion() > 2):
+                if data.ndim == 4:
+                    data_visibility = np.min(data, axis=3)
+                else:
+                    data_visibility = data
                 ids_to_blank = np.squeeze(np.argwhere(
-                    data.transpose(2, 1, 0).flatten() == 0))
+                    data_visibility.transpose(2, 1, 0).flatten() == 0))
                 [grid.BlankCell(i) for i in ids_to_blank]
             else:
                 visible = numpy_support.numpy_to_vtk(np.ravel(
@@ -2140,10 +2144,11 @@ def show_array(data, map_scalars=False, lut=None, hide_zero_values=True):
     return show_mesh(extract.GetOutput(), map_scalars, lut)
 
 
-def show_mesh(grid, map_scalars=False, lut=None, show_edges=False, edge_color=(0., 0., 0.), edge_line_width=1.0):
+def show_mesh(grid, show_scalar=True, map_scalars=False, lut=None, show_edges=False, edge_color=(0., 0., 0.), edge_line_width=1.0):
     """Create a 3d actor representing a mesh.
 
     :param grid: the vtkUnstructuredGrid object.
+    :param bool show_scalars: turn on or off the projection of scalar data in the mesh (True by default).
     :param bool map_scalars: map the scalar in the data array to the created surface (False by default).
     :param lut: a vtk lookup table (colormap) used to map the scalars.
     :param bool show_edges: display the mesh edges (False by default).
@@ -2153,15 +2158,22 @@ def show_mesh(grid, map_scalars=False, lut=None, show_edges=False, edge_color=(0
     """
     mapper = vtk.vtkDataSetMapper()
     mapper.ScalarVisibilityOff()
-    if map_scalars:
+    if show_scalar:
         mapper.ScalarVisibilityOn()
-        mapper.UseLookupTableScalarRangeOn()
         mapper.SetScalarModeToUseCellData()
-        mapper.SetColorModeToMapScalars()
-        if not lut:
-            # default to the usual gray colormap
-            lut = gray_cmap()
-        mapper.SetLookupTable(lut)
+        if map_scalars:
+            mapper.UseLookupTableScalarRangeOn()
+            mapper.SetColorModeToMapScalars()
+            if not lut:
+                # default to the usual gray colormap
+                lut = gray_cmap()
+            mapper.SetLookupTable(lut)
+        else:
+            mapper.SetColorModeToDirectScalars()
+            #mapper.UseLookupTableScalarRangeOff()
+            #mapper.InterpolateScalarsBeforeMappingOff()
+            #mapper.SelectColorArray(0)
+            
     if vtk.vtkVersion().GetVTKMajorVersion() > 5:
         mapper.SetInputData(grid)
     else:

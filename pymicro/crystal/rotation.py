@@ -181,9 +181,12 @@ def ro2ax(rod):
     :returns: A tuple in the (axis, angle) form.
     """
     r = np.linalg.norm(rod)
-    axis = rod / r
-    angle = 2 * np.arctan(r)
-    return np.array([*axis, angle])
+    if r < epsilon:
+        return np.array([0., 0., 1., 0.])
+    else:
+        axis = rod / r
+        angle = 2 * np.arctan(r)
+        return np.array([*axis, angle])
 
 
 def ro2qu(rod):

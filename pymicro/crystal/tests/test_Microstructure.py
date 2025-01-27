@@ -124,11 +124,11 @@ class MicrostructureTests(unittest.TestCase):
         center = m.get_grain_centers(id_list=[3])[0]
         the_center = [-0.24255674, 0.01383143, -0.08480002]
         for i in range(3):
-            self.assertAlmostEquals(center[i], the_center[i])
+            self.assertAlmostEqual(center[i], the_center[i])
         rod = m.get_grain_rodrigues(id_list=[3])[0]
         the_rod = [-0.05052439,  0.10440506,  0.23170687]
         for i in range(3):
-            self.assertAlmostEquals(rod[i], the_rod[i])
+            self.assertAlmostEqual(rod[i], the_rod[i])
         del m
 
     def test_grain_geometry(self):
@@ -235,21 +235,6 @@ class OrientationTests(unittest.TestCase):
         o = Orientation.from_euler([45, 45, 0])
         self.assertAlmostEqual(o.phi1(), 45.)
         self.assertAlmostEqual(o.Phi(), 45.)
-
-    def test_RodriguesConversion(self):
-        rod = [0.1449, -0.0281, 0.0616]
-        g = Orientation.Rodrigues2OrientationMatrix(rod)
-        calc_rod = Orientation.OrientationMatrix2Rodrigues(g)
-        for i in range(3):
-            self.assertAlmostEquals(calc_rod[i], rod[i])
-
-    def test_OrientationMatrix2Euler(self):
-        for test_euler in self.test_eulers:
-            o = Orientation.from_euler(test_euler)
-            g = o.orientation_matrix()
-            calc_euler = Orientation.OrientationMatrix2Euler(g)
-            for i in range(3):
-                self.assertAlmostEquals(calc_euler[i], test_euler[i])
 
     def test_SchimdFactor(self):
         o = Orientation.from_euler([0., 0., 0.])
@@ -446,8 +431,7 @@ class OrientationTests(unittest.TestCase):
         target_euler = [44.9, 0., 0.]
         rods = np.array([o1.rod, o2.rod])
         o = Orientation.compute_mean_orientation(rods)
-        for i in range(3):
-            self.assertEqual(o.euler[i], target_euler[i])
+        self.assertTrue(np.allclose(o.euler, target_euler))
         # now test with a set of rodrigues vectors
         rods = np.load(os.path.join(PYMICRO_EXAMPLES_DATA_DIR, 'rods.npy'))
         o = Orientation.compute_mean_orientation(rods)

@@ -143,8 +143,68 @@ def eu2om(euler):
 
     return g
 
+import numpy as np
 
 def eu2qu(euler):
+    """
+    Compute the quaternion(s) from the Euler angle(s) (in radians).
+    
+    If input is (3,), returns (4,).
+    If input is (n,3), returns (n,4).
+
+    The scalar part of the quaternion is made positive if it is negative.
+
+    Parameters
+    ----------
+    euler : array-like
+        Either a single set of Euler angles [phi1, Phi, phi2] in radians,
+        or an (n,3) array of n such sets.
+
+    Returns
+    -------
+    q : numpy.ndarray
+        A single quaternion (4,) or an array of quaternions (n,4).
+    """
+    # Convert to NumPy array and handle shape
+    euler = np.asarray(euler)
+    if euler.ndim == 1:
+        # reshape to (1,3) for uniform vectorized math
+        euler = euler[np.newaxis, :]
+        single_input = True
+    elif euler.ndim == 2:
+        single_input = False
+    else:
+        raise ValueError("Input must be shape (3,) or (n,3).")
+
+    phi1 = euler[:, 0]
+    Phi  = euler[:, 1]
+    phi2 = euler[:, 2]
+
+    # Compute half-angles (all are shape (n,))
+    half_phi1_plus_phi2 = 0.5 * (phi1 + phi2)
+    half_phi1_minus_phi2 = 0.5 * (phi1 - phi2)
+    half_Phi = 0.5 * Phi
+
+    # Compute quaternion components
+    q0 = np.cos(half_phi1_plus_phi2) * np.cos(half_Phi)
+    q1 = np.cos(half_phi1_minus_phi2) * np.sin(half_Phi)
+    q2 = np.sin(half_phi1_minus_phi2) * np.sin(half_Phi)
+    q3 = np.sin(half_phi1_plus_phi2)  * np.cos(half_Phi)
+
+    # Stack them into (n,4)
+    q = np.stack([q0, q1, q2, q3], axis=1)
+
+    # Ensure scalar part (q0) is positive
+    negative_scalar_mask = q[:, 0] < 0
+    q[negative_scalar_mask] *= -1
+
+    # If the original input was just a single set of Euler angles, return shape (4,)
+    if single_input:
+        return q[0]
+    return q
+
+
+def eu2qu_OLD(euler):
     """Compute the quaternion from the 3 euler angles (in radians).
 
     :param tuple euler: the 3 euler angles in radians.

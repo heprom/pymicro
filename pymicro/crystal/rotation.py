@@ -204,7 +204,7 @@ def ro2om(rod):
 def qu2eu(q):
     q_03 = q[0] ** 2 + q[3] ** 2
     q_12 = q[1] ** 2 + q[2] ** 2
-    chi = np.sqrt(q03 * q12)
+    chi = np.sqrt(q_03 * q_12)
     if chi < epsilon:
         if q_03 < epsilon:
             euler = np.array([np.arctan2(-2 * P * q[0] * q[3], q[0] ** 2 - q[3] ** 2), 0., 0.])
@@ -217,6 +217,20 @@ def qu2eu(q):
             np.arctan2((P * q[0] * q[2] + q[1] * q[3]) / chi, (q[2] * q[3] - P * q[0] * q[1]) / chi)
         ])
     return euler
+
+def qu2ax(q):
+    # start by computing the rotation angle
+    omega = 2 * np.arccos(q[0])
+    if omega < epsilon:
+        return np.array([0., 0., 1., 0.])
+    elif abs(q[0] < epsilon):
+        return np.array([q[1], q[2], q[3], np.pi])
+    else:
+        s = np.sign(q[0]) / np.sqrt(q[1] ** 2 + q[2] ** 2 + q[3] ** 2)
+        return np.array([s * q[1], s * q[2], s * q[3], omega])
+
+def qu2ro(q):
+    return ax2ro(qu2ax(q))
 
 def qu2om(q):
     (q0, q1, q2, q3) = q

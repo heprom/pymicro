@@ -113,6 +113,7 @@ def eu2qu(euler):
     q1 = np.cos(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
     q2 = np.sin(0.5 * (phi1 - phi2)) * np.sin(0.5 * Phi)
     q3 = np.sin(0.5 * (phi1 + phi2)) * np.cos(0.5 * Phi)
+    from pymicro.crystal.quaternion import Quaternion
     q = Quaternion(np.array([q0, -P * q1, -P * q2, -P * q3]), convention=P)
     if q0 < 0:
         # the scalar part must be positive
@@ -194,6 +195,28 @@ def ro2ax(rod):
 def ro2qu(rod):
     return ax2qu(ro2ax(rod))
 
+def ro2eu(rod):
+    return qu2eu(ro2qu(rod))
+
+def ro2om(rod):
+    return qu2om(ro2qu(rod))
+
+def qu2eu(q):
+    q_03 = q[0] ** 2 + q[3] ** 2
+    q_12 = q[1] ** 2 + q[2] ** 2
+    chi = np.sqrt(q03 * q12)
+    if chi < epsilon:
+        if q_03 < epsilon:
+            euler = np.array([np.arctan2(-2 * P * q[0] * q[3], q[0] ** 2 - q[3] ** 2), 0., 0.])
+        else:
+            euler = np.array([np.arctan2(2 * q[1] * q[2], q[1] ** 2 - q[2] ** 2), np.pi, 0.])
+    else:
+        euler = np.array([
+            np.arctan2((q[1] * q[3] - P * q[0] * q[2]) / chi, (- P * q[0] * q[1] - q[2] * q[3]) / chi),
+            np.arctan2(2 * chi, q_03 - q_12),
+            np.arctan2((P * q[0] * q[2] + q[1] * q[3]) / chi, (q[2] * q[3] - P * q[0] * q[1]) / chi)
+        ])
+    return euler
 
 def qu2om(q):
     (q0, q1, q2, q3) = q

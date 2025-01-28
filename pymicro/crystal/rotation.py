@@ -3,9 +3,6 @@ import numpy as np
 epsilon = np.finfo('float').eps
 P = -1  # passive convention
 
-
-import numpy as np
-
 def om2eu(g):
     """
     Compute the Euler angles from the orientation matrix (or matrices).
@@ -151,9 +148,85 @@ def om2ax(om):
 def om2ro(om):
     return eu2ro(om2eu(om))
 
-
 def om2qu(om):
-    return ro2qu(om2ro(om))
+    """
+    Convert a rotation matrix or an array of rotation matrices to quaternions.
+    
+    Parameters
+    ----------
+    om : numpy.ndarray
+        A single rotation matrix of shape (3,3) or an array of shape (n,3,3).
+
+    Returns
+    -------
+    q : numpy.ndarray
+        The resulting quaternion(s). Shape (4,) for a single input or (n,4) for multiple inputs.
+    
+    Notes
+    -----
+    The logic follows the paper of Rowenhorst et al. (2015) (A.7.)
+    """
+
+    # Ensure om is a NumPy array
+    om = np.asarray(om, dtype=float)
+    original_shape_was_single = False
+    
+    # Reshape input to (n,3,3) if a single matrix
+    if om.ndim == 2:
+        if om.shape == (3, 3):
+            om = om[np.newaxis, ...]  # shape becomes (1,3,3)
+            original_shape_was_single = True
+        else:
+            raise ValueError("Rotation matrix must be (3,3) or (n,3,3).")
+    elif om.ndim != 3 or om.shape[1:] != (3, 3):
+        raise ValueError("Rotation matrix must be (3,3) or (n,3,3).")
+
+    # Extract the a_ij
+    a11 = om[:, 0, 0]
+    a22 = om[:, 1, 1]
+    a33 = om[:, 2, 2]
+
+    a23 = om[:, 1, 2]
+    a32 = om[:, 2, 1]
+
+    a13 = om[:, 0, 2]
+    a31 = om[:, 2, 0]
+
+    a12 = om[:, 0, 1]
+    a21 = om[:, 1, 0]
+
+    # Compute each quaternion component
+    # Use np.clip to avoid negative values due to small floating errors
+    eps = 1e-14  # a tiny value to keep sqrt arguments non-negative
+
+    q0 = 0.5 * np.sqrt(np.clip(1.0 + a11 + a22 + a33, 0.0, None))
+    q1 = 0.5 * P * np.sqrt(np.clip(1.0 + a11 - a22 - a33, 0.0, None))
+    q2 = 0.5 * P * np.sqrt(np.clip(1.0 - a11 + a22 - a33, 0.0, None))
+    q3 = 0.5 * P * np.sqrt(np.clip(1.0 - a11 - a22 + a33, 0.0, None))
+
+    # Apply sign modifications
+    # q1 = -q1 if a32 < a23
+    sign_mask_1 = a32 < a23
+    q1 = np.where(sign_mask_1, -q1, q1)
+
+    # q2 = -q2 if a13 < a31
+    sign_mask_2 = a13 < a31
+    q2 = np.where(sign_mask_2, -q2, q2)
+
+    # q3 = -q3 if a21 < a12
+    sign_mask_3 = a21 < a12
+    q3 = np.where(sign_mask_3, -q3, q3)
+
+    q = np.stack((q0, q1, q2, q3), axis=-1)
+
+    # Normalize each quaternion
+    norms = np.linalg.norm(q, axis=1, keepdims=True)
+    q /= norms
+
+    # If the original input was a single 3x3 matrix, return a single (4,) quaternion
+    if original_shape_was_single:
+        return q[0]
+    return q
 
 
 def eu2ro(euler):
@@ -231,8 +304,6 @@ def eu2om(euler):
         g = g[0]
 
     return g
-
-import numpy as np
 
 def eu2qu(euler):
     """

@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from math import cos, sin
 from pymicro.crystal.microstructure import Orientation
-
+from pymicro.crystal.rotation import eu2qu
 
 class QuaternionTests(unittest.TestCase):
 
@@ -13,7 +13,7 @@ class QuaternionTests(unittest.TestCase):
     def test_Euler2Quaternion(self):
         euler_rad = np.radians(self.euler_deg)
         # compute quaternion using the passive convention
-        q = Orientation.Euler2Quaternion(self.euler_deg, P=-1)
+        q = eu2qu(euler_rad)
 
         euler = 0.5 * euler_rad
         c1 = cos(euler[0])
@@ -26,7 +26,7 @@ class QuaternionTests(unittest.TestCase):
         q1 = c1 * s2 * c3 + s1 * s2 * s3
         q2 = -c1 * s2 * s3 + s1 * s2 * c3
         q3 = c1 * c2 * s3 + s1 * c2 * c3
-        self.assertAlmostEqual(q.q0, q0)
-        self.assertAlmostEqual(q.q1, q1)
-        self.assertAlmostEqual(q.q2, q2)
-        self.assertAlmostEqual(q.q3, q3)
+        self.assertAlmostEqual(q[0], q0)
+        self.assertAlmostEqual(q[1], q1)
+        self.assertAlmostEqual(q[2], q2)
+        self.assertAlmostEqual(q[3], q3)

@@ -16,5 +16,5 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(len(rag.nodes), m.get_number_of_grains())
         e = rag.edges[15, 26]  # pick two neighboring grains
         self.assertTrue('misorientation' in e)
-        self.assertAlmostEqual(e['misorientation'], 43.9954034, 6)
+        self.assertAlmostEqual(e['misorientation'], 43.995404, 6)
 

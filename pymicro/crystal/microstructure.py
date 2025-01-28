@@ -20,7 +20,7 @@ from pathlib import Path
 from scipy import ndimage
 from matplotlib import pyplot as plt, colors
 from pymicro.crystal.lattice import Lattice, Symmetry, CrystallinePhase, Crystal
-from pymicro.crystal.rotation import om2eu, om2ro, ro2qu, eu2ro, qu2om
+from pymicro.crystal.rotation import om2eu, om2ro, ro2qu, eu2ro, eu2om, qu2om, ro2om
 from pymicro.core.samples import SampleData
 import tables
 from math import atan2, pi
@@ -54,7 +54,7 @@ class Orientation:
         """Initialization from the 9 components of the orientation matrix."""
         g = np.array(matrix, dtype=np.float64).reshape((3, 3))
         self._matrix = g
-        self.euler = om2eu(g)
+        self.euler = np.degrees(om2eu(g))  # unit is degrees
         self.rod = om2ro(g)
         self.quat = ro2qu(self.rod)
 
@@ -845,7 +845,7 @@ class Orientation:
 
     @staticmethod
     def from_euler(euler, convention='Bunge'):
-        """Rotation matrix from Euler angles.
+        """Rotation matrix from Euler angles, in degrees.
 
         This is the classical method to obtain an orientation matrix by 3
         successive rotations. The result depends on the convention used
@@ -858,7 +858,7 @@ class Orientation:
             (phi1, phi, phi2) = (euler[0] + 90, euler[1], euler[2] - 90)
         else:
             (phi1, phi, phi2) = euler
-        o = Orientation(eu2om([phi1, phi, phi2]))
+        o = Orientation(eu2om(np.radians([phi1, phi, phi2])))
         return o
 
     @staticmethod

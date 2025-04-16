@@ -633,7 +633,7 @@ class SampleDataTests(unittest.TestCase):
         self.assertTrue(sample.__contains__('Tmsh'))
         field1 = sample.get_field('test_field')
         self.assertEqual(field1.shape, tuple(dimensions))
-        field2 = sample.get_field('Tmsh_test_field_Tetra_mesh')
-        self.assertEqual(field2.shape, (11 * 11 * 11,))
+        field2 = sample.get_field('test_field_Tetra_mesh')
+        self.assertEqual(field2.shape, np.prod(dimensions))
         self.assertEqual(field1.ravel()[37], field2.ravel()[37])
         del sample

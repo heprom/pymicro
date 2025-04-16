@@ -31,7 +31,7 @@ jobs:
           pytest --junitxml=tesdata/pymicro${{ matrix.python-version }}.xml
 
       - name: Upload test results
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: tesdata/pymicro${{ matrix.python-version }}.xml

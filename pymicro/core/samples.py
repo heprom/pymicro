@@ -1176,9 +1176,7 @@ class SampleData:
                                                          dimensionality, array)
         # get indexname or create one
         if indexname is None:
-            grid_path = self._name_or_node_to_path(gridname)
-            grid_indexname = self.get_indexname_from_path(grid_path)
-            indexname = grid_indexname+'_'+fieldname
+            indexname = fieldname
         # If time value is provided, add to grid and field
         time_gridname = None
         time_suffix = ''

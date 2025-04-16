@@ -3253,16 +3253,13 @@ class SampleData:
 
     def _remove_from_index(self, node_path):
         """Remove a hdf5 node from content index dictionary."""
-        try:
-            key = self.get_indexname_from_path(node_path)
-            removed_path = self.content_index.pop(key)
+        # get all indexnames to remove 
+        removed_names = [k for k, v in self.content_index.items() if v == node_path]
+        # pop indexnames from index
+        for key in removed_names:
+            popped_item = self.content_index.pop(key)
             if key in self.aliases:
-                self.aliases.pop(key)
-            self._verbose_print('item {} : {} removed from context index'
-                                ' dictionary'.format(key, removed_path))
-        except:
-            self._verbose_print('node {} not found in content index values for'
-                                'removal'.format(node_path))
+                popped_aliases = self.aliases.pop(key)
         return
 
     def _find_xdmf_grid(self, gridname, time=None):

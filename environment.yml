@@ -16,7 +16,7 @@ dependencies:
   - h5py
   - lxml
   - pytables
-  - basictools
+  - BasicToolsFrozen
   # Code quality
   - pylint
   - nose

@@ -1693,7 +1693,8 @@ class Grain:
             grid.GetCellData().SetScalars(vtk_data_array)
             # threshold selected grain
             thresh = vtk.vtkThreshold()
-            thresh.ThresholdBetween(0.5, 1.5)
+            #thresh.ThresholdBetween(0.5, 1.5)
+            thresh.SetLowerThreshold(0.5)
             # thresh.ThresholdBetween(label-0.5, label+0.5)
             if vtk.vtkVersion().GetVTKMajorVersion() > 5:
                 thresh.SetInputData(grid)
@@ -3667,6 +3668,9 @@ class Microstructure(SampleData):
                         imagename='CellData', location='/',
                         spacing=spacing, replace=True)
                 else:
+                    if micro_crop._is_in_index(field_name):
+                        # skip field in case a duplicate is present
+                        continue
                     micro_crop.add_field(gridname='CellData',
                                          fieldname=field_name,
                                          array=field_crop, replace=True)
@@ -3680,13 +3684,22 @@ class Microstructure(SampleData):
             print(micro_crop)
         micro_crop.set_active_grain_map(self.active_grain_map)
         grain_ids = np.unique(micro_crop.get_grain_map())
+        crop_ids = np.intersect1d(grain_ids, self.get_grain_ids())
+        crop_rods = self.get_grain_rodrigues(id_list=crop_ids.tolist())
+        micro_crop.add_grains(orientation_list=crop_rods, 
+                              orientation_type='rod', 
+                              grain_ids=crop_ids)
+        #NB: the append grain can beak things if the data table structure has changed
+        '''
         for gid in grain_ids:
             if not gid > 0:
                 continue
             grain = self.grains.read_where('idnumber == gid')
+            print(grain)
             micro_crop.grains.append(grain)
         print('%d grains in cropped microstructure' % micro_crop.grains.nrows)
         micro_crop.grains.flush()
+        '''
         # recompute the grain geometry
         if recompute_geometry:
             print('updating grain geometry')
@@ -4145,6 +4158,10 @@ class Microstructure(SampleData):
                                     name=self.get_sample_name() + suffix, 
                                     phase=self.get_phase_list(),
                                     autodelete=False, overwrite_hdf5=True)
+                grain_map_xyz = self.get_grain_map().transpose(swap_indices)
+                if len(flip_indices) > 0:
+                    grain_map_xyz = np.flip(grain_map_xyz, axis=flip_indices)
+                m2.set_grain_map(grain_map_xyz, voxel_size=self.get_voxel_size())
             else:
                 m2 = Microstructure.copy_sample(self.h5_path, file_xyz, overwrite=True, get_object=True, autodelete=False)
         else:
@@ -4155,20 +4172,21 @@ class Microstructure(SampleData):
         # if len(flip_indices) > 0:
         #     grain_map_xyz = np.flip(grain_map_xyz, axis=flip_indices)
         # m2.set_grain_map(grain_map_xyz, voxel_size=self.get_voxel_size())
-        print('old grain_map has shape', m2.get_grain_map().shape)
+        print('old grain_map has shape', self.get_grain_map().shape)
         # m2.sync_grain_table_with_grain_map(sync_geometry=True)
 
         # get names of all the fields in CellData
-        image_group = m2.get_node(cell_data)
+        image_group = self.get_node(cell_data)
         fields_to_rotate = []
         for child in image_group._v_children: 
-            if m2._is_field(child):
+            if self._is_field(child):
                 fields_to_rotate.append(child)
         # rotate all fields in CellData
+        print(fields_to_rotate)
         for fieldname in tqdm(fields_to_rotate, desc="rotating fields"):
-                field = m2.get_field(fieldname)
+                field = self.get_field(fieldname)
                 print(f"Rotating {fieldname}...")
-                if m2._get_group_type(cell_data) == '2DImage':
+                if self._get_group_type(cell_data) == '2DImage':
                     field = np.expand_dims(field, axis=2)
                 if field.ndim == 4:
                     field_xyz = field.transpose(swap_indices + (-1,))

@@ -577,27 +577,27 @@ class Orientation:
         plt.show()
 
     def compute_XG_angle(self, hkl, omega, verbose=False):
-        """Compute the angle between the scattering vector :math:`\mathbf{G_{l}}`
-        and :math:`\mathbf{-X}` the X-ray unit vector at a given angular position :math:`\\omega`.
+        """Compute the angle between the scattering vector :math:`\\mathbf{G_{l}}`
+        and :math:`\\mathbf{-X}` the X-ray unit vector at a given angular position :math:`\\omega`.
 
-        A given hkl plane defines the scattering vector :math:`\mathbf{G_{hkl}}` by
+        A given hkl plane defines the scattering vector :math:`\\mathbf{G_{hkl}}` by
         the miller indices in the reciprocal space. It is expressed in the
-        cartesian coordinate system by :math:`\mathbf{B}.\mathbf{G_{hkl}}` and in the
+        cartesian coordinate system by :math:`\\mathbf{B}.\\mathbf{G_{hkl}}` and in the
         laboratory coordinate system accounting for the crystal orientation
-        by :math:`\mathbf{g}^{-1}.\mathbf{B}.\mathbf{G_{hkl}}`.
+        by :math:`\\mathbf{g}^{-1}.\\mathbf{B}.\\mathbf{G_{hkl}}`.
 
         The crystal is assumed to be placed on a rotation stage around the
         laboratory vertical axis. The scattering vector can finally be
-        written as :math:`\mathbf{G_l}=\mathbf{\\Omega}.\mathbf{g}^{-1}.\mathbf{B}.\mathbf{G_{hkl}}`.
-        The X-rays unit vector is :math:`\mathbf{X}=[1, 0, 0]`. So the computed angle
-        is :math:`\\alpha=acos(-\mathbf{X}.\mathbf{G_l}/||\mathbf{G_l}||`
+        written as :math:`\\mathbf{G_l}=\\mathbf{\\Omega}.\\mathbf{g}^{-1}.\\mathbf{B}.\\mathbf{G_{hkl}}`.
+        The X-rays unit vector is :math:`\\mathbf{X}=[1, 0, 0]`. So the computed angle
+        is :math:`\\alpha=acos(-\\mathbf{X}.\\mathbf{G_l}/||\\mathbf{G_l}||)`
 
-        The Bragg condition is fulfilled when :math:`\\alpha=\pi/2-\\theta_{Bragg}`
+        The Bragg condition is fulfilled when :math:`\\alpha=\\pi/2-\\theta_{Bragg}`
 
         :param hkl: the hkl plane, an instance of :py:class:`~pymicro.crystal.lattice.HklPlane`
         :param omega: the angle of rotation of the crystal around the laboratory vertical axis.
         :param bool verbose: activate verbose mode (False by default).
-        :return float: the angle between :math:`-\mathbf{X}` and :math:`\mathbf{G_{l}}` in degrees.
+        :return float: the angle between :math:`-\\mathbf{X}` and :math:`\\mathbf{G_{l}}` in degrees.
         """
         X = np.array([1., 0., 0.])
         gt = self.orientation_matrix().transpose()
@@ -622,7 +622,7 @@ class Orientation:
 
         .. math::
 
-           A\cos\\theta + B\sin\\theta = C
+           A\\cos\\theta + B\\sin\\theta = C
 
         :param float A: the A constant in the equation.
         :param float B: the B constant in the equation.
@@ -642,7 +642,7 @@ class Orientation:
         """Compute the two omega angles which satisfy the Bragg condition.
 
         For a given crystal orientation sitting on a vertical rotation axis,
-        there is exactly two :math:`\omega` positions in :math:`[0, 2\pi]` for which
+        there is exactly two :math:`\\omega` positions in :math:`[0, 2\\pi]` for which
         a particular :math:`(hkl)` reflexion will fulfil Bragg's law.
 
         According to the Bragg's law, a crystallographic plane of a given
@@ -650,18 +650,18 @@ class Orientation:
 
         .. math::
 
-           \sin\\theta=-[\mathbf{\Omega}.\mathbf{g}^{-1}\mathbf{G_c}]_1
+           \\sin\\theta=-[\\mathbf{\\Omega}.\\mathbf{g}^{-1}\\mathbf{G_c}]_1
 
-        with :math:`\mathbf{\Omega}` the matrix associated with the rotation
+        with :math:`\\mathbf{\\Omega}` the matrix associated with the rotation
         axis:
 
         .. math::
 
-           \mathbf{\Omega}=\\begin{pmatrix}
-                           \cos\omega & -\sin\omega & 0 \\\\
-                           \sin\omega & \cos\omega  & 0 \\\\
+           \\mathbf{\\Omega}=\\begin{pmatrix}
+                           \\cos\\omega & -\\sin\\omega & 0 \\\\
+                           \\sin\\omega & \\cos\\omega  & 0 \\\\
                            0          & 0           & 1 \\\\
-                           \end{pmatrix}
+                           \\end{pmatrix}
 
         This method solves the associated second order equation to return
         the two corresponding omega angles.
@@ -669,7 +669,7 @@ class Orientation:
         :param hkl: The given cristallographic plane :py:class:`~pymicro.crystal.lattice.HklPlane`
         :param float lambda_keV: The X-rays energy expressed in keV
         :param bool verbose: Verbose mode (False by default)
-        :returns tuple: :math:`(\omega_1, \omega_2)` the two values of the \
+        :returns tuple: :math:`(\\omega_1, \\omega_2)` the two values of the \
         rotation angle around the vertical axis (in degrees).
         """
         (h, k, l) = hkl.miller_indices()
@@ -745,7 +745,7 @@ class Orientation:
 
         # add bragg condition
         plt.axhline(90 - theta, xmin=0, xmax=360, linewidth=2)
-        plt.annotate('$\pi/2-\\theta_{Bragg}$', xycoords='data', xy=(360, 90 - theta), horizontalalignment='left',
+        plt.annotate('$\\pi/2-\\theta_{Bragg}$', xycoords='data', xy=(360, 90 - theta), horizontalalignment='left',
                      verticalalignment='center', fontsize=16)
         # add omega solutions
         plt.axvline(w1 + 180, ymin=0, ymax=180, linewidth=2, linestyle='dashed', color='gray')
@@ -1270,23 +1270,23 @@ class Orientation:
 
     @staticmethod
     def Euler2OrientationMatrix(euler):
-        """Compute the orientation matrix :math:`\mathbf{g}` associated with
-        the 3 Euler angles :math:`(\phi_1, \Phi, \phi_2)`.
+        """Compute the orientation matrix :math:`\\mathbf{g}` associated with
+        the 3 Euler angles :math:`(\\phi_1, \\Phi, \\phi_2)`.
 
         The matrix is calculated via (see the `euler_angles` recipe in the
         cookbook for a detailed example):
 
         .. math::
 
-           \mathbf{g}=\\begin{pmatrix}
-           \cos\phi_1\cos\phi_2 - \sin\phi_1\sin\phi_2\cos\Phi &
-           \sin\phi_1\cos\phi_2 + \cos\phi_1\sin\phi_2\cos\Phi &
-           \sin\phi_2\sin\Phi \\\\
-           -\cos\phi_1\sin\phi_2 - \sin\phi_1\cos\phi_2\cos\Phi &
-           -\sin\phi_1\sin\phi_2 + \cos\phi_1\cos\phi_2\cos\Phi &
-           \cos\phi_2\sin\Phi \\\\
-           \sin\phi_1\sin\Phi & -\cos\phi_1\sin\Phi & \cos\Phi \\\\
-           \end{pmatrix}
+           \\mathbf{g}=\\begin{pmatrix}
+           \\cos\\phi_1\\cos\\phi_2 - \\sin\\phi_1\\sin\\phi_2\\cos\\Phi &
+           \\sin\\phi_1\\cos\\phi_2 + \\cos\\phi_1\\sin\\phi_2\\cos\\Phi &
+           \\sin\\phi_2\\sin\\Phi \\\\
+           -\\cos\\phi_1\\sin\\phi_2 - \\sin\\phi_1\\cos\\phi_2\\cos\\Phi &
+           -\\sin\\phi_1\\sin\\phi_2 + \\cos\\phi_1\\cos\\phi_2\\cos\\Phi &
+           \\cos\\phi_2\\sin\Phi \\\\
+           \\sin\\phi_1\\sin\Phi & -\\cos\\phi_1\\sin\\Phi & \\cos\\Phi \\\\
+           \\end{pmatrix}
 
         :param euler: The triplet of the Euler angles (in degrees).
         :return g: The 3x3 orientation matrix.
@@ -1464,7 +1464,7 @@ class Orientation:
 
         .. math::
 
-          M^s_{ij} = \left(l^s_i.n^s_j)
+          M^s_{ij} = \\left(l^s_i.n^s_j)
         """
         gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
@@ -1482,7 +1482,7 @@ class Orientation:
 
         .. math::
 
-          m^s_{ij} = \\frac{1}{2}\left(l^s_i.n^s_j + l^s_j.n^s_i)
+          m^s_{ij} = \\frac{1}{2}\\left(l^s_i.n^s_j + l^s_j.n^s_i)
         """
         gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
@@ -1501,7 +1501,7 @@ class Orientation:
 
         .. math::
 
-          q^s_{ij} = \\frac{1}{2}\left(l^s_i.n^s_j - l^s_j.n^s_i)
+          q^s_{ij} = \\frac{1}{2}\\left(l^s_i.n^s_j - l^s_j.n^s_i)
         """
         gt = self.orientation_matrix().transpose()
         plane = s.get_slip_plane()
@@ -3855,7 +3855,7 @@ class Microstructure(SampleData):
 
         .. math::
 
-          D_{eq} = \left(\dfrac{6V}{\pi}\right)^{1/3}
+          D_{eq} = \\left(\\dfrac{6V}{\\pi}\\right)^{1/3}
 
         :param list id_list: the list of the grain ids to include (compute
             for all grains by default).
@@ -3878,7 +3878,7 @@ class Microstructure(SampleData):
 
         .. math::
 
-          \psi = \dfrac{\pi^{1/3}(6V)^{2/3}}{A}
+          \\psi = \\dfrac{\\pi^{1/3}(6V)^{2/3}}{A}
 
         :param list id_list: the list of the grain ids to include (compute
             for all grains by default).
@@ -5086,7 +5086,8 @@ class Microstructure(SampleData):
 
     @staticmethod
     def from_labdct(labdct_file, data_dir='.', name=None, include_ipf_map=False,
-                    grain_map_key='GrainId', recompute_mean_orientation=False):
+                    grain_map_key='GrainId', recompute_mean_orientation=False,
+                    add_absorption_data=False):
         """Create a microstructure from a DCT reconstruction.
 
         :param str labdct_file: the name of the file containing the labDCT data.
@@ -5102,6 +5103,9 @@ class Microstructure(SampleData):
         :param bool recompute_mean_orientation: it True, the orientation of 
             each grain is computed from the rodrigues map (this may take a 
             long time).
+        :param bool add_absorption_data: if True, the absorption data will be
+            included in the microstructure fields with its own grid, origin 
+            and spatial resolution.
         :return: a `Microstructure` instance created from the labDCT
             reconstruction file.
         """
@@ -5111,38 +5115,45 @@ class Microstructure(SampleData):
             name, ext = os.path.splitext(labdct_file)
         # get the phase data
         with h5py.File(file_path, 'r') as f:
-            #TODO handle multiple phases
-            phase01 = f['PhaseInfo']['Phase01']
-            #phase_name = phase01['Name'][()].decode('utf-8')
-            phase_name = phase01['Name'][0].decode('utf-8')
-            parameters = phase01['UnitCell'][()]  # length unit is angstrom
-            a, b, c = parameters[:3] / 10  # use nm unit
-            alpha, beta, gamma = parameters[3:]
-            print(parameters)
-            space_group = phase01['SpaceGroup'][()]
-            sym = Symmetry.from_space_group(space_group)
-            print('found %s symmetry' % sym)
-            lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
-            phase = CrystallinePhase(phase_id=1, name=phase_name, lattice=lattice)
+            n_phases = len(f['PhaseInfo'])
+            phase_list = []
+            for i in range(n_phases):
+                phase = f['PhaseInfo']['Phase%02d' % (i + 1)]
+                #phase_name = phase01['Name'][()].decode('utf-8')
+                phase_name = phase['Name'][0].decode('utf-8')
+                parameters = phase['UnitCell'][()]  # length unit is angstrom
+                a, b, c = parameters[:3] / 10  # use nm unit
+                alpha, beta, gamma = parameters[3:]
+                space_group = phase['SpaceGroup'][()]
+                sym = Symmetry.from_space_group(space_group)
+                lattice = Lattice.from_parameters(a, b, c, alpha, beta, gamma, symmetry=sym)
+                phase = CrystallinePhase(phase_id=1, name=phase_name, lattice=lattice)
+                print(phase)
+                phase_list.append(phase)
+            print('found %d phases in the labDCT data' % n_phases)
+
         # create the microstructure with the phase infos
-        m = Microstructure(name=name, overwrite_hdf5=True, phase=phase)
+        m = Microstructure(name=name, overwrite_hdf5=True, phase=phase_list)
 
         # load LabDCT cell data
         with h5py.File(file_path, 'r') as f:
-            spacing = f['LabDCT']['Spacing'][0]
+            spacing_DCT = f['LabDCT']['Spacing'][()]
+            center_DCT = f['LabDCT/Center'][()]
             rodrigues_map = f['LabDCT']['Data']['Rodrigues'][()].transpose(2, 1, 0, 3)
             grain_map = f['LabDCT']['Data'][grain_map_key][()].transpose(2, 1, 0)
+            origin_DCT = center_DCT - 0.5 * spacing_DCT * np.array(grain_map.shape)
             print('adding cell data with shape {}'.format(grain_map.shape))
-            m.set_grain_map(grain_map, voxel_size=spacing)
+            m.set_grain_map(grain_map, voxel_size=spacing_DCT)
             mask = f['LabDCT']['Data']['Mask'][()].transpose(2, 1, 0)
-            m.set_mask(mask, voxel_size=spacing)
+            m.set_mask(mask)
             phase_map = f['LabDCT']['Data']['PhaseId'][()].transpose(2, 1, 0)
-            m.set_phase_map(phase_map, voxel_size=spacing)
+            m.set_phase_map(phase_map)
             m.set_orientation_map(rodrigues_map)
             if 'Completeness' in f['LabDCT/Data']:
                 completeness_map = f['LabDCT']['Data']['Completeness'][()].transpose(2, 1, 0)
                 m.add_field(gridname='CellData', fieldname='completeness_map',
                             array=completeness_map)
+            m.set_origin('CellData', origin_DCT)
 
         # analyze the grain map
         grain_ids_list = range(1, grain_map.max() + 1)  # ids are consecutive
@@ -5172,14 +5183,14 @@ class Microstructure(SampleData):
             grain_data_bin = (this_grain_map == gid).astype(np.uint8)
             local_com = ndimage.measurements.center_of_mass(grain_data_bin) + \
                         np.array([0.5, 0.5, 0.5])  # account for first voxel coordinates
-            com = spacing * (np.array(bb)[:, 0] + local_com - 0.5 * np.array(grain_map.shape))
+            com = spacing_DCT * (np.array(bb)[:, 0] + local_com - 0.5 * np.array(grain_map.shape))
 
             # create new grain in the data table
             grain['idnumber'] = gid
             grain['orientation'] = rod
             grain['bounding_box'] = bb
             grain['center'] = com
-            grain['volume'] = sizes[i] * spacing ** 3
+            grain['volume'] = sizes[i] * np.prod(spacing_DCT)
             grain.append()
         m.grains.flush()
 
@@ -5208,6 +5219,24 @@ class Microstructure(SampleData):
                             array=IPF100_map, 
                             compression_options=m.default_compression_options)
                 del IPF001_map, IPF010_map, IPF100_map
+
+        if add_absorption_data:
+            print('adding absorption data')
+            with h5py.File(file_path, 'r') as f:
+                if 'AbsorptionCT' in f.keys():
+                    spacing_ACT = f['AbsorptionCT/Spacing'][()]
+                    voxel_size_ACT = spacing_ACT[0]
+                    print('ACT voxel size', voxel_size_ACT)
+                    ACT_data = f['AbsorptionCT/Data'][()].transpose(2, 1, 0)
+                    center_ACT = f['AbsorptionCT/Center'][()]
+                    origin_ACT = center_ACT - 0.5 * voxel_size_ACT * np.array(ACT_data.shape)
+                    m.add_image_from_field(ACT_data, 'ACT', 'AbsorptionData', location='/', 
+                                origin=origin_ACT,
+                                spacing=spacing_ACT,
+                                compression_options=m.default_compression_options)
+                    del ACT_data
+                else:
+                    print('no absorption data found in the file')
         return m
 
     @staticmethod
@@ -5477,7 +5506,7 @@ class Microstructure(SampleData):
         else:
             print('using existing segmentation containing %d grains, size is ' % 
                   len(np.unique(grain_ids)), grain_ids.shape)
-        voxel_size = np.array([scan.xStep, scan.yStep])
+        voxel_size = 0.001 * np.array([scan.xStep, scan.yStep])  # use mm unit
         micro.set_grain_map(grain_ids, voxel_size)
         micro.set_phase_map(scan.phase)
         micro.set_mask(mask)

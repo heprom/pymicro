@@ -2771,7 +2771,7 @@ class Microstructure(SampleData):
         if not self._is_mesh(meshname) or self._is_empty(meshname):
             raise ValueError('mesh_name do not refer to a non empty mesh group')
         # create empty element vector field
-        n_elements = int(self.get_attribute('Number_of_elements', meshname))
+        n_elements = int(self.get_attribute('Number_of_elements', meshname)[0])
         mesh = self.get_node(meshname)
         el_tag_path = '%s/Geometry/ElementsTags' % mesh._v_pathname
         grain_id_field = np.zeros((n_elements, 1), dtype=int)
@@ -2779,10 +2779,13 @@ class Microstructure(SampleData):
         # if mesh is provided
         for i in range(len(grain_ids)):
             set_name = '%s%d' % (elset_prefix, grain_ids[i])
-            print('using elset name %s' % set_name)
+            if not self.__contains__(set_name):
+                self._verbose_print('elset %s not found in mesh %s, skipping grain id %d' %
+                      (set_name, meshname, grain_ids[i]))
+                continue
             elset_path = '%s/%s' % (el_tag_path, set_name)
             element_ids = self.get_node(elset_path, as_numpy=True).astype(int)
-            grain_id_field[element_ids == 1] = grain_ids[i]
+            grain_id_field[element_ids] = grain_ids[i]
         if store:
             self.add_field(gridname=meshname, fieldname='grain_ids',
                            array=grain_id_field, replace=True)
@@ -3683,18 +3686,23 @@ class Microstructure(SampleData):
             print('cropped dataset:')
             print(micro_crop)
         micro_crop.set_active_grain_map(self.active_grain_map)
-        if micro_crop.get_grain_map() is None:
-            print('Warning: empty grain map in croped microstructure.')
-            print('please verified your active grain map')
-            print('active grain map =', self.active_grain_map)
-            return None
-        # get the grain orientation from the crop volume
-        crop_ids = np.unique(micro_crop.get_grain_map())
-        rods = self.get_grain_rodrigues()
-        crop_rods = rods[np.isin(self.get_grain_ids(), crop_ids, assume_unique=True)]
+        grain_ids = np.unique(micro_crop.get_grain_map())
+        crop_ids = np.intersect1d(grain_ids, self.get_grain_ids())
+        crop_rods = self.get_grain_rodrigues(id_list=crop_ids.tolist())
         micro_crop.add_grains(orientation_list=crop_rods, 
                               orientation_type='rod', 
                               grain_ids=crop_ids)
+        #NB: the append grain can beak things if the data table structure has changed
+        '''
+        for gid in grain_ids:
+            if not gid > 0:
+                continue
+            grain = self.grains.read_where('idnumber == gid')
+            print(grain)
+            micro_crop.grains.append(grain)
+        print('%d grains in cropped microstructure' % micro_crop.grains.nrows)
+        micro_crop.grains.flush()
+        '''
         # recompute the grain geometry
         if recompute_geometry:
             print('updating grain geometry')

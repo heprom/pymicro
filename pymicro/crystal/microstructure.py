@@ -2943,8 +2943,8 @@ class Microstructure(SampleData):
         if lattice.get_symmetry() is Symmetry.hexagonal:
             grain_ids_array = numpy_support.numpy_to_vtk(np.repeat(grain_ids, 3))
             grain_sizes_array = numpy_support.numpy_to_vtk(np.repeat(grain_sizes, 3))
-        grain_ids_array.SetName('grain_ids')
-        grain_sizes_array.SetName('grain_sizes')
+        grain_ids_array.SetName('lattice_grain_ids')
+        grain_sizes_array.SetName('lattice_grain_sizes')
         grid.GetCellData().AddArray(grain_ids_array)
         grid.GetCellData().AddArray(grain_sizes_array)
 
